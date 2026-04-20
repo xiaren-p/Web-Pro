@@ -26,8 +26,7 @@
     "allowJs": true,
 
     // 类型声明相关配置
-    "types": ["node", "vite/client", "element-plus/global"],
-    "ignoreDeprecations": "6.0"
+    "types": ["node", "vite/client", "element-plus/global"]
   },
 
   "include": ["src/**/*.ts", "src/**/*.vue", "vite.config.ts", "eslint.config.ts"],

@@ -1,0 +1,64 @@
+.strategy-page {
+  min-height: calc(100vh - 84px);
+  background-color: #fff;
+  // margin: 16px;
+}
+
+.page-title-bar {
+  padding: 14px 20px;
+  border-bottom: 1px solid #eef1f6;
+  .title-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: #337ab7;
+  }
+}
+
+.filter-panel {
+  padding: 16px 20px 0;
+  border-bottom: 1px solid #f0f2f5;
+  .filter-form :deep(.el-form-item) {
+    margin-bottom: 16px;
+  }
+  .checkbox-item {
+    margin-right: 20px;
+  }
+}
+
+.action-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background-color: #f7f8fa;
+}
+
+.table-container {
+  padding: 0 20px;
+}
+:deep(.table-header-gray) {
+  font-weight: 600;
+  color: #333;
+  background-color: #f9fafc !important;
+}
+.question-icon {
+  margin-left: 4px;
+  vertical-align: -2px;
+  color: #999;
+  cursor: pointer;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+
+  .batch-actions {
+    display: flex;
+    align-items: center;
+    .chk-all {
+      margin-right: 16px;
+    }
+  }
+}

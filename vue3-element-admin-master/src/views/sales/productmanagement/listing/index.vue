@@ -177,8 +177,8 @@
             </el-option>
           </el-select>
         </el-form-item>
-        <!-- 归类 -->
-        <el-form-item label="归类" prop="categoryType">
+        <!-- 分类 -->
+        <el-form-item label="分类" prop="categoryType">
           <el-select
             v-model="queryParams.categoryType"
             placeholder="全部"
@@ -367,12 +367,12 @@
           </el-button>
           <el-button
             v-if="selectedRows.length > 0"
-            type="warning"
+            type="primary"
             class="mr-2"
             size="small"
-            @click="handleBatchClassOpen"
+            @click="handleBatchAssortOpen"
           >
-            批量设置归类
+            批量设置分类
           </el-button>
         </div>
         <div class="data-table__toolbar--right">
@@ -487,6 +487,30 @@
                 </el-tooltip>
               </div>
             </template>
+            <!-- 标签 -->
+            <template v-else-if="col.prop === 'label'">
+              <div style="display: flex; align-items: center; justify-content: space-between; overflow: hidden;">
+                <div 
+                  style="flex: 1; display: flex; flex-wrap: wrap; gap: 4px; margin-right: 4px;"
+                >
+                  <template v-if="getRowTags(scope.row).length > 0">
+                    <el-tag
+                      v-for="(tag, index) in getRowTags(scope.row)"
+                      :key="index"
+                      size="small"
+                      type="warning"
+                      style="border: none;"
+                    >
+                      {{ tag }}
+                    </el-tag>
+                  </template>
+                  <span v-else class="color-#E6A23C text-12px">-</span>
+                </div>
+                <el-icon style="cursor: pointer; color: #409EFF; flex-shrink: 0;" @click="handleEditTags(scope.row)">
+                  <Edit />
+                </el-icon>
+              </div>
+            </template>
             <!-- ASIN -->
             <template v-else-if="col.prop === 'asin'">
               <span @dblclick="handleCopy(scope.row.asin)">{{ scope.row.asin }}</span>
@@ -502,45 +526,6 @@
               <el-tag v-else-if="scope.row.status === 'off'" type="info">停售</el-tag>
               <el-tag v-else-if="scope.row.status === 'draft'" type="warning">草稿</el-tag>
               <el-tag v-else-if="scope.row.status === 'deleted'" type="danger">已删除</el-tag>
-            </template>
-
-            <!-- 节气标签 -->
-            <template v-else-if="col.prop === 'solarTermTags'">
-              <div
-                class="cursor-pointer"
-                style="
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  min-height: 24px;
-                "
-                @click="handleEditTags(scope.row)"
-              >
-                <template v-if="asinTagsMap[scope.row.asin]?.length">
-                  <el-tag
-                    size="small"
-                    effect="plain"
-                    style="
-                      max-width: 70px;
-                      overflow: hidden;
-                      text-overflow: ellipsis;
-                      white-space: nowrap;
-                    "
-                  >
-                    {{ asinTagsMap[scope.row.asin][0] }}
-                  </el-tag>
-                  <el-tag
-                    v-if="asinTagsMap[scope.row.asin].length > 1"
-                    size="small"
-                    type="info"
-                    effect="plain"
-                    class="ml-1"
-                  >
-                    +{{ asinTagsMap[scope.row.asin].length - 1 }}
-                  </el-tag>
-                </template>
-                <el-icon v-else class="text-gray-400"><Edit /></el-icon>
-              </div>
             </template>
 
             <!-- 标题 (特殊处理 showOverflowTooltip 参数) -->
@@ -588,7 +573,7 @@
             <!-- 小类排名 (特殊双列显示 + Tooltip) -->
             <template v-else-if="col.prop === 'smallRank'">
               <div
-                v-if="scope.row.smallRank && scope.row.smallRank.length > 0"
+                v-if="scope.row.smallRank && scope.row.smallRank.rank !== undefined"
                 style="
                   display: flex;
                   flex-direction: column;
@@ -597,19 +582,65 @@
                 "
               >
                 <span style="font-weight: bold">
-                  {{ scope.row.smallRank[0].rank }}
+                  {{ scope.row.smallRank.rank }}
                 </span>
                 <el-tooltip
-                  :content="scope.row.smallRank[0].category"
+                  :content="scope.row.smallRank.category || ''"
                   placement="top"
                   :show-after="500"
+                  :disabled="!scope.row.smallRank.category"
                 >
                   <span class="text-ellipsis" style="width: 100%">
-                    {{ scope.row.smallRank[0].category }}
+                    {{ scope.row.smallRank.category }}
                   </span>
                 </el-tooltip>
               </div>
               <span v-else>-</span>
+            </template>
+
+            <!-- 商品编码 (双行显示) -->
+            <template v-else-if="col.prop === 'productCode'">
+              <div style="display: flex; flex-direction: column; text-align: center; line-height: 1.3;">
+                <span>{{ scope.row.productCode.id }}</span>
+                <span v-if="scope.row.productCode.type" style="color: #909399; font-size: 11px;">
+                  {{ scope.row.productCode.type }}
+                </span>
+              </div>
+            </template>
+
+            <!-- 变体属性 -->
+            <template v-else-if="col.prop === 'variants'">
+              <template v-if="getVariants(scope.row.variants).length > 0">
+                <el-popover placement="bottom" :width="200" trigger="hover" :show-after="200" popper-style="padding: 0; min-width: unset;">
+                  <template #reference>
+                    <div style="cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--el-color-primary);">
+                      <span class="text-ellipsis" style="max-width: 120px; font-size: 13px;">
+                        [{{ getVariants(scope.row.variants).map((v: any) => v.attr_value).join(', ') }}]
+                      </span>
+                      <el-icon style="margin-left: 2px" size="12" color="var(--el-text-color-secondary)"><ArrowDown /></el-icon>
+                    </div>
+                  </template>
+                  <el-table
+                    :data="getVariants(scope.row.variants)"
+                    :show-header="false"
+                    border
+                    size="small"
+                    style="width: 100%"
+                  >
+                    <el-table-column prop="attr_name" width="80" align="center">
+                      <template #default="{ row }">
+                        <span style="color: var(--el-text-color-secondary)">{{ row.attr_name }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="attr_value" align="left">
+                      <template #default="{ row }">
+                        <span>{{ row.attr_value }}</span>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                </el-popover>
+              </template>
+              <div v-else style="text-align: center">-</div>
             </template>
 
             <!-- 评分 (复刻样式：星级+分数一行，总数下一行，靠右) -->
@@ -655,6 +686,27 @@
               </div>
             </template>
 
+            <!-- 备注 (可编辑) -->
+            <template v-else-if="col.prop === 'remarks'">
+              <div 
+                style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px;" 
+                @dblclick="handleEditRemark(scope.row)"
+                v-loading="scope.row.remarkLoading"
+              >
+                <el-tooltip :content="scope.row[col.prop] !== '--' ? scope.row[col.prop] : '双击编辑备注'" placement="top" :show-after="500">
+                  <div class="text-ellipsis" style="flex: 1; cursor: pointer; color: var(--el-text-color-primary);">
+                    {{ scope.row[col.prop] }}
+                  </div>
+                </el-tooltip>
+                <el-icon 
+                  style="cursor: pointer; margin-left: 4px; color: var(--el-color-primary);" 
+                  @click="handleEditRemark(scope.row)"
+                >
+                  <Edit />
+                </el-icon>
+              </div>
+            </template>
+
             <!-- 操作 -->
             <template v-else-if="col.prop === 'operation'">
               <el-button type="primary" text size="small" disabled>查看</el-button>
@@ -682,31 +734,20 @@
       </div>
     </el-card>
 
-    <!-- 列配置组件 -->
-    <ColumnManager
-      v-model="columnConfigVisible"
-      :columns="columns"
-      @save="handleConfigSave"
-      @reset="handleConfigReset"
-    />
-
-    <!-- 节气标签编辑弹窗 -->
     <el-dialog
       v-model="batchTagDialogVisible"
       title="批量设置节气标签"
       width="400px"
-      append-to-body
     >
-      <div>
-        <div style="margin-bottom: 15px; font-size: 14px; color: #909399">
+      <div style="border-top: 1px solid var(--el-border-color-lighter); border-bottom: 1px solid var(--el-border-color-lighter); padding: 20px 0; margin-top: -20px;">
+        <div style="margin-bottom: 20px; color: #606266; font-size: 14px;">
           输入标签后回车确认，可输入多个。
         </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; min-height: 40px;">
           <el-tag
             v-for="tag in batchTags"
             :key="tag"
             closable
-            :disable-transitions="false"
             @close="handleBatchRemoveTag(tag)"
           >
             {{ tag }}
@@ -715,16 +756,17 @@
             v-if="batchInputVisible"
             ref="batchInputRef"
             v-model="batchInput"
-            size="small"
             style="width: 100px"
             @keyup.enter="handleBatchInputConfirm"
             @blur="handleBatchInputConfirm"
           />
-          <el-button v-else size="small" @click="showBatchInput">+ New Tag</el-button>
+          <el-button v-else @click="showBatchInput">
+            + New Tag
+          </el-button>
         </div>
       </div>
       <template #footer>
-        <div style="display: flex; justify-content: space-between">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: -10px;">
           <div>
             <el-button @click="handleBatchClear">清空</el-button>
             <el-button @click="batchTagDialogVisible = false">返回</el-button>
@@ -737,27 +779,34 @@
       </template>
     </el-dialog>
 
-    <!-- 节气标签编辑弹窗 -->
-    <el-dialog v-model="tagDialogVisible" title="编辑节气标签" width="400px" append-to-body>
-      <div>
-        <div style="margin-bottom: 15px; font-size: 14px; color: #909399">
-          ASIN: {{ currentTagAsin }}
-        </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px">
-          <el-tag v-for="tag in currentTags" :key="tag" closable @close="handleRemoveTag(tag)">
-            {{ tag }}
-          </el-tag>
-          <el-input
-            v-if="inputVisible"
-            ref="inputRef"
-            v-model="newTagInput"
-            style="width: 100px"
-            size="small"
-            @keyup.enter="handleInputConfirm"
-            @blur="handleInputConfirm"
-          />
-          <el-button v-else size="small" @click="showInput">+ New Tag</el-button>
-        </div>
+    <!-- 编辑标签弹窗 -->
+    <el-dialog
+      v-model="tagDialogVisible"
+      title="编辑标签"
+      width="400px"
+    >
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;">
+        <el-tag
+          v-for="(tag, index) in currentTags"
+          :key="index"
+          closable
+          :disable-transitions="false"
+          @close="handleRemoveTag(tag)"
+        >
+          {{ tag }}
+        </el-tag>
+        <el-input
+          v-if="inputVisible"
+          ref="inputRef"
+          v-model="newTagInput"
+          style="width: 100px"
+          size="small"
+          @keyup.enter="handleInputConfirm"
+          @blur="handleInputConfirm"
+        />
+        <el-button v-else size="small" @click="showInput">
+          + 新标签
+        </el-button>
       </div>
       <template #footer>
         <span class="dialog-footer">
@@ -767,43 +816,55 @@
       </template>
     </el-dialog>
 
-    <!-- 批量归类弹窗 -->
-    <el-dialog v-model="batchClassDialogVisible" title="批量设置归类" width="400px" append-to-body>
-      <div style="padding: 20px 0">
-        <el-form label-width="80px">
-          <el-form-item label="归类类型">
-            <el-select v-model="batchClassValue" placeholder="请选择归类" style="width: 100%">
-              <el-option
-                v-for="item in categoryTypeOptions"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-form>
+    <!-- 批量设置分类弹窗 -->
+    <el-dialog
+      v-model="batchAssortDialogVisible"
+      title="批量设置分类"
+      width="400px"
+    >
+      <div style="border-top: 1px solid var(--el-border-color-lighter); border-bottom: 1px solid var(--el-border-color-lighter); padding: 20px 0; margin-top: -20px; min-height: 80px;">
+        <div style="margin-bottom: 20px; color: #606266; font-size: 14px;">
+          已选中 {{ selectedRows.length }} 个商品。请选择要应用的分类：
+        </div>
+        <el-select
+          v-model="batchAssortValue"
+          placeholder="请选择分类"
+          clearable
+          style="width: 100%"
+        >
+          <el-option
+            v-for="it in categoryTypeOptions"
+            :key="it.value"
+            :label="it.label"
+            :value="it.value"
+          />
+        </el-select>
       </div>
       <template #footer>
-        <div style="display: flex; justify-content: flex-end">
-          <el-button @click="batchClassDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleBatchClassConfirm">确定</el-button>
-        </div>
+        <span class="dialog-footer">
+          <el-button @click="batchAssortDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="executeBatchAssort">保存</el-button>
+        </span>
       </template>
     </el-dialog>
+
+    <!-- 列配置组件 -->
+    <ColumnManager
+      v-model="columnConfigVisible"
+      :columns="columns"
+      @save="handleConfigSave"
+      @reset="handleConfigReset"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import {
-  ShopsAPI,
-  SalesProductListingAPI,
-  SolarTermTagAPI,
-  ProductClassificationAPI,
-  type ListingItemVO,
-} from "@/backend";
-import ColumnManager from "./components/ColumnManager.vue";
+import { ref, reactive, computed, onMounted, nextTick, watch } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import { ShopsAPI, SalesProductListingAPI, type ListingItemVO } from "@/backend";
 import useClipboard from "vue-clipboard3";
-import { Edit, Search } from "@element-plus/icons-vue";
+import ColumnManager from "./components/ColumnManager.vue";
+import { Search, Edit, Picture, StarFilled, ArrowDown } from "@element-plus/icons-vue";
 
 defineOptions({ name: "SalesProductListing" });
 
@@ -812,8 +873,6 @@ const queryFormRef = ref();
 const loading = ref(false);
 const columnConfigVisible = ref(false);
 
-const asinTagsMap = ref<Record<string, string[]>>({});
-
 // 批量操作相关
 const selectedRows = ref<ListingItemVO[]>([]);
 const batchTagDialogVisible = ref(false);
@@ -821,6 +880,66 @@ const batchTags = ref<string[]>([]);
 const batchInput = ref("");
 const batchInputVisible = ref(false);
 const batchInputRef = ref();
+
+// 批量分类相关
+const batchAssortDialogVisible = ref(false);
+const batchAssortValue = ref("");
+
+const tagDialogVisible = ref(false);
+const currentTagAsin = ref("");
+const currentTags = ref<string[]>([]);
+const newTagInput = ref("");
+const inputVisible = ref(false);
+const inputRef = ref();
+
+function getVariants(val: any) {
+  if (!val || val === "--") return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    try {
+      // Handle Python lists parsed as string like "[{'a': 1}]" using regex replace before parse if needed,
+      // but assuming it's standard JSON array structure here.
+      // Wait, python single quotes might be inside:
+      const trimmed = val.trim();
+      if (trimmed.startsWith('[')) {
+        let jsonStr = trimmed.replace(/'/g, '"');
+        const parsed = JSON.parse(jsonStr);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function getRowTags(row: any) {
+  if (!row.label) return [];
+  // 如果后端直接返回了数组
+  if (Array.isArray(row.label)) {
+    return row.label;
+  }
+  // 如果是字符串
+  if (typeof row.label === 'string') {
+    const trimmed = row.label.trim();
+    // 可能是标准 JSON 字符串如 '["a","b"]' 或者是 python 单引号字符串 "['a','b']"
+    if (trimmed.startsWith('[')) {
+      try {
+        // 先尝试正常 JSON 解析
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed;
+      } catch(e) {
+        // 解析失败（比如出现单引号），手动清理
+        const content = trimmed.slice(1, -1);
+        if (!content.trim()) return [];
+        return content.split(',').map((s: string) => s.trim().replace(/^['"]|['"]$/g, '')).filter((x: string) => x);
+      }
+    }
+    // 兼容原有的逗号分隔字符串
+    return trimmed.split(',').filter((x: string) => x);
+  }
+  return [];
+}
 
 function handleSelectionChange(selection: ListingItemVO[]) {
   selectedRows.value = selection;
@@ -834,6 +953,37 @@ function handleBatchOpen() {
   batchTags.value = [];
   batchInput.value = "";
   batchTagDialogVisible.value = true;
+}
+
+function handleBatchAssortOpen() {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning("请先勾选商品");
+    return;
+  }
+  batchAssortValue.value = "";
+  batchAssortDialogVisible.value = true;
+}
+
+async function executeBatchAssort() {
+  if (!batchAssortValue.value) {
+    ElMessage.warning("请选择要设置的分类");
+    return;
+  }
+
+  const updates: any[] = [];
+  for (const row of selectedRows.value) {
+    updates.push({ asin: row.asin, assort: batchAssortValue.value });
+  }
+
+  try {
+    await SalesProductListingAPI.upsertAssort(updates);
+    ElMessage.success("批量修改分类成功");
+    batchAssortDialogVisible.value = false;
+    handleQuery();
+  } catch (e) {
+    console.error(e);
+    ElMessage.error("批量修改分类失败");
+  }
 }
 
 function showBatchInput() {
@@ -862,7 +1012,7 @@ function handleBatchClear() {
   batchTags.value = [];
 }
 
-function confirmBatchAction(action: "add" | "delete") {
+function confirmBatchAction(action: 'add' | 'delete') {
   if (batchTags.value.length === 0) {
     ElMessage.warning("请先输入标签");
     return;
@@ -871,53 +1021,111 @@ function confirmBatchAction(action: "add" | "delete") {
   ElMessageBox.confirm(
     `确定要对选中的 ${selectedRows.value.length} 个商品${actionText}以下标签吗？\n${batchTags.value.join(", ")}`,
     "确认操作",
-    {
-      confirmButtonText: "确定",
-      cancelButtonText: "取消",
-      type: "warning",
-    }
+    { confirmButtonText: "确定", cancelButtonText: "取消", type: "warning" }
   ).then(() => {
     executeBatchAction(action);
   });
 }
 
-async function executeBatchAction(action: "add" | "delete") {
+async function executeBatchAction(action: 'add' | 'delete') {
   const updates: any[] = [];
-  // 遍历选中行，计算新的标签集合
   for (const row of selectedRows.value) {
-    // 确保使用最新的 asinTagsMap 数据
-    const originalTags = asinTagsMap.value[row.asin] || [];
+    const originalTags = getRowTags(row);
     let newTags = [...originalTags];
 
     if (action === "add") {
-      // 合并去重
       const set = new Set([...newTags, ...batchTags.value]);
       newTags = Array.from(set);
     } else {
-      // 移除
       newTags = newTags.filter((t) => !batchTags.value.includes(t));
     }
 
-    updates.push({
-      asin: row.asin,
-      tags: newTags,
-    });
+    updates.push({ asin: row.asin, tags: newTags });
   }
 
   try {
-    await SolarTermTagAPI.upsert(updates);
+    await SalesProductListingAPI.upsertLabels(updates);
     ElMessage.success("批量操作成功");
-
-    // 更新本地缓存
-    updates.forEach((u) => {
-      asinTagsMap.value[u.asin] = u.tags;
-    });
-
     batchTagDialogVisible.value = false;
+    handleQuery();
   } catch (e) {
     console.error(e);
     ElMessage.error("操作失败");
   }
+}
+
+function handleEditTags(row: ListingItemVO) {
+  currentTagAsin.value = row.asin;
+  currentTags.value = getRowTags(row);
+  tagDialogVisible.value = true;
+}
+
+function handleEditRemark(row: any) {
+  ElMessageBox.prompt("请输入备注内容", "编辑备注", {
+    confirmButtonText: "确定",
+    cancelButtonText: "取消",
+    inputValue: row.remarks !== "--" ? row.remarks : "",
+    inputType: "textarea",
+    inputPlaceholder: "输入备注...",
+  })
+    .then(async ({ value }) => {
+      row.remarkLoading = true;
+      try {
+        await SalesProductListingAPI.upsertRemark({
+          listing_id: row.listing_id,
+          remark: value
+        });
+        ElMessage.success("备注保存成功");
+        row.remarks = fallback(value);
+      } catch (e) {
+        ElMessage.error("备注保存失败");
+      } finally {
+        row.remarkLoading = false;
+      }
+    })
+    .catch(() => {
+      // 取消操作
+    });
+}
+
+function showInput() {
+  inputVisible.value = true;
+  nextTick(() => {
+    const el = inputRef.value;
+    if (el) {
+      if (el.input?.focus) {
+        el.input.focus();
+      } else {
+        el.focus?.();
+      }
+    }
+  });
+}
+
+function handleInputConfirm() {
+  const val = newTagInput.value.trim();
+  if (val) {
+    if (!currentTags.value.includes(val)) {
+      currentTags.value.push(val);
+    }
+  }
+  inputVisible.value = false;
+  newTagInput.value = "";
+}
+
+function handleRemoveTag(tag: string) {
+  currentTags.value = currentTags.value.filter((t) => t !== tag);
+}
+
+function handleSaveTags() {
+  SalesProductListingAPI.upsertLabels([{
+    asin: currentTagAsin.value,
+    tags: currentTags.value,
+  }]).then(() => {
+    ElMessage.success("保存成功");
+    tagDialogVisible.value = false;
+    handleQuery();
+  });
 }
 
 // 多项搜索相关
@@ -973,113 +1181,6 @@ const displayKeywords = computed({
   },
 });
 
-// 节气标签相关逻辑
-const tagDialogVisible = ref(false);
-// 当前操作的 ASIN
-const currentTagAsin = ref("");
-// 当前编辑的标签副本
-const currentTags = ref<string[]>([]);
-const newTagInput = ref("");
-const inputVisible = ref(false);
-const inputRef = ref();
-
-function handleEditTags(row: ListingItemVO) {
-  currentTagAsin.value = row.asin;
-  currentTags.value = [...(asinTagsMap.value[row.asin] || [])];
-  tagDialogVisible.value = true;
-}
-
-function showInput() {
-  inputVisible.value = true;
-  nextTick(() => {
-    const el = inputRef.value;
-    if (el) {
-      if (el.input?.focus) {
-        el.input.focus();
-      } else {
-        el.focus?.();
-      }
-    }
-  });
-}
-
-function handleInputConfirm() {
-  const val = newTagInput.value.trim();
-  if (val) {
-    if (!currentTags.value.includes(val)) {
-      currentTags.value.push(val);
-    }
-  }
-  inputVisible.value = false;
-  newTagInput.value = "";
-}
-
-function handleRemoveTag(tag: string) {
-  currentTags.value = currentTags.value.filter((t) => t !== tag);
-}
-
-function handleSaveTags() {
-  SolarTermTagAPI.upsert({
-    asin: currentTagAsin.value,
-    tags: currentTags.value,
-  }).then(() => {
-    ElMessage.success("保存成功");
-    asinTagsMap.value[currentTagAsin.value] = [...currentTags.value];
-    tagDialogVisible.value = false;
-  });
-}
-
-// 批量归类相关
-const batchClassDialogVisible = ref(false);
-const batchClassValue = ref(""); // 选中的类型
-
-function handleBatchClassOpen() {
-  if (selectedRows.value.length === 0) {
-    ElMessage.warning("请先勾选商品");
-    return;
-  }
-  batchClassValue.value = "";
-  batchClassDialogVisible.value = true;
-}
-
-function handleBatchClassConfirm() {
-  if (!batchClassValue.value) {
-    ElMessage.warning("请选择分类");
-    return;
-  }
-
-  ElMessageBox.confirm(
-    `确定要将选中的 ${selectedRows.value.length} 个商品归类设置为【${batchClassValue.value}】吗？`,
-    "确认操作",
-    {
-      confirmButtonText: "确定",
-      cancelButtonText: "取消",
-      type: "warning",
-    }
-  ).then(() => {
-    executeBatchClass();
-  });
-}
-
-async function executeBatchClass() {
-  const data = selectedRows.value.map((row) => ({
-    msku: row.seller_sku,
-    sku: row.local_sku,
-    classification_type: batchClassValue.value,
-  }));
-
-  try {
-    await ProductClassificationAPI.upsert(data);
-    ElMessage.success("设置成功");
-    batchClassDialogVisible.value = false;
-    // 刷新列表
-    handleQuery();
-  } catch (e) {
-    console.error(e);
-    ElMessage.error("设置失败");
-  }
-}
-
 // 复制功能
 const handleCopy = async (text: string) => {
   if (!text) return;
@@ -1122,6 +1223,7 @@ const defaultColumns = [
   },
   { prop: "shop", label: "店铺", visible: true, width: 114, category: "基础信息" },
   { prop: "country", label: "国家", visible: true, width: 75, category: "基础信息" },
+  { prop: "assort", label: "分类", visible: true, width: 100, category: "基础信息" },
   {
     prop: "status",
     label: "状态",
@@ -1132,7 +1234,7 @@ const defaultColumns = [
     category: "基础信息",
   },
   {
-    prop: "createTime",
+    prop: "open_date_time",
     label: "创建时间",
     visible: true,
     width: 185,
@@ -1142,21 +1244,20 @@ const defaultColumns = [
   { prop: "asin", label: "ASIN", visible: true, fixed: false, width: 120, category: "基础信息" },
   { prop: "parentAsin", label: "父ASIN", visible: true, width: 120, category: "基础信息" },
   {
+    prop: "label",
+    label: "标签",
+    visible: true,
+    width: 120,
+    align: "center",
+    category: "基础信息",
+  },
+  {
     prop: "title",
     label: "标题",
     visible: true,
     fixed: false,
     width: 174,
     showOverflowTooltip: false, // 改为手动控制 tooltip
-    category: "基础信息",
-  },
-  { prop: "classification", label: "归类", visible: true, width: 100, category: "基础信息" },
-  {
-    prop: "solarTermTags",
-    label: "节气标签",
-    visible: true,
-    width: 120,
-    align: "center",
     category: "基础信息",
   },
   { prop: "price", label: "价格", visible: true, width: 80, align: "right", category: "库存价格" },
@@ -1244,7 +1345,6 @@ const defaultColumns = [
     category: "销售数据",
     sortable: "custom",
   },
-  { prop: "salesTrend", label: "销量趋势图", visible: true, width: 150, category: "销售数据" },
   {
     prop: "avgSales7_14_30",
     label: "7|14|30日均销量",
@@ -1321,23 +1421,21 @@ const defaultColumns = [
   },
   { prop: "pairType", label: "配对方式", visible: true, width: 100, category: "其他信息" },
   { prop: "owner", label: "负责人", visible: true, width: 80, category: "其他信息" },
-  { prop: "remarks", label: "备注", visible: true, width: 150, category: "其他信息" },
   {
     prop: "operation",
     label: "操作",
     visible: true,
-    fixed: "right",
+    fixed: false,
     width: 160,
     align: "center",
     category: "基础信息",
   },
+  { prop: "remarks", label: "备注", visible: true, fixed: "right", width: 150, category: "其他信息" },
   // 补充 test.html 中的其他列（默认隐藏）
-  { prop: "analysis", label: "分析", visible: false, width: 80, category: "基础信息" },
   { prop: "fulfillment", label: "配送方式", visible: false, width: 90, category: "基础信息" },
   { prop: "brand", label: "亚马逊品牌", visible: false, width: 99, category: "基础信息" },
-  { prop: "productCode", label: "商品编码", visible: false, width: 100, category: "基础信息" },
+  { prop: "productCode", label: "商品编码", visible: false, width: 150, category: "基础信息" },
   { prop: "variants", label: "变体属性", visible: false, width: 100, category: "基础信息" },
-  { prop: "localBrand", label: "本地品牌", visible: false, width: 100, category: "基础信息" },
   {
     prop: "b2bPrice",
     label: "B2B价格",
@@ -1364,7 +1462,7 @@ const defaultColumns = [
   },
 ];
 
-const STORAGE_KEY = "SALES_PRODUCT_LISTING_COLUMNS_V4";
+const STORAGE_KEY = "SALES_PRODUCT_LISTING_COLUMNS_V5";
 
 // 初始化列配置（合并本地缓存）
 const initColumns = () => {
@@ -1661,8 +1759,8 @@ watch(
 // 负责人相关逻辑
 const ownerListRaw = ref<any[]>([]);
 const ownerOptions = computed(() => {
-  // 下拉值取 name 字段
-  return ownerListRaw.value.map((o) => ({ label: o.name, value: o.name }));
+  // 下拉值取 name 字段或 uid
+  return ownerListRaw.value.map((o) => ({ label: o.name_zh || o.name, value: String(o.uid || o.id) }));
 });
 const allOwnerValues = computed(() => ownerOptions.value.map((it) => it.value));
 const isAllOwners = computed(() => {
@@ -1692,7 +1790,7 @@ const searchTypeOptions = [
   { label: "SKU", value: "sku" },
   { label: "MSKU", value: "seller_sku" },
   { label: "ASIN", value: "asin" },
-  { label: "S-TAG", value: "tag" },
+  { label: "标签", value: "tag" },
 ];
 
 // 占位表格数据
@@ -1700,11 +1798,6 @@ const tableData = ref<any[]>([]);
 const pageNum = ref(1);
 const pageSize = ref(50);
 const total = ref(0);
-
-// 归类判断逻辑 (仅取后端 db_classification)
-const getCategoryBySku = (row: any): string => {
-  return row.db_classification || "";
-};
 
 // 价格格式化辅助函数
 const formatPrice = (price: any, currency: string) => {
@@ -1825,23 +1918,27 @@ function handleQuery() {
           }
         }
 
+        const fallback = (val: any) => (val === null || val === undefined || val === "" ? "--" : val);
         return {
           // 保留原始字段供后续操作使用
           seller_sku: item.seller_sku,
           local_sku: item.local_sku,
+          assort: fallback(item.assort),
           db_classification: item.db_classification,
 
-          image: item.small_image_url,
-          msku: item.seller_sku,
-          fnsku: item.fnsku,
+          id: item.id || "--",
+          listing_id: item.listing_id || item.id,
+          image: fallback(item.small_image_url),
+          msku: fallback(item.seller_sku),
+          fnsku: fallback(item.fnsku),
           // 品名/SKU
           skuName: item.local_name
             ? item.local_sku
               ? `${item.local_name}/${item.local_sku}`
               : item.local_name
-            : item.local_sku || "-",
-          shop: shopName,
-          country: item.marketplace,
+            : item.local_sku || "--",
+          shop: fallback(item.shop_name || shopName || item.sid),
+          country: fallback(item.marketplace || item.country_code),
           // 状态转义 1: on, 0: off (处理可能的小数点问题)
           status:
             isDeleteVal === 1
@@ -1851,77 +1948,62 @@ function handleQuery() {
                 : statusVal === 0
                   ? "off"
                   : "unknown",
-          createTime: item.open_date_display, // 使用 open_date_display
-          asin: item.asin,
-          parentAsin: item.parent_asin,
-          title: item.item_name,
+          open_date_time: fallback(item.open_date_display), // 使用 open_date_display 映射为 open_date_time 根据需要修改 mapping
+          asin: fallback(item.asin),
+          parentAsin: fallback(item.parent_asin),
+          label: item.label || [],
+          title: fallback(item.item_name),
           // Classification -> Computed from MSKU or SKU
-          classification: getCategoryBySku(item),
+          classification: "--",
           // tag -> global_tags
-          solarTermTag: "",
-          price: formatPrice(item.price, currency),
-          totalPrice: formatPrice(item.landed_price, currency),
-          discountPrice: formatPrice(item.listing_price, currency),
-          category: "", // item.seller_category  不取数据
-          fbaSellable: item.afn_fulfillable_quantity,
-          estFbaFee: formatPrice((item as any).shipping, currency),
-          referralFee: "",
-          salesToday: "", // 接口未提供今日销量
-          salesYesterday: item.yesterday_volume,
-          sales7_14_30: `${item.total_volume || 0} | ${item.fourteen_volume || 0} | ${item.thirty_volume || 0}`,
+          solarTermTag: "--",
+          price: fallback(formatPrice(item.price, currency)),
+          totalPrice: fallback(formatPrice(item.landed_price, currency)),
+          discountPrice: fallback(formatPrice(item.listing_price, currency)),
+          fbaSellable: fallback(item.afn_fulfillable_quantity),
+          estFbaFee: fallback(formatPrice((item as any).fba_fee, currency)),
+          referralFee: fallback(formatPrice((item as any).referral_fee, currency)),
+          salesToday: "--", // 接口未提供今日销量
+          salesYesterday: fallback(item.yesterday_volume),
+          sales7_14_30: `${fallback(item.total_volume)} | ${fallback(item.fourteen_volume)} | ${fallback(item.thirty_volume)}`,
           rank: {
-            rank: item.seller_rank,
-            category: rankCat,
+            rank: fallback(item.seller_rank),
+            category: fallback((item as any).small_category),
           },
-          profit: "", // 需计算或接口补充
-          salesTrend: "",
-          avgSales7_14_30: `${item.average_seven_volume || 0} | ${item.average_fourteen_volume || 0} | ${item.average_thirty_volume || 0}`,
-          salesAmountYesterday: formatPrice(item.yesterday_amount, currency),
-          salesAmount7_14_30: `${formatPrice(item.seven_amount || 0, currency)} | ${formatPrice(item.fourteen_amount || 0, currency)} | ${formatPrice(item.thirty_amount || 0, currency)}`,
-          adCostYesterday: "",
-          adCost7_14_30: "",
-          smallRank: (item as any).small_rank || [],
+          profit: "--", // 需计算或接口补充
+          avgSales7_14_30: `${fallback(item.average_seven_volume)} | ${fallback(item.average_fourteen_volume)} | ${fallback(item.average_thirty_volume)}`,
+          salesAmountYesterday: fallback(formatPrice(item.yesterday_amount, currency)),
+          salesAmount7_14_30: `${fallback(formatPrice(item.seven_amount || 0, currency))} | ${fallback(formatPrice(item.fourteen_amount || 0, currency))} | ${fallback(formatPrice(item.thirty_amount || 0, currency))}`,
+          adCostYesterday: fallback(formatPrice((item as any).yesterday_spend, currency)),
+          adCost7_14_30: `${fallback(formatPrice((item as any).seven_spend || 0, currency))} | ${fallback(formatPrice((item as any).fourteen_spend || 0, currency))} | ${fallback(formatPrice((item as any).thirty_spend || 0, currency))}`,
+          smallRank: {
+            rank: fallback((item as any).small_rank),
+            category: fallback((item as any).small_category),
+          },
           rating: {
-            value: Number(item.last_star || 0),
-            count: item.review_num || 0,
+            value: fallback(Number(item.last_star || 0)),
+            count: fallback(item.review_num || 0),
           },
-          owner: item.principal_info
-            ? item.principal_info.map((p) => p.principal_name).join(", ")
-            : "",
-          openTime: item.on_sale_time,
-          firstOrderTime: item.first_order_time,
-          remarks: "",
-          pairType: "", // 需后端提供
-
+          owner: fallback(item.principal_info
+            ? item.principal_info.map((p: any) => p.realname || p.principal_name).join(", ")
+            : ""),
+          openTime: fallback(item.on_sale_time),
+          firstOrderTime: fallback(item.first_order_time),
+            remarks: fallback((item as any).remarks),
           // 隐藏列数据映射
-          fulfillment: item.fulfillment_channel_type,
-          brand: item.seller_brand,
-          productCode: "",
-          variants: "",
-          localBrand: "",
-          b2bPrice: "",
-          listPrice: "",
-          fbmStock: item.quantity,
+          fulfillment: fallback(item.fulfillment_channel_type),
+          brand: fallback(item.seller_brand),
+          productCode: {
+            id: fallback((item as any).amz_product_id),
+            type: fallback((item as any).amz_product_id_type)
+          },
+          variants: fallback((item as any).variant_text),
+          b2bPrice: fallback(formatPrice((item as any).b2b_price, currency)),
+          listPrice: fallback(formatPrice((item as any).listing_price, currency)),
+          fbmStock: fallback(item.afn_fulfillable_quantity),
         };
       });
       total.value = res.total || 0;
-
-      // 获取节气标签
-      const asins = tableData.value.map((item) => item.asin).filter(Boolean) as string[];
-      if (asins.length > 0) {
-        SolarTermTagAPI.queryByAsins(asins).then((data: any) => {
-          // Response list: [{asin: "...", tags: [...]}, ...]
-          const map: Record<string, string[]> = {};
-          if (Array.isArray(data)) {
-            data.forEach((t: any) => {
-              if (t.asin) map[t.asin] = t.tags || [];
-            });
-          }
-          asinTagsMap.value = map;
-        });
-      } else {
-        asinTagsMap.value = {};
-      }
     })
     .finally(() => {
       loading.value = false;
@@ -2132,3 +2214,12 @@ function handleCurrentChange(page: number) {
   box-shadow: none !important;
 }
 </style>
+
+
+
+
+
+
+
+
+

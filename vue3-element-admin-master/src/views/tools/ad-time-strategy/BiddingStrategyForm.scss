@@ -1,0 +1,212 @@
+.scrollable-form-content {
+  min-height: 520px;
+  max-height: 75vh;
+  padding-right: 15px;
+  overflow-y: auto;
+}
+.tips-bar {
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  font-size: 13px;
+  line-height: 22px;
+  color: #333;
+  background: #fff7e6;
+  border: 1px solid #ffe1b0;
+  border-radius: 2px;
+}
+.form-main {
+  padding-right: 16px;
+  .el-form-item {
+    margin-bottom: 20px;
+  }
+  :deep(.el-form-item__label) {
+    font-weight: 500;
+    color: #606266;
+  }
+}
+.grid-form-item {
+  margin-top: 10px;
+  :deep(.el-form-item__content) {
+    display: flex;
+    flex-direction: column;
+    align-items: center; // 修复网格偏移，使其在整栏中居中
+    width: 100%;
+    margin-left: 0 !important;
+  }
+}
+.time-grid-wrapper {
+  box-sizing: border-box;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  .time-grid-header {
+    display: flex;
+    background: #fdfdfd;
+    border-bottom: 1px solid #e4e7ed;
+    .header-left {
+      display: flex;
+      flex-shrink: 0;
+      align-items: flex-end;
+      justify-content: center;
+      width: 80px;
+      padding-bottom: 6px;
+      font-size: 12px;
+      color: #333;
+      border-right: 1px solid #e4e7ed;
+    }
+    .header-right {
+      flex: 1;
+      .time-groups {
+        display: flex;
+        border-bottom: 1px solid #e4e7ed;
+        .time-group {
+          flex: 1;
+          padding: 8px 0;
+          font-size: 12px;
+          font-weight: 500;
+          color: #333;
+          text-align: center;
+          border-right: 1px solid #e4e7ed;
+        }
+      }
+      .time-hours {
+        display: flex;
+        .col-hour {
+          flex: 1;
+          padding: 6px 0;
+          font-size: 12px;
+          color: #333;
+          text-align: center;
+        }
+      }
+    }
+  }
+  .time-grid-body {
+    .time-grid-row {
+      display: flex;
+      border-bottom: 1px solid #fff;
+      &:last-child {
+        border-bottom: none;
+      }
+      .row-label {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: 80px;
+        font-size: 12px;
+        color: #333;
+        background: #fdfdfd;
+        border-right: 1px solid #e4e7ed;
+      }
+      .row-cells {
+        display: flex;
+        flex: 1;
+        user-select: none; // Prevent text selection while dragging
+        background: #f5f5f5; // Greyish background matching image
+        .cell {
+          position: relative;
+          display: flex;
+          flex: 1;
+          align-items: center;
+          height: 32px;
+          font-size: 12px;
+          color: #333;
+          cursor: pointer;
+          border-right: 1px solid #fff;
+          border-bottom: 1px solid #fff;
+
+          &:last-child {
+            border-right: none;
+          }
+
+          .cell-text {
+            white-space: nowrap;
+          }
+
+          &.cell-dragging {
+            background: #e6f1fc !important;
+            border-color: #a3d0fd !important;
+          }
+          &.cell-merged-right {
+            border-right-color: transparent !important;
+          }
+          &.cell-increase_percent {
+            background: #f89898;
+          }
+          &.cell-increase_fixed {
+            background: #f3d19e;
+          }
+          &.cell-decrease_percent {
+            background: #b3e19d;
+          }
+          &.cell-decrease_fixed {
+            background: #a0cfff;
+          }
+          &.cell-fixed {
+            background: #d4b3ff;
+          }
+        }
+      }
+    }
+  }
+}
+.grid-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 12px;
+  .grid-tips {
+    display: flex;
+    align-items: center;
+  }
+}
+.time-segments-container {
+  width: 100%;
+  .time-segment-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 0;
+    align-items: center;
+    margin-bottom: 20px;
+    background: #fff;
+    .tilde {
+      margin: 0 10px;
+      color: #666;
+    }
+    .text {
+      font-size: 13px;
+      color: #333;
+    }
+  }
+  .segment-tools {
+    display: flex;
+    align-items: center;
+  }
+}
+.callback-form-item {
+  margin-top: 6px;
+  :deep(.el-form-item__label) {
+    line-height: 22px;
+  }
+  .callback-container {
+    display: flex;
+    flex-direction: column;
+    .callback-desc {
+      margin-bottom: 12px;
+      font-size: 13px;
+      line-height: normal;
+      color: #333;
+    }
+    .callback-radios {
+      display: flex;
+      align-items: center;
+      line-height: normal;
+    }
+  }
+}
+.orange {
+  font-size: 13px;
+  color: #f5a623;
+}

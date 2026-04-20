@@ -1030,8 +1030,11 @@ export const WeatherAPI = {
 export interface ListingItemVO {
   listing_id: string;
   sid: number;
+  shop_name?: string;
   marketplace: string;
+  country_code?: string;
   seller_sku: string;
+  label?: string;
   fnsku: string;
   asin: string;
   parent_asin: string;
@@ -1113,36 +1116,23 @@ export const SalesProductListingAPI = {
       params,
     });
   },
-};
-
-export const SolarTermTagAPI = {
-  queryByAsins(asins: string[]) {
-    return request<any[]>({
-      url: "/solar-terms/query",
-      method: "post",
-      data: { asins },
-    });
-  },
-  upsert(data: { asin: string; tags: string[] } | { asin: string; tags: string[] }[]) {
+  upsertLabels(data: { asin: string; tags: string[] } | { asin: string; tags: string[] }[]) {
     return request<any>({
-      url: "/solar-terms/upsert",
+      url: "/sales/product/listing/labels/upsert",
       method: "post",
       data,
     });
   },
-};
-
-export const ProductClassificationAPI = {
-  query(data: any) {
-    return request<any[]>({
-      url: "/classification/query",
+  upsertAssort(data: { asin: string; assort: string } | { asin: string; assort: string }[]) {
+    return request<any>({
+      url: "/sales/product/listing/assort/upsert",
       method: "post",
       data,
     });
   },
-  upsert(data: any) {
-    return request({
-      url: "/classification/upsert",
+  upsertRemark(data: { listing_id: string; remark: string }) {
+    return request<any>({
+      url: "/sales/product/listing/remark/upsert",
       method: "post",
       data,
     });
@@ -1163,6 +1153,5 @@ export default {
   ImageUploadAPI,
   WeatherAPI,
   SalesProductListingAPI,
-  SolarTermTagAPI,
-  ProductClassificationAPI,
 };
+
