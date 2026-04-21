@@ -1,348 +1,7 @@
 <template>
   <div class="app-container">
     <!-- 搜索区域 -->
-    <div class="search-container">
-      <el-form ref="queryFormRef" :model="queryParams" :inline="true" size="small">
-        <!-- 国家 -->
-        <el-form-item label="国家" prop="country">
-          <el-select
-            v-model="queryParams.country"
-            placeholder="全部"
-            clearable
-            multiple
-            collapse-tags
-            collapse-tags-tooltip
-            :max-collapse-tags="1"
-            style="width: 140px"
-            @change="handleFilterChange"
-          >
-            <!-- 全选选项 -->
-            <el-option value="__ALL__" class="select-all-option">
-              <div class="flex-y-center">
-                <el-checkbox
-                  :model-value="isAllCountries"
-                  :indeterminate="isIndeterminateCountries"
-                  style="margin-right: 4px; pointer-events: none"
-                />
-                <span class="font-bold">全选</span>
-              </div>
-            </el-option>
-            <el-option
-              v-for="it in countryOptions"
-              :key="it.value"
-              :label="it.label"
-              :value="it.value"
-            >
-              <div class="flex-y-center">
-                <el-checkbox
-                  :model-value="queryParams.country.includes(it.value)"
-                  style="margin-right: 4px; pointer-events: none"
-                />
-                <span>{{ it.label }}</span>
-              </div>
-            </el-option>
-          </el-select>
-        </el-form-item>
-        <!-- 店铺 -->
-        <el-form-item label="店铺" prop="shopId" class="label-xs">
-          <el-select
-            v-model="queryParams.shopId"
-            placeholder="全部"
-            clearable
-            multiple
-            collapse-tags
-            collapse-tags-tooltip
-            :max-collapse-tags="1"
-            style="width: 140px"
-            @change="handleFilterChange"
-          >
-            <template #header>
-              <div
-                style="padding: 4px 6px; border-bottom: 1px solid var(--el-border-color-lighter)"
-              >
-                <el-input
-                  v-model="shopSearchKeyword"
-                  size="small"
-                  placeholder="搜索店铺"
-                  clearable
-                  :prefix-icon="Search"
-                  class="shop-filter-input"
-                />
-              </div>
-            </template>
-            <!-- 全选选项 -->
-            <el-option value="__ALL__">
-              <div class="flex-y-center">
-                <el-checkbox
-                  :model-value="isAllShops"
-                  :indeterminate="isIndeterminateShops"
-                  style="margin-right: 4px; pointer-events: none"
-                />
-                <span class="font-bold">全选</span>
-              </div>
-            </el-option>
-            <el-option
-              v-for="it in shopOptions"
-              :key="it.value"
-              :label="it.label"
-              :value="it.value"
-            >
-              <div class="flex-y-center">
-                <el-checkbox
-                  :model-value="queryParams.shopId.includes(it.value)"
-                  style="margin-right: 4px; pointer-events: none"
-                />
-                <span>{{ it.label }}</span>
-              </div>
-            </el-option>
-          </el-select>
-        </el-form-item>
-        <!-- Listing 状态 -->
-        <el-form-item label="Listing状态" prop="listingStatus">
-          <el-select
-            v-model="queryParams.listingStatus"
-            placeholder="全部"
-            clearable
-            multiple
-            collapse-tags
-            collapse-tags-tooltip
-            :max-collapse-tags="1"
-            style="width: 140px"
-            @change="handleFilterChange"
-          >
-            <!-- 全选选项 -->
-            <el-option value="__ALL__" class="select-all-option">
-              <div class="flex-y-center">
-                <el-checkbox
-                  :model-value="isAllListingStatus"
-                  :indeterminate="isIndeterminateListingStatus"
-                  style="margin-right: 4px; pointer-events: none"
-                />
-                <span class="font-bold">全选</span>
-              </div>
-            </el-option>
-            <el-option
-              v-for="it in listingStatusOptions"
-              :key="it.value"
-              :label="it.label"
-              :value="it.value"
-            >
-              <div class="flex-y-center">
-                <el-checkbox
-                  :model-value="queryParams.listingStatus.includes(it.value)"
-                  style="margin-right: 4px; pointer-events: none"
-                />
-                <span>{{ it.label }}</span>
-              </div>
-            </el-option>
-          </el-select>
-        </el-form-item>
-        <!-- 配对状态 -->
-        <el-form-item label="配对状态" prop="pairStatus">
-          <el-select
-            v-model="queryParams.pairStatus"
-            placeholder="全部"
-            clearable
-            multiple
-            collapse-tags
-            collapse-tags-tooltip
-            :max-collapse-tags="1"
-            style="width: 140px"
-            @change="handleFilterChange"
-          >
-            <!-- 全选选项 -->
-            <el-option value="__ALL__" class="select-all-option">
-              <div class="flex-y-center">
-                <el-checkbox
-                  :model-value="isAllPairStatus"
-                  :indeterminate="isIndeterminatePairStatus"
-                  style="margin-right: 4px; pointer-events: none"
-                />
-                <span class="font-bold">全选</span>
-              </div>
-            </el-option>
-            <el-option
-              v-for="it in pairStatusOptions"
-              :key="it.value"
-              :label="it.label"
-              :value="it.value"
-            >
-              <div class="flex-y-center">
-                <el-checkbox
-                  :model-value="queryParams.pairStatus.includes(it.value)"
-                  style="margin-right: 4px; pointer-events: none"
-                />
-                <span>{{ it.label }}</span>
-              </div>
-            </el-option>
-          </el-select>
-        </el-form-item>
-        <!-- 分类 -->
-        <el-form-item label="分类" prop="categoryType">
-          <el-select
-            v-model="queryParams.categoryType"
-            placeholder="全部"
-            clearable
-            multiple
-            collapse-tags
-            collapse-tags-tooltip
-            :max-collapse-tags="1"
-            style="width: 140px"
-            @change="handleFilterChange"
-          >
-            <!-- 全选选项 -->
-            <el-option value="__ALL__" class="select-all-option">
-              <div class="flex-y-center">
-                <el-checkbox
-                  :model-value="isAllCategoryTypes"
-                  :indeterminate="isIndeterminateCategoryTypes"
-                  style="margin-right: 4px; pointer-events: none"
-                />
-                <span class="font-bold">全选</span>
-              </div>
-            </el-option>
-            <el-option
-              v-for="it in categoryTypeOptions"
-              :key="it.value"
-              :label="it.label"
-              :value="it.value"
-            >
-              <div class="flex-y-center">
-                <el-checkbox
-                  :model-value="queryParams.categoryType.includes(it.value)"
-                  style="margin-right: 4px; pointer-events: none"
-                />
-                <span>{{ it.label }}</span>
-              </div>
-            </el-option>
-          </el-select>
-        </el-form-item>
-        <!-- 负责人 -->
-        <el-form-item label="负责人" prop="owner">
-          <el-select
-            v-model="queryParams.owner"
-            placeholder="全部"
-            clearable
-            multiple
-            collapse-tags
-            collapse-tags-tooltip
-            :max-collapse-tags="1"
-            style="width: 140px"
-            @change="handleFilterChange"
-          >
-            <!-- 全选选项 -->
-            <el-option value="__ALL__" class="select-all-option">
-              <div class="flex-y-center">
-                <el-checkbox
-                  :model-value="isAllOwners"
-                  :indeterminate="isIndeterminateOwners"
-                  style="margin-right: 4px; pointer-events: none"
-                />
-                <span class="font-bold">全选</span>
-              </div>
-            </el-option>
-            <el-option
-              v-for="it in ownerOptions"
-              :key="it.value"
-              :label="it.label"
-              :value="it.value"
-            >
-              <div class="flex-y-center">
-                <el-checkbox
-                  :model-value="queryParams.owner.includes(it.value)"
-                  style="margin-right: 4px; pointer-events: none"
-                />
-                <span>{{ it.label }}</span>
-              </div>
-            </el-option>
-          </el-select>
-        </el-form-item>
-        <!-- 报表更新时间（置于第一列） -->
-        <el-form-item label="新建时间" prop="reportUpdatedAt">
-          <el-date-picker
-            v-model="queryParams.reportUpdatedAt"
-            :editable="false"
-            type="daterange"
-            range-separator="~"
-            start-placeholder="开始日期"
-            end-placeholder="截止日期"
-            value-format="YYYY-MM-DD"
-            style="width: 240px"
-            @change="handleFilterChange"
-          />
-        </el-form-item>
-        <!-- 搜索行（单独一行：搜索 + 重置） -->
-        <el-form-item label="搜索" prop="keywords" class="search-row">
-          <el-input
-            v-model="displayKeywords"
-            placeholder="输入关键字"
-            clearable
-            style="width: 360px"
-            @keyup.enter="handleQuery"
-            @focus="searchInputFocused = true"
-            @blur="searchInputFocused = false"
-          >
-            <template #prepend>
-              <el-select
-                v-model="queryParams.searchType"
-                style="width: 80px"
-                @change="handleFilterChange"
-              >
-                <el-option
-                  v-for="it in searchTypeOptions"
-                  :key="it.value"
-                  :label="it.label"
-                  :value="it.value"
-                />
-              </el-select>
-            </template>
-            <template #suffix>
-              <el-popover
-                v-model:visible="multiSearchVisible"
-                placement="bottom"
-                :width="300"
-                trigger="click"
-              >
-                <template #reference>
-                  <div class="flex-center" style="height: 100%; margin-right: 4px; cursor: pointer">
-                    <el-tooltip content="多项搜索" :show-after="500" placement="top">
-                      <el-icon size="16" style="color: #909399"><Edit /></el-icon>
-                    </el-tooltip>
-                  </div>
-                </template>
-                <div>
-                  <el-input
-                    v-model="multiSearchText"
-                    type="textarea"
-                    :rows="10"
-                    placeholder="一行一项"
-                  />
-                  <div
-                    style="
-                      display: flex;
-                      gap: 6px;
-                      justify-content: flex-end;
-                      margin-top: 10px;
-                      text-align: right;
-                    "
-                  >
-                    <el-button size="small" @click="handleMultiSearchClear">清空</el-button>
-                    <el-button size="small" @click="multiSearchVisible = false">关闭</el-button>
-                    <el-button size="small" type="primary" @click="handleMultiSearchConfirm">
-                      搜索
-                    </el-button>
-                  </div>
-                </div>
-              </el-popover>
-            </template>
-            <template #append>
-              <el-button type="primary" icon="search" @click="handleQuery">搜索</el-button>
-            </template>
-          </el-input>
-          <el-button class="ml-2" icon="refresh" @click="handleResetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </div>
+    <ListingSearchForm />
 
     <!-- 占位表格区域 -->
     <el-card shadow="hover" class="data-table">
@@ -357,19 +16,21 @@
       >
         <div class="data-table__toolbar--left">
           <el-button
-            v-if="selectedRows.length > 0"
-            type="primary"
+            :disabled="selectedRows.length === 0"
+            type="success"
             class="mr-2"
-            size="small"
+            size="default"
+            icon="CollectionTag"
             @click="handleBatchOpen"
           >
             批量设置标签
           </el-button>
           <el-button
-            v-if="selectedRows.length > 0"
-            type="primary"
+            :disabled="selectedRows.length === 0"
+            type="warning"
             class="mr-2"
-            size="small"
+            size="default"
+            icon="Files"
             @click="handleBatchAssortOpen"
           >
             批量设置分类
@@ -388,13 +49,15 @@
       </div>
 
       <el-table
+        ref="tableRef"
         v-loading="loading"
         :data="tableData"
         class="data-table__content"
         border
-        height="100%"
+        height="750px"
         @sort-change="handleSortChange"
         @selection-change="handleSelectionChange"
+        @select="handleSelect"
       >
         <el-table-column type="selection" width="50" fixed="left" align="center" />
         <el-table-column v-for="col in tableColumns" :key="col.prop" v-bind="col">
@@ -489,24 +152,32 @@
             </template>
             <!-- 标签 -->
             <template v-else-if="col.prop === 'label'">
-              <div style="display: flex; align-items: center; justify-content: space-between; overflow: hidden;">
-                <div 
-                  style="flex: 1; display: flex; flex-wrap: wrap; gap: 4px; margin-right: 4px;"
-                >
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  overflow: hidden;
+                "
+              >
+                <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 4px; margin-right: 4px">
                   <template v-if="getRowTags(scope.row).length > 0">
                     <el-tag
                       v-for="(tag, index) in getRowTags(scope.row)"
                       :key="index"
                       size="small"
                       type="warning"
-                      style="border: none;"
+                      style="border: none"
                     >
                       {{ tag }}
                     </el-tag>
                   </template>
                   <span v-else class="color-#E6A23C text-12px">-</span>
                 </div>
-                <el-icon style="cursor: pointer; color: #409EFF; flex-shrink: 0;" @click="handleEditTags(scope.row)">
+                <el-icon
+                  style="cursor: pointer; color: #409eff; flex-shrink: 0"
+                  @click="handleEditTags(scope.row)"
+                >
                   <Edit />
                 </el-icon>
               </div>
@@ -600,9 +271,11 @@
 
             <!-- 商品编码 (双行显示) -->
             <template v-else-if="col.prop === 'productCode'">
-              <div style="display: flex; flex-direction: column; text-align: center; line-height: 1.3;">
+              <div
+                style="display: flex; flex-direction: column; text-align: center; line-height: 1.3"
+              >
                 <span>{{ scope.row.productCode.id }}</span>
-                <span v-if="scope.row.productCode.type" style="color: #909399; font-size: 11px;">
+                <span v-if="scope.row.productCode.type" style="color: #909399; font-size: 11px">
                   {{ scope.row.productCode.type }}
                 </span>
               </div>
@@ -611,13 +284,37 @@
             <!-- 变体属性 -->
             <template v-else-if="col.prop === 'variants'">
               <template v-if="getVariants(scope.row.variants).length > 0">
-                <el-popover placement="bottom" :width="200" trigger="hover" :show-after="200" popper-style="padding: 0; min-width: unset;">
+                <el-popover
+                  placement="bottom"
+                  :width="200"
+                  trigger="hover"
+                  :show-after="200"
+                  popper-style="padding: 0; min-width: unset;"
+                >
                   <template #reference>
-                    <div style="cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--el-color-primary);">
-                      <span class="text-ellipsis" style="max-width: 120px; font-size: 13px;">
-                        [{{ getVariants(scope.row.variants).map((v: any) => v.attr_value).join(', ') }}]
+                    <div
+                      style="
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: var(--el-color-primary);
+                      "
+                    >
+                      <span class="text-ellipsis" style="max-width: 120px; font-size: 13px">
+                        [{{
+                          getVariants(scope.row.variants)
+                            .map((v: any) => v.attr_value)
+                            .join(", ")
+                        }}]
                       </span>
-                      <el-icon style="margin-left: 2px" size="12" color="var(--el-text-color-secondary)"><ArrowDown /></el-icon>
+                      <el-icon
+                        style="margin-left: 2px"
+                        size="12"
+                        color="var(--el-text-color-secondary)"
+                      >
+                        <ArrowDown />
+                      </el-icon>
                     </div>
                   </template>
                   <el-table
@@ -629,7 +326,9 @@
                   >
                     <el-table-column prop="attr_name" width="80" align="center">
                       <template #default="{ row }">
-                        <span style="color: var(--el-text-color-secondary)">{{ row.attr_name }}</span>
+                        <span style="color: var(--el-text-color-secondary)">
+                          {{ row.attr_name }}
+                        </span>
                       </template>
                     </el-table-column>
                     <el-table-column prop="attr_value" align="left">
@@ -688,18 +387,30 @@
 
             <!-- 备注 (可编辑) -->
             <template v-else-if="col.prop === 'remarks'">
-              <div 
-                style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px;" 
-                @dblclick="handleEditRemark(scope.row)"
+              <div
                 v-loading="scope.row.remarkLoading"
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  padding: 0 4px;
+                "
+                @dblclick="handleEditRemark(scope.row)"
               >
-                <el-tooltip :content="scope.row[col.prop] !== '--' ? scope.row[col.prop] : '双击编辑备注'" placement="top" :show-after="500">
-                  <div class="text-ellipsis" style="flex: 1; cursor: pointer; color: var(--el-text-color-primary);">
+                <el-tooltip
+                  :content="scope.row[col.prop] !== '--' ? scope.row[col.prop] : '双击编辑备注'"
+                  placement="top"
+                  :show-after="500"
+                >
+                  <div
+                    class="text-ellipsis"
+                    style="flex: 1; cursor: pointer; color: var(--el-text-color-primary)"
+                  >
                     {{ scope.row[col.prop] }}
                   </div>
                 </el-tooltip>
-                <el-icon 
-                  style="cursor: pointer; margin-left: 4px; color: var(--el-color-primary);" 
+                <el-icon
+                  style="cursor: pointer; margin-left: 4px; color: var(--el-color-primary)"
                   @click="handleEditRemark(scope.row)"
                 >
                   <Edit />
@@ -707,10 +418,26 @@
               </div>
             </template>
 
-            <!-- 操作 -->
-            <template v-else-if="col.prop === 'operation'">
-              <el-button type="primary" text size="small" disabled>查看</el-button>
-              <el-button type="primary" text size="small" disabled>编辑</el-button>
+            <!-- 利润 (两行显示 毛利率百分比 / 毛利润值) -->
+            <template v-else-if="col.prop === 'profit'">
+              <div
+                style="display: flex; flex-direction: column; text-align: right; line-height: 1.3"
+              >
+                <span style="font-weight: 500; font-size: 13px">
+                  {{ Number((scope.row.profit?.gross_margin || 0) * 100).toFixed(2) }}%
+                </span>
+                <span
+                  :style="{
+                    color:
+                      (scope.row.profit?.gross_profit || 0) < 0
+                        ? 'var(--el-color-danger)'
+                        : '#909399',
+                    fontSize: '12px',
+                  }"
+                >
+                  €{{ Number(scope.row.profit?.gross_profit || 0).toFixed(2) }}
+                </span>
+              </div>
             </template>
 
             <!-- 默认展示 -->
@@ -719,7 +446,7 @@
         </el-table-column>
       </el-table>
 
-      <div class="flex-x-end" style="margin-top: -12px">
+      <div class="pagination-container">
         <el-pagination
           size="small"
           background
@@ -734,119 +461,25 @@
       </div>
     </el-card>
 
-    <el-dialog
-      v-model="batchTagDialogVisible"
-      title="批量设置节气标签"
-      width="400px"
-    >
-      <div style="border-top: 1px solid var(--el-border-color-lighter); border-bottom: 1px solid var(--el-border-color-lighter); padding: 20px 0; margin-top: -20px;">
-        <div style="margin-bottom: 20px; color: #606266; font-size: 14px;">
-          输入标签后回车确认，可输入多个。
-        </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; min-height: 40px;">
-          <el-tag
-            v-for="tag in batchTags"
-            :key="tag"
-            closable
-            @close="handleBatchRemoveTag(tag)"
-          >
-            {{ tag }}
-          </el-tag>
-          <el-input
-            v-if="batchInputVisible"
-            ref="batchInputRef"
-            v-model="batchInput"
-            style="width: 100px"
-            @keyup.enter="handleBatchInputConfirm"
-            @blur="handleBatchInputConfirm"
-          />
-          <el-button v-else @click="showBatchInput">
-            + New Tag
-          </el-button>
-        </div>
-      </div>
-      <template #footer>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: -10px;">
-          <div>
-            <el-button @click="handleBatchClear">清空</el-button>
-            <el-button @click="batchTagDialogVisible = false">返回</el-button>
-          </div>
-          <div>
-            <el-button type="danger" @click="confirmBatchAction('delete')">删除</el-button>
-            <el-button type="primary" @click="confirmBatchAction('add')">添加</el-button>
-          </div>
-        </div>
-      </template>
-    </el-dialog>
+    <BatchTagDialog
+      ref="batchTagDialogRef"
+      v-model:visible="batchTagDialogVisible"
+      :selected-rows="selectedRows"
+      @success="handleQuery"
+    />
 
-    <!-- 编辑标签弹窗 -->
-    <el-dialog
-      v-model="tagDialogVisible"
-      title="编辑标签"
-      width="400px"
-    >
-      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;">
-        <el-tag
-          v-for="(tag, index) in currentTags"
-          :key="index"
-          closable
-          :disable-transitions="false"
-          @close="handleRemoveTag(tag)"
-        >
-          {{ tag }}
-        </el-tag>
-        <el-input
-          v-if="inputVisible"
-          ref="inputRef"
-          v-model="newTagInput"
-          style="width: 100px"
-          size="small"
-          @keyup.enter="handleInputConfirm"
-          @blur="handleInputConfirm"
-        />
-        <el-button v-else size="small" @click="showInput">
-          + 新标签
-        </el-button>
-      </div>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="tagDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSaveTags">保存</el-button>
-        </span>
-      </template>
-    </el-dialog>
+    <EditTagDialog
+      v-model:visible="tagDialogVisible"
+      :row="currentEditTagRow"
+      @success="handleQuery"
+    />
 
-    <!-- 批量设置分类弹窗 -->
-    <el-dialog
-      v-model="batchAssortDialogVisible"
-      title="批量设置分类"
-      width="400px"
-    >
-      <div style="border-top: 1px solid var(--el-border-color-lighter); border-bottom: 1px solid var(--el-border-color-lighter); padding: 20px 0; margin-top: -20px; min-height: 80px;">
-        <div style="margin-bottom: 20px; color: #606266; font-size: 14px;">
-          已选中 {{ selectedRows.length }} 个商品。请选择要应用的分类：
-        </div>
-        <el-select
-          v-model="batchAssortValue"
-          placeholder="请选择分类"
-          clearable
-          style="width: 100%"
-        >
-          <el-option
-            v-for="it in categoryTypeOptions"
-            :key="it.value"
-            :label="it.label"
-            :value="it.value"
-          />
-        </el-select>
-      </div>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="batchAssortDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="executeBatchAssort">保存</el-button>
-        </span>
-      </template>
-    </el-dialog>
+    <BatchAssortDialog
+      v-model:visible="batchAssortDialogVisible"
+      :selected-rows="selectedRows"
+      :category-options="categoryTypeOptions"
+      @success="handleQuery"
+    />
 
     <!-- 列配置组件 -->
     <ColumnManager
@@ -859,38 +492,51 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, nextTick, watch } from "vue";
+import { provide, ref, computed, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { ShopsAPI, SalesProductListingAPI, type ListingItemVO } from "@/backend";
+import { SalesProductListingAPI, type ListingItemVO } from "@/backend";
 import useClipboard from "vue-clipboard3";
-import ColumnManager from "./components/ColumnManager.vue";
-import { Search, Edit, Picture, StarFilled, ArrowDown } from "@element-plus/icons-vue";
+import { useListingTable } from "./useListingTable";
+import ListingSearchForm from "./components/ListingSearchForm.vue";
+import ColumnManager from "@/components/ColumnManager/index.vue";
+import BatchTagDialog from "./components/BatchTagDialog.vue";
+import EditTagDialog from "./components/EditTagDialog.vue";
+import BatchAssortDialog from "./components/BatchAssortDialog.vue";
+import { defaultColumns } from "./constants";
+import { Edit, Picture, StarFilled, ArrowDown } from "@element-plus/icons-vue";
 
 defineOptions({ name: "SalesProductListing" });
 
+const listingHooks = useListingTable();
+provide("listingHooks", listingHooks);
 const { toClipboard } = useClipboard();
-const queryFormRef = ref();
-const loading = ref(false);
+
+const {
+  loading,
+  fallback,
+  categoryTypeOptions,
+  tableData,
+  pageNum,
+  pageSize,
+  total,
+  handleQuery,
+  handleSortChange,
+  handleSizeChange,
+  handleCurrentChange,
+} = listingHooks;
+
 const columnConfigVisible = ref(false);
 
 // 批量操作相关
 const selectedRows = ref<ListingItemVO[]>([]);
 const batchTagDialogVisible = ref(false);
-const batchTags = ref<string[]>([]);
-const batchInput = ref("");
-const batchInputVisible = ref(false);
-const batchInputRef = ref();
+const batchTagDialogRef = ref();
 
 // 批量分类相关
 const batchAssortDialogVisible = ref(false);
-const batchAssortValue = ref("");
 
 const tagDialogVisible = ref(false);
-const currentTagAsin = ref("");
-const currentTags = ref<string[]>([]);
-const newTagInput = ref("");
-const inputVisible = ref(false);
-const inputRef = ref();
+const currentEditTagRow = ref<any>(null);
 
 function getVariants(val: any) {
   if (!val || val === "--") return [];
@@ -901,8 +547,8 @@ function getVariants(val: any) {
       // but assuming it's standard JSON array structure here.
       // Wait, python single quotes might be inside:
       const trimmed = val.trim();
-      if (trimmed.startsWith('[')) {
-        let jsonStr = trimmed.replace(/'/g, '"');
+      if (trimmed.startsWith("[")) {
+        const jsonStr = trimmed.replace(/'/g, '"');
         const parsed = JSON.parse(jsonStr);
         if (Array.isArray(parsed)) return parsed;
       }
@@ -920,23 +566,26 @@ function getRowTags(row: any) {
     return row.label;
   }
   // 如果是字符串
-  if (typeof row.label === 'string') {
+  if (typeof row.label === "string") {
     const trimmed = row.label.trim();
     // 可能是标准 JSON 字符串如 '["a","b"]' 或者是 python 单引号字符串 "['a','b']"
-    if (trimmed.startsWith('[')) {
+    if (trimmed.startsWith("[")) {
       try {
         // 先尝试正常 JSON 解析
         const parsed = JSON.parse(trimmed);
         if (Array.isArray(parsed)) return parsed;
-      } catch(e) {
+      } catch {
         // 解析失败（比如出现单引号），手动清理
         const content = trimmed.slice(1, -1);
         if (!content.trim()) return [];
-        return content.split(',').map((s: string) => s.trim().replace(/^['"]|['"]$/g, '')).filter((x: string) => x);
+        return content
+          .split(",")
+          .map((s: string) => s.trim().replace(/^['"]|['"]$/g, ""))
+          .filter((x: string) => x);
       }
     }
     // 兼容原有的逗号分隔字符串
-    return trimmed.split(',').filter((x: string) => x);
+    return trimmed.split(",").filter((x: string) => x);
   }
   return [];
 }
@@ -945,13 +594,51 @@ function handleSelectionChange(selection: ListingItemVO[]) {
   selectedRows.value = selection;
 }
 
+const isShiftDown = ref(false);
+function handleKeyDown(e: KeyboardEvent) {
+  if (e.key === "Shift") isShiftDown.value = true;
+}
+function handleKeyUp(e: KeyboardEvent) {
+  if (e.key === "Shift") isShiftDown.value = false;
+}
+
+onMounted(() => {
+  window.addEventListener("keydown", handleKeyDown);
+  window.addEventListener("keyup", handleKeyUp);
+});
+onUnmounted(() => {
+  window.removeEventListener("keydown", handleKeyDown);
+  window.removeEventListener("keyup", handleKeyUp);
+});
+
+const tableRef = ref();
+let lastSelectedIndex = -1;
+
+function handleSelect(selection: any[], row: any) {
+  const currentIndex = tableData.value.findIndex((item) => item === row);
+  const isSelected = selection.some((item) => item === row);
+
+  if (isShiftDown.value && lastSelectedIndex !== -1 && lastSelectedIndex !== currentIndex) {
+    const start = Math.min(lastSelectedIndex, currentIndex);
+    const end = Math.max(lastSelectedIndex, currentIndex);
+
+    // Select or deselect everything between based on the target row's state
+    for (let i = start; i <= end; i++) {
+      tableRef.value?.toggleRowSelection(tableData.value[i], isSelected);
+    }
+    // Prevent default selection text highlighting
+    window.getSelection()?.removeAllRanges();
+  }
+
+  lastSelectedIndex = currentIndex;
+}
+
 function handleBatchOpen() {
   if (selectedRows.value.length === 0) {
     ElMessage.warning("请先勾选商品");
     return;
   }
-  batchTags.value = [];
-  batchInput.value = "";
+  batchTagDialogRef.value?.init?.();
   batchTagDialogVisible.value = true;
 }
 
@@ -960,103 +647,11 @@ function handleBatchAssortOpen() {
     ElMessage.warning("请先勾选商品");
     return;
   }
-  batchAssortValue.value = "";
   batchAssortDialogVisible.value = true;
 }
 
-async function executeBatchAssort() {
-  if (!batchAssortValue.value) {
-    ElMessage.warning("请选择要设置的分类");
-    return;
-  }
-
-  const updates: any[] = [];
-  for (const row of selectedRows.value) {
-    updates.push({ asin: row.asin, assort: batchAssortValue.value });
-  }
-
-  try {
-    await SalesProductListingAPI.upsertAssort(updates);
-    ElMessage.success("批量修改分类成功");
-    batchAssortDialogVisible.value = false;
-    handleQuery();
-  } catch (e) {
-    console.error(e);
-    ElMessage.error("批量修改分类失败");
-  }
-}
-
-function showBatchInput() {
-  batchInputVisible.value = true;
-  nextTick(() => {
-    batchInputRef.value?.focus();
-  });
-}
-
-function handleBatchInputConfirm() {
-  const val = batchInput.value.trim();
-  if (val) {
-    if (!batchTags.value.includes(val)) {
-      batchTags.value.push(val);
-    }
-  }
-  batchInputVisible.value = false;
-  batchInput.value = "";
-}
-
-function handleBatchRemoveTag(tag: string) {
-  batchTags.value = batchTags.value.filter((t) => t !== tag);
-}
-
-function handleBatchClear() {
-  batchTags.value = [];
-}
-
-function confirmBatchAction(action: 'add' | 'delete') {
-  if (batchTags.value.length === 0) {
-    ElMessage.warning("请先输入标签");
-    return;
-  }
-  const actionText = action === "add" ? "添加" : "删除";
-  ElMessageBox.confirm(
-    `确定要对选中的 ${selectedRows.value.length} 个商品${actionText}以下标签吗？\n${batchTags.value.join(", ")}`,
-    "确认操作",
-    { confirmButtonText: "确定", cancelButtonText: "取消", type: "warning" }
-  ).then(() => {
-    executeBatchAction(action);
-  });
-}
-
-async function executeBatchAction(action: 'add' | 'delete') {
-  const updates: any[] = [];
-  for (const row of selectedRows.value) {
-    const originalTags = getRowTags(row);
-    let newTags = [...originalTags];
-
-    if (action === "add") {
-      const set = new Set([...newTags, ...batchTags.value]);
-      newTags = Array.from(set);
-    } else {
-      newTags = newTags.filter((t) => !batchTags.value.includes(t));
-    }
-
-    updates.push({ asin: row.asin, tags: newTags });
-  }
-
-  try {
-    await SalesProductListingAPI.upsertLabels(updates);
-    ElMessage.success("批量操作成功");
-    batchTagDialogVisible.value = false;
-    handleQuery();
-  } catch (e) {
-    console.error(e);
-    ElMessage.error("操作失败");
-  }
-}
-
 function handleEditTags(row: ListingItemVO) {
-  currentTagAsin.value = row.asin;
-  currentTags.value = getRowTags(row);
+  currentEditTagRow.value = row;
   tagDialogVisible.value = true;
 }
 
@@ -1073,11 +668,11 @@ function handleEditRemark(row: any) {
       try {
         await SalesProductListingAPI.upsertRemark({
           listing_id: row.listing_id,
-          remark: value
+          remark: value,
         });
         ElMessage.success("备注保存成功");
         row.remarks = fallback(value);
-      } catch (e) {
+      } catch {
         ElMessage.error("备注保存失败");
       } finally {
         row.remarkLoading = false;
@@ -1087,99 +682,6 @@ function handleEditRemark(row: any) {
       // 取消操作
     });
 }
-
-function showInput() {
-  inputVisible.value = true;
-  nextTick(() => {
-    const el = inputRef.value;
-    if (el) {
-      if (el.input?.focus) {
-        el.input.focus();
-      } else {
-        el.focus?.();
-      }
-    }
-  });
-}
-
-function handleInputConfirm() {
-  const val = newTagInput.value.trim();
-  if (val) {
-    if (!currentTags.value.includes(val)) {
-      currentTags.value.push(val);
-    }
-  }
-  inputVisible.value = false;
-  newTagInput.value = "";
-}
-
-function handleRemoveTag(tag: string) {
-  currentTags.value = currentTags.value.filter((t) => t !== tag);
-}
-
-function handleSaveTags() {
-  SalesProductListingAPI.upsertLabels([{
-    asin: currentTagAsin.value,
-    tags: currentTags.value,
-  }]).then(() => {
-    ElMessage.success("保存成功");
-    tagDialogVisible.value = false;
-    handleQuery();
-  });
-}
-
-// 多项搜索相关
-const multiSearchVisible = ref(false);
-const multiSearchText = ref("");
-
-watch(multiSearchVisible, (val) => {
-  if (val) {
-    if (queryParams.keywords) {
-      // 将逗号分隔转换为换行显示
-      multiSearchText.value = queryParams.keywords.replace(/,|，/g, "\n");
-    } else {
-      multiSearchText.value = "";
-    }
-  }
-});
-
-function handleMultiSearchClear() {
-  multiSearchText.value = "";
-}
-
-function handleMultiSearchConfirm() {
-  if (multiSearchText.value) {
-    const lines = multiSearchText.value
-      .split(/[\n\r]+/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-    queryParams.keywords = lines.join(","); // 用英文逗号连接
-  } else {
-    queryParams.keywords = "";
-  }
-  multiSearchVisible.value = false;
-  handleQuery();
-}
-
-const searchInputFocused = ref(false);
-const displayKeywords = computed({
-  get: () => {
-    const raw = queryParams.keywords;
-    if (searchInputFocused.value) return raw;
-    if (!raw) return "";
-    // 判断是否包含逗号
-    if (raw.includes(",")) {
-      const arr = raw.split(",").filter((s) => s.trim());
-      if (arr.length > 1) {
-        return `${arr[0]} +${arr.length - 1}`;
-      }
-    }
-    return raw;
-  },
-  set: (val) => {
-    queryParams.keywords = val;
-  },
-});
 
 // 复制功能
 const handleCopy = async (text: string) => {
@@ -1193,274 +695,6 @@ const handleCopy = async (text: string) => {
 };
 
 // 默认列配置
-const defaultColumns = [
-  {
-    prop: "image",
-    label: "图片",
-    visible: true,
-    fixed: "left",
-    width: 69,
-    align: "center",
-    category: "基础信息",
-  },
-  {
-    prop: "msku",
-    label: "MSKU/FNSKU",
-    visible: true,
-    fixed: "left",
-    width: 150,
-    category: "基础信息",
-    sortable: "custom",
-  },
-  {
-    prop: "skuName",
-    label: "品名/SKU",
-    visible: true,
-    fixed: "left",
-    width: 150,
-    category: "基础信息",
-    sortable: "custom",
-  },
-  { prop: "shop", label: "店铺", visible: true, width: 114, category: "基础信息" },
-  { prop: "country", label: "国家", visible: true, width: 75, category: "基础信息" },
-  { prop: "assort", label: "分类", visible: true, width: 100, category: "基础信息" },
-  {
-    prop: "status",
-    label: "状态",
-    visible: true,
-    fixed: false,
-    width: 90,
-    align: "center",
-    category: "基础信息",
-  },
-  {
-    prop: "open_date_time",
-    label: "创建时间",
-    visible: true,
-    width: 185,
-    category: "其他信息",
-    sortable: "custom",
-  },
-  { prop: "asin", label: "ASIN", visible: true, fixed: false, width: 120, category: "基础信息" },
-  { prop: "parentAsin", label: "父ASIN", visible: true, width: 120, category: "基础信息" },
-  {
-    prop: "label",
-    label: "标签",
-    visible: true,
-    width: 120,
-    align: "center",
-    category: "基础信息",
-  },
-  {
-    prop: "title",
-    label: "标题",
-    visible: true,
-    fixed: false,
-    width: 174,
-    showOverflowTooltip: false, // 改为手动控制 tooltip
-    category: "基础信息",
-  },
-  { prop: "price", label: "价格", visible: true, width: 80, align: "right", category: "库存价格" },
-  {
-    prop: "totalPrice",
-    label: "售价(总价)",
-    visible: true,
-    width: 85,
-    align: "right",
-    category: "库存价格",
-  },
-  {
-    prop: "discountPrice",
-    label: "优惠价",
-    visible: true,
-    width: 80,
-    align: "right",
-    category: "库存价格",
-  },
-  {
-    prop: "fbaSellable",
-    label: "FBA可售",
-    visible: true,
-    width: 80,
-    align: "right",
-    category: "库存价格",
-  },
-  {
-    prop: "estFbaFee",
-    label: "预估FBA费",
-    visible: true,
-    width: 85,
-    align: "right",
-    category: "库存价格",
-  },
-  {
-    prop: "referralFee",
-    label: "平台费",
-    visible: true,
-    width: 80,
-    align: "right",
-    category: "库存价格",
-  },
-  {
-    prop: "salesToday",
-    label: "今日销量",
-    visible: true,
-    width: 100,
-    align: "right",
-    category: "销售数据",
-    sortable: "custom",
-  },
-  {
-    prop: "salesYesterday",
-    label: "昨日销量",
-    visible: true,
-    width: 100,
-    align: "right",
-    category: "销售数据",
-    sortable: "custom",
-  },
-  {
-    prop: "sales7_14_30",
-    label: "7|14|30天销量",
-    visible: true,
-    width: 150,
-    align: "center",
-    category: "销售数据",
-  },
-  {
-    prop: "rank",
-    label: "大类排名",
-    visible: true,
-    width: 150,
-    align: "left",
-    category: "销售数据",
-    sortable: "custom",
-  },
-  {
-    prop: "profit",
-    label: "订单毛利率/毛利润",
-    visible: true,
-    width: 180,
-    align: "right",
-    category: "销售数据",
-    sortable: "custom",
-  },
-  {
-    prop: "avgSales7_14_30",
-    label: "7|14|30日均销量",
-    visible: true,
-    width: 150,
-    align: "center",
-    category: "销售数据",
-  },
-  {
-    prop: "salesAmountYesterday",
-    label: "昨日销售额",
-    visible: true,
-    width: 120,
-    align: "right",
-    category: "销售数据",
-  },
-  {
-    prop: "salesAmount7_14_30",
-    label: "7|14|30天销售额",
-    visible: true,
-    width: 200,
-    align: "center",
-    category: "销售数据",
-  },
-  {
-    prop: "adCostYesterday",
-    label: "昨日广告费",
-    visible: true,
-    width: 120,
-    align: "right",
-    category: "销售数据",
-    sortable: "custom",
-  },
-  {
-    prop: "adCost7_14_30",
-    label: "7|14|30天广告费",
-    visible: true,
-    width: 200,
-    align: "center",
-    category: "销售数据",
-  },
-  {
-    prop: "smallRank",
-    label: "小类排名",
-    visible: true,
-    width: 150,
-    align: "left",
-    category: "销售数据",
-    sortable: "custom",
-  },
-  {
-    prop: "rating",
-    label: "评分/Rating总数",
-    visible: true,
-    width: 140,
-    align: "right",
-    category: "销售数据",
-  },
-  {
-    prop: "openTime",
-    label: "开售时间",
-    visible: true,
-    width: 150,
-    category: "其他信息",
-    sortable: "custom",
-  },
-  {
-    prop: "firstOrderTime",
-    label: "首单时间",
-    visible: true,
-    width: 110,
-    category: "其他信息",
-    sortable: "custom",
-  },
-  { prop: "pairType", label: "配对方式", visible: true, width: 100, category: "其他信息" },
-  { prop: "owner", label: "负责人", visible: true, width: 80, category: "其他信息" },
-  {
-    prop: "operation",
-    label: "操作",
-    visible: true,
-    fixed: false,
-    width: 160,
-    align: "center",
-    category: "基础信息",
-  },
-  { prop: "remarks", label: "备注", visible: true, fixed: "right", width: 150, category: "其他信息" },
-  // 补充 test.html 中的其他列（默认隐藏）
-  { prop: "fulfillment", label: "配送方式", visible: false, width: 90, category: "基础信息" },
-  { prop: "brand", label: "亚马逊品牌", visible: false, width: 99, category: "基础信息" },
-  { prop: "productCode", label: "商品编码", visible: false, width: 150, category: "基础信息" },
-  { prop: "variants", label: "变体属性", visible: false, width: 100, category: "基础信息" },
-  {
-    prop: "b2bPrice",
-    label: "B2B价格",
-    visible: false,
-    width: 100,
-    align: "right",
-    category: "库存价格",
-  },
-  {
-    prop: "listPrice",
-    label: "List Price",
-    visible: false,
-    width: 100,
-    align: "right",
-    category: "库存价格",
-  },
-  {
-    prop: "fbmStock",
-    label: "FBM库存",
-    visible: false,
-    width: 100,
-    align: "right",
-    category: "库存价格",
-  },
-];
 
 const STORAGE_KEY = "SALES_PRODUCT_LISTING_COLUMNS_V5";
 
@@ -1509,717 +743,7 @@ function handleConfigReset() {
   localStorage.removeItem(STORAGE_KEY);
   ElMessage.success("已恢复默认配置");
 }
-
-// 查询参数
-const queryParams = reactive({
-  country: [] as string[],
-  shopId: [] as string[],
-  listingStatus: [] as string[],
-  pairStatus: [] as string[],
-  categoryType: [] as string[],
-  owner: [] as string[],
-  reportUpdatedAt: undefined as [string, string] | undefined,
-  searchType: "sku" as "seller_sku" | "asin" | "sku",
-  keywords: "",
-  // 新增排序参数
-  sort: undefined as string | undefined,
-  order: undefined as string | null | undefined, // ascending, descending, null
-});
-
-// 店铺原始数据
-const shopListRaw = ref<any[]>([]);
-
-// 动态计算国家选项
-const countryOptions = computed(() => {
-  const countries = new Set<string>();
-  shopListRaw.value.forEach((s) => {
-    if (s.country) countries.add(s.country);
-  });
-  // 多选模式下移除“全部”选项，空数组即代表全部
-  const list: { label: string; value: string }[] = [];
-  Array.from(countries)
-    .sort()
-    .forEach((c) => {
-      list.push({ label: c, value: c });
-    });
-  return list;
-});
-
-// 计算所有有效的国家值
-const allCountryValues = computed(() => countryOptions.value.map((it) => it.value));
-// 判断国家是否全选
-const isAllCountries = computed(() => {
-  const selected = queryParams.country;
-  const all = allCountryValues.value;
-  return all.length > 0 && selected.length === all.length;
-});
-// 判断国家是否半选
-const isIndeterminateCountries = computed(() => {
-  const len = queryParams.country.length;
-  return len > 0 && len < allCountryValues.value.length;
-});
-
-// 动态计算店铺选项（根据选中的国家筛选）
-const shopSearchKeyword = ref("");
-
-// 基础店铺选项 (仅国家过滤)
-const baseShopOptions = computed(() => {
-  let list = shopListRaw.value;
-  // 如果选择了国家（数组非空），则进行筛选
-  if (queryParams.country && queryParams.country.length > 0) {
-    list = list.filter((s) => queryParams.country.includes(s.country));
-  }
-  const options: { label: string; value: string }[] = [];
-  list.forEach((s) => {
-    options.push({ label: s.label || s.name, value: s.id });
-  });
-  return options;
-});
-
-// 最终展示选项 (搜索过滤)
-const shopOptions = computed(() => {
-  const options = baseShopOptions.value;
-  if (!shopSearchKeyword.value) return options;
-  const kw = shopSearchKeyword.value.trim().toLowerCase();
-  return options.filter((o) => o.label.toLowerCase().includes(kw));
-});
-
-// 计算所有有效的店铺值 (基于当前筛选结果)
-const allShopValues = computed(() => shopOptions.value.map((it) => it.value));
-// 判断店铺是否全选 (基于当前筛选结果)
-const isAllShops = computed(() => {
-  const selected = queryParams.shopId;
-  const all = allShopValues.value;
-  if (all.length === 0) return false;
-  return all.every((id) => selected.includes(id));
-});
-// 判断店铺是否半选 (基于当前筛选结果)
-const isIndeterminateShops = computed(() => {
-  const selected = queryParams.shopId;
-  const all = allShopValues.value;
-  if (all.length === 0) return false;
-  // 计算选中了多少个当前可见的
-  const selectedCount = all.filter((id) => selected.includes(id)).length;
-  return selectedCount > 0 && selectedCount < all.length;
-});
-
-// 监听国家变化，过滤已选的店铺 + 处理全选逻辑
-watch(
-  () => queryParams.country,
-  (newVal) => {
-    // 处理全选点击 (包含 __ALL__ 的情况)
-    if (newVal.includes("__ALL__")) {
-      // 移除 __ALL__ 标记
-      const realValues = newVal.filter((v) => v !== "__ALL__");
-      // 如果之前不是全选，则变为全选；如果之前是全选（理论上此时点全选，数组会变长，但逻辑上我们视作反选操作或者强制全选）
-      // 这里的交互逻辑：点击“全选”Item -> 触发变更。
-      // 如果当前真实选中的数量 等于 总数量（说明之前就是全选），则清空。
-      // 否则（说明之前是部分选或未选），则全选。
-      if (realValues.length === allCountryValues.value.length) {
-        queryParams.country = [];
-      } else {
-        queryParams.country = [...allCountryValues.value];
-      }
-      return;
-    }
-
-    // 正常的过滤逻辑
-    if (newVal && newVal.length > 0) {
-      // 获取当前符合条件的店铺 ID 集合
-      // 注意：这里需要重新基于新的 countryOptions 计算 shopOptions（computed 会自动更新，但在这里我们要获取的是更新后的）
-      // 由于 computed 更新也是响应式的，这里直接用逻辑推算一下安全的 shop list
-      const currentCountryCodes = newVal;
-      const validShops = shopListRaw.value.filter((s) => currentCountryCodes.includes(s.country));
-      const validShopIds = validShops.map((s) => s.id);
-
-      // 保留那些仍然有效的已选店铺
-      queryParams.shopId = queryParams.shopId.filter((id) => validShopIds.includes(id));
-    }
-  },
-  { deep: true } // 数组监听建议加 deep，虽然这里引用变化也会触发
-);
-
-// 监听店铺变化，处理全选逻辑
-watch(
-  () => queryParams.shopId,
-  (newVal) => {
-    if (newVal.includes("__ALL__")) {
-      const realValues = newVal.filter((v) => v !== "__ALL__");
-      // 获取当前筛选后的所有选项值
-      const visibleValues = allShopValues.value;
-
-      // 判断 visibleValues 是否都已经选中
-      const isAllVisibleSelected =
-        visibleValues.length > 0 && visibleValues.every((id) => realValues.includes(id));
-
-      if (isAllVisibleSelected) {
-        // 反选：移除所有当前可见的
-        queryParams.shopId = realValues.filter((id) => !visibleValues.includes(id));
-      } else {
-        // 全选：合并当前可见的
-        const newSet = new Set([...realValues, ...visibleValues]);
-        queryParams.shopId = Array.from(newSet);
-      }
-    }
-  }
-);
-
-const listingStatusOptions = [
-  { label: "在售", value: "on" },
-  { label: "停售", value: "off" },
-  { label: "已删除", value: "deleted" },
-];
-// listingStatus 全选逻辑
-const allListingStatusValues = listingStatusOptions.map((it) => it.value);
-const isAllListingStatus = computed(() => {
-  const selected = queryParams.listingStatus;
-  const all = allListingStatusValues;
-  return all.length > 0 && selected.length === all.length;
-});
-const isIndeterminateListingStatus = computed(() => {
-  const len = queryParams.listingStatus.length;
-  return len > 0 && len < allListingStatusValues.length;
-});
-watch(
-  () => queryParams.listingStatus,
-  (newVal) => {
-    if (newVal.includes("__ALL__")) {
-      const realValues = newVal.filter((v) => v !== "__ALL__");
-      if (realValues.length === allListingStatusValues.length) {
-        queryParams.listingStatus = [];
-      } else {
-        queryParams.listingStatus = [...allListingStatusValues];
-      }
-    }
-  }
-);
-
-const pairStatusOptions = [
-  { label: "已配对", value: "paired" },
-  { label: "未配对", value: "unpaired" },
-];
-// pairStatus 全选逻辑
-const allPairStatusValues = pairStatusOptions.map((it) => it.value);
-const isAllPairStatus = computed(() => {
-  const selected = queryParams.pairStatus;
-  const all = allPairStatusValues;
-  return all.length > 0 && selected.length === all.length;
-});
-const isIndeterminatePairStatus = computed(() => {
-  const len = queryParams.pairStatus.length;
-  return len > 0 && len < allPairStatusValues.length;
-});
-watch(
-  () => queryParams.pairStatus,
-  (newVal) => {
-    if (newVal.includes("__ALL__")) {
-      const realValues = newVal.filter((v) => v !== "__ALL__");
-      if (realValues.length === allPairStatusValues.length) {
-        queryParams.pairStatus = [];
-      } else {
-        queryParams.pairStatus = [...allPairStatusValues];
-      }
-    }
-  }
-);
-
-const categoryTypeOptions = [
-  { label: "饰品", value: "饰品" },
-  { label: "普货", value: "普货" },
-  { label: "正常服装", value: "正常服装" },
-  { label: "情趣服装", value: "情趣服装" },
-  { label: "其他", value: "其他" },
-  { label: "无", value: "无" },
-];
-// categoryType 全选逻辑
-const allCategoryTypeValues = categoryTypeOptions.map((it) => it.value);
-const isAllCategoryTypes = computed(() => {
-  const selected = queryParams.categoryType;
-  const all = allCategoryTypeValues;
-  return all.length > 0 && selected.length === all.length;
-});
-const isIndeterminateCategoryTypes = computed(() => {
-  const len = queryParams.categoryType.length;
-  return len > 0 && len < allCategoryTypeValues.length;
-});
-watch(
-  () => queryParams.categoryType,
-  (newVal) => {
-    if (newVal.includes("__ALL__")) {
-      const realValues = newVal.filter((v) => v !== "__ALL__");
-      if (realValues.length === allCategoryTypeValues.length) {
-        queryParams.categoryType = [];
-      } else {
-        queryParams.categoryType = [...allCategoryTypeValues];
-      }
-    }
-  }
-);
-
-// 负责人相关逻辑
-const ownerListRaw = ref<any[]>([]);
-const ownerOptions = computed(() => {
-  // 下拉值取 name 字段或 uid
-  return ownerListRaw.value.map((o) => ({ label: o.name_zh || o.name, value: String(o.uid || o.id) }));
-});
-const allOwnerValues = computed(() => ownerOptions.value.map((it) => it.value));
-const isAllOwners = computed(() => {
-  const selected = queryParams.owner;
-  const all = allOwnerValues.value;
-  return all.length > 0 && selected.length === all.length;
-});
-const isIndeterminateOwners = computed(() => {
-  const len = queryParams.owner.length;
-  return len > 0 && len < allOwnerValues.value.length;
-});
-watch(
-  () => queryParams.owner,
-  (newVal) => {
-    if (newVal.includes("__ALL__")) {
-      const realValues = newVal.filter((v) => v !== "__ALL__");
-      if (realValues.length === allOwnerValues.value.length) {
-        queryParams.owner = [];
-      } else {
-        queryParams.owner = [...allOwnerValues.value];
-      }
-    }
-  }
-);
-
-const searchTypeOptions = [
-  { label: "SKU", value: "sku" },
-  { label: "MSKU", value: "seller_sku" },
-  { label: "ASIN", value: "asin" },
-  { label: "标签", value: "tag" },
-];
-
-// 占位表格数据
-const tableData = ref<any[]>([]);
-const pageNum = ref(1);
-const pageSize = ref(50);
-const total = ref(0);
-
-// 价格格式化辅助函数
-const formatPrice = (price: any, currency: string) => {
-  if (price === undefined || price === null || price === "") return "";
-  let symbol = currency;
-  switch (currency) {
-    case "EUR":
-      symbol = "€";
-      break;
-    case "USD":
-      symbol = "$";
-      break;
-    case "GBP":
-      symbol = "£";
-      break;
-    case "JPY":
-    case "CNY":
-      symbol = "¥";
-      break;
-    case "CAD":
-      symbol = "C$";
-      break;
-    case "AUD":
-      symbol = "A$";
-      break;
-  }
-  return symbol ? `${symbol} ${price}` : `${price}`;
-};
-
-const CACHE_KEY_QUERY = "SALES_LISTING_QUERY_PARAMS_V2";
-
-function saveQueryToCache() {
-  const cacheData = {
-    queryParams,
-    pageNum: pageNum.value,
-    pageSize: pageSize.value,
-  };
-  localStorage.setItem(CACHE_KEY_QUERY, JSON.stringify(cacheData));
-}
-
-function loadQueryFromCache() {
-  const cached = localStorage.getItem(CACHE_KEY_QUERY);
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached);
-      // 恢复 queryParams
-      if (parsed.queryParams) {
-        Object.assign(queryParams, parsed.queryParams);
-      }
-      // 恢复分页信息
-      if (parsed.pageNum) pageNum.value = parsed.pageNum;
-      if (parsed.pageSize) pageSize.value = parsed.pageSize;
-    } catch (e) {
-      console.error("加载查询缓存失败", e);
-    }
-  }
-}
-
-function handleFilterChange() {
-  pageNum.value = 1;
-  handleQuery();
-}
-
-function handleQuery() {
-  loading.value = true;
-  saveQueryToCache(); // 保存缓存
-  const params = {
-    pageNum: pageNum.value,
-    pageSize: pageSize.value,
-    ...queryParams,
-  };
-
-  SalesProductListingAPI.getPage(params)
-    .then((res: any) => {
-      // 假设响应结构为 { total: number, data: ListingItemVO[] } 或符合 request 拦截器处理后的结构
-      const list = res.data || [];
-      tableData.value = list.map((item: ListingItemVO) => {
-        // 查找店铺名称 (兼容 id 为数字或字符串的情况)
-        const shopObj = shopListRaw.value.find((s) => String(s.id) === String(item.sid));
-        const shopName = shopObj ? shopObj.label || shopObj.name : item.sid;
-
-        // 状态转义：转为数字判定，避免 "1.0" 等带点字符串导致匹配失败或由前端自行截断
-        const statusVal = Number(item.status);
-        const isDeleteVal = Number(item.is_delete);
-        const currency = (item as any).currency_code;
-
-        // 处理大类排名分类：优先取 seller_category (可能是字符串化的列表)，否则取 seller_category_new (列表)
-        const rankCatRaw = item.seller_category || (item as any).seller_category_new;
-        let rankCat = "";
-
-        if (Array.isArray(rankCatRaw)) {
-          rankCat = rankCatRaw.join("； ");
-        } else if (typeof rankCatRaw === "string") {
-          const str = rankCatRaw.trim();
-          if (str.startsWith("[") && str.endsWith("]")) {
-            try {
-              // 1. 尝试标准 JSON 解析
-              const parsed = JSON.parse(str);
-              if (Array.isArray(parsed)) rankCat = parsed.join("； ");
-              else rankCat = String(parsed);
-            } catch {
-              // 2. 如果标准解析失败（例如 Python 风格单引号 ['A','B']），尝试手动处理
-              // 去除首尾括号
-              const content = str.slice(1, -1);
-              if (!content.trim()) {
-                rankCat = "";
-              } else {
-                // 简单按逗号分割，并去除每一项的首尾引号
-                rankCat = content
-                  .split(",")
-                  .map((s) => s.trim().replace(/^['"]|['"]$/g, ""))
-                  .join("； ");
-              }
-            }
-          } else {
-            // 普通字符串直接使用
-            rankCat = str;
-          }
-        }
-
-        const fallback = (val: any) => (val === null || val === undefined || val === "" ? "--" : val);
-        return {
-          // 保留原始字段供后续操作使用
-          seller_sku: item.seller_sku,
-          local_sku: item.local_sku,
-          assort: fallback(item.assort),
-          db_classification: item.db_classification,
-
-          id: item.id || "--",
-          listing_id: item.listing_id || item.id,
-          image: fallback(item.small_image_url),
-          msku: fallback(item.seller_sku),
-          fnsku: fallback(item.fnsku),
-          // 品名/SKU
-          skuName: item.local_name
-            ? item.local_sku
-              ? `${item.local_name}/${item.local_sku}`
-              : item.local_name
-            : item.local_sku || "--",
-          shop: fallback(item.shop_name || shopName || item.sid),
-          country: fallback(item.marketplace || item.country_code),
-          // 状态转义 1: on, 0: off (处理可能的小数点问题)
-          status:
-            isDeleteVal === 1
-              ? "deleted"
-              : statusVal === 1
-                ? "on"
-                : statusVal === 0
-                  ? "off"
-                  : "unknown",
-          open_date_time: fallback(item.open_date_display), // 使用 open_date_display 映射为 open_date_time 根据需要修改 mapping
-          asin: fallback(item.asin),
-          parentAsin: fallback(item.parent_asin),
-          label: item.label || [],
-          title: fallback(item.item_name),
-          // Classification -> Computed from MSKU or SKU
-          classification: "--",
-          // tag -> global_tags
-          solarTermTag: "--",
-          price: fallback(formatPrice(item.price, currency)),
-          totalPrice: fallback(formatPrice(item.landed_price, currency)),
-          discountPrice: fallback(formatPrice(item.listing_price, currency)),
-          fbaSellable: fallback(item.afn_fulfillable_quantity),
-          estFbaFee: fallback(formatPrice((item as any).fba_fee, currency)),
-          referralFee: fallback(formatPrice((item as any).referral_fee, currency)),
-          salesToday: "--", // 接口未提供今日销量
-          salesYesterday: fallback(item.yesterday_volume),
-          sales7_14_30: `${fallback(item.total_volume)} | ${fallback(item.fourteen_volume)} | ${fallback(item.thirty_volume)}`,
-          rank: {
-            rank: fallback(item.seller_rank),
-            category: fallback((item as any).small_category),
-          },
-          profit: "--", // 需计算或接口补充
-          avgSales7_14_30: `${fallback(item.average_seven_volume)} | ${fallback(item.average_fourteen_volume)} | ${fallback(item.average_thirty_volume)}`,
-          salesAmountYesterday: fallback(formatPrice(item.yesterday_amount, currency)),
-          salesAmount7_14_30: `${fallback(formatPrice(item.seven_amount || 0, currency))} | ${fallback(formatPrice(item.fourteen_amount || 0, currency))} | ${fallback(formatPrice(item.thirty_amount || 0, currency))}`,
-          adCostYesterday: fallback(formatPrice((item as any).yesterday_spend, currency)),
-          adCost7_14_30: `${fallback(formatPrice((item as any).seven_spend || 0, currency))} | ${fallback(formatPrice((item as any).fourteen_spend || 0, currency))} | ${fallback(formatPrice((item as any).thirty_spend || 0, currency))}`,
-          smallRank: {
-            rank: fallback((item as any).small_rank),
-            category: fallback((item as any).small_category),
-          },
-          rating: {
-            value: fallback(Number(item.last_star || 0)),
-            count: fallback(item.review_num || 0),
-          },
-          owner: fallback(item.principal_info
-            ? item.principal_info.map((p: any) => p.realname || p.principal_name).join(", ")
-            : ""),
-          openTime: fallback(item.on_sale_time),
-          firstOrderTime: fallback(item.first_order_time),
-            remarks: fallback((item as any).remarks),
-          // 隐藏列数据映射
-          fulfillment: fallback(item.fulfillment_channel_type),
-          brand: fallback(item.seller_brand),
-          productCode: {
-            id: fallback((item as any).amz_product_id),
-            type: fallback((item as any).amz_product_id_type)
-          },
-          variants: fallback((item as any).variant_text),
-          b2bPrice: fallback(formatPrice((item as any).b2b_price, currency)),
-          listPrice: fallback(formatPrice((item as any).listing_price, currency)),
-          fbmStock: fallback(item.afn_fulfillable_quantity),
-        };
-      });
-      total.value = res.total || 0;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-}
-
-function handleResetQuery() {
-  queryFormRef.value?.resetFields?.();
-  // 确保多选字段重置为数组
-  queryParams.country = [];
-  queryParams.shopId = [];
-  queryParams.listingStatus = [];
-  queryParams.pairStatus = [];
-  queryParams.categoryType = [];
-  queryParams.owner = [];
-  queryParams.searchType = "sku";
-  queryParams.keywords = "";
-  queryParams.reportUpdatedAt = undefined;
-  // 排序也会被清除，如果需要保留，请注释下面两行
-  queryParams.sort = undefined;
-  queryParams.order = undefined;
-  // 清除搜索类型及关键字
-  queryParams.searchType = "sku";
-  queryParams.keywords = "";
-
-  // 清除 Element Table 的排序状态 (通过 ref 调用 table 的 clearSort)
-  // 此处因 el-table 未绑定 ref，可暂略，或给 table 加 ref="tableRef"
-  handleQuery();
-}
-
-/**
- * 排序处理
- * { prop, order }: { prop: string, order: 'ascending' | 'descending' | null }
- */
-function handleSortChange({ prop, order }: { prop: string; order: string | null }) {
-  queryParams.sort = prop;
-  queryParams.order = order;
-  // 当 order 为 null 时，表示取消排序，恢复默认
-  handleQuery();
-}
-
-onMounted(async () => {
-  // 1. 先加载本地缓存的查询条件
-  loadQueryFromCache();
-
-  // 2. 获取店铺下拉数据 (await 确保店铺字典加载完毕后再请求列表，解决店铺名无法匹配的问题)
-  try {
-    const res = await ShopsAPI.getOptions();
-    shopListRaw.value = res || [];
-  } catch (err) {
-    console.error("加载店铺数据失败", err);
-  }
-
-  // 加载负责人数据
-  try {
-    const res = await ShopsAPI.getOwners();
-    ownerListRaw.value = res || [];
-  } catch (err) {
-    console.error("加载负责人数据失败", err);
-  }
-
-  // 3. 执行查询
-  handleQuery();
-});
-
-function handleSizeChange(size: number) {
-  pageSize.value = size;
-  pageNum.value = 1;
-  handleQuery();
-}
-function handleCurrentChange(page: number) {
-  pageNum.value = page;
-  handleQuery();
-}
 </script>
 
-<style scoped>
-/* 布局优化：确保表格区域自适应高度，滚动条在表格内部 */
-.app-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%; /* 需配合父级容器高度 */
-  padding-bottom: 0px; /* 减小整页底部留白 */
-  overflow: hidden;
-}
-.data-table {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  margin-top: -4px; /* 减小与搜索栏的间距 */
-  overflow: hidden;
-}
-:deep(.el-card__body) {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  /* 减小内边距，特别是顶部，以压缩设置栏上方空间 */
-  padding: 8px 10px 8px 10px;
-}
-.data-table__content {
-  flex: 1;
-  height: 0; /* 关键属性：强制 flex 子项高度收缩 */
-}
-
-/* 搜索栏整体字体稍小 */
-.search-container {
-  --el-font-size-base: 13px;
-  padding-top: 12px; /* 上边距加宽 */
-  padding-bottom: 2px; /* 下边距 */
-}
-/* 控制搜索项横向间距为 20px，且大幅减小底部间距以节省高度 */
-.search-container :deep(.el-form--inline .el-form-item) {
-  margin-right: 20px;
-  margin-bottom: 10px; /* 下边距收窄 */
-  margin-left: 10px;
-}
-/* 搜索行内部的按钮与输入框保持一点间距 */
-.search-container :deep(.search-row .ml-2) {
-  margin-left: 8px;
-}
-/* 单独将“店铺”这一项的 label 字体调小 */
-.search-container :deep(.label-xs .el-form-item__label) {
-  font-size: 12px;
-  font-weight: 600;
-}
-/* 所有搜索项的 label 字体统一为 12px 加粗 */
-.search-container :deep(.el-form-item__label) {
-  font-size: 12px;
-  font-weight: 600;
-}
-/* 表头样式：居中、12px、加粗、黑体、黑色 */
-:deep(.el-table__header th) {
-  text-align: center;
-}
-:deep(.el-table__header th .cell) {
-  display: block;
-  width: 100%;
-  font-family: SimHei, "Microsoft YaHei", sans-serif; /* 黑体 */
-  font-size: 12px;
-  font-weight: 600;
-  color: #000; /* 表头黑色 */
-  /* 强制表头文字居中，避免非固定列仍为左对齐 */
-  text-align: center;
-}
-
-/* 表格内容字体小一号，颜色深一点但比表头浅 */
-:deep(.el-table .el-table__cell) {
-  padding: 4px 0 !important;
-  font-size: 12px;
-  color: #333; /* 内容深灰色 */
-}
-
-/* 文本容器：用于 MSKU, SKU Name 等 */
-.cell-text-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  width: 100%; /* 确保容器能限制宽度 */
-  line-height: 1.4;
-}
-/* 单行文本溢出隐藏 */
-.text-ellipsis {
-  display: block;
-  width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 图片容器 36x36，居中 */
-.thumb-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  margin: 0 auto;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 4px;
-}
-/* 图片大小 34x34 */
-.thumb-img {
-  display: block;
-  width: 34px;
-  height: 34px;
-}
-/* 表格行高 48px */
-:deep(.el-table__row) {
-  height: 48px;
-}
-</style>
-
-<style>
-/* 下拉框全选选项吸顶样式 (需在非 scoped 中定义以作用于 teleported 的 popper) */
-.select-all-option {
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 10 !important;
-  background-color: var(--el-bg-color-overlay) !important;
-  border-bottom: 1px solid var(--el-border-color-light);
-}
-
-/* 店铺下拉搜索框 去除边框和阴影 (覆盖所有状态) */
-.shop-filter-input .el-input__wrapper,
-.shop-filter-input .el-input__wrapper:hover,
-.shop-filter-input .el-input__wrapper.is-focus {
-  padding-left: 0;
-  box-shadow: none !important;
-}
-</style>
-
-
-
-
-
-
-
-
-
+<style scoped src="./index.scss" lang="scss"></style>
+<style src="./index-global.scss" lang="scss"></style>

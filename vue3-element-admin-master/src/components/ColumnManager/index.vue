@@ -1,8 +1,8 @@
 <template>
   <el-drawer
     v-model="visible"
-    title="列配置"
-    size="680px"
+    title="表头字段显示与排序配置"
+    size="880px"
     class="column-config-drawer"
     append-to-body
   >
@@ -248,62 +248,86 @@ function resetToDefault() {
 <style scoped>
 .column-config-container {
   display: flex;
-  height: calc(100vh - 180px);
-  font-size: 12px;
-  border: 1px solid var(--el-border-color-lighter);
+  height: calc(100vh - 140px);
+  font-size: 14px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--el-border-color-light);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
 }
 
 .config-left {
   display: flex;
   flex-direction: column;
-  width: 65%;
-  border-right: 1px solid var(--el-border-color-lighter);
+  width: 62%;
+  background-color: #fff;
 }
 
 .search-box {
-  padding: 10px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+
+.search-box :deep(.el-input__wrapper) {
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--el-border-color-lighter) inset;
+}
+.search-box :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px var(--el-color-primary-light-3) inset;
 }
 
 .checkbox-groups {
   flex: 1;
-  padding: 10px;
 }
 
 .group-section {
-  margin-bottom: 15px;
+  padding: 20px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.group-section:last-child {
+  border-bottom: none;
 }
 
 .group-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 8px;
-  padding-right: 10px;
-  margin-bottom: 8px;
-  font-size: 12px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
   font-weight: bold;
+  color: var(--el-text-color-primary);
   background-color: var(--el-fill-color-light);
-  border-radius: 4px;
+  border-radius: 8px;
+  border-left: 4px solid var(--el-color-primary);
 }
 
 .group-items {
   display: flex;
   flex-wrap: wrap;
-  padding: 0 4px;
+  gap: 12px 0;
 }
 
 .group-item-checkbox {
-  width: 33%;
+  width: 33.33%;
   margin-right: 0;
-  margin-bottom: 4px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
 }
-/* 强制不换行，超长省略 */
+.group-item-checkbox:hover {
+  background-color: var(--el-fill-color);
+}
+
+/* 优化 checkbox 的截断与展示 */
 :deep(.el-checkbox__label) {
-  width: calc(100% - 24px);
+  width: calc(100% - 22px);
+  padding-left: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 12px;
+  font-size: 15px;
+  color: var(--el-text-color-regular);
   vertical-align: middle;
   white-space: nowrap;
 }
@@ -311,16 +335,21 @@ function resetToDefault() {
 .config-right {
   display: flex;
   flex-direction: column;
-  width: 35%;
-  background-color: var(--el-fill-color-extra-light);
+  width: 38%;
+  background-color: var(--el-color-info-light-9);
+  border-left: 1px solid var(--el-border-color-light);
 }
 
 .selected-count {
   display: flex;
   justify-content: space-between;
-  padding: 10px 15px;
+  align-items: center;
+  padding: 16px 20px;
+  font-size: 14px;
   font-weight: bold;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  color: var(--el-text-color-primary);
+  background-color: #fff;
+  border-bottom: 1px solid var(--el-border-color-light);
 }
 
 .limit-tip {
@@ -330,28 +359,31 @@ function resetToDefault() {
 }
 
 .sort-tip {
-  padding: 5px 15px;
-  font-size: 12px;
+  padding: 12px 20px;
+  font-size: 13px;
   color: var(--el-text-color-secondary);
-  background-color: var(--el-fill-color-light);
 }
 
 .sort-list {
-  padding: 10px;
+  padding: 10px 20px;
 }
 
 .sort-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
-  margin-bottom: 6px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
   background-color: #fff;
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 4px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
 }
 .sort-item:hover {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border-color: var(--el-color-primary-light-5);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 
 .sort-handle {
@@ -361,23 +393,35 @@ function resetToDefault() {
   overflow: hidden;
   cursor: grab;
 }
+.sort-handle:active {
+  cursor: grabbing;
+}
 
 .drag-icon {
-  margin-right: 8px;
-  color: var(--el-text-color-secondary);
+  margin-right: 12px;
+  font-size: 18px;
+  color: var(--el-text-color-placeholder);
+  transition: color 0.2s;
+}
+.sort-item:hover .drag-icon {
+  color: var(--el-color-primary-light-3);
 }
 
 .sort-index {
   display: inline-block;
-  width: 20px;
-  font-size: 12px;
+  width: 28px;
+  font-size: 13px;
+  font-weight: 800;
   color: var(--el-text-color-secondary);
+  font-family: monospace;
 }
 
 .sort-label {
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--el-text-color-regular);
   white-space: nowrap;
 }
 
@@ -388,39 +432,46 @@ function resetToDefault() {
 }
 
 .action-icon {
-  padding: 4px;
-  font-size: 18px; /* 再次增大至 22px */
-  color: var(--el-text-color-primary); /* 加深颜色，解决“不清楚”的问题 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
   cursor: pointer;
   border-radius: 4px;
-  opacity: 0;
-  transition:
-    opacity 0.2s,
-    background-color 0.2s;
+  opacity: 0.4;
+  transition: all 0.2s;
 }
 
 .action-icon:hover {
-  background-color: var(--el-fill-color-dark);
-}
-
-/* 悬浮列时显示所有图标 */
-.sort-item:hover .action-icon {
-  opacity: 1;
-}
-
-/* 激活(固定)状态常驻显示 */
-.action-icon.active {
   color: var(--el-color-primary);
   background-color: var(--el-color-primary-light-9);
+  opacity: 1 !important;
+  transform: scale(1.05);
+}
+
+.sort-item:hover .action-icon {
+  opacity: 0.7;
+}
+
+.action-icon.active {
+  color: #fff;
+  background-color: var(--el-color-primary);
   opacity: 1;
+  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
 }
 
 .delete-icon:hover {
-  color: var(--el-color-danger);
+  color: #fff !important;
+  background-color: var(--el-color-danger) !important;
+  box-shadow: 0 2px 6px rgba(245, 108, 108, 0.3);
 }
 
 .drawer-footer {
   display: flex;
   justify-content: space-between;
+  align-items: center;
 }
 </style>

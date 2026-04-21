@@ -1154,4 +1154,3 @@ export default {
   WeatherAPI,
   SalesProductListingAPI,
 };
-

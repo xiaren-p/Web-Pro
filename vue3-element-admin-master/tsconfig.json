@@ -4,10 +4,9 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "lib": ["esnext", "dom"],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@/backend": ["src/backend.ts"]
+      "@/*": ["./src/*"],
+      "@/backend": ["./src/backend.ts"]
     },
 
     // 严格性和类型检查相关配置

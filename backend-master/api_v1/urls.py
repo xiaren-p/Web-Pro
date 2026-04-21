@@ -40,7 +40,7 @@ urlpatterns = [
     path('users/options', views.UserViewSet.as_view({'get': 'options'}), name='user-options'),
     path('users/cloud-create', views.UserViewSet.as_view({'post': 'cloud_create'}), name='user-cloud-create'),
     # 列表/创建
-    path('users', views.UserViewSet.as_view({'post': 'create', 'get': 'generic_get'}), name='users-create-or-template'),
+    path('users', views.UserViewSet.as_view({'get': 'generic_get'}), name='users-create-or-template'),
     # 最后放置 catch-all 的单资源路径
     path('users/<str:id>', views.UserViewSet.as_view({'put': 'update', 'delete': 'delete'}), name='user-update-delete'),
     path('users/<str:id>/password/reset', views.UserViewSet.as_view({'put': 'reset_password'}), name='user-reset-password'),
@@ -50,8 +50,12 @@ urlpatterns = [
     path('users/email/code', views.ProfileViewSet.as_view({'post': 'send_email_code'}), name='user-email-code'),
 
     # 销售相关
-    path('sales/product/listing', views.SalesProductListingViewSet.as_view({'get': 'page', 'post': 'create'}), name='sales-product-listing'),
-    path('sales/product/listing/<str:pk>', views.SalesProductListingViewSet.as_view({'put': 'update', 'delete': 'destroy'}), name='sales-product-listing-detail'),
+    path('sales/product/listing', views.SalesProductListingViewSet.as_view({'get': 'page', }), name='sales-product-listing'),
+    path('sales/product/listing/labels/upsert', views.SalesProductListingViewSet.as_view({'post': 'upsert_labels'}), name='sales-product-listing-labels-upsert'),
+    path('sales/product/listing/assort/upsert', views.SalesProductListingViewSet.as_view({'post': 'upsert_assort'}), name='sales-product-listing-assort-upsert'),
+
+    # 广告模块
+    path('ads/campaigns', views.AdCampaignViewSet.as_view({'get': 'list', }), name='ads-campaigns'),
 
     path('users/email', views.ProfileViewSet.as_view({'put': 'bind_email'}), name='user-bind-email'),
     # moved above
@@ -173,25 +177,17 @@ urlpatterns = [
     path('image-uploads', views.ImageUploadViewSet.as_view({'post': 'create'}), name='image-upload-create'),
     path('image-uploads/<str:pk>', views.ImageUploadViewSet.as_view({'put': 'update', 'delete': 'delete_ids'}), name='image-upload-update-delete'),
 
-    # 节气标签
-    path('solar-terms/query', views.SolarTermTagViewSet.as_view({'post': 'query_by_asins'}), name='solar-terms-query'),
-    path('solar-terms/upsert', views.SolarTermTagViewSet.as_view({'post': 'upsert'}), name='solar-terms-upsert'),
-    path('solar-terms', views.SolarTermTagViewSet.as_view({'get': 'list', 'post': 'create'}), name='solar-terms-list-create'),
-    path('solar-terms/<str:pk>', views.SolarTermTagViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='solar-terms-detail'),
-
-    # 产品归类
-    path('classification/query', views.ProductClassificationViewSet.as_view({'post': 'query_by_mskus'}), name='classification-query'),
-    path('classification/upsert', views.ProductClassificationViewSet.as_view({'post': 'upsert'}), name='classification-upsert'),
-    path('classification', views.ProductClassificationViewSet.as_view({'get': 'list'}), name='classification-list'),
-
     # 根
     # 天气
     # 工作汇报
     path('work-report/team/stats/details', views.WorkReportViewSet.as_view({'get': 'team_stats_details'}), name='work-report-team-stats-details'),
     path('work-report/team/stats', views.WorkReportViewSet.as_view({'get': 'team_stats'}), name='work-report-team-stats'),
-    path('work-report', views.WorkReportViewSet.as_view({'get': 'list', 'post': 'create'}), name='work-report-list'),
+    path('work-report', views.WorkReportViewSet.as_view({'get': 'list', }), name='work-report-list'),
     path('work-report/<str:pk>', views.WorkReportViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='work-report-detail'),
 
     path('weather/live', views.WeatherViewSet.as_view({'get': 'live'}), name='weather-live'),
     path('', views.root_index, name='api-root'),
 ]
+
+
+

@@ -13,8 +13,7 @@ from api_v1.models import CrawlerCategory
 from api_v1.models import CrawlerSellerAccount
 from api_v1.models import ImageUpload
 from api_v1.models import MonthlyLossOrder, MonthlyLossOrderFirst20
-from api_v1.models import SalesProductListing
-from api_v1.models import SolarTermTag, ProductClassification, WorkReport
+from api_v1.models import WorkReport
 import re
 
 
@@ -333,26 +332,6 @@ class MonthlyLossFirst20Serializer(MonthlyLossSerializer):
         fields = MonthlyLossSerializer.Meta.fields
 
 
-class SalesProductListingSerializer(serializers.ModelSerializer):
-    db_classification = serializers.CharField(read_only=True, required=False)
-
-    class Meta:
-        model = SalesProductListing
-        fields = '__all__'
-
-
-class ProductClassificationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProductClassification
-        fields = '__all__'
-
-
-class SolarTermTagSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SolarTermTag
-        fields = '__all__'
-
-
 
 class WorkReportSerializer(serializers.ModelSerializer):
     """
@@ -374,3 +353,16 @@ class WorkReportSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['user', 'created_at', 'updated_at']
+
+from api_v1.models import AdCampaign
+
+class AdCampaignSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AdCampaign
+        fields = '__all__'
+
+from api_v1.models import AdMetricData
+class AdMetricDataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AdMetricData
+        fields = '__all__'

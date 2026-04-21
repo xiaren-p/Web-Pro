@@ -23,17 +23,30 @@
 
     <!-- Toolbar removed here; controls consolidated into table-controls above AdsTable -->
 
-    <section class="content-block">
+    <!-- 指标统计（暂不展示） -->
+    <section v-if="false" class="content-block">
       <Indicators />
     </section>
 
-    <section class="content-block">
+    <section class="content-block data-table-block">
       <div class="table-controls">
-        <div class="left-controls"></div>
+        <div class="left-controls">
+          <!-- 预留左侧操作区可以放批量操作按钮等 -->
+        </div>
 
         <div class="right-controls">
-          <el-checkbox v-model="onlyOverBudget">只查看超预算的</el-checkbox>
-          <el-button size="small" @click="restoreDefaultColumns">列配置</el-button>
+          <el-checkbox v-model="onlyOverBudget" style="margin-right: 8px">
+            只查看超预算的
+          </el-checkbox>
+          <el-tooltip content="列配置" placement="top">
+            <el-button
+              text
+              style="height: 22px; min-height: 22px; padding: 4px; font-size: 16px; color: #606266"
+              @click="restoreDefaultColumns"
+            >
+              <el-icon><Operation /></el-icon>
+            </el-button>
+          </el-tooltip>
         </div>
       </div>
 
@@ -43,7 +56,7 @@
         :page-size="pageSize"
         :current-page="currentPage"
         :total="total"
-        :columns="activeColumns"
+        :columns="tableColumns"
         @current-change="handlePageChange"
         @view-row="viewRow"
         @edit-row="editRow"
@@ -51,16 +64,21 @@
       />
     </section>
 
-    <ColumnConfig v-model="columnConfigVisible" @save="onColumnConfigSave" />
+    <ColumnManager
+      v-model="columnConfigVisible"
+      :columns="activeColumns"
+      @save="onColumnConfigSave"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from "vue";
+import { reactive, ref, computed } from "vue";
+import { Operation } from "@element-plus/icons-vue";
 import Filters from "./Filters.vue";
 import Indicators from "./Indicators.vue";
 import AdsTable from "./AdsTable.vue";
-import ColumnConfig from "./ColumnConfig.vue";
+import ColumnManager from "@/components/ColumnManager/index.vue";
 import { ElMessage } from "element-plus";
 import { getAdCampaigns } from "@/api/ads";
 
@@ -153,36 +171,6 @@ const portfolios = [
   { value: "173732966030275", label: "1.14 选品(FR)" },
 ];
 
-const budgetTypes = [
-  { value: "daily", label: "每日预算" },
-  { value: "lifetime", label: "终生预算" },
-];
-
-const biddingTypes = [
-  { value: "legacyForSales", label: "动态竞价-只降低" },
-  { value: "autoForSales", label: "动态竞价-提高和降低" },
-  { value: "manual", label: "固定竞价" },
-  { value: "ruleBased", label: "基于规则的竞价" },
-];
-
-const costTypes = [
-  { value: "cpc", label: "CPC" },
-  { value: "vcpm", label: "VCPM" },
-];
-
-const siteRestrictions = [
-  { value: "AMAZON_ALL", label: "亚马逊站内外" },
-  { value: "AMAZON_BUSINESS", label: "亚马逊企业购" },
-];
-
-const adsStrategies = [
-  { value: "TimingTactics", label: "分时策略" },
-  { value: "StepBudget", label: "递增预算" },
-  { value: "RuleEngine", label: "自动规则" },
-  { value: "TimingCustomSet", label: "自定义设置" },
-  { value: "NotAppliedTool", label: "未使用工具" },
-];
-
 const tagsList = [
   { value: "unset", label: "未添加标签" },
   { value: "promo", label: "促销" },
@@ -270,26 +258,30 @@ const filters = reactive({
 });
 
 const columnConfigVisible = ref(false);
-const activeColumns = ref([
-  { label: "服务状态", value: "serviceStatus" },
-  { label: "广告组合", value: "portfolio" },
-  { label: "竞价策略", value: "biddingStrategy" },
-  { label: "预算", value: "budget" },
-  { label: "超预算时间", value: "overBudgetTime" },
-  { label: "开始日期", value: "startDate" },
-  { label: "标签", value: "tags" },
-  { label: "IS", value: "is" },
-  { label: "广告销售额", value: "adsSales" },
-  { label: "广告销售额%", value: "adsSalesPercent" },
-  { label: "直接销售额", value: "directSales" },
-  { label: "ACoS", value: "acos" },
-  { label: "ROAS", value: "roas" },
-  { label: "广告订单", value: "adsOrders" },
-  { label: "直接订单", value: "directOrders" },
-  { label: "CVR", value: "cvr" },
-  { label: "广告笔单价", value: "adsOrderPrice" },
-  { label: "广告销量", value: "adsVolume" },
-]);
+
+const defaultColumns = [
+  { label: "服务状态", prop: "serviceStatus", visible: true, category: "基础状态" },
+  { label: "广告组合", prop: "portfolio", visible: true, category: "基础状态" },
+  { label: "竞价策略", prop: "biddingStrategy", visible: true, category: "基础状态" },
+  { label: "预算", prop: "budget", visible: true, category: "基础状态" },
+  { label: "超预算时间", prop: "overBudgetTime", visible: true, category: "基础状态" },
+  { label: "开始日期", prop: "startDate", visible: true, category: "基础状态" },
+  { label: "标签", prop: "tags", visible: true, category: "基础状态" },
+  { label: "IS", prop: "is", visible: true, category: "销售指标" },
+  { label: "广告销售额", prop: "adsSales", visible: true, category: "销售指标" },
+  { label: "广告销售额%", prop: "adsSalesPercent", visible: true, category: "销售指标" },
+  { label: "直接销售额", prop: "directSales", visible: true, category: "销售指标" },
+  { label: "ACoS", prop: "acos", visible: true, category: "核心数据" },
+  { label: "ROAS", prop: "roas", visible: true, category: "核心数据" },
+  { label: "广告订单", prop: "adsOrders", visible: true, category: "核心数据" },
+  { label: "直接订单", prop: "directOrders", visible: true, category: "核心数据" },
+  { label: "CVR", prop: "cvr", visible: true, category: "转化数据" },
+  { label: "广告笔单价", prop: "adsOrderPrice", visible: true, category: "转化数据" },
+  { label: "广告销量", prop: "adsVolume", visible: true, category: "转化数据" },
+];
+
+const activeColumns = ref(defaultColumns);
+const tableColumns = computed(() => activeColumns.value.filter((col) => col.visible));
 
 function restoreDefaultColumns() {
   columnConfigVisible.value = true;

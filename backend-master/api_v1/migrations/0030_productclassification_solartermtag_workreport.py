@@ -9,42 +9,11 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api_v1', '0029_salesproductlisting'),
+        ('api_v1', '0028_allow_blank_cloudpath'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='ProductClassification',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('msku', models.CharField(db_index=True, max_length=255, unique=True, verbose_name='MSKU')),
-                ('sku', models.CharField(blank=True, max_length=255, null=True, verbose_name='SKU')),
-                ('classification_type', models.CharField(max_length=100, verbose_name='归类类型')),
-            ],
-            options={
-                'verbose_name': '产品归类',
-                'verbose_name_plural': '产品归类',
-                'db_table': 'product_classification',
-            },
-        ),
-        migrations.CreateModel(
-            name='SolarTermTag',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('asin', models.CharField(db_index=True, max_length=50, unique=True, verbose_name='ASIN')),
-                ('tags', models.JSONField(blank=True, default=list, verbose_name='标签列表')),
-            ],
-            options={
-                'verbose_name': '节气标签',
-                'verbose_name_plural': '节气标签',
-                'db_table': 'solar_term_tag',
-            },
-        ),
         migrations.CreateModel(
             name='WorkReport',
             fields=[

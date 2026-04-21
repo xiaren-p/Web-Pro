@@ -1,0 +1,218 @@
+/* 布局优化：更现代、干净的界面风格 */
+.app-container {
+  padding: 16px;
+  background-color: var(--el-bg-color-page);
+  box-sizing: border-box;
+  overflow: auto;
+  min-height: 100vh;
+}
+
+/* 独立将搜索包裹为白底圆角卡片 */
+.search-container {
+  --el-font-size-base: 13px;
+  padding: 16px 20px 4px 20px;
+  background-color: var(--el-bg-color);
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s;
+}
+
+.search-container:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.search-container :deep(.el-form--inline .el-form-item) {
+  margin-right: 24px;
+  margin-bottom: 12px;
+}
+
+.search-container :deep(.el-form-item__label) {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+}
+
+/* 数据表格卡片样式优化 */
+.data-table {
+  margin-top: 16px;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+  border: none;
+}
+
+.data-table:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 顶部操作区留白 */
+.data-table__toolbar {
+  padding: 12px 16px 8px 16px;
+}
+
+:deep(.el-card__body) {
+  padding: 0 !important; /* 移除外层内边距，让表格顶入边缘 */
+}
+
+.data-table__content {
+  border-left: none;
+  border-right: none;
+}
+
+/* 表头：浅灰色背景，不生硬 */
+:deep(.el-table__header th) {
+  background-color: #f7f8fb !important;
+  color: #3f4551 !important;
+  font-weight: 600 !important;
+  font-size: 13px;
+  border-bottom: 1px solid #ebeef5;
+  text-align: center;
+}
+
+:deep(.el-table__header th .cell) {
+  width: 100%;
+  display: block;
+}
+
+/* 表格内容：干净字体 */
+:deep(.el-table .el-table__cell) {
+  padding: 8px 0 !important;
+  font-size: 13px;
+  color: #4b5263;
+}
+
+/* 文本容器 */
+.cell-text-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.5;
+  width: 100%;
+}
+
+.text-ellipsis {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 优化图片容器，减弱边框 */
+.thumb-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto;
+  background-color: #fcfcfc;
+  border: 1px solid #f0f2f5;
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.thumb-img {
+  display: block;
+  width: 36px;
+  height: 36px;
+}
+
+:deep(.el-table__row) {
+  height: 54px;
+}
+
+/* 鼠标悬停高亮当前行 */
+:deep(.el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell) {
+  background-color: #f4f6fa;
+}
+
+/* 分页器放到卡片底部边距内 */
+.pagination-container {
+  padding: 12px 16px;
+  border-top: none; /* 移除顶部边框，避免与表格底边框重叠形成双线条 */
+  background-color: #fff;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---------------- 按钮与表单控件全局视觉优化 ---------------- */
+.app-container {
+  /* 减小按钮尺寸，恢复精致比例 */
+  :deep(.el-button) {
+    height: auto;
+    min-height: 32px;
+    padding: 6px 16px;
+    font-size: 13px;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.25s ease;
+  }
+  :deep(.el-button.is-text) {
+    padding: 6px 10px;
+    min-height: 28px;
+  }
+  :deep(.el-button.el-button--small) {
+    min-height: 28px;
+    padding: 4px 12px;
+  }
+  :deep(.el-button--primary) {
+    box-shadow: 0 2px 6px rgba(64, 158, 255, 0.25);
+  }
+  :deep(.el-button--primary:hover) {
+    box-shadow: 0 4px 10px rgba(64, 158, 255, 0.4);
+    transform: translateY(-1px);
+  }
+  :deep(.el-button--success) {
+    box-shadow: 0 2px 6px rgba(103, 194, 58, 0.25);
+  }
+  :deep(.el-button--success:hover) {
+    box-shadow: 0 4px 10px rgba(103, 194, 58, 0.4);
+    transform: translateY(-1px);
+  }
+  :deep(.el-button--warning) {
+    box-shadow: 0 2px 6px rgba(230, 162, 60, 0.25);
+  }
+  :deep(.el-button--warning:hover) {
+    box-shadow: 0 4px 10px rgba(230, 162, 60, 0.4);
+    transform: translateY(-1px);
+  }
+  :deep(.el-button--default) {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+  :deep(.el-button--default:hover) {
+    border-color: var(--el-color-primary);
+    color: var(--el-color-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+  }
+
+  /* 表单包裹框样式优化 */
+  :deep(.el-form-item__label) {
+    font-weight: 500;
+    color: var(--el-text-color-primary);
+    padding-right: 8px;
+    height: 32px;
+    line-height: 32px;
+  }
+  :deep(.el-form-item) {
+    margin-bottom: 12px;
+    margin-right: 16px;
+    align-items: center;
+  }
+  :deep(.el-input__wrapper), :deep(.el-select__wrapper) {
+    min-height: 32px;
+    font-size: 13px;
+    padding: 0 12px;
+    border-radius: 6px;
+    transition: all 0.25s ease;
+    box-shadow: 0 0 0 1px var(--el-border-color) inset;
+    background-color: var(--el-fill-color-blank);
+  }
+  :deep(.el-input__wrapper:hover), :deep(.el-select__wrapper:hover) {
+    box-shadow: 0 0 0 1px var(--el-color-primary) inset, 0 2px 6px rgba(0, 0, 0, 0.02) !important;
+  }
+  :deep(.el-input__wrapper.is-focus), :deep(.el-select__wrapper.is-focus) {
+    box-shadow: 0 0 0 1px var(--el-color-primary) inset, 0 0 0 3px rgba(64, 158, 255, 0.15) !important;
+  }
+}
+

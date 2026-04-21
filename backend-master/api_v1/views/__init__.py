@@ -15,7 +15,7 @@ from api_v1.utils.responses import drf_ok
 def root_index(request):
     return drf_ok({"name": "api_v1"})
 
-from .solar_term_views import SolarTermTagViewSet
-from .classification_views import ProductClassificationViewSet
+from .ads_views import AdCampaignViewSet
 
 from api_v1.views.work_report_views import WorkReportViewSet
+

@@ -21,6 +21,22 @@ class TimeStampedModel(models.Model):
     class Meta:
         abstract = True
 
+class CurrencyIcon(TimeStampedModel):
+    """货币图标配置"""
+    id = models.AutoField(primary_key=True)
+    country = models.CharField(max_length=50, unique=True, verbose_name="国家")
+    code = models.CharField(max_length=50, verbose_name="货币代码")
+    icon = models.CharField(max_length=50, verbose_name="货币标识")
+    name = models.CharField(max_length=100, verbose_name="名字")
+
+    class Meta:
+        db_table = "currency_icon"
+        verbose_name = "货币图标配置"
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return f"{self.country} - {self.code}"
+
 
 class Role(TimeStampedModel):
     """角色表
@@ -544,132 +560,6 @@ class ImageUpload(TimeStampedModel):
         ordering = ['-created_at']
 
 
-class SalesProductListing(TimeStampedModel):
-    """
-    销售商品 Listing
-    关键字段：sid + seller_sku + fnsku + asin 唯一确定一个商品
-    """
-    listing_id = models.CharField(max_length=50, unique=True, default=uuid.uuid4, verbose_name="业务ID", help_text="唯一标识")
-    sid = models.IntegerField(verbose_name="店铺ID", db_index=True)
-    marketplace = models.CharField(max_length=50, verbose_name="国家/站点")
-    seller_sku = models.CharField(max_length=100, verbose_name="MSKU", db_index=True)
-    fnsku = models.CharField(max_length=100, verbose_name="FNSKU", blank=True, default="")
-    asin = models.CharField(max_length=50, verbose_name="ASIN", db_index=True)
-    parent_asin = models.CharField(max_length=50, verbose_name="父ASIN", blank=True, default="")
-    small_image_url = models.CharField(max_length=500, verbose_name="商品缩略图", blank=True, default="")
-    
-    status = models.IntegerField(default=1, verbose_name="状态 1:在售 0:停售")
-    is_delete = models.IntegerField(default=0, verbose_name="是否删除 0:否 1:是")
-    
-    item_name = models.CharField(max_length=500, verbose_name="标题", blank=True, default="")
-    local_sku = models.CharField(max_length=100, verbose_name="本地SKU", blank=True, default="")
-    local_name = models.CharField(max_length=200, verbose_name="本地品名", blank=True, default="")
-    
-    currency_code = models.CharField(max_length=10, verbose_name="币种", default="USD")
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="价格", default=0)
-    landed_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="总价", default=0)
-    listing_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="优惠价", default=0)
-    shipping = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="运费", default=0)
-    points = models.CharField(max_length=50, verbose_name="积分", blank=True, default="")
-    
-    quantity = models.IntegerField(default=0, verbose_name="FBM库存")
-    afn_fulfillable_quantity = models.IntegerField(default=0, verbose_name="FBA可售")
-    afn_unsellable_quantity = models.IntegerField(default=0, verbose_name="FBA不可售")
-    
-    reserved_fc_transfers = models.IntegerField(default=0, verbose_name="待调仓")
-    reserved_fc_processing = models.IntegerField(default=0, verbose_name="调仓中")
-    reserved_customerorders = models.IntegerField(default=0, verbose_name="待发货")
-    
-    afn_inbound_shipped_quantity = models.IntegerField(default=0, verbose_name="在途")
-    afn_inbound_working_quantity = models.IntegerField(default=0, verbose_name="计划入库")
-    afn_inbound_receiving_quantity = models.IntegerField(default=0, verbose_name="入库中")
-    
-    open_date = models.CharField(max_length=50, verbose_name="创建时间", blank=True, default="")
-    open_date_display = models.CharField(max_length=50, verbose_name="创建时间Display", blank=True, default="")
-    listing_update_date = models.CharField(max_length=50, verbose_name="更新时间", blank=True, default="")
-    
-    seller_rank = models.IntegerField(default=0, verbose_name="排名")
-    seller_brand = models.CharField(max_length=100, verbose_name="亚马逊品牌", blank=True, default="")
-    seller_category = models.CharField(max_length=200, verbose_name="类别", blank=True, default="")
-    
-    review_num = models.IntegerField(default=0, verbose_name="评论数")
-    last_star = models.CharField(max_length=10, verbose_name="评分", blank=True, default="")
-    fulfillment_channel_type = models.CharField(max_length=20, verbose_name="配送方式", blank=True, default="")
-    
-    # 复杂结构，使用 JSONField 存储
-    principal_info = models.JSONField(verbose_name="负责人信息", default=list, blank=True)
-    seller_category_new = models.JSONField(verbose_name="新版类别", default=list, blank=True)
-    
-    pair_update_time = models.CharField(max_length=50, verbose_name="配对更新时间", blank=True, default="")
-    first_order_time = models.CharField(max_length=50, verbose_name="首单时间", blank=True, default="")
-    on_sale_time = models.CharField(max_length=50, verbose_name="开售时间", blank=True, default="")
-    store_type = models.IntegerField(default=1, verbose_name="商店类型")
-    
-    # 销量相关 (存字符串或数值，根据需求，这里沿用字符串以保持一致性，或建议转数值)
-    total_volume = models.CharField(max_length=50, default="0", verbose_name="7天销量")
-    yesterday_volume = models.CharField(max_length=50, default="0", verbose_name="昨日销量")
-    fourteen_volume = models.CharField(max_length=50, default="0", verbose_name="14天销量")
-    thirty_volume = models.CharField(max_length=50, default="0", verbose_name="30天销量")
-    
-    yesterday_amount = models.CharField(max_length=50, default="0.00", verbose_name="昨日销售额")
-    seven_amount = models.CharField(max_length=50, default="0.00", verbose_name="7天销售额")
-    fourteen_amount = models.CharField(max_length=50, default="0.00", verbose_name="14天销售额")
-    thirty_amount = models.CharField(max_length=50, default="0.00", verbose_name="30天销售额")
-    
-    average_seven_volume = models.CharField(max_length=50, default="0", verbose_name="7日均销量")
-    average_fourteen_volume = models.CharField(max_length=50, default="0", verbose_name="14日均销量")
-    average_thirty_volume = models.CharField(max_length=50, default="0", verbose_name="30日均销量")
-    
-    dimension_info = models.JSONField(verbose_name="尺寸信息", default=dict, blank=True)
-    small_rank = models.JSONField(verbose_name="小类排名", default=dict, blank=True)
-    global_tags = models.JSONField(verbose_name="全局标签", default=list, blank=True)
-    
-    class Meta:
-        verbose_name = "销售Listing"
-        verbose_name_plural = "销售Listing"
-        db_table = "sales_product_listing"
-        indexes = [
-            models.Index(fields=['sid', 'seller_sku', 'fnsku', 'asin']),
-        ]
-
-class SolarTermTag(TimeStampedModel):
-    """
-    ASIN 节气标签表
-    独立于 Listing，以 ASIN 为维度维护标签
-    """
-    asin = models.CharField(max_length=50, unique=True, verbose_name="ASIN", db_index=True)
-    tags = models.JSONField(default=list, verbose_name="标签列表", blank=True)
-
-    def __str__(self):
-        return f"{self.asin}: {self.tags}"
-
-    class Meta:
-        verbose_name = "节气标签"
-        verbose_name_plural = "节气标签"
-        db_table = "solar_term_tag"
-
-
-class ProductClassification(TimeStampedModel):
-    """
-    产品归类表
-    通过 MSKU (Seller SKU) 为维度维护产品归类
-    优先于规则匹配
-    """
-    msku = models.CharField(max_length=255, unique=True, verbose_name="MSKU", db_index=True)
-    sku = models.CharField(max_length=255, blank=True, null=True, verbose_name="SKU")
-    classification_type = models.CharField(max_length=100, verbose_name="归类类型") # 饰品, 普货, etc.
-
-    def __str__(self):
-        return f"{self.msku}: {self.classification_type}"
-
-    class Meta:
-        verbose_name = "产品归类"
-        verbose_name_plural = "产品归类"
-        db_table = "product_classification"
-
-
-
-
 class WorkReport(TimeStampedModel):
     """
     工作汇报 (日报/周报)
@@ -694,3 +584,202 @@ class WorkReport(TimeStampedModel):
 
     def __str__(self):
         return f'{self.user.username} {self.report_date} {self.type}'
+
+class AdCampaign(TimeStampedModel):
+    """广告活动基础数据表"""
+    campaign_id = models.CharField(max_length=100, unique=True, help_text="活动ID")
+    profile_id = models.CharField(max_length=100, help_text="Profile ID")
+    store_id = models.CharField(max_length=100, help_text="Store ID")
+    portfolio_id = models.CharField(max_length=100, null=True, blank=True, help_text="Portfolio ID")
+    
+    state = models.CharField(max_length=20, help_text="状态")
+    sponsored_type = models.CharField(max_length=50, help_text="赞助类型 (sponsored_type)")
+    targeting_type = models.CharField(max_length=50, help_text="投放类型 (targeting_type)")
+    store_name = models.CharField(max_length=100, null=True, blank=True, help_text="店铺")
+    
+    name = models.CharField(max_length=255, help_text="广告活动名称")
+    service_status = models.CharField(max_length=50, help_text="服务状态")
+    portfolio_name = models.CharField(max_length=255, null=True, blank=True, help_text="广告组合")
+    bidding_type = models.CharField(max_length=50, help_text="竞价策略")
+    start_date = models.DateField(null=True, blank=True, help_text="开始日期")
+    budget = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="预算")
+    last_over_budget_at = models.DateTimeField(null=True, blank=True, help_text="超预算时间")
+
+    class Meta:
+        db_table = "v1_ad_campaign"
+        verbose_name = "广告活动"
+
+
+class AdMetricData(TimeStampedModel):
+    """广告指标数据表"""
+    campaign_id = models.CharField(max_length=100, unique=True, help_text="活动ID主键")
+    impressions = models.IntegerField(null=True, blank=True, help_text="曝光量")
+    impressions_percent = models.CharField(max_length=50, null=True, blank=True, help_text="曝光%")
+    clicks = models.IntegerField(null=True, blank=True, help_text="点击")
+    clicks_percent = models.CharField(max_length=50, null=True, blank=True, help_text="点击%")
+    ctr = models.CharField(max_length=50, null=True, blank=True, help_text="CTR")
+    cpc = models.CharField(max_length=50, null=True, blank=True, help_text="CPC")
+    spends = models.CharField(max_length=50, null=True, blank=True, help_text="花费")
+    spends_percent = models.CharField(max_length=50, null=True, blank=True, help_text="花费%")
+    cpa = models.CharField(max_length=50, null=True, blank=True, help_text="CPA")
+    sales = models.CharField(max_length=50, null=True, blank=True, help_text="广告销售额")
+    sales_percent = models.CharField(max_length=50, null=True, blank=True, help_text="广告销售额%")
+    direct_sales = models.CharField(max_length=50, null=True, blank=True, help_text="直接销售额")
+    acos = models.CharField(max_length=50, null=True, blank=True, help_text="ACoS")
+    roas = models.CharField(max_length=50, null=True, blank=True, help_text="ROAS")
+    orders = models.IntegerField(null=True, blank=True, help_text="广告订单")
+    direct_orders = models.IntegerField(null=True, blank=True, help_text="直接订单")
+    cvr = models.CharField(max_length=50, null=True, blank=True, help_text="CVR")
+    unit_price = models.CharField(max_length=50, null=True, blank=True, help_text="广告笔单价")
+    ad_units = models.IntegerField(null=True, blank=True, help_text="广告销量")
+    top_of_search_impression_share = models.CharField(max_length=50, null=True, blank=True, help_text="IS")
+
+    class Meta:
+        db_table = "v1_ad_metric_data"
+        verbose_name = "广告指标数据"
+
+class LxSellers(models.Model):
+    id = models.BigAutoField(primary_key=True, verbose_name='id')
+    name = models.CharField(max_length=255, null=True, blank=True)
+    seller_id = models.CharField(max_length=100, null=True, blank=True)
+    country_code = models.CharField(max_length=10, null=True, blank=True)
+    country = models.CharField(max_length=50, null=True, blank=True)
+    is_concept = models.IntegerField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = 'lx_sellers'
+
+class LxListingInfo(models.Model):
+    id = models.BigAutoField(primary_key=True, verbose_name="listing 产品ID")
+    msku = models.CharField(max_length=100, blank=True, default="")
+    fnsku = models.CharField(max_length=100, blank=True, default="")
+    status = models.IntegerField(default=0, verbose_name="状态")
+    product_link = models.ForeignKey('LxProductInfo', null=True, blank=True, on_delete=models.DO_NOTHING, db_column='asin', to_field='asin', related_name='listings')
+    item_name = models.TextField(blank=True, null=True, verbose_name="标题")
+    shop_link = models.ForeignKey('LxSellers', null=True, blank=True, on_delete=models.DO_NOTHING, db_column='store_id', to_field='id', related_name='listings')
+    fulfillment_channel_type = models.CharField(max_length=50, blank=True, default="", verbose_name="配送方式")
+    # ... rest is the same
+    amz_product_id = models.CharField(max_length=100, blank=True, default="", verbose_name="商品编码")
+    amz_product_id_type = models.CharField(max_length=50, blank=True, default="")
+    parent_asin = models.CharField(max_length=100, blank=True, default="", verbose_name="父体ASIN")
+    variant_text = models.JSONField(blank=True, null=True, verbose_name="变体属性")
+    seller_category = models.TextField(blank=True, null=True, verbose_name="大类类目")
+    seller_rank = models.IntegerField(default=0, verbose_name="大类排名")
+    small_rank = models.IntegerField(default=0, verbose_name="小类排名")
+    small_category = models.CharField(max_length=255, blank=True, default="", verbose_name="小类类目")
+    stars = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, verbose_name="评分")
+    reviews_num = models.IntegerField(default=0, verbose_name="Rating总数")
+    pair_type = models.CharField(max_length=200, blank=True, default="", verbose_name="配对方式")
+    open_date_time = models.CharField(max_length=100, blank=True, default="", verbose_name="创建时间")
+    on_sale_time = models.CharField(max_length=100, blank=True, default="", verbose_name="开售时间")
+    first_order_time = models.CharField(max_length=100, blank=True, default="", verbose_name="首单时间")
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = 'lx_listing_info'
+        verbose_name = 'Listing 基础表'
+
+
+class LxProductInfo(models.Model):
+    asin = models.CharField(max_length=100, primary_key=True, verbose_name="ASIN")
+    product_id = models.BigIntegerField(default=0, verbose_name="产品ID")
+    local_sku = models.CharField(max_length=100, blank=True, default="", verbose_name="本地SKU")
+    local_name = models.CharField(max_length=255, blank=True, default="", verbose_name="品名")
+    image = models.TextField(blank=True, null=True, verbose_name="图片")
+    brand = models.CharField(max_length=100, blank=True, default="", verbose_name="亚马逊品牌")
+    local_brand = models.CharField(max_length=100, blank=True, default="", verbose_name="本地品牌")
+    principal_list = models.JSONField(blank=True, null=True, verbose_name="负责人信息")
+    assort = models.CharField(max_length=100, blank=True, default="", verbose_name="分类")
+    label = models.CharField(max_length=100, blank=True, default="", verbose_name="标签")
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = 'lx_product_info'
+        verbose_name = '产品基础表'
+
+
+class LxListingRemark(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    listing = models.OneToOneField(LxListingInfo, on_delete=models.CASCADE, db_column='listing_id', related_name='remark', db_constraint=False)
+    remark_text = models.TextField(blank=True, null=True, verbose_name="备注")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
+
+    class Meta:
+        db_table = 'lx_listing_remark'
+        verbose_name = 'Listing备注'
+        verbose_name_plural = verbose_name
+
+class LxOrderProfit(models.Model):
+    listing_id = models.BigAutoField(primary_key=True, verbose_name='listing 产品ID')
+    report_date = models.DateField(verbose_name='报表时间')
+    asin = models.CharField(max_length=100, blank=True, default='', verbose_name='ASIN')
+    gross_profit = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name='毛利润')
+    gross_margin = models.DecimalField(max_digits=10, decimal_places=4, default=0.0000, verbose_name='毛利率')
+    net_gross_margin = models.DecimalField(max_digits=10, decimal_places=4, default=0.0000, verbose_name='净毛利率')
+    volume = models.IntegerField(default=0, verbose_name='销量')
+    return_rate = models.DecimalField(max_digits=10, decimal_places=4, default=0.0000, verbose_name='退货率')
+    refund_amount_rate = models.DecimalField(max_digits=10, decimal_places=4, default=0.0000, verbose_name='退款率')
+    total_stock_fee = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name='仓储费')
+    spend = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name='广告费')
+    spend_rate = models.DecimalField(max_digits=10, decimal_places=4, default=0.0000, verbose_name='广告费率')
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'lx_order_profit'
+        verbose_name = '产品利润报表'
+        verbose_name_plural = verbose_name
+
+
+class LxListingMetrics(models.Model):
+    listing = models.OneToOneField(LxListingInfo, on_delete=models.DO_NOTHING, primary_key=True, db_column='listing_id', related_name='metrics')
+    regular_price = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="售价")
+    price = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="价格")
+    landed_price = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="优惠价")
+    b2b_price = models.CharField(max_length=255, blank=True, default="", verbose_name="B2B价格")
+    listing_price = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="Listing价格")
+    afn_fulfillable_quantity = models.IntegerField(default=0, verbose_name="FBA可售")
+    fba_fee = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="预估FBA费")
+    referral_fee = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="平台费")
+    yesterday_volume = models.IntegerField(default=0, verbose_name="昨日销量")
+    total_volume = models.IntegerField(default=0, verbose_name="7天销量")
+    fourteen_volume = models.IntegerField(default=0, verbose_name="14天销量")
+    thirty_volume = models.IntegerField(default=0, verbose_name="30天销量")
+    average_seven_volume = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="7天日均销量")
+    average_fourteen_volume = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="14天日均销量")
+    average_thirty_volume = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="30天日均销量")
+    yesterday_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="昨日销售额")
+    seven_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="7天销售额")
+    fourteen_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="14天销售额")
+    thirty_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="30天销售额")
+    yesterday_spend = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="昨日广告费")
+    seven_spend = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="7天广告费")
+    fourteen_spend = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="14天广告费")
+    thirty_spend = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="30天广告费")
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = 'lx_listing_metrics'
+        verbose_name = 'Listing业务指标表'
+
+
+class LxUserList(models.Model):
+    """用户列表数据表"""
+    uid = models.BigIntegerField(primary_key=True, help_text="主键")
+    name = models.CharField(max_length=255, null=True, blank=True, help_text="名字")
+    name_zh = models.CharField(max_length=255, null=True, blank=True, help_text="中文名字")
+    has_rule = models.BooleanField(null=True, blank=True, help_text="是否有规则")
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True, help_text="系统更新时间")
+
+    class Meta:
+        managed = False
+        db_table = "lx_user_list"
+        verbose_name = "用户列表"
+        verbose_name_plural = "用户列表"
+
+
