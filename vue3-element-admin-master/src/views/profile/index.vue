@@ -434,9 +434,7 @@ function handleSendEmailCode() {
 const handleSubmit = async () => {
   if (dialog.type === DialogType.ACCOUNT) {
     try {
-      // 如果后端在登录时已告知 seafile token 在服务器端缓存，则
-      // 前端不再强制提示输入密码；仅当缓存不存在时再弹出提示。
-      await UserAPI.updateProfile({ ...userProfileForm });
+    await UserAPI.updateProfile({ ...userProfileForm });
       ElMessage.success("账号资料修改成功");
       dialog.visible = false;
       loadUserProfile();

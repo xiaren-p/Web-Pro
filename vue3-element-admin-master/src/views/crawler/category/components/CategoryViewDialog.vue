@@ -53,7 +53,7 @@
 
 <script setup lang="ts">
 /**
- * 类目数据查看弹窗：通过 Seafile 管理员账号查看爬虫数据文件列表与下载链接。
+ * 类目数据查看弹窗：查看爬虫数据文件列表与下载链接。
  * 所属板块：crawler/category。
  */
 import { ref } from "vue";

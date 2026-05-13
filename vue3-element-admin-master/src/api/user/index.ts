@@ -134,7 +134,7 @@ export const UserAPI = {
       data: form,
     });
   },
-  createCloudUsers(ids: Array<string | number>, passwords: Record<string, string>) {
+  createCloudUsers(ids: Array<string | number>, passwords: Record<string, string> = {}) {
     return request<any, any>({
       url: `${USER_BASE_URL}/cloud-create`,
       method: "post",

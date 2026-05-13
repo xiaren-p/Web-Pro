@@ -3,15 +3,15 @@ from django.db import models
 
 
 class LxOrderProfit(models.Model):
-    """产品利润报表。"""
+    """产品利润报表。
 
-    id = models.BigAutoField(
-        primary_key=True,
-        verbose_name="主键",
-    )
+    实际主键为 (listing_id, report_date) 复合主键；
+    此处以 listing_id 作为 Django ORM 的 pseudo-PK，
+    可安全执行 filter(listing_id__in=...) 批量读取操作。
+    """
 
     listing_id = models.BigIntegerField(
-        default=0,
+        primary_key=True,
         verbose_name="Listing 产品ID",
     )
 
@@ -98,4 +98,8 @@ class LxOrderProfit(models.Model):
         db_table = "lx_order_profit"
         verbose_name = "产品利润报表"
         verbose_name_plural = "产品利润报表"
+        ordering = ["-report_date"]
+
+    def __str__(self) -> str:
+        return f"LxOrderProfit<listing={self.listing_id}, date={self.report_date}>"
 

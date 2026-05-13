@@ -374,50 +374,40 @@ async function handleCreateCloudUser() {
     ElMessage.warning("请先勾选需要创建 cloud 用户的用户行");
     return;
   }
+
+  // 弹输入框获取统一密码（与系统账号密码一致，需管理员确认）
+  let inputPassword: string;
+  try {
+    const { value } = await ElMessageBox.prompt(
+      `将为选中的 ${selectIds.value.length} 位用户在 Seafile 创建账号，请输入其系统账号密码（统一密码，各用户密码须保持一致）`,
+      "创建 Cloud 账号",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        inputType: "password",
+        inputValidator: (val: string) => {
+          if (!val || val.length < 6) return "密码至少 6 位";
+          return true;
+        },
+      }
+    );
+    inputPassword = value;
+  } catch {
+    // 用户点击取消，静默退出
+    return;
+  }
+
   loading.value = true;
   try {
-    // 收集每个选中用户对应的密码（从表单中尝试读取，不存在则询问）
-    const pwdMap: Record<string, string> = {};
-    const ids: Array<string | number> = [];
-    for (const id of selectIds.value) {
-      ids.push(id);
-      try {
-        const u = await UserAPI.getFormData(String(id));
-        const email = u.email;
-        if (!email) {
-          ElMessage.warning(`用户 ${u.username || id} 未配置邮箱，跳过`);
-          continue;
-        }
-        let password = (u as any).password || "";
-        if (!password) {
-          try {
-            const { value } = await (ElMessageBox as any).prompt(
-              `请输入用户 ${u.username || email} 的密码（用于同步到 Seafile）`,
-              "输入密码",
-              { inputType: "password", confirmButtonText: "确定", cancelButtonText: "取消" }
-            );
-            password = value;
-          } catch {
-            ElMessage.info("已取消该用户的创建");
-            continue;
-          }
-        }
-        pwdMap[String(id)] = password;
-      } catch (e: any) {
-        ElMessage.error(`获取用户信息失败：ID=${id} ${e?.message || e}`);
-      }
+    const ids: Array<string | number> = [...selectIds.value];
+    // 构造 passwords 字典：{ "userId": "password" }
+    const passwords: Record<string, string> = {};
+    for (const id of ids) {
+      passwords[String(id)] = inputPassword;
     }
-
-    if (Object.keys(pwdMap).length === 0) {
-      ElMessage.warning("未收集到任何用户密码，操作已取消");
-      return;
-    }
-
-    // 调用后端代理接口进行统一创建，避免浏览器 CORS
-    const resp = await UserAPI.createCloudUsers(ids, pwdMap);
+    const resp = await UserAPI.createCloudUsers(ids, passwords);
     const data = resp?.data || resp || {};
     const fail = data.failCount || 0;
-    // 仅显示通用提示，避免泄露过多细节
     if (fail === 0) {
       ElMessage.success("创建成功！");
     } else {

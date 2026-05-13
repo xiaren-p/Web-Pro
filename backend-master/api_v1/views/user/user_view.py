@@ -33,6 +33,7 @@ from api_v1.serializers import (
     EmailCodeSendSerializer, EmailBindSerializer
 )
 from api_v1.utils.responses import drf_ok, drf_error
+from api_v1.utils.seafile import get_or_refresh_admin_token, invalidate_admin_token, delete_seafile_account
 from api_v1.utils.pagination import paginate_queryset
 # write_log 调用已移除
 
@@ -227,8 +228,12 @@ class UserViewSet(viewsets.ViewSet):
         gender = payload.get("gender")
         if not username:
             return drf_error("用户名不能为空", status=400)
+        if not email:
+            return drf_error("邮箱不能为空", status=400)
         if User.objects.filter(username=username).exists():
             return drf_error("用户名已存在", status=400)
+        if User.objects.filter(email=email).exists():
+            return drf_error("邮箱已被使用", status=400)
         user = User.objects.create(username=username, email=email, is_active=bool(int(status_num)))
         user.set_password(password)
         user.save()
@@ -291,6 +296,44 @@ class UserViewSet(viewsets.ViewSet):
             users_qs = User.objects.filter(id__in=ids)
             if not users_qs.exists():
                 return drf_error("未找到用户", status=404)
+
+            # ── 同步删除 Seafile 账号 ──────────────────────────────────────
+            # 尝试读取 Seafile 管理员配置；若未配置则跳过 cloud 删除，不影响本地删除
+            def _cfg(key: str) -> str:
+                try:
+                    obj = Config.objects.filter(key=key, status=True).first()
+                    return (obj.value or "").strip() if obj else ""
+                except Exception:
+                    return ""
+
+            site = _cfg("SEAFILE_SITE")
+            admin_user = _cfg("SEAFILE_ADMIN_USER")
+            admin_pass = _cfg("SEAFILE_ADMIN_PASSWORD")
+            ttl_str = _cfg("SEAFILE_ADMIN_TOKEN_TTL")
+            try:
+                token_ttl = int(ttl_str) if ttl_str else 3600
+            except ValueError:
+                token_ttl = 3600
+
+            if site and admin_user and admin_pass:
+                token, token_err = get_or_refresh_admin_token(site, admin_user, admin_pass, ttl=token_ttl)
+                if token and not token_err:
+                    for u in users_qs.select_related("profile"):
+                        # 优先使用 cloud_id，其次用邮箱
+                        cloud_email = ""
+                        try:
+                            cloud_email = (getattr(u.profile, "cloud_id", None) or u.email or "").strip()
+                        except Exception:
+                            cloud_email = (u.email or "").strip()
+                        if cloud_email:
+                            ok, err = delete_seafile_account(site, token, cloud_email)
+                            if not ok and err and "401" in str(err):
+                                # token 失效，刷新后重试一次
+                                invalidate_admin_token(site)
+                                token, _ = get_or_refresh_admin_token(site, admin_user, admin_pass, ttl=token_ttl)
+                                if token:
+                                    delete_seafile_account(site, token, cloud_email)
+
             count = users_qs.count()
             users_qs.delete()
             return drf_ok({"deletedCount": count})
@@ -372,10 +415,16 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="cloud-create", permission_classes=[IsAuthenticated])
     def cloud_create(self, request):
-        """后端代理：为选中用户在 Seafile 上创建账号。
+        """后端代理：为选中用户在 Seafile 上批量创建账号。
+
+        管理员凭据从参数配置表（Config）读取，token 由 seafile 工具模块自动缓存刷新。
+        Seafile 账号密码必须由调用方显式传入，与系统账号密码保持一致。
 
         请求 JSON:
-        { "ids": [1,2,3], "passwords": {"1": "pwd1", "2": "pwd2"} }
+        {
+            "ids": [1, 2, 3],
+            "passwords": {"1": "明文密码", "2": "明文密码"}  // 键为用户 ID 字符串
+        }
 
         返回:
         { results: [{id, email, username, success, msg}], successCount, failCount }
@@ -384,9 +433,11 @@ class UserViewSet(viewsets.ViewSet):
         ids = data.get("ids") or data.get("userIds") or []
         if isinstance(ids, str):
             ids = [x.strip() for x in ids.split(",") if x.strip()]
-        passwords = data.get("passwords") or {}
 
-        # 从参数配置表（Config）读取 Seafile 管理员凭据
+        # passwords 字典：{ str(user_id): "明文密码" }
+        passwords: dict = data.get("passwords") or {}
+
+        # 从参数配置表（Config）读取 Seafile 管理员凭据及 token TTL
         def _cfg(key: str) -> str:
             try:
                 obj = Config.objects.filter(key=key, status=True).first()
@@ -397,43 +448,39 @@ class UserViewSet(viewsets.ViewSet):
         site = _cfg("SEAFILE_SITE")
         admin_user = _cfg("SEAFILE_ADMIN_USER")
         admin_pass = _cfg("SEAFILE_ADMIN_PASSWORD")
+        ttl_str = _cfg("SEAFILE_ADMIN_TOKEN_TTL")
+        try:
+            token_ttl = int(ttl_str) if ttl_str else 3600
+        except ValueError:
+            token_ttl = 3600
 
         if not site or not admin_user or not admin_pass:
-            return drf_error("未在参数配置中找到完整的 Seafile 站点和管理员凭据，请在参数配置中配置 SEAFILE_SITE/SEAFILE_ADMIN_USER/SEAFILE_ADMIN_PASSWORD", status=400)
+            return drf_error(
+                "未在参数配置中找到完整的 Seafile 站点和管理员凭据，"
+                "请在参数配置中配置 SEAFILE_SITE / SEAFILE_ADMIN_USER / SEAFILE_ADMIN_PASSWORD",
+                status=400,
+            )
 
         base_site = str(site).strip()
         if not re.match(r"^https?://", base_site, re.I):
             base_site = "https://" + base_site
-        auth_url = base_site.rstrip("/")
-        if not re.search(r"api2/auth-token", auth_url, re.I):
-            auth_url = auth_url + "/api2/auth-token/"
 
-        try:
-            resp = requests.post(auth_url, json={"username": admin_user, "password": admin_pass}, timeout=10)
-        except Exception as e:
-            # write_log removed: 创建 cloud 用户失败: 获取 token 错误
-            return drf_error(f"请求 Seafile 获取 token 失败: {e}", status=502)
-
-        if resp.status_code < 200 or resp.status_code >= 300:
-            try:
-                txt = resp.text
-            except Exception:
-                txt = ""
-            # write_log removed: 创建 cloud 用户失败: Seafile 返回 {resp.status_code}
-            return drf_error(f"Seafile 返回错误: {resp.status_code} {txt}", status=502)
-
-        try:
-            token = resp.json().get("token")
-        except Exception:
-            token = None
-        if not token:
-            return drf_error("未从 Seafile 获取到 token，请检查字典中管理员账号/密码是否正确", status=502)
+        # 获取管理员 token（优先从 Redis cache 读取，过期自动刷新）
+        token, token_err = get_or_refresh_admin_token(site, admin_user, admin_pass, ttl=token_ttl)
+        if token_err or not token:
+            return drf_error(f"获取 Seafile 管理员 token 失败: {token_err}", status=502)
 
         results = []
         success = 0
         fail = 0
         headers = {"Authorization": f"Token {token}", "Content-Type": "application/x-www-form-urlencoded"}
         for uid in ids:
+            uid_str = str(uid)
+            user_password = passwords.get(uid_str) or passwords.get(uid)
+            if not user_password:
+                results.append({"id": uid, "success": False, "msg": "未提供密码"})
+                fail += 1
+                continue
             try:
                 u = User.objects.get(pk=uid)
             except Exception:
@@ -445,20 +492,10 @@ class UserViewSet(viewsets.ViewSet):
                 results.append({"id": uid, "username": u.username, "success": False, "msg": "未配置邮箱"})
                 fail += 1
                 continue
-            pwd = None
-            # 密码可能按 id 字符串或数字 key 存在
-            if str(uid) in passwords:
-                pwd = passwords.get(str(uid))
-            elif isinstance(uid, int) and uid in passwords:
-                pwd = passwords.get(uid)  # type: ignore
-            if not pwd:
-                results.append({"id": uid, "email": email, "username": u.username, "success": False, "msg": "未提供密码"})
-                fail += 1
-                continue
 
             account_url = base_site.rstrip("/") + f"/api2/accounts/{quote(email)}/"
             form = {
-                "password": pwd,
+                "password": user_password,
                 "is_staff": "false",
                 "is_active": ("true" if getattr(u, 'is_active', True) else "false"),
                 "name": (u.profile.nickname if getattr(u, 'profile', None) else u.username),
@@ -469,6 +506,11 @@ class UserViewSet(viewsets.ViewSet):
                 results.append({"id": uid, "email": email, "username": u.username, "success": False, "msg": f"请求创建失败: {e}"})
                 fail += 1
                 continue
+
+            # 若收到 401，可能是 token 已被 Seafile 端清除，主动清除本地缓存
+            if r.status_code == 401:
+                invalidate_admin_token(site)
+
             if 200 <= r.status_code < 300:
                 # 解析返回 JSON，尝试读取 Seafile 返回的 email 作为 cloud_id 并保存到 profile
                 returned_email = None
