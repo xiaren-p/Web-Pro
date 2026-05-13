@@ -9,6 +9,8 @@
 - `custom_exception_handler`：DRF 的自定义异常处理器
 """
 
+import logging
+
 from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer
 from rest_framework.views import exception_handler as drf_exception_handler
@@ -20,6 +22,8 @@ from rest_framework.exceptions import (
     ValidationError,
     AuthenticationFailed,
 )
+
+logger = logging.getLogger(__name__)
 
 SUCCESS_CODE = "00000"
 PARAM_ERROR_CODE = "B0001"
@@ -79,6 +83,7 @@ def custom_exception_handler(exc, context):
         return exception_to_response(exc)
 
     response = drf_exception_handler(exc, context)
+
     if response is not None:
         status = response.status_code
         if isinstance(exc, (NotAuthenticated, AuthenticationFailed)):
@@ -101,4 +106,12 @@ def custom_exception_handler(exc, context):
             msg = str(getattr(exc, 'detail', '服务器错误'))
         return drf_error(msg=msg, code=code, status=status, data=response.data)
 
+    # 未知异常：记录完整堆栈，方便生产环境排查
+    view = context.get("view") if context else None
+    logger.error(
+        "[custom_exception_handler] [%s] 未处理异常: %s",
+        view.__class__.__name__ if view else "UnknownView",
+        exc,
+        exc_info=True,
+    )
     return exception_to_response(exc)
