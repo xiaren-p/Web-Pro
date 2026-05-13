@@ -1,5 +1,5 @@
 :root {
-  --ads-bg: #f5f7fa;
+  --ads-bg: #f0f2f5;
   --ads-text: #1d1e20;
   --ads-muted: #8c8f94;
   --primary: #409eff;
@@ -9,53 +9,60 @@
 }
 
 .ads-text-container {
-  padding: 20px;
-  background-color: var(--ads-bg);
   min-height: calc(100vh - 50px);
-  color: var(--ads-text);
+  padding: 20px;
   font-family:
-    "Inter",
-    "Helvetica Neue",
-    Helvetica,
-    "PingFang SC",
-    "Hiragino Sans GB",
-    "Microsoft YaHei",
-    "微软雅黑",
-    Arial,
-    sans-serif;
+    "Inter", "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    "微软雅黑", Arial, sans-serif;
+  color: var(--ads-text);
+  background-color: var(--ads-bg);
 }
 
 .content-block {
   padding: 20px 24px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   background: #ffffff;
   border: 1px solid var(--block-border);
   border-radius: var(--radius);
-  box-shadow: 0 1px 4px rgba(19, 23, 31, 0.04);
-  transition: all 0.2s ease-in-out;
+  box-shadow: 0 2px 6px rgba(19, 23, 31, 0.05);
+  transition:
+    box-shadow 0.2s ease-in-out,
+    border-color 0.2s ease-in-out;
 }
 .content-block:hover {
-  box-shadow: 0 4px 14px rgba(19, 23, 31, 0.06);
-  border-color: #dcdfe6;
+  border-color: #d0d7de;
+  box-shadow: 0 4px 16px rgba(19, 23, 31, 0.08);
 }
 
+/* 数据表格区域：去掉自身 padding，由内部子块分别控制 */
+.data-table-block {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+/* 工具栏：统一在此处定义，紧贴表格顶部 */
 .table-controls {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  padding: 4px 0;
+  justify-content: space-between;
+  padding: 10px 20px 10px 20px;
+  border-bottom: 1px solid #f0f2f5;
+}
+.table-controls .left-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 .table-controls .right-controls {
   display: flex;
+  gap: 12px;
   align-items: center;
-  gap: 16px;
 }
 
 .sku-code {
   margin-left: 6px;
-  color: var(--ads-muted);
   font-size: 12px;
+  color: var(--ads-muted);
 }
 .oneLine {
   overflow: hidden;
@@ -72,22 +79,23 @@
   gap: 16px;
 }
 .indicator-card {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 4px;
   min-width: 140px;
   padding: 16px;
   background: #fafafa;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  transition: all 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 .indicator-card:hover {
   background: #ffffff;
   border-color: var(--primary);
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.08);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1);
 }
 
 @media (max-width: 768px) {
@@ -99,18 +107,7 @@
   }
   .table-controls {
     flex-direction: column;
-    align-items: stretch;
     gap: 12px;
+    align-items: stretch;
   }
 }
-
-
-.data-table-block {
-  padding: 0 !important;
-}
-
-.table-controls {
-  padding: 12px 16px 8px 16px !important;
-  margin-bottom: 0 !important;
-}
-

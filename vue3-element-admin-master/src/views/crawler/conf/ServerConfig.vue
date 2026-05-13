@@ -105,7 +105,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from "vue";
-import { CrawlerAPI } from "@/backend";
+import { CrawlerAPI } from "@/api/crawler/conf";
 import { ElMessage, ElMessageBox } from "element-plus";
 import ServerFormDialog from "./components/ServerFormDialog.vue";
 

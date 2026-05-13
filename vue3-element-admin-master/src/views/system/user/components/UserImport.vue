@@ -89,7 +89,7 @@
 
 <script lang="ts" setup>
 import { ElMessage, type UploadUserFile } from "element-plus";
-import { UserAPI } from "@/backend";
+import { UserAPI } from "@/api/user";
 import { ApiCodeEnum } from "@/enums/api/code-enum";
 
 const emit = defineEmits(["import-success"]);

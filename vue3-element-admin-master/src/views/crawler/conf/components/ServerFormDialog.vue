@@ -38,7 +38,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed } from "vue";
-import { CrawlerAPI } from "@/backend";
+import { CrawlerAPI } from "@/api/crawler/conf";
 import { ElMessage } from "element-plus";
 
 const emit = defineEmits(["success"]);

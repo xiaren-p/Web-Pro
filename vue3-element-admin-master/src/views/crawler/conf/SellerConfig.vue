@@ -108,7 +108,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from "vue";
-import { SellerAPI } from "@/backend";
+import { SellerAPI } from "@/api/crawler/seller";
 import { ElMessage, ElMessageBox } from "element-plus";
 import SellerFormDialog from "./components/SellerFormDialog.vue";
 

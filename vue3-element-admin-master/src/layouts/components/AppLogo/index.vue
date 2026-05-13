@@ -39,6 +39,7 @@ defineProps({
 }
 </style>
 
+<!-- 全局样式：需要穿透到 body 级的 .layout-top / .layout-mix / .openSidebar / .hideSidebar 布局状态类，不能使用 scoped 否则完全失效。 -->
 <style lang="scss">
 // 顶部布局和混合布局的特殊处理
 .layout-top,

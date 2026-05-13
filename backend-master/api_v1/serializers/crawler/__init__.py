@@ -1,0 +1,5 @@
+"""crawler 板块序列化器子包。"""
+from api_v1.serializers.crawler.crawler_log_serializer import CrawlerLogSerializer
+from api_v1.serializers.crawler.crawler_conf_serializer import CrawlerConfSerializer
+from api_v1.serializers.crawler.crawler_seller_serializer import CrawlerSellerSerializer
+from api_v1.serializers.crawler.crawler_category_serializer import CrawlerCategorySerializer

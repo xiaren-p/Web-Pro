@@ -80,7 +80,7 @@
 </template>
 <script setup lang="ts">
 import type { FormInstance } from "element-plus";
-import { AuthAPI, type LoginFormData } from "@/backend";
+import { AuthAPI, type LoginFormData } from "@/api/auth";
 import router from "@/router";
 import { useUserStore } from "@/store";
 import { AuthStorage } from "@/utils/auth";

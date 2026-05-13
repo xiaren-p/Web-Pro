@@ -10,8 +10,6 @@ export const STORAGE_KEYS = {
   ACCESS_TOKEN: `${APP_PREFIX}:auth:access_token`, // JWT访问令牌
   REFRESH_TOKEN: `${APP_PREFIX}:auth:refresh_token`, // JWT刷新令牌
   REMEMBER_ME: `${APP_PREFIX}:auth:remember_me`, // 记住登录状态
-  // Seafile token cached flag (后端登录时返回的缓存状态，前端用于判断是否需要提示密码)
-  SEAFILE_CACHED: `${APP_PREFIX}:auth:seafile_cached`,
 
   // 系统核心相关
   DICT_CACHE: `${APP_PREFIX}:system:dict_cache`, // 字典数据缓存

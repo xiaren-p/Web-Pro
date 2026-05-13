@@ -59,7 +59,8 @@
 <script setup lang="ts">
 import { useAppStore } from "@/store/modules/app-store";
 import { DeviceEnum } from "@/enums/settings/device-enum";
-import { RoleAPI, type RolePageVO, MenuAPI } from "@/backend";
+import { RoleAPI, type RolePageVO } from "@/api/role";
+import { MenuAPI } from "@/api/menu";
 
 const emit = defineEmits(["success"]);
 

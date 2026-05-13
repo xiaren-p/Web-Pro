@@ -1,0 +1,144 @@
+/**
+ * 用户相关 API：分页查询、增删改、个人中心、头像上传等。
+ */
+import request from "@/utils/request";
+import type { PageQuery, PageResult } from "@/api/common/page";
+
+export interface UserPageQuery extends PageQuery {
+  keywords?: string;
+  status?: number;
+  deptId?: string;
+  createTime?: [string, string];
+}
+
+export interface UserPageVO {
+  id: string;
+  username?: string;
+  nickname?: string;
+  avatar?: string;
+  email?: string;
+  mobile?: string;
+  gender?: number;
+  deptName?: string;
+  roleNames?: string;
+  status?: number;
+  createTime?: Date;
+}
+
+export interface UserForm {
+  id?: string;
+  avatar?: string;
+  deptId?: string;
+  email?: string;
+  gender?: number;
+  mobile?: string;
+  nickname?: string;
+  roleIds?: number[];
+  status?: number;
+  username?: string;
+  password?: string;
+}
+
+export interface UserInfo {
+  userId?: string;
+  username?: string;
+  nickname?: string;
+  avatar?: string;
+  roles: string[];
+  perms: string[];
+}
+
+const USER_BASE_URL = "/users";
+
+export const UserAPI = {
+  getInfo() {
+    return request<any, UserInfo>({ url: `${USER_BASE_URL}/me`, method: "get" });
+  },
+  getPage(queryParams: UserPageQuery) {
+    return request<any, PageResult<UserPageVO[]>>({
+      url: `${USER_BASE_URL}/page`,
+      method: "get",
+      params: queryParams,
+    });
+  },
+  getFormData(userId: string) {
+    return request<any, UserForm>({ url: `${USER_BASE_URL}/${userId}/form`, method: "get" });
+  },
+  create(data: UserForm) {
+    return request({ url: `${USER_BASE_URL}`, method: "post", data });
+  },
+  update(id: string, data: UserForm) {
+    return request({ url: `${USER_BASE_URL}/${id}`, method: "put", data });
+  },
+  resetPassword(id: string, password: string) {
+    return request({
+      url: `${USER_BASE_URL}/${id}/password/reset`,
+      method: "put",
+      params: { password },
+    });
+  },
+  deleteByIds(ids: string) {
+    return request({ url: `${USER_BASE_URL}/${ids}`, method: "delete" });
+  },
+  downloadTemplate() {
+    return request({ url: `${USER_BASE_URL}/template`, method: "get", responseType: "blob" });
+  },
+  export(queryParams: UserPageQuery) {
+    return request({
+      url: `${USER_BASE_URL}/export`,
+      method: "get",
+      params: queryParams,
+      responseType: "blob",
+    });
+  },
+  import(deptId: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<any, any>({
+      url: `${USER_BASE_URL}/import`,
+      method: "post",
+      params: { deptId },
+      data: formData,
+    });
+  },
+  getProfile() {
+    return request<any, any>({ url: `${USER_BASE_URL}/profile`, method: "get" });
+  },
+  updateProfile(data: any) {
+    return request({ url: `${USER_BASE_URL}/profile`, method: "put", data });
+  },
+  changePassword(data: any) {
+    return request({ url: `${USER_BASE_URL}/password`, method: "put", data });
+  },
+  sendMobileCode(mobile: string) {
+    return request({ url: `${USER_BASE_URL}/mobile/code`, method: "post", params: { mobile } });
+  },
+  bindOrChangeMobile(data: any) {
+    return request({ url: `${USER_BASE_URL}/mobile`, method: "put", data });
+  },
+  sendEmailCode(email: string) {
+    return request({ url: `${USER_BASE_URL}/email/code`, method: "post", params: { email } });
+  },
+  bindOrChangeEmail(data: any) {
+    return request({ url: `${USER_BASE_URL}/email`, method: "put", data });
+  },
+  getOptions() {
+    return request<any, any[]>({ url: `${USER_BASE_URL}/options`, method: "get" });
+  },
+  uploadAvatar(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    return request<any, { url: string; name: string }>({
+      url: `${USER_BASE_URL}/avatar`,
+      method: "post",
+      data: form,
+    });
+  },
+  createCloudUsers(ids: Array<string | number>, passwords: Record<string, string>) {
+    return request<any, any>({
+      url: `${USER_BASE_URL}/cloud-create`,
+      method: "post",
+      data: { ids, passwords },
+    });
+  },
+};

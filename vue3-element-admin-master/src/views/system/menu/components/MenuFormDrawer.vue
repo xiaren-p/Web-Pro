@@ -128,7 +128,7 @@
 <script setup lang="ts">
 import { useAppStore } from "@/store/modules/app-store";
 import { DeviceEnum } from "@/enums/settings/device-enum";
-import { MenuAPI, type MenuForm } from "@/backend";
+import { MenuAPI, type MenuForm } from "@/api/menu";
 import { MenuTypeEnum } from "@/enums/system/menu-enum";
 
 const emit = defineEmits(["success"]);

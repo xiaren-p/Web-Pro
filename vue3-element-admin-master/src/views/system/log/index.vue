@@ -68,7 +68,7 @@ defineOptions({
   inheritAttrs: false,
 });
 
-import { LogAPI, type LogPageQuery, type LogPageVO } from "@/backend";
+import { LogAPI, type LogPageQuery, type LogPageVO } from "@/api/log";
 
 const queryFormRef = ref();
 

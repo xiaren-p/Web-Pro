@@ -32,7 +32,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed } from "vue";
-import { CategoryAPI, type CategoryForm } from "@/backend";
+import { CategoryAPI, type CategoryForm } from "@/api/crawler/category";
 import { ElMessage } from "element-plus";
 
 const emit = defineEmits(["success"]);

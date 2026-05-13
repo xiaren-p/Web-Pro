@@ -1,5 +1,6 @@
 import { ref, reactive, computed, onMounted, nextTick, watch } from "vue";
-import { ShopsAPI, SalesProductListingAPI, type ListingItemVO } from "@/backend";
+import { ShopsAPI } from "@/api/shops";
+import { SalesProductListingAPI, type ListingItemVO } from "@/api/sales/listing";
 import {
   listingStatusOptions,
   pairStatusOptions,
@@ -283,13 +284,8 @@ export function useListingTable() {
   const pageSize = ref(50);
   const total = ref(0);
 
-  // 价格格式化辅助函数
-  const formatPrice = (price: any, icon: string) => {
-    if (price === undefined || price === null || price === "") return "";
-    const numPrice = Number(price);
-    if (isNaN(numPrice)) return `${icon} ${price}`;
-    return `${icon} ${numPrice.toFixed(2)}`;
-  };
+  // 价格 / 金额 / 利润等格式化均由后端 serializer/view 完成（``*_display`` 字段），
+  // 前端只负责取值与嵌代，不再作任何数据加工。
 
   const CACHE_KEY_QUERY = "SALES_LISTING_QUERY_PARAMS_V2";
 
@@ -348,7 +344,6 @@ export function useListingTable() {
           // 状态转义：转为数字判定，避免 "1.0" 等带点字符串导致匹配失败或由前端自行截断
           const statusVal = Number(item.status);
           const isDeleteVal = Number(item.is_delete);
-          const currency = (item as any).currency_icon;
 
           // 处理大类排名分类：优先取 seller_category (可能是字符串化的列表)，否则取 seller_category_new (列表)
 
@@ -390,12 +385,12 @@ export function useListingTable() {
             classification: "--",
             // tag -> global_tags
             solarTermTag: "--",
-            price: fallback(formatPrice(item.price, currency)),
-            totalPrice: fallback(formatPrice(item.landed_price, currency)),
-            discountPrice: fallback(formatPrice(item.listing_price, currency)),
+            price: fallback((item as any).price_display),
+            totalPrice: fallback((item as any).landed_price_display),
+            discountPrice: fallback((item as any).listing_price_display),
             fbaSellable: fallback(item.afn_fulfillable_quantity),
-            estFbaFee: fallback(formatPrice((item as any).fba_fee, currency)),
-            referralFee: fallback(formatPrice((item as any).referral_fee, currency)),
+            estFbaFee: fallback((item as any).fba_fee_display),
+            referralFee: fallback((item as any).referral_fee_display),
             salesToday: "--", // 接口未提供今日销量
             salesYesterday: fallback(item.yesterday_volume),
             sales7_14_30: `${fallback(item.total_volume)} | ${fallback(item.fourteen_volume)} | ${fallback(item.thirty_volume)}`,
@@ -406,12 +401,14 @@ export function useListingTable() {
             profit: {
               gross_margin: (item as any).profit_metrics?.gross_margin,
               gross_profit: (item as any).profit_metrics?.gross_profit,
+              gross_margin_display: (item as any).gross_margin_display,
+              gross_profit_display: (item as any).gross_profit_display,
             },
             avgSales7_14_30: `${fallback(item.average_seven_volume)} | ${fallback(item.average_fourteen_volume)} | ${fallback(item.average_thirty_volume)}`,
-            salesAmountYesterday: fallback(formatPrice(item.yesterday_amount, currency)),
-            salesAmount7_14_30: `${fallback(formatPrice(item.seven_amount || 0, currency))} | ${fallback(formatPrice(item.fourteen_amount || 0, currency))} | ${fallback(formatPrice(item.thirty_amount || 0, currency))}`,
-            adCostYesterday: fallback(formatPrice((item as any).yesterday_spend, currency)),
-            adCost7_14_30: `${fallback(formatPrice((item as any).seven_spend || 0, currency))} | ${fallback(formatPrice((item as any).fourteen_spend || 0, currency))} | ${fallback(formatPrice((item as any).thirty_spend || 0, currency))}`,
+            salesAmountYesterday: fallback((item as any).yesterday_amount_display),
+            salesAmount7_14_30: `${fallback((item as any).seven_amount_display)} | ${fallback((item as any).fourteen_amount_display)} | ${fallback((item as any).thirty_amount_display)}`,
+            adCostYesterday: fallback((item as any).yesterday_spend_display),
+            adCost7_14_30: `${fallback((item as any).seven_spend_display)} | ${fallback((item as any).fourteen_spend_display)} | ${fallback((item as any).thirty_spend_display)}`,
             smallRank: {
               rank: fallback((item as any).small_rank),
               category: fallback((item as any).small_category),
@@ -436,8 +433,8 @@ export function useListingTable() {
               type: fallback((item as any).amz_product_id_type),
             },
             variants: fallback((item as any).variant_text),
-            b2bPrice: fallback(formatPrice((item as any).b2b_price, currency)),
-            listPrice: fallback(formatPrice((item as any).listing_price, currency)),
+            b2bPrice: fallback((item as any).b2b_price_display),
+            listPrice: fallback((item as any).listing_price_display),
             fbmStock: fallback(item.afn_fulfillable_quantity),
           };
         });

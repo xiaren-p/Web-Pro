@@ -160,7 +160,7 @@
                   overflow: hidden;
                 "
               >
-                <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 4px; margin-right: 4px">
+                <div style="display: flex; flex: 1; flex-wrap: wrap; gap: 4px; margin-right: 4px">
                   <template v-if="getRowTags(scope.row).length > 0">
                     <el-tag
                       v-for="(tag, index) in getRowTags(scope.row)"
@@ -175,7 +175,7 @@
                   <span v-else class="color-#E6A23C text-12px">-</span>
                 </div>
                 <el-icon
-                  style="cursor: pointer; color: #409eff; flex-shrink: 0"
+                  style="flex-shrink: 0; color: #409eff; cursor: pointer"
                   @click="handleEditTags(scope.row)"
                 >
                   <Edit />
@@ -272,10 +272,10 @@
             <!-- 商品编码 (双行显示) -->
             <template v-else-if="col.prop === 'productCode'">
               <div
-                style="display: flex; flex-direction: column; text-align: center; line-height: 1.3"
+                style="display: flex; flex-direction: column; line-height: 1.3; text-align: center"
               >
                 <span>{{ scope.row.productCode.id }}</span>
-                <span v-if="scope.row.productCode.type" style="color: #909399; font-size: 11px">
+                <span v-if="scope.row.productCode.type" style="font-size: 11px; color: #909399">
                   {{ scope.row.productCode.type }}
                 </span>
               </div>
@@ -294,11 +294,11 @@
                   <template #reference>
                     <div
                       style="
-                        cursor: pointer;
                         display: flex;
                         align-items: center;
                         justify-content: center;
                         color: var(--el-color-primary);
+                        cursor: pointer;
                       "
                     >
                       <span class="text-ellipsis" style="max-width: 120px; font-size: 13px">
@@ -404,13 +404,13 @@
                 >
                   <div
                     class="text-ellipsis"
-                    style="flex: 1; cursor: pointer; color: var(--el-text-color-primary)"
+                    style="flex: 1; color: var(--el-text-color-primary); cursor: pointer"
                   >
                     {{ scope.row[col.prop] }}
                   </div>
                 </el-tooltip>
                 <el-icon
-                  style="cursor: pointer; margin-left: 4px; color: var(--el-color-primary)"
+                  style="margin-left: 4px; color: var(--el-color-primary); cursor: pointer"
                   @click="handleEditRemark(scope.row)"
                 >
                   <Edit />
@@ -421,10 +421,10 @@
             <!-- 利润 (两行显示 毛利率百分比 / 毛利润值) -->
             <template v-else-if="col.prop === 'profit'">
               <div
-                style="display: flex; flex-direction: column; text-align: right; line-height: 1.3"
+                style="display: flex; flex-direction: column; line-height: 1.3; text-align: right"
               >
-                <span style="font-weight: 500; font-size: 13px">
-                  {{ Number((scope.row.profit?.gross_margin || 0) * 100).toFixed(2) }}%
+                <span style="font-size: 13px; font-weight: 500">
+                  {{ scope.row.profit?.gross_margin_display || "0.00%" }}
                 </span>
                 <span
                   :style="{
@@ -435,7 +435,7 @@
                     fontSize: '12px',
                   }"
                 >
-                  €{{ Number(scope.row.profit?.gross_profit || 0).toFixed(2) }}
+                  {{ scope.row.profit?.gross_profit_display || "" }}
                 </span>
               </div>
             </template>
@@ -494,7 +494,7 @@
 <script setup lang="ts">
 import { provide, ref, computed, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { SalesProductListingAPI, type ListingItemVO } from "@/backend";
+import { SalesProductListingAPI, type ListingItemVO } from "@/api/sales/listing";
 import useClipboard from "vue-clipboard3";
 import { useListingTable } from "./useListingTable";
 import ListingSearchForm from "./components/ListingSearchForm.vue";

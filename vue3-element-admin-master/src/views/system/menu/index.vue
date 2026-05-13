@@ -134,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { MenuAPI, type MenuQuery, type MenuVO } from "@/backend";
+import { MenuAPI, type MenuQuery, type MenuVO } from "@/api/menu";
 import { MenuTypeEnum } from "@/enums/system/menu-enum";
 import MenuFormDrawer from "./components/MenuFormDrawer.vue";
 

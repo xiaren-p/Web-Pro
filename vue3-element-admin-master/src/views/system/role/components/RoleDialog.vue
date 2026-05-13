@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { RoleAPI, type RoleForm } from "@/backend";
+import { RoleAPI, type RoleForm } from "@/api/role";
 
 const emit = defineEmits(["success"]);
 

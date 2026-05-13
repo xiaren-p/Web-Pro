@@ -55,7 +55,11 @@ urlpatterns = [
     path('sales/product/listing/assort/upsert', views.SalesProductListingViewSet.as_view({'post': 'upsert_assort'}), name='sales-product-listing-assort-upsert'),
 
     # 广告模块
-    path('ads/campaigns', views.AdCampaignViewSet.as_view({'get': 'list', }), name='ads-campaigns'),
+    path('ads/campaigns', views.AdCampaignViewSet.as_view({'post': 'list', }), name='ads-campaigns'),
+    path('ads/campaigns/detail', views.AdCampaignViewSet.as_view({'get': 'campaign_info', }), name='ads-campaign-detail'),
+    path('ads/options', views.ShopProfileViewSet.as_view({'post': 'options', }), name='ads-options'),
+    path('ads/portfolios/options', views.AdPortfolioViewSet.as_view({'post': 'options', }), name='ads-portfolios-options'),
+    path('ads/ad-groups', views.AdGroupViewSet.as_view({'post': 'list_groups', }), name='ads-adgroups-list'),
 
     path('users/email', views.ProfileViewSet.as_view({'put': 'bind_email'}), name='user-bind-email'),
     # moved above

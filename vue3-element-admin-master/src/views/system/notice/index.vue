@@ -214,7 +214,7 @@
 </template>
 
 <script setup lang="ts">
-import { NoticeAPI, type NoticePageQuery, type NoticePageVO } from "@/backend";
+import { NoticeAPI, type NoticePageQuery, type NoticePageVO } from "@/api/notice";
 import { useUserStoreHook } from "@/store/modules/user-store";
 import NoticeDialog from "./components/NoticeDialog.vue";
 import NoticeDetailDialog from "./components/NoticeDetailDialog.vue";
@@ -278,7 +278,7 @@ async function handleExport() {
   try {
     console.log("[Debug] Start Export, NoticeAPI keys:", Object.keys(NoticeAPI));
     if (typeof (NoticeAPI as any).exportData !== "function") {
-      throw new Error("NoticeAPI.exportData is not a function. Check backend.ts update.");
+      throw new Error("NoticeAPI.exportData is not a function. Check @/api/notice update.");
     }
     // 非管理员仅导出当前用户可见项，后端支持 onlyMine 参数；管理员导出所有匹配项
     const params: any = { ...exportForm };

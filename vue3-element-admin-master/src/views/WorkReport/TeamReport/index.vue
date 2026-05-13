@@ -122,7 +122,7 @@
         <el-table-column prop="type" label="类型" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.type === 'daily' ? 'primary' : 'success'" effect="light">
-              {{ row.type === "daily" ? "日报" : "周报" }}
+              {{ row.type_display || (row.type === "daily" ? "日报" : "周报") }}
             </el-tag>
           </template>
         </el-table-column>
@@ -138,7 +138,7 @@
 
         <el-table-column prop="created_at" label="提交时间" width="160" align="center">
           <template #default="{ row }">
-            {{ formatTime(row.created_at) }}
+            {{ row.created_at_display || formatTime(row.created_at) }}
           </template>
         </el-table-column>
 
@@ -194,7 +194,7 @@
 import { ref, reactive, onMounted } from "vue";
 import { User, Check, Warning, Search, Refresh, View } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
-import ReportDrawer from "../components/ReportDrawer.vue";
+import ReportDrawer from "@/views/WorkReport/components/ReportDrawer.vue";
 import {
   getWorkReportList,
   getTeamStats,
@@ -202,8 +202,8 @@ import {
   type WorkReportVO,
   type WorkReportQuery,
   type TeamStatsVO,
-} from "@/api/work-report";
-import { DeptAPI } from "@/backend";
+} from "@/api/workReport";
+import { DeptAPI } from "@/api/dept";
 
 const loading = ref(false);
 const detailLoading = ref(false);

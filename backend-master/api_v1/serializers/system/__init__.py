@@ -1,0 +1,14 @@
+"""system 板块序列化器子包。"""
+from api_v1.serializers.system.role_serializer import RoleSerializer
+from api_v1.serializers.system.role_write_serializer import RoleWriteSerializer
+from api_v1.serializers.system.dept_serializer import DeptSerializer
+from api_v1.serializers.system.menu_serializer import MenuSerializer
+from api_v1.serializers.system.oper_log_serializer import OperLogSerializer
+from api_v1.serializers.system.user_serializer import UserSerializer
+from api_v1.serializers.system.dict_type_serializer import DictTypeSerializer
+from api_v1.serializers.system.dict_item_serializer import DictItemSerializer
+from api_v1.serializers.system.config_serializer import ConfigSerializer
+from api_v1.serializers.system.mobile_code_send_serializer import MobileCodeSendSerializer
+from api_v1.serializers.system.mobile_bind_serializer import MobileBindSerializer
+from api_v1.serializers.system.email_code_send_serializer import EmailCodeSendSerializer
+from api_v1.serializers.system.email_bind_serializer import EmailBindSerializer

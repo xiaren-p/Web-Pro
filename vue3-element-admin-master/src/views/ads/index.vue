@@ -6,14 +6,15 @@
         :countries="countries"
         :profiles="profiles"
         :ads-types="adsTypes"
-        :target-types="targetTypes"
         :portfolios="portfolios"
         :sku-options="skuOptions"
         :tags-list="tagsList"
         :owners="owners"
         :campaign-statuses="campaignStatuses"
         :service-statuses="serviceStatuses"
+        :bidding-types="biddingTypes"
         :remote-search-sku="remoteSearchSku"
+        :remote-search-portfolio="remoteSearchPortfolio"
         @update:filters="(v) => Object.assign(filters, v)"
         @search="search"
         @reset="resetFilters"
@@ -57,10 +58,11 @@
         :current-page="currentPage"
         :total="total"
         :columns="tableColumns"
+        :summary="summary"
+        :date-range="filters.range"
         @current-change="handlePageChange"
-        @view-row="viewRow"
-        @edit-row="editRow"
         @page-size-change="handlePageSizeChange"
+        @sort-change="handleSortChange"
       />
     </section>
 
@@ -73,103 +75,42 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed } from "vue";
+import { reactive, ref, computed, onMounted, watch } from "vue";
 import { Operation } from "@element-plus/icons-vue";
 import Filters from "./Filters.vue";
 import Indicators from "./Indicators.vue";
 import AdsTable from "./AdsTable.vue";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import { ElMessage } from "element-plus";
-import { getAdCampaigns } from "@/api/ads";
+import { getAdCampaigns, getAdOptions, getAdPortfolioOptions } from "@/api/ads";
 
 defineOptions({ name: "AdsText" });
 
 const onlyOverBudget = ref(false);
 
-const countries = [
-  { value: "UK", label: "英国" },
-  { value: "FR", label: "法国" },
-  { value: "IT", label: "意大利" },
-  { value: "ES", label: "西班牙" },
-  { value: "DE", label: "德国" },
-  { value: "NL", label: "荷兰" },
-  { value: "SE", label: "瑞典" },
-  { value: "PL", label: "波兰" },
-  { value: "BE", label: "比利时" },
-];
+// 切换超预算筛选时自动刷新表格
+watch(onlyOverBudget, () => {
+  currentPage.value = 1;
+  loadTableData();
+});
 
-const profiles = [
-  { value: "hanlis-DE", label: "hanlis-DE" },
-  { value: "hanlis-ES", label: "hanlis-ES" },
-  { value: "hanlis-FR", label: "hanlis-FR" },
-  { value: "hanlis-IT", label: "hanlis-IT" },
-  { value: "hanlis-NL", label: "hanlis-NL" },
-  { value: "hanlis-PL", label: "hanlis-PL" },
-  { value: "hanlis-SE", label: "hanlis-SE" },
-  { value: "hanlis-UK", label: "hanlis-UK" },
-  { value: "pinx-BE", label: "pinx-BE" },
-  { value: "pinx-DE", label: "pinx-DE" },
-  { value: "pinx-ES", label: "pinx-ES" },
-  { value: "pinx-FR", label: "pinx-FR" },
-  { value: "pinx-IT", label: "pinx-IT" },
-  { value: "pinx-NL", label: "pinx-NL" },
-  { value: "pinx-PL", label: "pinx-PL" },
-  { value: "pinx-SE", label: "pinx-SE" },
-  { value: "pinx-UK", label: "pinx-UK" },
-  { value: "RR-BE", label: "RR-BE" },
-  { value: "RR-DE", label: "RR-DE" },
-  { value: "RR-ES", label: "RR-ES" },
-  { value: "RR-FR", label: "RR-FR" },
-  { value: "RR-IT", label: "RR-IT" },
-  { value: "RR-NL", label: "RR-NL" },
-  { value: "RR-PL", label: "RR-PL" },
-  { value: "RR-SE", label: "RR-SE" },
-  { value: "RR-UK", label: "RR-UK" },
-  { value: "ZY-BE", label: "ZY-BE" },
-  { value: "ZY-DE", label: "ZY-DE" },
-  { value: "ZY-ES", label: "ZY-ES" },
-  { value: "ZY-FR", label: "ZY-FR" },
-  { value: "ZY-IT", label: "ZY-IT" },
-  { value: "ZY-NL", label: "ZY-NL" },
-  { value: "ZY-PL", label: "ZY-PL" },
-  { value: "ZY-SE", label: "ZY-SE" },
-  { value: "ZY-UK", label: "ZY-UK" },
-];
+const countries = ref<{ value: string; label: string }[]>([]);
+const profiles = ref<{ value: string; label: string }[]>([]);
+const portfolios = ref<{ value: string; label: string }[]>([]);
+const biddingTypes = ref<{ value: string; label: string }[]>([]);
+const summary = ref<Record<string, unknown> | null>(null);
 
-const adsTypes = [
-  { value: "sp", label: "SP" },
-  { value: "sb", label: "SB" },
-  { value: "商品集", label: "商品集" },
-  { value: "品牌旗舰店焦点", label: "品牌旗舰店焦点" },
-  { value: "sbv", label: "SBV" },
-  { value: "单个商品", label: "单个商品" },
-  { value: "定向到品牌旗舰店", label: "定向到品牌旗舰店" },
-  { value: "sd", label: "SD" },
-];
+onMounted(() => {
+  getAdOptions().then((res: any) => {
+    countries.value = res.countries || [];
+    profiles.value = res.profiles || [];
+    biddingTypes.value = res.bidding_types || [];
+  });
 
-const targetTypes = [
-  { value: "sp,auto", label: "自动" },
-  { value: "sp,keyword", label: "关键词投放" },
-  { value: "sp,target", label: "商品投放" },
-  { value: "sp,both", label: "关键词和商品投放并存" },
-  { value: "sb,keyword", label: "SB-关键词" },
-  { value: "sb,target", label: "SB-商品投放" },
-  { value: "sbv,keyword", label: "SBV-关键词" },
-  { value: "sbv,target", label: "SBV-商品投放" },
-  { value: "sb2,keyword", label: "SB2-关键词" },
-  { value: "sb2,target", label: "SB2-商品投放" },
-  { value: "sb2,both", label: "SB2-关键词和商品并存" },
-  { value: "sd,target", label: "SD-商品投放" },
-  { value: "sd,audience", label: "SD-商品&受众" },
-  { value: "sd,other", label: "SD-再营销" },
-];
+  remoteSearchPortfolio("");
+});
 
-const portfolios = [
-  { value: "-1", label: "未设置广告组合" },
-  { value: "78719854694782", label: "01.14 选品" },
-  { value: "270312778162221", label: "1.14 选品" },
-  { value: "173732966030275", label: "1.14 选品(FR)" },
-];
+const adsTypes = [{ value: "sp", label: "SP" }];
 
 const tagsList = [
   { value: "unset", label: "未添加标签" },
@@ -191,19 +132,19 @@ const owners = [
 ];
 
 const campaignStatuses = [
-  { value: "ENABLED", label: "已启用" },
-  { value: "CAMPAIGN_PAUSED", label: "已暂停" },
-  { value: "CAMPAIGN_ARCHIVED", label: "已归档" },
-  { value: "CAMPAIGN_OUT_OF_BUDGET", label: "超预算" },
-  { value: "PENDING_REVIEW", label: "待审核" },
-  { value: "ENDED", label: "已结束" },
-  { value: "REJECTED", label: "已拒绝" },
+  { value: "enabled", label: "已启用" },
+  { value: "paused", label: "已暂停" },
+  { value: "archived", label: "已归档" },
 ];
 
 const serviceStatuses = [
-  { value: "SERVICE_OK", label: "正常" },
+  { value: "CAMPAIGN_STATUS_ENABLED", label: "投放中" },
+  { value: "CAMPAIGN_PAUSED", label: "广告活动已暂停" },
+  { value: "CAMPAIGN_ARCHIVED", label: "广告活动已归档" },
+  { value: "CAMPAIGN_INCOMPLETE", label: "不完整" },
+  { value: "CAMPAIGN_OUT_OF_BUDGET", label: "超预算" },
+  { value: "ADVERTISER_PAYMENT_FAILURE", label: "广告账号付款失败" },
   { value: "LANDING_PAGE_NOT_AVAILABLE", label: "着陆页失效" },
-  { value: "ADVERTISER_PAYMENT_FAILURE", label: "付款失败" },
   { value: "OTHER", label: "未知" },
 ];
 
@@ -241,15 +182,10 @@ const filters = reactive({
   profiles: [] as string[],
   range: [] as string[],
   adsTypes: [] as string[],
-  targetTypes: [] as string[],
   portfolios: [] as string[],
   asinSearchType: "sku",
   skus: [] as string[],
-  budgetType: "",
   biddingType: "",
-  costType: "",
-  siteRestrictions: "",
-  adsStrategy: "",
   tags: [] as string[],
   owners: [] as string[],
   campaignName: "",
@@ -260,24 +196,42 @@ const filters = reactive({
 const columnConfigVisible = ref(false);
 
 const defaultColumns = [
-  { label: "服务状态", prop: "serviceStatus", visible: true, category: "基础状态" },
-  { label: "广告组合", prop: "portfolio", visible: true, category: "基础状态" },
-  { label: "竞价策略", prop: "biddingStrategy", visible: true, category: "基础状态" },
-  { label: "预算", prop: "budget", visible: true, category: "基础状态" },
-  { label: "超预算时间", prop: "overBudgetTime", visible: true, category: "基础状态" },
-  { label: "开始日期", prop: "startDate", visible: true, category: "基础状态" },
-  { label: "标签", prop: "tags", visible: true, category: "基础状态" },
-  { label: "IS", prop: "is", visible: true, category: "销售指标" },
-  { label: "广告销售额", prop: "adsSales", visible: true, category: "销售指标" },
-  { label: "广告销售额%", prop: "adsSalesPercent", visible: true, category: "销售指标" },
-  { label: "直接销售额", prop: "directSales", visible: true, category: "销售指标" },
-  { label: "ACoS", prop: "acos", visible: true, category: "核心数据" },
-  { label: "ROAS", prop: "roas", visible: true, category: "核心数据" },
-  { label: "广告订单", prop: "adsOrders", visible: true, category: "核心数据" },
-  { label: "直接订单", prop: "directOrders", visible: true, category: "核心数据" },
-  { label: "CVR", prop: "cvr", visible: true, category: "转化数据" },
-  { label: "广告笔单价", prop: "adsOrderPrice", visible: true, category: "转化数据" },
-  { label: "广告销量", prop: "adsVolume", visible: true, category: "转化数据" },
+  // 设置
+  { label: "服务状态", prop: "service_status", visible: true, category: "设置" },
+  { label: "竞价策略", prop: "bidding_type", visible: true, category: "设置" },
+  { label: "广告组合", prop: "portfolio_name", visible: true, category: "设置" },
+  { label: "预算", prop: "budget", visible: true, category: "设置" },
+  {
+    label: "超预算时间",
+    prop: "overBudgetTime",
+    visible: true,
+    category: "设置",
+    sortable: "custom",
+  },
+  { label: "开始日期", prop: "startDate", visible: true, category: "设置" },
+  { label: "标签", prop: "tags", visible: true, category: "设置" },
+  // 转化
+  { label: "IS", prop: "is", visible: true, category: "转化" },
+  { label: "广告销售额", prop: "adsSales", visible: true, category: "转化" },
+  { label: "广告销售额%", prop: "adsSalesPercent", visible: true, category: "转化" },
+  { label: "直接销售额", prop: "directSales", visible: true, category: "转化" },
+  { label: "广告订单", prop: "adsOrders", visible: true, category: "转化" },
+  { label: "直接订单", prop: "directOrders", visible: true, category: "转化" },
+  { label: "ACoS", prop: "acos", visible: true, category: "转化" },
+  { label: "ROAS", prop: "roas", visible: true, category: "转化" },
+  { label: "CVR", prop: "cvr", visible: true, category: "转化" },
+  { label: "广告笔单价", prop: "adsOrderPrice", visible: true, category: "转化" },
+  { label: "广告销量", prop: "adsVolume", visible: true, category: "转化" },
+  // 业绩
+  { label: "曝光量", prop: "impressions", visible: true, category: "业绩" },
+  { label: "曝光%", prop: "impressionsPercent", visible: true, category: "业绩" },
+  { label: "点击", prop: "clicks", visible: true, category: "业绩" },
+  { label: "点击%", prop: "clicksPercent", visible: true, category: "业绩" },
+  { label: "CTR", prop: "ctr", visible: true, category: "业绩" },
+  { label: "CPC", prop: "cpc", visible: true, category: "业绩" },
+  { label: "花费", prop: "spends", visible: true, category: "业绩" },
+  { label: "花费%", prop: "spendsPercent", visible: true, category: "业绩" },
+  { label: "CPA", prop: "cpa", visible: true, category: "业绩" },
 ];
 
 const activeColumns = ref(defaultColumns);
@@ -301,6 +255,12 @@ function remoteSearchSku(query: string) {
   skuOptions.value = allSkus.filter((s) => (s.title + s.code + s.value).toLowerCase().includes(q));
 }
 
+function remoteSearchPortfolio(query: string = "") {
+  getAdPortfolioOptions({ keyword: query }).then((res: any) => {
+    portfolios.value = [{ value: "-1", label: "未设置广告组合" }, ...(res.portfolios || [])];
+  });
+}
+
 function search() {
   currentPage.value = 1;
   loadTableData();
@@ -311,15 +271,10 @@ function resetFilters() {
   filters.profiles = [];
   filters.range = [];
   filters.adsTypes = [];
-  filters.targetTypes = [];
   filters.portfolios = [];
   filters.asinSearchType = "sku";
   filters.skus = [];
-  filters.budgetType = "";
   filters.biddingType = "";
-  filters.costType = "";
-  filters.siteRestrictions = "";
-  filters.adsStrategy = "";
   filters.tags = [];
   filters.owners = [];
   filters.campaignName = "";
@@ -335,6 +290,11 @@ const pageSize = ref(25);
 const currentPage = ref(1);
 
 const loading = ref(false);
+const sortParams = reactive({
+  prop: "",
+  order: "",
+});
+
 async function loadTableData() {
   loading.value = true;
   try {
@@ -344,19 +304,30 @@ async function loadTableData() {
       name: filters.campaignName,
       state: filters.campaignStatus.join(","),
       service_status: filters.serviceStatus.join(","),
+      // 勾选“只查看超预算的”时，强制覆盖 service_status 为超预算状态
+      ...(onlyOverBudget.value ? { service_status: "CAMPAIGN_OUT_OF_BUDGET" } : {}),
       sponsored_type: filters.adsTypes.join(","),
-      targeting_type: filters.targetTypes.join(","),
-      portfolio_name: filters.portfolios.join(","),
+      portfolio_id: filters.portfolios.join(","),
       bidding_type: filters.biddingType,
+      profiles: filters.profiles.join(","),
+      countries: filters.countries.join(","),
+      date_start: filters.range?.[0] || "",
+      date_end: filters.range?.[1] || "",
     };
+
+    if (sortParams.prop && sortParams.order) {
+      params.sort_prop = sortParams.prop;
+      params.sort_order = sortParams.order === "ascending" ? "asc" : "desc";
+    }
 
     // 如果有组合或者其他可以在这里继续加
 
     const res = await getAdCampaigns(params);
 
     // 直接使用后端纯净的真实字段！前端列配置已对齐
-    tableData.value = res.data?.list || [];
-    total.value = res.data?.total || 0;
+    tableData.value = res.list || [];
+    total.value = res.total || 0;
+    summary.value = res.summary ?? null;
   } catch (error) {
     console.error(error);
     ElMessage.error("获取广告列表数据失败");
@@ -374,12 +345,14 @@ function handlePageSizeChange(size: number) {
   currentPage.value = 1;
   loadTableData();
 }
-function viewRow(row: any) {
-  ElMessage.info(`查看 ${row.title}`);
+
+function handleSortChange({ prop, order }: { prop: string; order: string }) {
+  sortParams.prop = prop || "";
+  sortParams.order = order || "";
+  currentPage.value = 1;
+  loadTableData();
 }
-function editRow(row: any) {
-  ElMessage.info(`编辑 ${row.title}`);
-}
+
 function openSearchTemplates() {
   ElMessage.info("打开筛选模板（占位）");
 }

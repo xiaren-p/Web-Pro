@@ -120,7 +120,7 @@
             <el-table-column label="状态" align="center" prop="status" width="80">
               <template #default="scope">
                 <el-tag :type="scope.row.status == 1 ? 'success' : 'info'">
-                  {{ scope.row.status == 1 ? "正常" : "禁用" }}
+                  {{ scope.row.status_text || (scope.row.status == 1 ? "正常" : "禁用") }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -181,7 +181,7 @@
 </template>
 
 <script setup lang="ts">
-import { UserAPI, type UserPageQuery, type UserPageVO } from "@/backend";
+import { UserAPI, type UserPageQuery, type UserPageVO } from "@/api/user";
 import { useUserStore } from "@/store";
 
 import DeptTree from "./components/DeptTree.vue";
@@ -256,21 +256,8 @@ function hancleResetPassword(row: UserPageVO) {
         return false;
       }
       UserAPI.resetPassword(row.id, value)
-        .then((resp: any) => {
-          const data = resp?.data || resp || {};
+        .then(() => {
           ElMessage.success("密码重置成功，新密码是：" + value);
-          // 若后端返回 Seafile 同步结果，则展示给用户
-          if (data.seafileSync) {
-            const s = data.seafileSync;
-            if (s.success) {
-              ElMessage.success("云端密码同步成功");
-            } else {
-              ElMessageBox.alert(`云端密码同步失败：${s.msg || "未知错误"}`, "云端同步结果", {
-                type: "warning",
-                confirmButtonText: "确定",
-              });
-            }
-          }
         })
         .catch(() => {
           ElMessage.error("重置密码失败，请稍后重试");

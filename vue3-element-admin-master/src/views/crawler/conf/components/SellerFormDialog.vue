@@ -35,7 +35,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed } from "vue";
-import { SellerAPI } from "@/backend";
+import { SellerAPI } from "@/api/crawler/seller";
 import { ElMessage } from "element-plus";
 
 const emit = defineEmits(["success"]);

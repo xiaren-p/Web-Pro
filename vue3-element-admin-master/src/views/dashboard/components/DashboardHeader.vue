@@ -89,7 +89,7 @@
 
 <script setup lang="ts">
 import { useUserStore } from "@/store/modules/user-store";
-import { WeatherAPI } from "@/backend";
+import { WeatherAPI } from "@/api/weather";
 import { Folder, Document, VideoCamera } from "@element-plus/icons-vue";
 
 const userStore = useUserStore();

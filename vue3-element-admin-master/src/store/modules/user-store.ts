@@ -1,10 +1,9 @@
 import { store } from "@/store";
 
-import { AuthAPI, UserAPI, type UserInfo, type LoginFormData } from "@/backend";
+import { AuthAPI, type LoginFormData } from "@/api/auth";
+import { UserAPI, type UserInfo } from "@/api/user";
 
 import { AuthStorage } from "@/utils/auth";
-import { Storage } from "@/utils/storage";
-import { STORAGE_KEYS } from "@/constants";
 import { usePermissionStoreHook } from "@/store/modules/permission-store";
 import { useDictStoreHook } from "@/store/modules/dict-store";
 import { useTagsViewStore } from "@/store";
@@ -15,9 +14,6 @@ export const useUserStore = defineStore("user", () => {
   const userInfo = ref<UserInfo>({} as UserInfo);
   // 记住我状态
   const rememberMe = ref(AuthStorage.getRememberMe());
-  // Seafile 缓存标志：后端登录时返回，表示服务器侧已缓存 Seafile token
-  const seafileCached = ref<boolean>(Storage.get(STORAGE_KEYS.SEAFILE_CACHED, false));
-
   /**
    * 登录
    *
@@ -29,23 +25,6 @@ export const useUserStore = defineStore("user", () => {
       AuthAPI.login(formData)
         .then((data) => {
           const { accessToken, refreshToken } = data;
-          // 记录后端返回的 seafileCached 标志（若有）
-          try {
-            // 记录后端返回的 seafileCached 标志（兼容后端返回对象 {cached: bool, msg:...} 或直接布尔）
-            const sf = (data as any).seafileCached;
-            let cached = false;
-            if (sf !== undefined && sf !== null) {
-              if (typeof sf === "object" && "cached" in sf) {
-                cached = !!sf.cached;
-              } else {
-                cached = !!sf;
-              }
-            }
-            seafileCached.value = cached;
-            Storage.set(STORAGE_KEYS.SEAFILE_CACHED, cached);
-          } catch {
-            // ignore parsing errors
-          }
           // 保存记住我状态和token
           rememberMe.value = !!formData.rememberMe;
           AuthStorage.setTokens(accessToken, refreshToken, rememberMe.value);
@@ -228,7 +207,6 @@ export const useUserStore = defineStore("user", () => {
   return {
     userInfo,
     rememberMe,
-    seafileCached,
     isLoggedIn: () => !!AuthStorage.getAccessToken(),
     getUserInfo,
     login,

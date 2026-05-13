@@ -18,12 +18,14 @@ def paginate_queryset(request, queryset: QuerySet, default_page_size: int = 10) 
     - 如果传入为 None，返回 (0, [], 1, page_size)
     - 如果对象有 .count() 方法（通常为 QuerySet），使用它获取总数；否则尝试 len()
     """
+    data = request.data if request.method == "POST" else request.query_params
+    
     try:
-        page_num = int(request.query_params.get('pageNum', 1))
+        page_num = int(data.get('pageNum', 1))
     except Exception:
         page_num = 1
     try:
-        page_size = int(request.query_params.get('pageSize', default_page_size))
+        page_size = int(data.get('pageSize', default_page_size))
     except Exception:
         page_size = default_page_size
     if page_num < 1:

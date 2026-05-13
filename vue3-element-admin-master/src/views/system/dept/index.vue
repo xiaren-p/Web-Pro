@@ -113,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { DeptAPI, type DeptVO, type DeptQuery } from "@/backend";
+import { DeptAPI, type DeptVO, type DeptQuery } from "@/api/dept";
 import DeptFormDialog from "./components/DeptFormDialog.vue";
 
 defineOptions({

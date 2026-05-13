@@ -184,6 +184,7 @@ function externalHref(route: RouteRecordRaw) {
 }
 </script>
 
+<!-- 全局样式：需要覆盖 Element Plus 内部选择器（.el-sub-menu 等）与 body 级 .hideSidebar 状态类，不能使用 scoped 否则无法穿透。 -->
 <style lang="scss">
 .hideSidebar {
   .submenu-title-noDropdown {

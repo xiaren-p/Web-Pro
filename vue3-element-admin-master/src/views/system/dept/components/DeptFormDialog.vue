@@ -43,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { DeptAPI, type DeptForm } from "@/backend";
+import { DeptAPI, type DeptForm } from "@/api/dept";
 
 const emit = defineEmits(["success"]);
 

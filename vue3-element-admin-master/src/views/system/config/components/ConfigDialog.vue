@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { ConfigAPI, type ConfigForm } from "@/backend";
+import { ConfigAPI, type ConfigForm } from "@/api/config";
 
 const emit = defineEmits(["success"]);
 

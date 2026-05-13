@@ -3,7 +3,7 @@ import { constantRoutes } from "@/router";
 import { store } from "@/store";
 import router from "@/router";
 
-import { MenuAPI, type RouteVO } from "@/backend";
+import { MenuAPI, type RouteVO } from "@/api/menu";
 const modules = import.meta.glob("../../views/**/**.vue");
 const Layout = () => import("../../layouts/index.vue");
 

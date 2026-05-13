@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { ref, nextTick, watch } from "vue";
 import { ElMessage } from "element-plus";
-import { SalesProductListingAPI } from "@/backend";
+import { SalesProductListingAPI } from "@/api/sales/listing";
 
 const props = defineProps<{
   visible: boolean;

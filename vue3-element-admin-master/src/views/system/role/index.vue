@@ -118,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { RoleAPI, type RolePageVO, type RolePageQuery } from "@/backend";
+import { RoleAPI, type RolePageVO, type RolePageQuery } from "@/api/role";
 import RoleDialog from "./components/RoleDialog.vue";
 import RolePermDrawer from "./components/RolePermDrawer.vue";
 

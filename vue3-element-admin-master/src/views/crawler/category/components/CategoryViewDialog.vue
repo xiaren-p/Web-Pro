@@ -13,19 +13,6 @@
           @change="onDateChanged"
         />
       </el-form-item>
-      <el-form-item v-if="needCloudPassword" label="输入 cloud 密码">
-        <el-input
-          v-model="cloudPassword"
-          placeholder="请输入 cloud 密码以刷新后端缓存"
-          show-password
-          style="width: 100%"
-        />
-        <div style="margin-top: 8px; text-align: right">
-          <el-button size="small" type="primary" @click="refreshCloudPasswordAndRetry">
-            刷新并重试
-          </el-button>
-        </div>
-      </el-form-item>
       <el-form-item label="可选时间">
         <el-table :data="timesList" size="small" style="width: 100%">
           <el-table-column prop="index" label="序号" width="60" />
@@ -65,20 +52,22 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 类目数据查看弹窗：通过 Seafile 管理员账号查看爬虫数据文件列表与下载链接。
+ * 所属板块：crawler/category。
+ */
 import { ref } from "vue";
-import { CategoryAPI, UserAPI } from "@/backend";
-import { useUserStoreHook } from "@/store";
+
 import { ElMessage } from "element-plus";
+
+import { CategoryAPI } from "@/api/crawler/category";
 
 const visible = ref(false);
 const time = ref<string | null>(null);
 const timesChecking = ref(false);
-const needCloudPassword = ref(false);
-const cloudPassword = ref("");
 
-// Internal state
+// 内部状态
 const currentCategory = ref<any>(null);
-const pendingDownloadName = ref<string | null>(null);
 const timesList = ref<any[]>([]);
 const allTimes = ref<string[]>([]);
 const allTimesDates = ref<string[]>([]);
@@ -98,46 +87,8 @@ async function open(row: any) {
   time.value = null;
   currentCategory.value = row || null;
   timesList.value = [];
-  timesChecking.value = true;
-
-  try {
-    const profile: any = await UserAPI.getProfile();
-    const cached = !!(
-      profile &&
-      (profile.seafileCached || (profile.data && profile.data.seafileCached))
-    );
-    if (cached) {
-      needCloudPassword.value = false;
-      if (row && row.id) {
-        await loadTimes(String(row.id));
-      }
-    } else {
-      needCloudPassword.value = true;
-      cloudPassword.value = "";
-      pendingDownloadName.value = null;
-      ElMessage.info("未找到缓存的 Seafile token，请在弹窗中输入 cloud 密码并点击刷新以继续");
-      timesChecking.value = false;
-    }
-  } catch (err) {
-    console.warn(err);
-    needCloudPassword.value = true;
-    cloudPassword.value = "";
-    pendingDownloadName.value = null;
-    ElMessage.info("无法查询缓存状态，请输入 cloud 密码并点击刷新以继续");
-    timesChecking.value = false;
-  }
-}
-
-function isNeedCloud(status: number | undefined, data: any) {
-  try {
-    const needCloudFlag =
-      data && ((data.data && data.data.needCloudPassword) || data.needCloudPassword);
-    const msg = (data && (data.msg || data.error_msg || data.error || "")) + "";
-    const match = /未找到缓存|needCloudPassword|need cloud password|need cloud/i.test(msg);
-    return status === 401 || !!needCloudFlag || match;
-  } catch (e) {
-    console.warn(e);
-    return false;
+  if (row && row.id) {
+    await loadTimes(String(row.id));
   }
 }
 
@@ -200,21 +151,12 @@ async function loadTimes(id: string) {
         const resp = err && (err.response || err);
         const status = resp && resp.status;
         const data = resp && resp.data;
-        if (isNeedCloud(status, data)) {
-          needCloudPassword.value = true;
-          cloudPassword.value = "";
-          pendingDownloadName.value = null;
-          ElMessage.info("请输入 cloud 密码（弹窗内嵌），填写后点击'刷新并重试'。若不填写可取消。");
-          const e = new Error("needCloud");
-          (e as any).code = "needCloud";
-          throw e;
-        }
         if (status && status !== 404) {
           let msg = "检查文件可用性失败";
           try {
             msg = (data && (data.msg || data.error_msg)) || err.message || msg;
-          } catch (ex) {
-            console.warn(ex);
+          } catch {
+            // ignore
           }
           ElMessage.error(msg);
           const e = new Error("fatal");
@@ -245,11 +187,7 @@ async function loadTimes(id: string) {
         workers.push(worker(cand));
       }
       await Promise.all(workers);
-    } catch (e: any) {
-      if (e && (e.code === "needCloud" || (e.message && e.message === "needCloud"))) {
-        timesChecking.value = false;
-        return;
-      }
+    } catch {
       timesChecking.value = false;
       return;
     }
@@ -262,19 +200,9 @@ async function loadTimes(id: string) {
       downloadUrl: it.downloadUrl,
     }));
   } catch (e: any) {
-    const resp = e && (e.response || e);
-    const status = resp && resp.status;
-    const data = resp && resp.data;
-    if (isNeedCloud(status, data)) {
-      needCloudPassword.value = true;
-      cloudPassword.value = "";
-      pendingDownloadName.value = null;
-      ElMessage.info("请输入 cloud 密码（弹窗内嵌），填写后点击'刷新并重试'。若不填写可关闭弹窗。");
-      return;
-    }
-
     let msg = "查询时间失败";
     try {
+      const data = e && (e.response?.data || e.data);
       if (data && data.data && data.data.msg) {
         msg = data.data.msg;
       } else if (data && data.msg) {
@@ -282,8 +210,8 @@ async function loadTimes(id: string) {
       } else if (e && e.message) {
         msg = e.message;
       }
-    } catch (ex) {
-      console.warn(ex);
+    } catch {
+      // ignore
     }
     ElMessage.error(msg);
   } finally {
@@ -316,13 +244,10 @@ async function selectTime(name: string) {
       return;
     }
     const res = await CategoryAPI.downloadFile(id, name);
-    // CategoryAPI.downloadFile is expected to return a Blob.
     const blob = res as Blob;
 
-    // Try to read textual body first: backend may return JSON or plain URL string.
     try {
       const text = await blob.text();
-      // Try JSON parse
       try {
         const parsed = JSON.parse(text);
         const maybeDownloadUrl =
@@ -338,7 +263,6 @@ async function selectTime(name: string) {
           return;
         }
       } catch {
-        // Not JSON — maybe plain URL text
         const trimmed = (text || "").trim();
         if (/^https?:\/\//i.test(trimmed)) {
           window.open(trimmed, "_blank");
@@ -349,34 +273,21 @@ async function selectTime(name: string) {
       // reading as text failed; fall through to binary handling
     }
 
-    // Fallback: treat as binary blob and open via object URL
     const url = window.URL.createObjectURL(blob as any);
     window.open(url, "_blank");
     setTimeout(() => window.URL.revokeObjectURL(url), 60 * 1000);
-    return;
   } catch (err: any) {
     const resp = err && (err.response || err);
     const status = resp && resp.status;
     const data = resp && resp.data;
     if (status === 404 || (data && data.error_msg && data.error_msg.includes("File not found"))) {
       ElMessage.error("文件不存在");
-    } else if (isNeedCloud(status, data)) {
-      try {
-        needCloudPassword.value = true;
-        cloudPassword.value = "";
-        pendingDownloadName.value = name;
-        ElMessage.info("请输入 cloud 密码（弹窗内嵌），填写后点击'刷新并重试'以继续下载。");
-        return;
-      } catch (ex) {
-        console.warn(ex);
-        ElMessage.info("已取消");
-      }
     } else {
       let msg = "下载失败";
       try {
         msg = (data && (data.msg || data.error_msg)) || err.message || msg;
-      } catch (ex) {
-        console.warn(ex);
+      } catch {
+        // ignore
       }
       ElMessage.error(msg);
     }
@@ -408,82 +319,13 @@ async function onDateChanged(val: string | null) {
         timesList.value = [];
         ElMessage.warning("所选日期对应的文件不存在");
       }
-    } catch (err) {
-      console.warn(err);
+    } catch {
       timesList.value = [];
       ElMessage.warning("检查文件失败");
     }
   } else {
     timesList.value = [];
     ElMessage.warning("未找到与所选日期匹配的时间记录");
-  }
-}
-
-async function refreshCloudPasswordAndRetry() {
-  if (!cloudPassword.value) {
-    ElMessage.warning("请输入 cloud 密码后再刷新");
-    return;
-  }
-  try {
-    timesChecking.value = true;
-    await UserAPI.updateProfile({ cloudPassword: cloudPassword.value });
-    ElMessage.success("已刷新 cloud token，正在重试...");
-    needCloudPassword.value = false;
-    const pending = pendingDownloadName.value;
-    pendingDownloadName.value = null;
-    const catId = currentCategory.value && currentCategory.value.id;
-    if (pending && catId) {
-      await selectTime(pending);
-    } else if (catId) {
-      await loadTimes(String(catId));
-    }
-  } catch (err) {
-    console.warn(err);
-    ElMessage.error("刷新失败，请检查密码或联系管理员");
-    // Nested fallback retry logic
-    try {
-      timesChecking.value = true;
-      await UserAPI.updateProfile({ cloudPassword: cloudPassword.value });
-      ElMessage.success("已请求后端刷新 cloud token，正在验证状态...");
-
-      try {
-        const profile: any = await UserAPI.getProfile();
-        const cached = !!(
-          profile &&
-          (profile.seafileCached || (profile.data && profile.data.seafileCached))
-        );
-        if (cached) {
-          try {
-            const userStore = useUserStoreHook();
-            (userStore as any).seafileCached = cached;
-          } catch (e) {
-            console.warn("更新 userStore seafileCached 失败", e);
-          }
-
-          needCloudPassword.value = false;
-          const pending = pendingDownloadName.value;
-          pendingDownloadName.value = null;
-          cloudPassword.value = "";
-          const catId = currentCategory.value && currentCategory.value.id;
-          if (pending && catId) {
-            await selectTime(pending);
-          } else if (catId) {
-            await loadTimes(String(catId));
-          }
-        } else {
-          ElMessage.error("后端未能缓存 Seafile token，请确认密码是否正确或联系管理员");
-        }
-      } catch (e) {
-        console.warn("验证 profile 失败", e);
-        ElMessage.error("刷新后验证失败，请稍后重试");
-      }
-    } catch (err) {
-      console.warn(err);
-      ElMessage.error("刷新失败，请检查密码或联系管理员");
-    } finally {
-      timesChecking.value = false;
-      cloudPassword.value = "";
-    }
   }
 }
 

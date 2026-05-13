@@ -19,7 +19,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from "vue";
-import { ImageUploadAPI, type ImageUploadForm } from "@/backend";
+import { ImageUploadAPI, type ImageUploadForm } from "@/api/imageUpload";
 import { ElMessage } from "element-plus"; // Import ElMessage explicitly if auto-import isn't working for logic, but usually it is. But better safe.
 
 const emit = defineEmits(["success"]);

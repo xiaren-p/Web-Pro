@@ -41,7 +41,8 @@
 </template>
 
 <script setup lang="ts">
-import { NoticeAPI, type NoticeForm, UserAPI } from "@/backend";
+import { NoticeAPI, type NoticeForm } from "@/api/notice";
+import { UserAPI } from "@/api/user";
 
 const emit = defineEmits(["success"]);
 

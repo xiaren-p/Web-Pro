@@ -20,9 +20,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, True),
     SECRET_KEY=(str, 'django-insecure-v9t&lx8patv5db$l)y#4jioqhrvzzl!cg6k4grcn2ow0%+jd^r'),
+    DJANGO_ALLOWED_HOSTS=(str, ''),  # 逗号分隔，优先于 ALLOWED_HOSTS 列表
     ALLOWED_HOSTS=(list, ['127.0.0.1', 'localhost']),
     CORS_ALLOW_ALL_ORIGINS=(bool, True),
-    CSRF_TRUSTED_ORIGINS=(list, ['http://localhost:3000', 'http://127.0.0.1:3000']),
+    CORS_ALLOWED_ORIGINS=(str, ''),  # 逗号分隔，CORS_ALLOW_ALL_ORIGINS=False 时生效
+    CSRF_TRUSTED_ORIGINS=(str, ''),  # 逗号分隔，空则为空列表
     ACCESS_TOKEN_EXPIRE_SECONDS=(int, 3600),
     REFRESH_TOKEN_EXPIRE_SECONDS=(int, 3600 * 24 * 7),
     # 可选：对外可访问的后端基础 URL（例如 http://192.168.0.251:8000），用于在 API 中生成对外可访问的绝对文件 URL
@@ -33,24 +35,23 @@ env = environ.Env(
     ONLINE_STALE_SECONDS=(int, 180),
     # 是否允许 Django 在非 DEBUG 模式下通过视图直接提供媒体文件（仅在你确知需要 nginx 反代到 Django 时开启）
     DJANGO_SERVE_MEDIA=(bool, False),
+    # 默认头像
+    DEFAULT_AVATAR_URL=(str, 'https://foruda.gitee.com/images/1723603502796844527/03cdca2a_716974.gif'),
     # 图片同步服务地址
     IMAGE_SYNC_URL=(str, 'https://cloud.hanlis.cn:9898'),
     # 高德天气 API 配置
-    AMAP_BASE=(str,'https://restapi.amap.com'),
+    AMAP_BASE=(str, 'https://restapi.amap.com'),
     AMAP_KEY=(str, '9ca18a1d97d6a8c31a77e001bfbd2742'),
     AMAP_CITY=(str, '440605'),  # 默认佛山南海区
-    # LingXing OpenAPI SDK 配置
-    LINGXING_SDK_APP_ID=(str, 'ak_cWhLzGDgtJ87v'),
-    LINGXING_SDK_APP_SECRET=(str, 'AZ6veZryDpIkbH8HcGCG1w=='),
-    LINGXING_SDK_API_BASE_URL=(str, 'https://openapi.lingxing.com'),
-    # 可选：向外请求时使用的代理（JSON 字符串），例如: '{"http": "http://user:pass@host:port", "https": "http://..."}'
-    LINGXING_SDK_PROXIES=(str, ''),
-    # 是否让 aiohttp 使用环境变量中的代理（trust_env=True）
-    LINGXING_SDK_TRUST_ENV=(bool, False),
     # 是否允许使用万能验证码绕过（仅用于受控开发/测试，生产请勿启用）
     ALLOW_CAPTCHA_BYPASS=(bool, False),
     # 全局万能验证码（仅在 ALLOW_CAPTCHA_BYPASS 为 true 时生效），请在生产环境不要设置
     CAPTCHA_MASTER_CODE=(str, ''),
+    # 安全响应头（开发默认全部关闭）
+    SECURE_SSL_REDIRECT=(bool, False),
+    SESSION_COOKIE_SECURE=(bool, False),
+    CSRF_COOKIE_SECURE=(bool, False),
+    SECURE_HSTS_SECONDS=(int, 0),
 )
 
 env_file = BASE_DIR / '.env'
@@ -69,20 +70,7 @@ AMAP_BASE = env('AMAP_BASE')
 AMAP_KEY = env('AMAP_KEY')
 AMAP_CITY = env('AMAP_CITY')
 
-# LingXing OpenAPI SDK 配置（可通过环境变量或 .env 文件设置）
-LINGXING_SDK_APP_ID = env('LINGXING_SDK_APP_ID')
-LINGXING_SDK_APP_SECRET = env('LINGXING_SDK_APP_SECRET')
-LINGXING_SDK_API_BASE_URL = env('LINGXING_SDK_API_BASE_URL')
-# 解析可选的代理配置（期望为 JSON 字符串或空）
-LINGXING_SDK_PROXIES_RAW = env('LINGXING_SDK_PROXIES')
-try:
-    LINGXING_SDK_PROXIES = json.loads(LINGXING_SDK_PROXIES_RAW) if LINGXING_SDK_PROXIES_RAW else {}
-except Exception:
-    LINGXING_SDK_PROXIES = {}
-
-LINGXING_SDK_TRUST_ENV = env('LINGXING_SDK_TRUST_ENV')
-
-_allowed_from_env = os.environ.get('DJANGO_ALLOWED_HOSTS')
+_allowed_from_env = os.environ.get('DJANGO_ALLOWED_HOSTS') or env('DJANGO_ALLOWED_HOSTS')
 if _allowed_from_env:
     # 支持逗号分隔的字符串，例如: 'example.com,www.example.com'
     ALLOWED_HOSTS = [h.strip() for h in _allowed_from_env.split(',') if h.strip()]
@@ -106,6 +94,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # 静态文件（nginx 前置时可移除）
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # 必须置于 CommonMiddleware 之前
     'django.middleware.common.CommonMiddleware',
@@ -126,8 +115,13 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
+                'django.template.context_processors.i18n',
+                'django.template.context_processors.media',
+                'django.template.context_processors.static',
+                'django.template.context_processors.tz',
                 'django.contrib.messages.context_processors.messages',
             ],
         },
@@ -138,12 +132,27 @@ WSGI_APPLICATION = 'backend_master.wsgi.application'
 ASGI_APPLICATION = 'backend_master.asgi.application'
 
 
-# 数据库（开发默认 SQLite，后续可切换至 MySQL/PostgreSQL）
+# 数据库（通过 .env 切换引擎，本地开发默认 MySQL，生产可改为 PostgreSQL 等）
+
+_db_engine = env('DB_ENGINE', default='django.db.backends.mysql')
+
+# MySQL 专属连接选项（其他引擎不需要）
+_db_options = {}
+if 'mysql' in _db_engine:
+    _db_options = {
+        'charset': 'utf8mb4',
+        'connect_timeout': 10,
+    }
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE':   _db_engine,
+        'NAME':     env('DB_NAME',     default='webpro_db'),
+        'USER':     env('DB_USER',     default='root'),
+        'PASSWORD': env('DB_PASSWORD', default=''),
+        'HOST':     env('DB_HOST',     default='127.0.0.1'),
+        'PORT':     env('DB_PORT',     default='3306'),
+        'OPTIONS':  _db_options,
     }
 }
 
@@ -175,7 +184,9 @@ USE_TZ = True
 
 
 # 静态文件
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # 媒体文件（文件上传）
 MEDIA_URL = '/media/'
@@ -185,8 +196,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# 默认头像（用户未上传头像时使用）。可根据需要替换为 CDN/OSS 地址。
-DEFAULT_AVATAR_URL = 'https://foruda.gitee.com/images/1723603502796844527/03cdca2a_716974.gif'
+DEFAULT_AVATAR_URL = env('DEFAULT_AVATAR_URL')
 
 # 对外可访问的后端 URL（例如内部开发机对局域网可见的 IP）
 BACKEND_EXTERNAL_URL = env('BACKEND_EXTERNAL_URL')
@@ -195,10 +205,12 @@ ONLINE_STALE_SECONDS = env('ONLINE_STALE_SECONDS')
 # 该变量在 urls.py 中通过 getattr(settings, 'DJANGO_SERVE_MEDIA', False) 读取
 DJANGO_SERVE_MEDIA = env('DJANGO_SERVE_MEDIA')
 
-# CORS（开发环境）
-CORS_ALLOW_ALL_ORIGINS = env('CORS_ALLOW_ALL_ORIGINS')  # 生产建议改为 CORS_ALLOWED_ORIGINS 精确白名单
+# CORS
+CORS_ALLOW_ALL_ORIGINS = env('CORS_ALLOW_ALL_ORIGINS')
+if not CORS_ALLOW_ALL_ORIGINS:
+    _cors_origins = env('CORS_ALLOWED_ORIGINS')
+    CORS_ALLOWED_ORIGINS = [u.strip() for u in _cors_origins.split(',') if u.strip()] if _cors_origins else []
 CORS_ALLOW_CREDENTIALS = True
-# 允许的自定义请求头（包含 Authorization，便于携带令牌）
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
@@ -210,26 +222,11 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
-# 暴露的响应头（文件下载场景需要）
-CORS_EXPOSE_HEADERS = [
-    'Content-Disposition',
-]
+CORS_EXPOSE_HEADERS = ['Content-Disposition']
 
-# 信任本地前端域名（CSRF）
-CSRF_TRUSTED_ORIGINS = env('CSRF_TRUSTED_ORIGINS')
-if isinstance(CSRF_TRUSTED_ORIGINS, list):
-    # 自动补充常见本地/局域网前端地址
-    extra_origins = [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://192.168.0.28:3000',
-        'http://192.168.0.251:3000',
-        'http://192.168.1.100:3000',
-        'http://192.168.1.101:3000',
-    ]
-    for origin in extra_origins:
-        if origin not in CSRF_TRUSTED_ORIGINS:
-            CSRF_TRUSTED_ORIGINS.append(origin)
+# CSRF
+_csrf_env = env('CSRF_TRUSTED_ORIGINS')
+CSRF_TRUSTED_ORIGINS = [u.strip() for u in _csrf_env.split(',') if u.strip()] if _csrf_env else []
 
 # DRF 设置（解析器）。分页/响应统一在视图内封装。
 REST_FRAMEWORK = {
@@ -279,4 +276,25 @@ try:
         }
 except Exception:
     pass
+
+# 安全响应头（开发默认全部关闭，生产通过 .env 开启）
+SECURE_SSL_REDIRECT = env('SECURE_SSL_REDIRECT')
+SESSION_COOKIE_SECURE = env('SESSION_COOKIE_SECURE')
+CSRF_COOKIE_SECURE = env('CSRF_COOKIE_SECURE')
+SECURE_HSTS_SECONDS = env('SECURE_HSTS_SECONDS')
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
+# 日志
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {'verbose': {'format': '[%(asctime)s] %(levelname)s %(name)s %(message)s'}},
+    'handlers': {'console': {'class': 'logging.StreamHandler', 'formatter': 'verbose'}},
+    'root': {'handlers': ['console'], 'level': LOG_LEVEL},
+}
 

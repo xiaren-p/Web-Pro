@@ -33,7 +33,7 @@
 
 <script setup lang="ts">
 import { UploadRawFile, UploadRequestOptions } from "element-plus";
-import { UploadAPI } from "@/backend";
+import { UploadAPI } from "@/api/upload";
 type FileInfo = { url: string; name?: string };
 
 const props = defineProps({

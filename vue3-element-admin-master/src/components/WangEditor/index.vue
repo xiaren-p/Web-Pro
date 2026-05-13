@@ -33,7 +33,7 @@ import "@wangeditor-next/editor/dist/css/style.css";
 import { Toolbar, Editor } from "@wangeditor-next/editor-for-vue";
 import { IToolbarConfig, IEditorConfig } from "@wangeditor-next/editor";
 
-import { UploadAPI } from "@/backend";
+import { UploadAPI } from "@/api/upload";
 
 // 上传图片回调函数类型
 type InsertFnType = (_url: string, _alt: string, _href: string) => void;

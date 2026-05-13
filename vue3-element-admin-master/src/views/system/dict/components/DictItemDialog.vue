@@ -61,7 +61,7 @@
 
 <script setup lang="ts">
 import type { TagProps } from "element-plus";
-import { DictAPI, type DictItemForm, type DictItemPageVO } from "@/backend";
+import { DictAPI, type DictItemForm, type DictItemPageVO } from "@/api/dict";
 
 const emit = defineEmits(["success"]);
 

@@ -31,7 +31,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from "vue";
-import { ImageUploadAPI } from "@/backend";
+import { ImageUploadAPI } from "@/api/imageUpload";
 import { ElMessage } from "element-plus";
 
 const visible = ref(false);

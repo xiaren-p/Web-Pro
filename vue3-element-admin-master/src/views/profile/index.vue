@@ -235,13 +235,13 @@
 </template>
 
 <script lang="ts" setup>
-import { UserAPI } from "@/backend";
+import { UserAPI } from "@/api/user";
 import { useUserStoreHook } from "@/store";
 import { Camera, Edit, Male, Female } from "@element-plus/icons-vue";
-import { ref, reactive, onMounted, computed } from "vue";
-import { ElLoading, ElMessageBox, ElMessage } from "element-plus";
+import { ref, reactive, onMounted } from "vue";
+import { ElLoading, ElMessage } from "element-plus";
 
-// 本地类型定义（适配 consolidated backend.ts）
+// 本地类型定义
 interface UserProfileVO {
   id?: string;
   username?: string;
@@ -274,14 +274,6 @@ interface UserProfileForm {
 }
 
 const userStore = useUserStoreHook();
-// 计算 seafile 缓存标志为本地布尔，避免直接比较可能的 ref/object
-const seafileCached = computed(() => {
-  try {
-    return !!(userStore && (userStore as any).seafileCached);
-  } catch {
-    return false;
-  }
-});
 const userProfile = ref<UserProfileVO>({});
 const loading = ref(true);
 const loadError = ref<string | null>(null);
@@ -444,52 +436,10 @@ const handleSubmit = async () => {
     try {
       // 如果后端在登录时已告知 seafile token 在服务器端缓存，则
       // 前端不再强制提示输入密码；仅当缓存不存在时再弹出提示。
-      let pwd = "";
-      // 明确将 seafileCached 转为布尔值以避免 ref/未定义导致的误判
-      console.debug("[profile] seafileCached (before profile submit):", seafileCached.value);
-      if (!seafileCached.value) {
-        try {
-          const promptRes: any = await ElMessageBox.prompt(
-            "请输入当前登录密码以同步云端昵称（可留空以跳过同步）",
-            "验证密码",
-            {
-              inputType: "password",
-              confirmButtonText: "确定",
-              cancelButtonText: "取消",
-            }
-          );
-          pwd = promptRes && promptRes.value ? promptRes.value : "";
-        } catch {
-          // 取消输入：继续本地更新但不进行 Seafile 同步
-          pwd = "";
-        }
-      }
-      const payload: any = { ...userProfileForm };
-      if (pwd) payload.cloudPassword = pwd;
-      const resp: any = await UserAPI.updateProfile(payload);
+      await UserAPI.updateProfile({ ...userProfileForm });
       ElMessage.success("账号资料修改成功");
       dialog.visible = false;
       loadUserProfile();
-      const seafileProfileSync =
-        resp?.seafileProfileSync || (resp && resp.data && resp.data.seafileProfileSync);
-      // 弹窗展示云端同步结果（若有）或提示未执行同步
-      let content = "";
-      let boxType: any = "info";
-      if (seafileProfileSync) {
-        content = `云端同步结果：${seafileProfileSync.success ? "成功" : "失败"}\n${seafileProfileSync.msg || ""}`;
-        boxType = seafileProfileSync.success ? "success" : "warning";
-      } else {
-        content = "未执行云端同步（未提供密码或未配置 Seafile 站点）";
-        boxType = "info";
-      }
-      // 使用消息提示替代模态对话框
-      if (boxType === "success") {
-        ElMessage.success(content);
-      } else if (boxType === "warning") {
-        ElMessage.warning(content);
-      } else {
-        ElMessage.info(content);
-      }
     } catch (err: any) {
       ElMessage.error(err?.message || "更新失败");
     }
@@ -499,20 +449,9 @@ const handleSubmit = async () => {
       return;
     }
     try {
-      const resp: any = await UserAPI.changePassword(passwordChangeForm);
-      const seafileSync = resp?.seafileSync || (resp && resp.data && resp.data.seafileSync);
-      // 先告知本地修改成功
+      await UserAPI.changePassword(passwordChangeForm);
       ElMessage.success("密码修改成功");
       dialog.visible = false;
-      // 若后端返回云端同步结果，展示给用户
-      if (seafileSync) {
-        const content = `云端同步结果：${seafileSync.success ? "成功" : "失败"}\n${seafileSync.msg || ""}`;
-        if (seafileSync.success) {
-          ElMessage.success(content);
-        } else {
-          ElMessage.warning(content);
-        }
-      }
     } catch (err: any) {
       ElMessage.error(err?.message || "修改密码失败");
     }
@@ -571,50 +510,14 @@ const handleFileChange = async (e: Event) => {
   }
   let loadingSvc: any = null;
   try {
-    // 如果后端已在登录时告知服务器已缓存 Seafile token，优先不弹密码提示
-    let pwd = "";
-    console.debug("[profile] seafileCached (before avatar upload):", seafileCached.value);
-    if (!seafileCached.value) {
-      try {
-        const promptRes: any = await ElMessageBox.prompt(
-          "请输入当前登录密码以同步 Seafile（必填）",
-          "验证密码",
-          {
-            inputType: "password",
-            confirmButtonText: "确定",
-            cancelButtonText: "取消",
-          }
-        );
-        pwd = promptRes && promptRes.value ? promptRes.value : "";
-      } catch {
-        // 用户取消输入，直接终止上传
-        return;
-      }
-      if (!pwd) {
-        ElMessage.error("必须输入当前登录密码以继续同步");
-        return;
-      }
-    }
     uploading.value = true;
     loadingSvc = ElLoading.service({ text: "上传中...", background: "rgba(0,0,0,0.3)" });
-    const res: any = await UserAPI.uploadAvatar(file, pwd || undefined);
+    const res: any = await UserAPI.uploadAvatar(file);
     const url = res?.url || (res && (res as any).data && (res as any).data.url) || "";
-    const seafileAvatarSync =
-      res?.seafileAvatarSync || (res && (res as any).data && (res as any).data.seafileAvatarSync);
-    // 同步更新 Pinia store，避免额外 profile 请求
     if (url) userStore.userInfo.avatar = url;
     await UserAPI.updateProfile({ avatar: url });
-    // 本地 userProfile 也立即更新
     userProfile.value.avatar = url;
     ElMessage.success("头像已更新");
-    // 若后端返回 Seafile 同步结果，则展示给用户
-    if (seafileAvatarSync) {
-      if (seafileAvatarSync.success) {
-        ElMessage.success("云端头像同步成功");
-      } else {
-        ElMessage.warning(`云端头像同步失败：${seafileAvatarSync.msg || "未知错误"}`);
-      }
-    }
   } catch (err: any) {
     ElMessage.error(err?.message || "上传失败");
   } finally {

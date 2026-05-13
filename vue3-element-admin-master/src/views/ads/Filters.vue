@@ -1,15 +1,18 @@
 <template>
   <div class="filters-container">
-    <div class="filter-row">
+    <!-- Row 1: 所有筛选下拉项 -->
+    <div class="filter-row filter-row-main">
       <FsSelect
         v-model="local.countries"
-        class="filter-item w-160"
+        size="small"
+        class="filter-item w-80"
         :options="countries"
         multiple
-        placeholder="选择国家"
+        placeholder="国家"
       />
       <FsSelect
         v-model="local.profiles"
+        size="small"
         class="filter-item w-160"
         :options="profiles"
         multiple
@@ -17,7 +20,8 @@
       />
       <el-date-picker
         v-model="local.range"
-        class="filter-item date-picker-custom"
+        size="small"
+        class="filter-item date-picker"
         type="daterange"
         start-placeholder="开始"
         end-placeholder="结束"
@@ -27,32 +31,29 @@
       />
       <FsSelect
         v-model="local.adsTypes"
-        class="filter-item w-140"
+        size="small"
+        class="filter-item w-100"
         :options="adsTypes"
         multiple
-        placeholder="全部广告类型"
-      />
-      <FsSelect
-        v-model="local.targetTypes"
-        class="filter-item w-140"
-        :options="targetTypes"
-        multiple
-        placeholder="全部投放类型"
+        placeholder="广告类型"
       />
       <FsSelect
         v-model="local.portfolios"
-        class="filter-item w-140"
+        size="small"
+        class="filter-item w-100"
         :options="portfolios"
         multiple
+        filterable
+        remote
+        reserve-keyword
+        :remote-method="remoteSearchPortfolio"
         placeholder="广告组合"
       />
-    </div>
-
-    <div class="filter-row">
       <div class="filter-item input-group-seamless">
         <el-select
           v-model="local.asinSearchType"
-          class="seamless-left w-120"
+          size="small"
+          class="seamless-left w-110"
           placeholder="ASIN查询"
         >
           <el-option label="按ASIN/MSKU查询" value="sku" />
@@ -60,115 +61,89 @@
         </el-select>
         <FsSelect
           v-model="local.skus"
+          size="small"
           :options="skuOptions"
           multiple
           remote
           :remote-method="remoteSearchSku"
-          placeholder="全部MSKU"
+          placeholder="MSKU"
           :show-only="true"
-          class="seamless-right w-160"
+          class="seamless-right w-110"
+        />
+        <el-button
+          v-if="local.skus?.length"
+          size="small"
+          :icon="Close"
+          class="btn-msku-clear"
+          title="清空MSKU"
+          @click="clearField('skus')"
         />
       </div>
       <FsSelect
         v-model="local.campaignStatus"
-        class="filter-item w-120"
+        size="small"
+        class="filter-item w-80"
         :options="campaignStatuses"
         multiple
-        placeholder="全部状态"
+        placeholder="状态"
       />
       <FsSelect
         v-model="local.serviceStatus"
-        class="filter-item w-140"
+        size="small"
+        class="filter-item w-100"
         :options="serviceStatuses"
         multiple
-        placeholder="全部服务状态"
+        placeholder="服务状态"
       />
-      <el-select
-        v-model="local.budgetType"
-        class="filter-item w-120"
-        placeholder="预算类型"
-        clearable
-      >
-        <el-option label="每日预算" value="daily" />
-        <el-option label="终生预算" value="lifetime" />
-      </el-select>
-      <el-select
-        v-model="local.biddingType"
-        class="filter-item w-120"
-        placeholder="竞价策略"
-        clearable
-      >
-        <el-option label="动态竞价-只降低" value="legacyForSales" />
-        <el-option label="动态竞价-提高和降低" value="autoForSales" />
-        <el-option label="固定竞价" value="manual" />
-        <el-option label="基于规则的竞价" value="ruleBased" />
-      </el-select>
-      <el-select
-        v-model="local.costType"
-        class="filter-item w-120"
-        placeholder="成本类型"
-        clearable
-      >
-        <el-option label="CPC" value="cpc" />
-        <el-option label="VCPM" value="vcpm" />
-      </el-select>
-      <el-select
-        v-model="local.siteRestrictions"
-        class="filter-item w-120"
-        placeholder="网站"
-        clearable
-      >
-        <el-option label="亚马逊站内外" value="AMAZON_ALL" />
-        <el-option label="亚马逊企业购" value="AMAZON_BUSINESS" />
-      </el-select>
-      <el-select
-        v-model="local.adsStrategy"
-        class="filter-item w-120"
-        placeholder="广告工具"
-        clearable
-      >
-        <el-option label="分时策略" value="TimingTactics" />
-        <el-option label="递增预算" value="StepBudget" />
-        <el-option label="自动规则" value="RuleEngine" />
-        <el-option label="自定义设置" value="TimingCustomSet" />
-        <el-option label="未使用工具" value="NotAppliedTool" />
-      </el-select>
     </div>
 
-    <div class="filter-row">
+    <!-- Row 2: 标签/负责人/搜索/操作 -->
+    <div class="filter-row filter-row-secondary">
+      <FsSelect
+        v-model="local.biddingType"
+        size="small"
+        class="filter-item w-100"
+        :options="biddingTypes"
+        placeholder="竞价策略"
+        clearable
+      />
       <FsSelect
         v-model="local.tags"
-        class="filter-item w-140"
+        size="small"
+        class="filter-item w-110"
         :options="tagsList"
         multiple
         placeholder="活动标签"
       />
       <FsSelect
         v-model="local.owners"
-        class="filter-item w-140"
+        size="small"
+        class="filter-item w-100"
         :options="owners"
         multiple
         placeholder="负责人"
       />
-
       <el-input
         v-model="local.campaignName"
-        class="filter-item w-280"
-        placeholder="Y-PX-SY01 露肩V领修身上衣 酒红/黑"
+        size="small"
+        class="filter-item campaign-input"
+        placeholder="请输入广告活动"
+        :prefix-icon="Search"
         clearable
-      >
-        <template #suffix>
-          <el-icon><Operation /></el-icon>
-        </template>
-      </el-input>
-
+      />
       <div class="filter-actions">
-        <el-button class="btn-template" @click="openTemplates">
+        <el-button size="small" class="btn-template" @click="openTemplates">
           <el-icon style="margin-right: 4px"><Filter /></el-icon>
           筛选模板
         </el-button>
-        <el-button type="primary" class="btn-search" @click="onSearch">查询</el-button>
-        <el-button class="btn-reset" @click="onReset">重置</el-button>
+        <el-button
+          type="primary"
+          size="small"
+          :icon="Search"
+          class="btn-icon-only"
+          @click="onSearch"
+        />
+        <el-button size="small" :icon="Brush" class="btn-icon-only" @click="onReset" />
       </div>
     </div>
 
@@ -199,15 +174,6 @@
         @close="clearField('adsTypes')"
       >
         {{ formatTagText("广告类型", local.adsTypes, adsTypes) }}
-      </el-tag>
-      <el-tag
-        v-if="local.targetTypes?.length"
-        closable
-        effect="plain"
-        class="filter-tag"
-        @close="clearField('targetTypes')"
-      >
-        {{ formatTagText("投放类型", local.targetTypes, targetTypes) }}
       </el-tag>
       <el-tag
         v-if="local.portfolios?.length"
@@ -265,15 +231,6 @@
       </el-tag>
 
       <el-tag
-        v-if="local.budgetType"
-        closable
-        effect="plain"
-        class="filter-tag"
-        @close="clearField('budgetType')"
-      >
-        预算类型：{{ dicts.budgetType[local.budgetType] }}
-      </el-tag>
-      <el-tag
         v-if="local.biddingType"
         closable
         effect="plain"
@@ -281,33 +238,6 @@
         @close="clearField('biddingType')"
       >
         竞价策略：{{ dicts.biddingType[local.biddingType] }}
-      </el-tag>
-      <el-tag
-        v-if="local.costType"
-        closable
-        effect="plain"
-        class="filter-tag"
-        @close="clearField('costType')"
-      >
-        成本类型：{{ dicts.costType[local.costType] }}
-      </el-tag>
-      <el-tag
-        v-if="local.siteRestrictions"
-        closable
-        effect="plain"
-        class="filter-tag"
-        @close="clearField('siteRestrictions')"
-      >
-        网站：{{ dicts.siteRestrictions[local.siteRestrictions] }}
-      </el-tag>
-      <el-tag
-        v-if="local.adsStrategy"
-        closable
-        effect="plain"
-        class="filter-tag"
-        @close="clearField('adsStrategy')"
-      >
-        广告工具：{{ dicts.adsStrategy[local.adsStrategy] }}
       </el-tag>
       <el-tag
         v-if="local.campaignName"
@@ -319,7 +249,7 @@
         广告活动：{{ local.campaignName }}
       </el-tag>
 
-      <el-icon class="clear-all-icon" title="清空所有" @click="onReset"><Delete /></el-icon>
+      <el-icon class="clear-all-icon" title="清空所有" @click="onReset"><Brush /></el-icon>
     </div>
   </div>
 </template>
@@ -327,7 +257,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import type { PropType } from "vue";
-import { Filter, Operation, Delete } from "@element-plus/icons-vue";
+import { Filter, Search, Brush, Close } from "@element-plus/icons-vue";
 import FsSelect from "@/components/FsSelect.vue";
 
 const props = defineProps({
@@ -335,14 +265,15 @@ const props = defineProps({
   countries: { type: Array as () => any[], default: () => [] },
   profiles: { type: Array as () => any[], default: () => [] },
   adsTypes: { type: Array as () => any[], default: () => [] },
-  targetTypes: { type: Array as () => any[], default: () => [] },
   portfolios: { type: Array as () => any[], default: () => [] },
   skuOptions: { type: Array as () => any[], default: () => [] },
   tagsList: { type: Array as () => any[], default: () => [] },
   owners: { type: Array as () => any[], default: () => [] },
   campaignStatuses: { type: Array as () => any[], default: () => [] },
   serviceStatuses: { type: Array as () => any[], default: () => [] },
+  biddingTypes: { type: Array as () => any[], default: () => [] },
   remoteSearchSku: { type: Object as PropType<(query: string) => void>, required: true },
+  remoteSearchPortfolio: { type: Object as PropType<(query: string) => void>, required: true },
 });
 
 const emit = defineEmits(["update:filters", "search", "reset", "open-templates"]);
@@ -396,21 +327,11 @@ watch(
 );
 
 const dicts: Record<string, Record<string, string>> = {
-  budgetType: { daily: "每日预算", lifetime: "终生预算" },
   biddingType: {
     legacyForSales: "动态竞价-只降低",
     autoForSales: "动态竞价-提高和降低",
     manual: "固定竞价",
     ruleBased: "基于规则的竞价",
-  },
-  costType: { cpc: "CPC", vcpm: "VCPM" },
-  siteRestrictions: { AMAZON_ALL: "亚马逊站内外", AMAZON_BUSINESS: "亚马逊企业购" },
-  adsStrategy: {
-    TimingTactics: "分时策略",
-    StepBudget: "递增预算",
-    RuleEngine: "自动规则",
-    TimingCustomSet: "自定义设置",
-    NotAppliedTool: "未使用工具",
   },
 };
 
@@ -435,19 +356,13 @@ const hasSelected = computed(() => {
     local.value.countries?.length > 0 ||
     local.value.profiles?.length > 0 ||
     local.value.adsTypes?.length > 0 ||
-    local.value.targetTypes?.length > 0 ||
     local.value.portfolios?.length > 0 ||
     local.value.skus?.length > 0 ||
     local.value.campaignStatus?.length > 0 ||
     local.value.serviceStatus?.length > 0 ||
     local.value.tags?.length > 0 ||
     local.value.owners?.length > 0 ||
-    local.value.budgetType ||
-    local.value.biddingType ||
-    local.value.costType ||
-    local.value.siteRestrictions ||
-    local.value.adsStrategy ||
-    local.value.campaignName
+    !!local.value.biddingType
   );
 });
 
@@ -478,53 +393,92 @@ function openTemplates() {
 .filters-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
+
 .filter-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
+
+.filter-row-main {
+  flex-wrap: nowrap;
+}
+
+.filter-row-secondary {
+  flex-wrap: nowrap;
+}
+
 .filter-item {
   flex-shrink: 0;
+  overflow: visible;
+}
+
+.w-90 {
+  width: 90px;
+}
+.w-100 {
+  width: 100px;
+}
+.w-110 {
+  width: 110px;
 }
 .w-120 {
   width: 120px;
 }
-.w-140 {
-  width: 140px;
+.w-130 {
+  width: 130px;
+}
+.w-80 {
+  width: 80px;
 }
 .w-160 {
   width: 160px;
 }
-.w-200 {
-  width: 200px !important;
-}
-.w-240 {
-  width: 240px;
-}
-.w-280 {
-  width: 280px;
-}
-.w-300 {
-  width: 300px !important;
+.w-150 {
+  width: 150px;
 }
 
-.date-picker-custom {
-  width: 240px !important;
-  --el-date-editor-width: 240px !important;
-  min-width: 240px !important;
-  max-width: 240px !important;
+/* 筛选框高度 */
+.filter-row :deep(.el-select__wrapper),
+.filter-row :deep(.el-input__wrapper) {
+  min-height: 32px;
+}
+.filter-row :deep(.el-range-editor.el-input__wrapper) {
+  min-height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
-:deep(.el-range-editor.el-input__wrapper) {
+.campaign-input {
+  flex: 1 1 200px;
+  width: 200px;
+  max-width: 320px;
+}
+
+.date-picker {
+  flex: 0 0 210px;
+  width: 210px;
+}
+:deep(.date-picker .el-range-editor.el-input__wrapper),
+:deep(.date-picker.el-range-editor.el-input__wrapper) {
+  width: 210px !important;
   padding: 0 8px;
 }
 
 .input-group-seamless {
   display: flex;
   align-items: center;
+}
+
+.btn-msku-clear {
+  padding: 5px 6px;
+  color: #909399;
+  border-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 .input-group-seamless :deep(.seamless-left .el-input__wrapper) {
   border-right: 0;
@@ -542,51 +496,86 @@ function openTemplates() {
 
 .filter-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   margin-left: 4px;
 }
-.btn-template {
-  color: #606266;
-}
-.btn-search {
-  min-width: 60px;
-}
-.btn-reset {
-  min-width: 60px;
+
+.filter-actions :deep(.el-button) {
+  height: 32px;
 }
 
+.filter-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+.btn-template {
+  color: #606266;
+  border-color: #dcdfe6;
+}
+.btn-template:hover {
+  color: #409eff;
+  background-color: #ecf5ff;
+  border-color: #c6e2ff;
+}
+
+/* 图标独立按钮 */
+.btn-icon-only {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+/* 已选标签行 */
 .filter-tags-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f2f5;
 }
+
 .filter-tag {
-  height: 28px;
-  padding: 0 10px;
-  font-size: 13px;
-  line-height: 26px;
-  color: #409eff;
-  background: #fdfdfd;
-  border-color: #a0cfff;
-  border-radius: 4px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 22px;
+  color: #1677ff;
+  background: #e8f4ff;
+  border-color: #91caff;
+  border-radius: 12px;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.filter-tag:hover {
+  background: #d6eaff;
+  border-color: #409eff;
 }
 .filter-tag :deep(.el-tag__close) {
-  color: #a0cfff;
+  color: #91caff;
 }
 .filter-tag :deep(.el-tag__close:hover) {
   color: #fff;
   background-color: #409eff;
 }
+
 .clear-all-icon {
   margin-left: 2px;
-  font-size: 16px;
-  color: #606266;
+  font-size: 14px;
+  color: #909399;
   cursor: pointer;
+  transition: color 0.15s;
 }
 .clear-all-icon:hover {
   color: #f56c6c;
+}
+
+@media (max-width: 1400px) {
+  .filter-row-main,
+  .filter-row-secondary {
+    flex-wrap: wrap;
+  }
 }
 </style>

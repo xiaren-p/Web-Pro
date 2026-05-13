@@ -45,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { NoticeAPI, type NoticeDetailVO } from "@/backend";
+import { NoticeAPI, type NoticeDetailVO } from "@/api/notice";
 
 const visible = ref(false);
 const currentNotice = ref<NoticeDetailVO>({});

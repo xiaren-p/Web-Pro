@@ -65,7 +65,7 @@
         <el-table-column label="状态">
           <template #default="scope">
             <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">
-              {{ scope.row.status === 1 ? "启用" : "禁用" }}
+              {{ scope.row.status_text || (scope.row.status === 1 ? "启用" : "禁用") }}
             </el-tag>
           </template>
         </el-table-column>
@@ -112,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { DictAPI, type DictItemPageQuery, type DictItemPageVO, type DictPageVO } from "@/backend";
+import { DictAPI, type DictItemPageQuery, type DictItemPageVO, type DictPageVO } from "@/api/dict";
 import DictItemDialog from "./components/DictItemDialog.vue";
 
 const route = useRoute();

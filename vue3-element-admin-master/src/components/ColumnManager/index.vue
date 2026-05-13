@@ -249,10 +249,10 @@ function resetToDefault() {
 .column-config-container {
   display: flex;
   height: calc(100vh - 140px);
-  font-size: 14px;
-  border-radius: 12px;
   overflow: hidden;
+  font-size: 14px;
   border: 1px solid var(--el-border-color-light);
+  border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
 }
 
@@ -298,8 +298,8 @@ function resetToDefault() {
   font-weight: bold;
   color: var(--el-text-color-primary);
   background-color: var(--el-fill-color-light);
-  border-radius: 8px;
   border-left: 4px solid var(--el-color-primary);
+  border-radius: 8px;
 }
 
 .group-items {
@@ -309,10 +309,10 @@ function resetToDefault() {
 }
 
 .group-item-checkbox {
-  width: 33.33%;
-  margin-right: 0;
-  padding: 6px 10px;
   box-sizing: border-box;
+  width: 33.33%;
+  padding: 6px 10px;
+  margin-right: 0;
   border-radius: 6px;
   transition: background-color 0.2s ease;
 }
@@ -327,8 +327,8 @@ function resetToDefault() {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 15px;
-  color: var(--el-text-color-regular);
   vertical-align: middle;
+  color: var(--el-text-color-regular);
   white-space: nowrap;
 }
 
@@ -342,8 +342,8 @@ function resetToDefault() {
 
 .selected-count {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   padding: 16px 20px;
   font-size: 14px;
   font-weight: bold;
@@ -410,10 +410,10 @@ function resetToDefault() {
 .sort-index {
   display: inline-block;
   width: 28px;
+  font-family: monospace;
   font-size: 13px;
   font-weight: 800;
   color: var(--el-text-color-secondary);
-  font-family: monospace;
 }
 
 .sort-label {
@@ -459,8 +459,8 @@ function resetToDefault() {
 .action-icon.active {
   color: #fff;
   background-color: var(--el-color-primary);
-  opacity: 1;
   box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
+  opacity: 1;
 }
 
 .delete-icon:hover {
@@ -471,7 +471,7 @@ function resetToDefault() {
 
 .drawer-footer {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
 }
 </style>

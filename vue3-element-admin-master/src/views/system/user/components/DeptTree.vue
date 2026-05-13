@@ -21,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { DeptAPI } from "@/backend";
+import { DeptAPI } from "@/api/dept";
 const props = defineProps({
   modelValue: {
     type: [String, Number],

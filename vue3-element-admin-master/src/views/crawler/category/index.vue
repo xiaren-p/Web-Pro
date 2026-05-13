@@ -69,7 +69,7 @@
         <el-table-column label="状态" prop="status">
           <template #default="scope">
             <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">
-              {{ scope.row.status === 1 ? "正常" : "禁用" }}
+              {{ scope.row.status_text || (scope.row.status === 1 ? "正常" : "禁用") }}
             </el-tag>
           </template>
         </el-table-column>
@@ -129,7 +129,7 @@ defineOptions({ name: "CrawlerCategory", inheritAttrs: false });
 
 import { ref, reactive, onMounted } from "vue";
 import request from "@/utils/request";
-import { CategoryAPI, type CategoryPageQuery, type CategoryVO } from "@/backend";
+import { CategoryAPI, type CategoryPageQuery, type CategoryVO } from "@/api/crawler/category";
 import { ElMessage, ElMessageBox } from "element-plus";
 import CategoryFormDialog from "./components/CategoryFormDialog.vue";
 import CategoryViewDialog from "./components/CategoryViewDialog.vue";

@@ -79,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { NoticeAPI, type NoticePageVO, type NoticeDetailVO } from "@/backend";
+import { NoticeAPI, type NoticePageVO, type NoticeDetailVO } from "@/api/notice";
 import router from "@/router";
 
 const noticeList = ref<NoticePageVO[]>([]);

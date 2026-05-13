@@ -7,14 +7,14 @@
   >
     <div
       style="
-        border-top: 1px solid var(--el-border-color-lighter);
-        border-bottom: 1px solid var(--el-border-color-lighter);
+        min-height: 80px;
         padding: 20px 0;
         margin-top: -20px;
-        min-height: 80px;
+        border-top: 1px solid var(--el-border-color-lighter);
+        border-bottom: 1px solid var(--el-border-color-lighter);
       "
     >
-      <div style="margin-bottom: 20px; color: #606266; font-size: 14px">
+      <div style="margin-bottom: 20px; font-size: 14px; color: #606266">
         已选中 {{ selectedRows.length }} 个商品。请选择要应用的分类：
       </div>
       <el-select v-model="batchAssortValue" placeholder="请选择分类" clearable style="width: 100%">
@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { ElMessage } from "element-plus";
-import { SalesProductListingAPI } from "@/backend";
+import { SalesProductListingAPI } from "@/api/sales/listing";
 
 const props = defineProps<{
   visible: boolean;

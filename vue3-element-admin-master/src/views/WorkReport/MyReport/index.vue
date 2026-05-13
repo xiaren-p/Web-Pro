@@ -24,7 +24,7 @@
         <el-table-column prop="type" label="类型" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.type === 'daily' ? 'primary' : 'success'" effect="light">
-              {{ row.type === "daily" ? "日报" : "周报" }}
+              {{ row.type_display || (row.type === "daily" ? "日报" : "周报") }}
             </el-tag>
           </template>
         </el-table-column>
@@ -41,7 +41,7 @@
 
         <el-table-column prop="created_at" label="提交时间" width="160" align="center">
           <template #default="{ row }">
-            <span>{{ formatTime(row.created_at) }}</span>
+            <span>{{ row.created_at_display || formatTime(row.created_at) }}</span>
           </template>
         </el-table-column>
 
@@ -87,14 +87,14 @@ import { Plus, View, Edit, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import dayjs from "dayjs";
 
-import ReportDrawer from "../components/ReportDrawer.vue";
+import ReportDrawer from "@/views/WorkReport/components/ReportDrawer.vue";
 import {
   getWorkReportList,
   addWorkReport,
   updateWorkReport,
   deleteWorkReport,
-} from "@/api/work-report";
-import type { WorkReportVO, WorkReportQuery } from "@/api/work-report";
+} from "@/api/workReport";
+import type { WorkReportVO, WorkReportQuery } from "@/api/workReport";
 
 const loading = ref(false);
 const myReportList = ref<WorkReportVO[]>([]);

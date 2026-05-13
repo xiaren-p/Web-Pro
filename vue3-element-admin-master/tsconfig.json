@@ -5,8 +5,7 @@
     "moduleResolution": "bundler",
     "lib": ["esnext", "dom"],
     "paths": {
-      "@/*": ["./src/*"],
-      "@/backend": ["./src/backend.ts"]
+      "@/*": ["./src/*"]
     },
 
     // 严格性和类型检查相关配置

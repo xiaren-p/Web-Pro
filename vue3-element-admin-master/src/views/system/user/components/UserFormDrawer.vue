@@ -97,7 +97,9 @@
 <script setup lang="ts">
 import { useAppStore } from "@/store/modules/app-store";
 import { DeviceEnum } from "@/enums/settings/device-enum";
-import { UserAPI, DeptAPI, RoleAPI } from "@/backend";
+import { UserAPI } from "@/api/user";
+import { DeptAPI } from "@/api/dept";
+import { RoleAPI } from "@/api/role";
 
 const appStore = useAppStore();
 const emit = defineEmits(["success"]);
@@ -189,22 +191,8 @@ const handleSubmit = useDebounceFn(() => {
       loading.value = true;
       if (userId) {
         UserAPI.update(userId, formData)
-          .then((resp: any) => {
-            const data = resp?.data || resp || {};
-            // 显示常规成功提示
+          .then(() => {
             ElMessage.success("修改用户成功");
-            // 若后端返回 Seafile 同步结果，展示给用户
-            if (data.seafileSync) {
-              const s = data.seafileSync;
-              if (s.success) {
-                ElMessage.success("云端账户同步成功");
-              } else {
-                ElMessageBox.alert(`云端账户同步失败：${s.msg || "未知错误"}`, "云端同步结果", {
-                  type: "warning",
-                  confirmButtonText: "确定",
-                });
-              }
-            }
             emit("success");
             handleClose();
           })

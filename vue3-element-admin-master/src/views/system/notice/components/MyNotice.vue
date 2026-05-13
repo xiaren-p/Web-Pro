@@ -115,7 +115,12 @@ defineOptions({
   inheritAttrs: false,
 });
 
-import { NoticeAPI, type NoticePageVO, type NoticePageQuery, type NoticeDetailVO } from "@/backend";
+import {
+  NoticeAPI,
+  type NoticePageVO,
+  type NoticePageQuery,
+  type NoticeDetailVO,
+} from "@/api/notice";
 
 const queryFormRef = ref();
 const pageData = ref<NoticePageVO[]>([]);

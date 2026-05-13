@@ -147,7 +147,7 @@
 <script setup lang="ts">
 import { Picture as IconPicture } from "@element-plus/icons-vue";
 import type { UploadProps, UploadRequestOptions } from "element-plus";
-import { ImageUploadAPI } from "@/backend";
+import { ImageUploadAPI } from "@/api/imageUpload";
 import ImageGroupDialog from "./components/ImageGroupDialog.vue";
 import LogDetailDialog from "./components/LogDetailDialog.vue";
 import SyncQueueDialog from "./components/SyncQueueDialog.vue";

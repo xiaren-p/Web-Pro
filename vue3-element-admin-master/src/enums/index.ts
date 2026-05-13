@@ -1,11 +1,14 @@
-export * from "./api/code-enum";
+/**
+ * 枚举统一出口：显式封装所有业务枚举，禁止使用 `export *` 桶文件。
+ */
+export { ApiCodeEnum } from "./api/code-enum";
 
-export * from "./codegen/form-enum";
-export * from "./codegen/query-enum";
+export { FormTypeEnum } from "./codegen/form-enum";
+export { QueryTypeEnum } from "./codegen/query-enum";
 
-export * from "./settings/layout-enum";
-export * from "./settings/theme-enum";
-export * from "./settings/locale-enum";
-export * from "./settings/device-enum";
+export { LayoutMode, SidebarStatus, ComponentSize } from "./settings/layout-enum";
+export { ThemeMode, SidebarColor } from "./settings/theme-enum";
+export { LanguageEnum } from "./settings/locale-enum";
+export { DeviceEnum } from "./settings/device-enum";
 
-export * from "./system/menu-enum";
+export { MenuTypeEnum } from "./system/menu-enum";

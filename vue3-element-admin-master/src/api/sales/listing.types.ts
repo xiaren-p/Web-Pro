@@ -1,0 +1,84 @@
+/**
+ * Listing 行项类型定义：销售-商品管理列表的行实体。
+ */
+
+export interface ListingItemVO {
+  listing_id: string;
+  sid: number;
+  shop_name?: string;
+  marketplace: string;
+  country_code?: string;
+  seller_sku: string;
+  label?: string;
+  fnsku: string;
+  asin: string;
+  parent_asin: string;
+  small_image_url: string;
+  status: number;
+  is_delete: number;
+  item_name: string;
+  local_sku: string;
+  local_name: string;
+  currency_code: string;
+  price: string;
+  landed_price: string;
+  listing_price: string;
+  shipping: string;
+  points: string;
+  quantity: number;
+  afn_fulfillable_quantity: number;
+  afn_unsellable_quantity: number;
+  reserved_fc_transfers: number;
+  reserved_fc_processing: number;
+  reserved_customerorders: number;
+  afn_inbound_shipped_quantity: number;
+  afn_inbound_working_quantity: number;
+  afn_inbound_receiving_quantity: number;
+  open_date: string;
+  open_date_display: string;
+  listing_update_date: string;
+  seller_rank: number;
+  seller_brand: string;
+  seller_category: string;
+  review_num: number;
+  last_star: string;
+  fulfillment_channel_type: string;
+  principal_info: { principal_uid: number; principal_name: string }[];
+  seller_category_new: string[];
+  pair_update_time: string;
+  first_order_time: string;
+  on_sale_time: string;
+  store_type: number;
+  total_volume: string;
+  yesterday_volume: string;
+  fourteen_volume: string;
+  thirty_volume: string;
+  yesterday_amount: string;
+  seven_amount: string;
+  fourteen_amount: string;
+  thirty_amount: string;
+  average_seven_volume: string;
+  average_fourteen_volume: string;
+  average_thirty_volume: string;
+  dimension_info: {
+    item_height: string;
+    item_height_units_type: string;
+    item_length: string;
+    item_length_units_type: string;
+    item_width: string;
+    item_width_units_type: string;
+    item_weight: string;
+    item_weight_units_type: string;
+    package_height: string;
+    package_height_units_type: string;
+    package_length: string;
+    package_length_units_type: string;
+    package_width: string;
+    package_width_units_type: string;
+    package_weight: string;
+    package_weight_units_type: string;
+  };
+  small_rank: { category: string; rank: string };
+  global_tags: { globalTagId: string; tagName: string; color: string }[];
+  db_classification?: string;
+}

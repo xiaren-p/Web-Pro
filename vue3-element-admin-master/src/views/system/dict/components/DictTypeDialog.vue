@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { DictAPI, type DictForm } from "@/backend";
+import { DictAPI, type DictForm } from "@/api/dict";
 
 const emit = defineEmits(["success"]);
 

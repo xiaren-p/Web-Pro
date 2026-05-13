@@ -7,13 +7,13 @@
   >
     <div
       style="
-        border-top: 1px solid var(--el-border-color-lighter);
-        border-bottom: 1px solid var(--el-border-color-lighter);
         padding: 20px 0;
         margin-top: -20px;
+        border-top: 1px solid var(--el-border-color-lighter);
+        border-bottom: 1px solid var(--el-border-color-lighter);
       "
     >
-      <div style="margin-bottom: 20px; color: #606266; font-size: 14px">
+      <div style="margin-bottom: 20px; font-size: 14px; color: #606266">
         输入标签后回车确认，可输入多个。
       </div>
       <div style="display: flex; flex-wrap: wrap; gap: 8px; min-height: 40px">
@@ -35,8 +35,8 @@
       <div
         style="
           display: flex;
-          justify-content: space-between;
           align-items: center;
+          justify-content: space-between;
           margin-top: -10px;
         "
       >
@@ -56,7 +56,7 @@
 <script setup lang="ts">
 import { ref, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { SalesProductListingAPI } from "@/backend";
+import { SalesProductListingAPI } from "@/api/sales/listing";
 
 const props = defineProps<{
   visible: boolean;

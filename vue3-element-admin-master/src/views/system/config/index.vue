@@ -96,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { ConfigAPI, type ConfigPageQuery, type ConfigPageVO } from "@/backend";
+import { ConfigAPI, type ConfigPageQuery, type ConfigPageVO } from "@/api/config";
 import { useDebounceFn } from "@vueuse/core";
 import ConfigDialog from "./components/ConfigDialog.vue";
 

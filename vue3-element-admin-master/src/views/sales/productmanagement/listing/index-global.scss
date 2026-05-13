@@ -17,27 +17,27 @@
 
 /* SaaS风格 Select 下拉浮层优化 */
 .el-popper {
-  border-radius: 8px !important;
   padding: 6px !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
   border: 1px solid var(--el-border-color-lighter) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
 }
 .el-select-dropdown__item {
-  border-radius: 6px;
-  margin: 2px 4px;
   padding: 0 12px;
+  margin: 2px 4px;
+  border-radius: 6px;
   transition: all 0.2s ease;
 }
-.el-select-dropdown__item.hover, .el-select-dropdown__item:hover {
-  background-color: var(--el-color-primary-light-9) !important;
+.el-select-dropdown__item.hover,
+.el-select-dropdown__item:hover {
   color: var(--el-color-primary) !important;
+  background-color: var(--el-color-primary-light-9) !important;
 }
 .el-select-dropdown__item.selected {
-  background-color: var(--el-color-primary-light-8) !important;
-  color: var(--el-color-primary) !important;
   font-weight: 500;
+  color: var(--el-color-primary) !important;
+  background-color: var(--el-color-primary-light-8) !important;
 }
 .el-select-dropdown .el-scrollbar__wrap {
   max-height: 280px;
 }
-

@@ -1,5 +1,5 @@
 import { store } from "@/store";
-import { DictAPI, type DictItemOption } from "@/backend";
+import { DictAPI, type DictItemOption } from "@/api/dict";
 import { STORAGE_KEYS } from "@/constants";
 
 export const useDictStore = defineStore("dict", () => {
