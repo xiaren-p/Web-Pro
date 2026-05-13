@@ -24,6 +24,8 @@ from urllib3.util.retry import Retry
 
 # 全局复用的会话（连接池 + 重试策略）
 _SESSION = None
+# Django cache 的 key 前缀，避免与其他 key 碰撞
+_ADMIN_TOKEN_CACHE_PREFIX = "seafile_admin_token:"
 
 
 def _get_session():
@@ -145,13 +147,7 @@ def cache_token_for_user(user, site, token):
         return False
 
 
-# ── 管理员 Token 自动刷新（面向后端服务，不绑定具体用户）──────────────────────
-
-# Django cache 的 key 前缀，避免与其他 key 碰撞
-_ADMIN_TOKEN_CACHE_PREFIX = "seafile_admin_token:"
-
-
-
+# ── 管理员 Token 自动刷新（面向后端服务，不绑定具体用户）
 def _admin_token_cache_key(site: str) -> str:
     """根据 site 生成稳定的 cache key，避免 URL 拼写差异导致误判。"""
     base_site, _ = _normalize_site(site)
