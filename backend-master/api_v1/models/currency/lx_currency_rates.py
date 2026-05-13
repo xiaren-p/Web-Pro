@@ -1,34 +1,22 @@
-"""亮礿广告货币汇率配置模型（只读镜像，managed=False）。"""
+"""广告货币汇率配置模型（lx_currency_rates，managed=False）。"""
 from django.db import models
 
 
 class LxCurrencyRates(models.Model):
     """亚马逊广告货币汇率配置（只读镜像）。
 
-    率字段 rate 为实际使用汇率，目标货币为人民币（CNY），
+    rate 为实际使用汇率，目标货币为人民币（CNY），
     即 1 单位本地货币 = rate 人民币。
-    匹配逻辑：优先用 country_code，找不到则用 country_code_alias。
+    货币到国家的映射由 currency_icon 表负责，本表仅存汇率数据。
     """
 
-    id = models.BigAutoField(primary_key=True)
+    id = models.BigAutoField(
+        primary_key=True,
+    )
 
     code = models.CharField(
         max_length=20,
         verbose_name="货币代码",
-    )
-
-    country_code = models.CharField(
-        max_length=10,
-        blank=True,
-        default="",
-        verbose_name="国家代码（主）",
-    )
-
-    country_code_alias = models.CharField(
-        max_length=10,
-        blank=True,
-        default="",
-        verbose_name="国家代码（别名）",
     )
 
     icon = models.CharField(
@@ -85,4 +73,4 @@ class LxCurrencyRates(models.Model):
         verbose_name_plural = "货币汇率配置"
 
     def __str__(self) -> str:
-        return f"{self.code} ({self.country_code})"
+        return f"LxCurrencyRates<{self.code}>"
