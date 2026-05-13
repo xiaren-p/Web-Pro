@@ -714,8 +714,8 @@ function finishDrag() {
       maxC: Math.max(dragStart.value.c, dragEnd.value.c),
     };
     strategyForm.operateType = "percent_increase";
-    strategyForm.operateValue = "";
-    strategyForm.limitValue = "";
+    strategyForm.operateValue = null;
+    strategyForm.limitValue = null;
   }
 
   strategyDialogVisible.value = true;
@@ -789,8 +789,8 @@ function addSegment() {
     startTime: "",
     endTime: "",
     operateType: "percent_decrease",
-    operateValue: "",
-    limitValue: "",
+    operateValue: 0,
+    limitValue: 0,
   });
 }
 function removeSegment(index: number) {
