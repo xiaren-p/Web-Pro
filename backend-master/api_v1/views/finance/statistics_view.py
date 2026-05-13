@@ -102,6 +102,80 @@ class StatisticsViewSet(viewsets.ViewSet):
             'spend_rate': item.get('spend_rate'),
         }
 
+    @staticmethod
+    def _normalize_month_value(value: str) -> Optional[str]:
+        """将日期/月份参数统一归一化为 ``YYYY-MM``，无法解析时返回 ``None``。"""
+        try:
+            if value is None:
+                return None
+            s = str(value).strip()
+            if not s:
+                return None
+            if re.match(r"^\d{4}-\d{2}", s):
+                return s[:7]
+            if re.match(r"^\d{8}$", s):
+                return f"{s[:4]}-{s[4:6]}"
+            if re.match(r"^\d{6}$", s):
+                return f"{s[:4]}-{s[4:6]}"
+            return None
+        except Exception:
+            return None
+
+    def _build_lossmaking_cache_rows(self, start_date: str, end_date: str, currency_code: Optional[str]) -> List[dict]:
+        """基于 ``MonthlyLossOrder`` 构建前端可直接使用的亏损订单缓存条目。
+
+        Args:
+            start_date: 开始日期/月份（支持 ``YYYY-MM``、``YYYYMM``、``YYYY-MM-DD``）。
+            end_date: 结束日期/月份（支持 ``YYYY-MM``、``YYYYMM``、``YYYY-MM-DD``）。
+            currency_code: 币种代码（当前保留入参并透传到结果，用于前端展示）。
+
+        Returns:
+            list[dict]: 规范化后的缓存行列表（兼容现有 `lossmakingorders_data` 的筛选逻辑）。
+        """
+        start_month = self._normalize_month_value(start_date)
+        end_month = self._normalize_month_value(end_date)
+        if not (start_month and end_month):
+            return []
+
+        qs = MonthlyLossOrder.objects.filter(month__gte=start_month, month__lte=end_month).order_by("-month", "-id")
+        rows: List[dict] = []
+        for item in qs:
+            owner_name = (item.owner or "").strip()
+            rows.append(
+                {
+                    "gross_margin": float(item.gross_margin) if item.gross_margin is not None else None,
+                    "gross_profit": float(item.gross_profit) if item.gross_profit is not None else None,
+                    "currency_icon": None,
+                    "principal_names": [owner_name] if owner_name else [],
+                    "sids": [],
+                    "small_image_url": item.image_url or "",
+                    "currency_code": currency_code,
+                    # 保持与既有前端结构兼容
+                    "price_list": [
+                        {
+                            "local_sku": item.msku or "",
+                            "sku": item.msku or "",
+                            "principal_uids": [owner_name] if owner_name else [],
+                        }
+                    ],
+                    "parent_asins": [item.parent_asin] if item.parent_asin else [],
+                    "seller_store_countries": [item.store_country] if item.store_country else [],
+                    "local_infos": [{"local_name": item.product_name_sku or "", "local_sku": item.msku or ""}],
+                    "net_gross_margin": float(item.net_gross_margin) if item.net_gross_margin is not None else None,
+                    "return_rate": float(item.return_rate) if item.return_rate is not None else None,
+                    "refund_amount_rate": float(item.refund_amount_rate) if item.refund_amount_rate is not None else None,
+                    "total_stock_fee": float(item.total_stock_fee) if item.total_stock_fee is not None else None,
+                    "spend": float(item.spend) if item.spend is not None else None,
+                    "spend_rate": float(item.spend_rate) if item.spend_rate is not None else None,
+                    # 扁平字段：用于后端兜底筛选
+                    "msku": item.msku or "",
+                    "owner": owner_name,
+                    "month": item.month,
+                    "asin": item.asin or "",
+                }
+            )
+        return rows
+
 
     def apply_rule(self, items: List[dict], rule_name: Optional[str]) -> List[dict]:
         """
@@ -143,17 +217,14 @@ class StatisticsViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="lossmakingorders_sync")
     def lossmaking_orders_sync(self, request):
-        """返回本次查询应使用的缓存 key 与上次同步时间，并告知是否需要刷新缓存。
+        """返回实时查询上下文（兼容保留 key 字段）。
 
-        请求 body (JSON): 同 `lossmakingorders`（sids/startDate/endDate/currencyCode/rule）
-        返回: { key: str, sync_time: str|null, needs_refresh: bool }
+        当前模式已改为“按聚合参数实时查询”，不再依赖 OrderProfitCache。
+        该接口仅用于前端保留原有调用链：sync -> data。
+
+        请求 body (JSON): { startDate, endDate, currencyCode? }
+        返回: { key: str, sync_time: str, needs_refresh: false, syncing: false }
         """
-        # 说明：该接口只负责判断与触发后台刷新（若需要），不直接返回业务数据。
-        # 返回字段解释：
-        # - key: 本次查询对应的缓存 key，供前端后续调用 `lossmakingorders_data` 使用；
-        # - sync_time: 上次缓存写入时间（ISO 格式），若无缓存则为 null；
-        # - needs_refresh: 若缓存不存在或超过 10 分钟则为 True；若最近已刷新则为 False；
-        # - syncing: 如果本次触发了后台刷新或已有其他进程在刷新，则为 True（表示正在同步）。
         try:
             if getattr(request, 'method', '').upper() == 'GET':
                 payload = request.query_params or {}
@@ -180,26 +251,13 @@ class StatisticsViewSet(viewsets.ViewSet):
             except Exception:
                 return drf_error('failed to build cache key', status=500)
 
-            cache_created_at = None
-            needs_refresh = True
-            try:
-                if cache_key and OrderProfitCache is not None:
-                    entry = OrderProfitCache.objects.filter(key=cache_key).first()
-                    if entry:
-                        try:
-                            # 使用 updated_at 判断缓存是否过期（update_or_create 会刷新 updated_at）
-                            cache_created_at = entry.updated_at.isoformat()
-                            if timezone.now() - entry.updated_at <= timedelta(minutes=10):
-                                needs_refresh = False
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-
-            # 上游同步能力已移除，syncing 始终为 false
-            syncing_flag = False
-
-            return drf_ok({'key': cache_key, 'sync_time': cache_created_at, 'needs_refresh': needs_refresh, 'syncing': syncing_flag})
+            # 实时模式：不再触发后台缓存刷新
+            return drf_ok({
+                'key': cache_key,
+                'sync_time': timezone.now().isoformat(),
+                'needs_refresh': False,
+                'syncing': False,
+            })
         except Exception as e:
             tb = traceback.format_exc()
             return drf_error('lossmakingorders_sync failed', status=500, data={'msg': str(e), 'trace': tb})
@@ -207,42 +265,44 @@ class StatisticsViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="lossmakingorders_data")
     def lossmaking_orders_data(self, request):
-        """根据 cache key 返回缓存的 pick_fields 数据。
-        请求 body (JSON): { key: str, page?: int, page_size?: int }
+        """按聚合参数实时查询亏损订单并返回分页数据。
+
+        请求 body (JSON):
+        {
+          startDate: str,
+          endDate: str,
+          currencyCode?: str,
+          key?: str,
+          page?: int,
+          page_size?: int,
+          owners?: str[]|str,
+          searchValue?: str[]|str,
+          sids?: str[]|str,
+          rule?: str,
+          sort_by?: str,
+          sort_order?: 'asc'|'desc'
+        }
+
         返回: { list: [...], total: int, sync_time: str|null }
         """
-        # 说明：该接口仅从 `OrderProfitCache` 读取已缓存的 `pick_fields` 数据并按页返回，
-        # 不会触发上游请求或对数据做额外过滤（前端若需过滤可在客户端完成或调用其它接口）。
+        # 说明：该接口不再依赖旧缓存表，直接基于入参实时查 `MonthlyLossOrder`。
         try:
             if getattr(request, 'method', '').upper() == 'GET':
                 payload = request.query_params or {}
             else:
                 payload = request.data or {}
 
-            cache_key = payload.get('key')
-            if not cache_key:
-                return drf_error('key is required', status=400)
+            start_date = payload.get('startDate')
+            end_date = payload.get('endDate')
+            currency_code = payload.get('currencyCode')
+            if not (start_date and end_date):
+                return drf_error('startDate and endDate are required', status=400)
 
             page = int(payload.get('page', 1) or 1)
             page_size = int(payload.get('page_size', 50) or 50)
 
-            data_list = []
-            sync_time = None
-            try:
-                if OrderProfitCache is not None:
-                    entry = OrderProfitCache.objects.filter(key=cache_key).first()
-                    if entry:
-                        try:
-                            data_list = json.loads(entry.data or '[]')
-                        except Exception:
-                            data_list = []
-                        try:
-                            # 返回最近一次写入时间，使用 updated_at
-                            sync_time = entry.updated_at.isoformat()
-                        except Exception:
-                            sync_time = None
-            except Exception:
-                data_list = []
+            data_list = self._build_lossmaking_cache_rows(start_date, end_date, currency_code)
+            sync_time = timezone.now().isoformat()
             # 额外支持基于 listing 负责人（owners）、MSKU（searchValue）和 rule 的服务器端筛选。
             # 解析可选筛选参数（兼容字符串或数组）
             owners = payload.get('owners')
@@ -311,6 +371,15 @@ class StatisticsViewSet(viewsets.ViewSet):
                     except Exception:
                         continue
 
+                # 兜底：兼容已扁平化缓存结构（owner / principal_names）
+                if not principals:
+                    owner_fallback = item.get('owner') or ''
+                    if owner_fallback:
+                        principals.append(str(owner_fallback).strip())
+                    for pn in (item.get('principal_names') or []):
+                        if pn is not None and str(pn).strip():
+                            principals.append(str(pn).strip())
+
                 # 将 owners_list 中的任意项与 principals 精确比较（字符串化后比对）
                 for o in owners_list:
                     for p in principals:
@@ -332,6 +401,9 @@ class StatisticsViewSet(viewsets.ViewSet):
                                 candidates.append(str(p.get('sku')))
                     except Exception:
                         continue
+                # 兜底：兼容已扁平化缓存结构（msku）
+                if not candidates and item.get('msku'):
+                    candidates.append(str(item.get('msku')))
                 for li in (item.get('local_infos') or []):
                     try:
                         if isinstance(li, dict) and li.get('local_sku'):

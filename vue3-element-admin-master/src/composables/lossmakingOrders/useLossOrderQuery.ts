@@ -115,7 +115,12 @@ export function useLossOrderQuery(filters: LossOrderFilters, shopsRef: ShopOptio
       let dataRes: any = { list: [], total: 0, sync_time: syncRes && syncRes.sync_time };
       try {
         if (syncRes && syncRes.key) {
-          const dataBody: LossOrderDataBody = { key: syncRes.key };
+          const dataBody: LossOrderDataBody = {
+            key: syncRes.key,
+            startDate: body.startDate,
+            endDate: body.endDate,
+            currencyCode: body.currencyCode,
+          };
           if (body.page) dataBody.page = body.page;
           if (body.page_size) dataBody.page_size = body.page_size;
           if (body.owners !== undefined) dataBody.owners = body.owners;

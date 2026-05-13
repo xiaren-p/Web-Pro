@@ -27,7 +27,10 @@ export interface LossOrderSyncBody {
 
 /** 数据接口请求体。 */
 export interface LossOrderDataBody {
-  key: string;
+  key?: string;
+  startDate: string;
+  endDate: string;
+  currencyCode?: string;
   page?: number;
   page_size?: number;
   owners?: string[];

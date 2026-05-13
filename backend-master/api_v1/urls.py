@@ -40,7 +40,7 @@ urlpatterns = [
     path('users/options', views.UserViewSet.as_view({'get': 'options'}), name='user-options'),
     path('users/cloud-create', views.UserViewSet.as_view({'post': 'cloud_create'}), name='user-cloud-create'),
     # 列表/创建
-    path('users', views.UserViewSet.as_view({'get': 'generic_get'}), name='users-create-or-template'),
+    path('users', views.UserViewSet.as_view({'get': 'generic_get', 'post': 'create'}), name='users-create-or-template'),
     # 最后放置 catch-all 的单资源路径
     path('users/<str:id>', views.UserViewSet.as_view({'put': 'update', 'delete': 'delete'}), name='user-update-delete'),
     path('users/<str:id>/password/reset', views.UserViewSet.as_view({'put': 'reset_password'}), name='user-reset-password'),
