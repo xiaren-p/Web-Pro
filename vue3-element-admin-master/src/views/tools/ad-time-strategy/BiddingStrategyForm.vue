@@ -481,7 +481,7 @@ const form = reactive({
   status: "active",
   effectiveTime: [],
   baseValueType: "apply",
-  baseFixedValue: "",
+  baseFixedValue: null as number | null,
   category: "",
   managers: [],
   tags: [],
@@ -496,13 +496,13 @@ const form = reactive({
       startTime: "01:00",
       endTime: "06:00",
       operateType: "percent_decrease",
-      operateValue: "0.02",
-      limitValue: "0.02",
+      operateValue: 0.02,
+      limitValue: 0.02,
     },
   ],
   invalidCallbackType: "previous",
-  invalidCallbackMultiplier: "1.0",
-  invalidCallbackFixed: "",
+  invalidCallbackMultiplier: 1.0 as number | null,
+  invalidCallbackFixed: null as number | null,
   executionResult: "no_notice",
 });
 
@@ -537,8 +537,8 @@ const strategyDialogVisible = ref(false);
 const currentSelection = ref({ minR: -1, maxR: -1, minC: -1, maxC: -1 });
 const strategyForm = reactive({
   operateType: "percent_increase",
-  operateValue: "",
-  limitValue: "",
+  operateValue: null as number | null,
+  limitValue: null as number | null,
 });
 
 const strategyLabels: Record<string, string> = {

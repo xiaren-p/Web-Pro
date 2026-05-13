@@ -24,8 +24,6 @@ ENV/
 backend-master/.env
 vue3-element-admin-master/.env.development
 vue3-element-admin-master/.env.production
-ws-node/.env
-ws-node/.env.development
 
 # =======================
 # 额外排除的文件/目录

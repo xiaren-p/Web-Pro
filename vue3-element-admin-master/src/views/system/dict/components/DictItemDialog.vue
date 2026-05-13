@@ -75,7 +75,7 @@ const dictCode = ref("");
 const formData = reactive<DictItemForm>({});
 
 // 标签类型
-const tagType: TagProps["type"][] = ["primary", "success", "info", "warning", "danger"];
+const tagType: NonNullable<TagProps["type"]>[] = ["primary", "success", "info", "warning", "danger"];
 
 const rules = computed(() => {
   const rules: Partial<Record<string, any>> = {
