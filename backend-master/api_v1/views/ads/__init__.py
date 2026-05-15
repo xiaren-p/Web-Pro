@@ -7,10 +7,14 @@ from api_v1.views.ads.shop_profile_view import ShopProfileViewSet
 from api_v1.views.ads.ad_portfolio_view import AdPortfolioViewSet
 from api_v1.views.ads.ad_campaign_view import AdCampaignViewSet
 from api_v1.views.ads.ad_group_view import AdGroupViewSet
+from api_v1.views.ads.ad_view import AdViewSet
+from api_v1.views.ads.auto_targeting_view import AutoTargetingViewSet
 
 __all__ = [
     "ShopProfileViewSet",
     "AdPortfolioViewSet",
     "AdCampaignViewSet",
     "AdGroupViewSet",
+    "AdViewSet",
+    "AutoTargetingViewSet",
 ]

@@ -25,11 +25,28 @@ _LABEL_MAP: dict[str, str] = {
     # ── 广告组层（lx_ad_group_info） ──
     "AD_GROUP_STATUS_ENABLED":      "投放中",
     "AD_GROUP_PAUSED":              "广告组已暂停",
-    "AD_GROUP_STATUS_PAUSED":       "已暂停",
-    "AD_GROUP_ARCHIVED":            "已归档",
+    "AD_GROUP_STATUS_PAUSED":       "广告组已暂停",
+    "AD_GROUP_ARCHIVED":            "广告组已归档",
 
     # ── 通用（广告活动与广告组均可出现） ──
     "PORTFOLIO_OUT_OF_BUDGET":      "超预算",
+
+    # ── 广告投放层（lx_ad_info） ──
+    "AD_STATUS_LIVE":                       "投放中",
+    "AD_PAUSED":                            "广告已暂停",
+    "NOT_BUYABLE":                          "商品不可售",
+    "MISSING_DECORATION":                   "素材缺失",
+    "INELIGIBLE":                           "不符合资格",
+    "AD_POLICING_SUSPENDED":                "违规暂停",
+    "AD_POLICING_PENDING_REVIEW":           "广告审核中",
+
+    # ── 自动投放定向条款层（lx_auto_targeting_info） ──
+    "TARGETING_CLAUSE_STATUS_LIVE":         "投放中",
+    "TARGETING_CLAUSE_PAUSED":              "已暂停",
+    "TARGETING_CLAUSE_STATUS_PAUSED":       "已暂停",
+    "TARGETING_CLAUSE_ARCHIVED":            "已归档",
+    "TARGETING_CLAUSE_STATUS_ARCHIVED":     "已归档",
+    "TARGETING_CLAUSE_INCOMPLETE":          "不完整",
 }
 
 # ── 前端徽标类型映射（原始枚举值 → CSS 类后缀：success / warning / danger / default）────
@@ -52,6 +69,23 @@ _TYPE_MAP: dict[str, str] = {
     "AD_GROUP_ARCHIVED":            "danger",
     "PORTFOLIO_OUT_OF_BUDGET":      "danger",
     "OTHER":                        "danger",
+
+    # 广告投放层
+    "AD_STATUS_LIVE":                       "success",
+    "AD_PAUSED":                            "warning",
+    "NOT_BUYABLE":                          "danger",
+    "MISSING_DECORATION":                   "warning",
+    "INELIGIBLE":                           "danger",
+    "AD_POLICING_SUSPENDED":                "danger",
+    "AD_POLICING_PENDING_REVIEW":           "warning",
+
+    # 自动投放定向条款层
+    "TARGETING_CLAUSE_STATUS_LIVE":         "success",
+    "TARGETING_CLAUSE_PAUSED":              "warning",
+    "TARGETING_CLAUSE_STATUS_PAUSED":       "warning",
+    "TARGETING_CLAUSE_ARCHIVED":            "danger",
+    "TARGETING_CLAUSE_STATUS_ARCHIVED":     "danger",
+    "TARGETING_CLAUSE_INCOMPLETE":          "danger",
 }
 
 

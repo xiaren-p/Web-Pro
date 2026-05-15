@@ -2,6 +2,8 @@
 @use "./element-plus";
 // Vxe Table
 @use "./vxe-table";
+// ads 详情面板通用样式（AdGroupsPanel / AdsPanel 等共用）
+@use "./ads-panel";
 @import url("./vxe-table.css");
 
 .app-container {

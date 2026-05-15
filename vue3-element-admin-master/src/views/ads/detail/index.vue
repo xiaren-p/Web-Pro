@@ -47,16 +47,39 @@
         />
       </el-tab-pane>
       <el-tab-pane label="广告" name="ads">
-        <AdsPanel :initial-date-range="inheritedDateRange" />
+        <AdsPanel
+          :campaign-id="campaignId"
+          :profile-id="profileId"
+          :initial-date-range="inheritedDateRange"
+        />
       </el-tab-pane>
       <el-tab-pane label="投放" name="targeting">
-        <div class="tab-placeholder">投放（占位）</div>
+        <template v-if="campaignInfo?.targeting_type?.toUpperCase() === 'AUTO'">
+          <AutoTargetingPanel
+            :campaign-id="campaignId"
+            :profile-id="profileId"
+            :initial-date-range="inheritedDateRange"
+          />
+        </template>
+        <template v-else>
+          <div class="tab-placeholder">手动投放（占位）</div>
+        </template>
       </el-tab-pane>
       <el-tab-pane label="否定投放" name="negative">
-        <div class="tab-placeholder">否定投放（占位）</div>
+        <template v-if="campaignInfo?.targeting_type?.toUpperCase() === 'AUTO'">
+          <div class="tab-placeholder">自动 · 否定投放（占位）</div>
+        </template>
+        <template v-else>
+          <div class="tab-placeholder">手动 · 否定投放（占位）</div>
+        </template>
       </el-tab-pane>
       <el-tab-pane label="用户搜索词" name="search-terms">
-        <div class="tab-placeholder">用户搜索词（占位）</div>
+        <template v-if="campaignInfo?.targeting_type?.toUpperCase() === 'AUTO'">
+          <div class="tab-placeholder">自动 · 用户搜索词（占位）</div>
+        </template>
+        <template v-else>
+          <div class="tab-placeholder">手动 · 用户搜索词（占位）</div>
+        </template>
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -66,17 +89,19 @@
 import { computed, ref, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ArrowLeft, VideoPause, CircleClose } from "@element-plus/icons-vue";
+import { useLocalStorage } from "@vueuse/core";
 import { getAdCampaignDetail, type AdCampaignDetailResponse } from "@/api/ads";
 import AdGroupsPanel from "@/views/ads/detail/AdGroupsPanel.vue";
 import AdsPanel from "@/views/ads/detail/AdsPanel.vue";
+import AutoTargetingPanel from "@/views/ads/detail/AutoTargetingPanel.vue";
 
 defineOptions({ name: "AdCampaignDetail" });
 
 const route = useRoute();
 const router = useRouter();
 
-/** 当前激活的 Tab 标签 */
-const activeTab = ref("adgroups");
+/** 当前激活的 Tab 标签（持久化，刷新后恢复上次所在 Tab） */
+const activeTab = useLocalStorage<string>("ad_detail_active_tab", "adgroups");
 
 /**
  * 从路由 query 中解析 campaign_id。

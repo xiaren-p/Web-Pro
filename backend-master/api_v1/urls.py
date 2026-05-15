@@ -60,6 +60,8 @@ urlpatterns = [
     path('ads/options', views.ShopProfileViewSet.as_view({'post': 'options', }), name='ads-options'),
     path('ads/portfolios/options', views.AdPortfolioViewSet.as_view({'post': 'options', }), name='ads-portfolios-options'),
     path('ads/ad-groups', views.AdGroupViewSet.as_view({'post': 'list_groups', }), name='ads-adgroups-list'),
+    path('ads/ads', views.AdViewSet.as_view({'post': 'list_ads', }), name='ads-ads-list'),
+    path('ads/auto-targeting', views.AutoTargetingViewSet.as_view({'post': 'list_auto_targeting', }), name='ads-auto-targeting-list'),
 
     path('users/email', views.ProfileViewSet.as_view({'put': 'bind_email'}), name='user-bind-email'),
     # moved above

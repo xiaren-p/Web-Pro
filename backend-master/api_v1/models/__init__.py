@@ -36,6 +36,8 @@ from api_v1.models.ads.lx_campaign_info import LxCampaignInfo
 from api_v1.models.ads.lx_campaign_metrics import LxCampaignMetrics
 from api_v1.models.ads.lx_ad_group_info import LxAdGroupInfo
 from api_v1.models.ads.lx_ad_group_metrics import LxAdGroupMetrics
+from api_v1.models.ads.lx_ad_info import LxAdInfo
+from api_v1.models.ads.lx_ad_metrics import LxAdMetrics
 from api_v1.models.shop.lx_shop_profile import LxShopProfile
 from api_v1.models.shop.lx_sellers import LxSellers
 from api_v1.models.shop.lx_user_list import LxUserList
@@ -45,4 +47,4 @@ from api_v1.models.listing.lx_listing_remark import LxListingRemark
 from api_v1.models.listing.lx_order_profit import LxOrderProfit
 from api_v1.models.listing.lx_listing_metrics import LxListingMetrics
 
-__all__ = ['TimeStampedModel', 'Role', 'Department', 'Menu', 'DictType', 'DictItem', 'Config', 'OperLog', 'UserProfile', 'AuthToken', 'CloudAuthToken', 'Notice', 'NoticeTarget', 'NoticeRead', 'FileFolder', 'FileAsset', 'FileChunk', 'ImageUpload', 'CrawlerLog', 'CrawlerConf', 'CrawlerSellerAccount', 'CrawlerCategory', 'OrderProfitCache', 'MonthlyLossOrder', 'MonthlyLossOrderFirst20', 'WorkReport', 'CurrencyIcon', 'LxCurrencyRates', 'LxAdPortfolios', 'LxCampaignInfo', 'LxCampaignMetrics', 'LxAdGroupInfo', 'LxAdGroupMetrics', 'LxShopProfile', 'LxSellers', 'LxUserList', 'LxListingInfo', 'LxProductInfo', 'LxListingRemark', 'LxOrderProfit', 'LxListingMetrics']
+__all__ = ['TimeStampedModel', 'Role', 'Department', 'Menu', 'DictType', 'DictItem', 'Config', 'OperLog', 'UserProfile', 'AuthToken', 'CloudAuthToken', 'Notice', 'NoticeTarget', 'NoticeRead', 'FileFolder', 'FileAsset', 'FileChunk', 'ImageUpload', 'CrawlerLog', 'CrawlerConf', 'CrawlerSellerAccount', 'CrawlerCategory', 'OrderProfitCache', 'MonthlyLossOrder', 'MonthlyLossOrderFirst20', 'WorkReport', 'CurrencyIcon', 'LxCurrencyRates', 'LxAdPortfolios', 'LxCampaignInfo', 'LxCampaignMetrics', 'LxAdGroupInfo', 'LxAdGroupMetrics', 'LxAdInfo', 'LxAdMetrics', 'LxShopProfile', 'LxSellers', 'LxUserList', 'LxListingInfo', 'LxProductInfo', 'LxListingRemark', 'LxOrderProfit', 'LxListingMetrics']

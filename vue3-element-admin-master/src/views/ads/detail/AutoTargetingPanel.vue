@@ -1,6 +1,6 @@
 <template>
-  <div class="ad-groups-panel ads-detail-panel">
-    <!-- 筛选栏（全部控件同一行，风格对齐广告活动页） -->
+  <div class="auto-targeting-panel ads-detail-panel">
+    <!-- 筛选栏 -->
     <div class="filter-bar">
       <el-date-picker
         v-model="filters.range"
@@ -25,23 +25,13 @@
         <el-option label="已暂停" value="paused" />
         <el-option label="已归档" value="archived" />
       </el-select>
-      <el-input
-        v-model="filters.keyword"
-        size="small"
-        class="filter-item keyword-input"
-        placeholder="请输入广告组"
-        clearable
-      />
 
-      <!-- 筛选模板 / 查询 / 重置 -->
       <el-button size="small" :icon="Filter" class="btn-template">筛选模板</el-button>
       <el-button type="primary" size="small" @click="onSearch">查询</el-button>
       <el-button size="small" @click="onReset">重置</el-button>
 
-      <!-- 占位：把列配置按鈔推到最右 -->
       <span style="flex: 1" />
 
-      <!-- 列配置图标按鈔（右侧固定） -->
       <el-tooltip content="列配置" placement="top">
         <el-button
           text
@@ -66,7 +56,7 @@
         @selection-change="onSelectionChange"
         @header-dragend="onHeaderDragEnd"
       >
-        <!-- 固定左侧：勾选列 -->
+        <!-- 固定左侧：勾选 -->
         <el-table-column
           type="selection"
           width="42"
@@ -89,20 +79,59 @@
           </template>
         </el-table-column>
 
-        <!-- 固定左侧：广告组（两行截断，悬浮复制） -->
-        <el-table-column label="广告组" min-width="280" fixed="left" align="left" sortable>
+        <!-- 固定左侧：自动定位组（targeting_text + 状态图标） -->
+        <el-table-column label="自动定位组" width="150" fixed="left" align="left" sortable>
           <template #default="{ row }">
             <span v-if="row._isSummary" class="summary-label">汇总</span>
+            <div v-else class="msku-cell">
+              <!-- 服务状态徽标 -->
+              <span
+                class="campaign-state-icon"
+                :class="`state-${row.state || 'unknown'}`"
+              >
+                <template v-if="row.state === 'enabled'">
+                  <span class="dot-circle" />
+                </template>
+                <template v-else-if="row.state === 'paused'">
+                  <el-icon><VideoPause /></el-icon>
+                </template>
+                <template v-else-if="row.state === 'archived'">
+                  <el-icon><CircleClose /></el-icon>
+                </template>
+              </span>
+              <span class="msku-text msku-text--dark">{{ row.targeting_text || "-" }}</span>
+            </div>
+          </template>
+        </el-table-column>
+
+        <!-- 固定左侧：广告组（adgroup_name + 状态图标） -->
+        <el-table-column label="广告组" min-width="220" fixed="left" align="left" sortable>
+          <template #default="{ row }">
+            <template v-if="row._isSummary">---</template>
             <el-tooltip
               v-else
-              :content="row.name ?? ''"
+              :content="row.adgroup_name ?? ''"
               placement="top"
               :show-after="400"
-              :disabled="!isLikelyOverflow(row.name, 255)"
+              :disabled="!isLikelyOverflow(row.adgroup_name, 185)"
             >
               <div class="msku-cell">
-                <span class="msku-text">{{ row.name || "-" }}</span>
-                <el-icon class="copy-icon" @click.stop="copyText(row.name)">
+                <span
+                  class="campaign-state-icon"
+                  :class="`state-${row.adgroup_state || 'unknown'}`"
+                >
+                  <template v-if="row.adgroup_state === 'enabled'">
+                    <span class="dot-circle" />
+                  </template>
+                  <template v-else-if="row.adgroup_state === 'paused'">
+                    <el-icon><VideoPause /></el-icon>
+                  </template>
+                  <template v-else-if="row.adgroup_state === 'archived'">
+                    <el-icon><CircleClose /></el-icon>
+                  </template>
+                </span>
+                <span class="msku-text msku-text--dark">{{ row.adgroup_name || "-" }}</span>
+                <el-icon class="copy-icon" @click.stop="copyText(row.adgroup_name)">
                   <CopyDocument />
                 </el-icon>
               </div>
@@ -122,6 +151,7 @@
           show-overflow-tooltip
         >
           <template #default="{ row }">
+            <!-- 服务状态徽标 -->
             <template v-if="col.prop === 'service_status'">
               <template v-if="row._isSummary">---</template>
               <span
@@ -132,18 +162,37 @@
                 {{ row.service_status_label || row.service_status || "-" }}
               </span>
             </template>
-            <template v-else-if="col.prop === 'default_bid'">
+
+            <!-- 竞价可编辑框 -->
+            <template v-else-if="col.prop === 'bid'">
               <template v-if="row._isSummary">---</template>
               <div v-else class="bid-cell">
                 <span class="bid-icon">{{ currencyIcon }}</span>
                 <el-input
-                  v-model="row.default_bid"
+                  v-model="row.bid"
                   size="small"
                   class="bid-input"
                   @change="onBidChange(row)"
                 />
               </div>
             </template>
+
+            <!-- 建议竞价（带范围提示） -->
+            <template v-else-if="col.prop === 'recommended_bid'">
+              <template v-if="row._isSummary">---</template>
+              <el-tooltip
+                v-else
+                :content="`建议范围：${row.recommend_range_start} ~ ${row.recommend_range_end}`"
+                placement="top"
+                :disabled="row.recommended_bid === '-'"
+              >
+                <span class="recommended-bid">
+                  {{ row.recommended_bid === "-" ? "-" : `${currencyIcon}${row.recommended_bid}` }}
+                </span>
+              </el-tooltip>
+            </template>
+
+            <!-- 广告活动（带状态图标） -->
             <template v-else-if="col.prop === 'campaign_name'">
               <template v-if="row._isSummary">---</template>
               <el-tooltip
@@ -175,6 +224,8 @@
                 </div>
               </el-tooltip>
             </template>
+
+            <!-- 默认文本渲染 -->
             <template v-else>
               <span>{{ row[col.prop] ?? "-" }}</span>
             </template>
@@ -184,7 +235,7 @@
         <!-- 固定右侧：分析 -->
         <el-table-column label="分析" width="80" fixed="right" align="center" :resizable="false">
           <template #default="{ row }">
-            <el-button v-if="row.ad_group_id && !row._isSummary" type="primary" link size="small">
+            <el-button v-if="row.target_id && !row._isSummary" type="primary" link size="small">
               分析
             </el-button>
           </template>
@@ -217,7 +268,7 @@
     </div>
 
     <!-- 通用列配置抽屉 -->
-    <ColumnManager
+    <column-manager
       v-model="columnConfigVisible"
       :columns="activeColumns"
       @save="onColumnConfigSave"
@@ -226,21 +277,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+/**
+ * 自动投放定向条款列表面板。
+ * 所属板块：ads / detail。
+ * 展示广告活动下四种自动定位组（紧密匹配 / 宽泛匹配 / 同类商品 / 关联商品）
+ * 的竞价信息与聚合指标。
+ */
+import { computed, onMounted, ref, watch } from "vue";
 import { useLocalStorage } from "@vueuse/core";
 import { CopyDocument, Filter, Operation, VideoPause, CircleClose } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
-import ColumnManager from "@/components/ColumnManager/index.vue";
-import { getAdGroups } from "@/api/ads";
 
-defineOptions({ name: "AdGroupsPanel" });
+import ColumnManager from "@/components/ColumnManager/index.vue";
+import { getAutoTargeting } from "@/api/ads";
+
+defineOptions({ name: "AutoTargetingPanel" });
 
 /**
- * 父页面透传过来的初始日期范围（路由 query 中的 date_start / date_end）。
- * 若存在则作为筛选栏的默认时间，用户可自行修改。
- *
- * @prop {string} campaignId - 广告活动 ID（必填，用于查询广告组）
- * @prop {string} profileId - 店铺 Profile ID（必填，用于数据隔离）
+ * @prop {string} campaignId - 广告活动 ID（必填）
+ * @prop {string} profileId - 店铺 Profile ID（必填）
  * @prop {string[]} initialDateRange - 格式 ['YYYY-MM-DD', 'YYYY-MM-DD'] 或空数组
  */
 const props = defineProps<{
@@ -249,62 +304,56 @@ const props = defineProps<{
   initialDateRange?: string[];
 }>();
 
-/** 列可见性持久化（只存 prop → visible 映射，列定义结构始终以代码为准） */
-const _savedColVis = useLocalStorage<Record<string, boolean>>("adgroups_panel_col_vis", {});
+/** 列可见性持久化 */
+const _savedColVis = useLocalStorage<Record<string, boolean>>("auto_targeting_panel_col_vis", {});
 
-/** 筛选条件持久化（不含日期范围，日期由父组件 props 注入） */
-const _savedFilters = useLocalStorage("adgroups_panel_filters", {
-  state: "",
-  keyword: "",
-});
+/** 筛选条件持久化（不含日期范围） */
+const _savedFilters = useLocalStorage("auto_targeting_panel_filters", { state: "" });
 
-/** 筛选条件状态，range 以父页面传入的日期范围初始化 */
+/** 筛选条件，range 以父页面传入的日期范围初始化 */
 const filters = ref({
   range: (props.initialDateRange?.length === 2 ? [...props.initialDateRange] : []) as string[],
   state: _savedFilters.value.state,
-  keyword: _savedFilters.value.keyword,
 });
 
-/** 列配置抽屉显示状态（持久化，刷新后保持上次开关状态） */
-const columnConfigVisible = useLocalStorage<boolean>("adgroups_panel_drawer", false);
+/** 列配置抽屉显示状态（持久化） */
+const columnConfigVisible = useLocalStorage<boolean>("auto_targeting_panel_drawer", false);
 
 /** 数据加载状态 */
 const loading = ref(false);
 
-/** 分页状态（pageSize 持久化） */
+/** 分页状态 */
 const total = ref(0);
 const currentPage = ref(1);
-const pageSize = useLocalStorage<number>("adgroups_panel_page_size", 25);
+const pageSize = useLocalStorage<number>("auto_targeting_panel_page_size", 25);
 
-/** 表格数据（后端返回的广告组列表） */
+/** 表格数据 */
 const tableData = ref<any[]>([]);
 
-/** 汇总行数据（后端返回的 summary，挂载 _isSummary 标志后置顶） */
+/** 汇总行 */
 const summaryRow = ref<Record<string, unknown> | null>(null);
 
-/** 货币符号（从接口响应中获取，用于默认竞价列前缀） */
+/** 货币符号 */
 const currencyIcon = ref<string>("$");
+
+/** 当前已勾选的行 */
+const selectedRows = ref<any[]>([]);
 
 /**
  * 列定义（含 category，供 ColumnManager 分组展示）。
- * visible 控制是否在表格中渲染，由 ColumnManager @save 回调更新。
+ * visible 控制渲染，由 ColumnManager @save 回调更新。
  */
 const activeColumns = ref([
   // 设置
   { prop: "service_status", label: "服务状态", visible: true, category: "设置" },
+  { prop: "recommended_bid", label: "建议竞价", visible: true, category: "设置" },
+  { prop: "bid", label: "竞价", visible: true, category: "设置" },
   { prop: "portfolio_name", label: "广告组合", visible: true, category: "设置" },
-  {
-    prop: "campaign_name",
-    label: "广告活动",
-    visible: true,
-    category: "设置",
-    minWidth: 240,
-    sortable: true,
-  },
-  { prop: "default_bid", label: "默认竞价", visible: true, category: "设置" },
-  { prop: "product", label: "商品", visible: false, category: "设置" },
+  { prop: "campaign_name", label: "广告活动", visible: true, category: "设置", minWidth: 240, sortable: true },
   { prop: "created_at", label: "创建时间", visible: false, category: "设置" },
+  { prop: "tag", label: "标签", visible: false, category: "设置" },
   // 转化
+  { prop: "is", label: "IS", visible: true, category: "转化" },
   { prop: "adsSales", label: "广告销售额", visible: true, category: "转化" },
   { prop: "adsSalesPercent", label: "广告销售额%", visible: true, category: "转化" },
   { prop: "directSales", label: "直接销售额", visible: false, category: "转化" },
@@ -327,7 +376,7 @@ const activeColumns = ref([
   { prop: "cpa", label: "CPA", visible: false, category: "业绩" },
 ]);
 
-// 用存储的可见性覆盖默认定义（仅覆盖有记录的列，新列保留代码默认定义）
+// 用存储的可见性覆盖代码默认定义（仅覆盖有记录的列）
 activeColumns.value.forEach((col) => {
   if (_savedColVis.value[col.prop] !== undefined) {
     col.visible = _savedColVis.value[col.prop];
@@ -335,16 +384,16 @@ activeColumns.value.forEach((col) => {
 });
 
 /**
- * 从所有列中过滤出 visible=true 的列，用于动态渲染表格列。
+ * 过滤出 visible=true 的列用于动态渲染。
  *
- * @returns {当前需要展示的列定义数组}
+ * @returns {列定义数组}
  */
 const visibleColumns = computed(() => activeColumns.value.filter((c) => c.visible));
 
 /**
- * 表格展示数据 = 汇总行（置顶）+ 分页数据列表。
+ * 表格展示数据 = 汇总行（置顶）+ 分页数据。
  *
- * @returns {any[]} 拼接后的表格数据数组
+ * @returns {any[]}
  */
 const displayData = computed<any[]>(() => {
   if (!summaryRow.value) return tableData.value;
@@ -352,17 +401,17 @@ const displayData = computed<any[]>(() => {
 });
 
 /**
- * 表格行自定义类名，为汇总行附加样式类。
+ * 为汇总行附加样式类。
  *
- * @param {{ row: any }} 下构 - el-table 传入的行上下文
- * @returns {string} CSS 类名
+ * @param {{ row: any }} 下构 - el-table 行上下文
+ * @returns {string}
  */
 function rowClassName({ row }: { row: any }): string {
   return row._isSummary ? "is-summary-row" : "";
 }
 
 /**
- * ColumnManager 保存回调，用新列配置替换 activeColumns。
+ * ColumnManager 保存回调，更新列配置并持久化可见性。
  *
  * @param {typeof activeColumns.value} columns - 用户配置后的完整列数组
  */
@@ -373,11 +422,8 @@ function onColumnConfigSave(columns: typeof activeColumns.value): void {
 }
 
 // 筛选条件变化时自动持久化（不含日期范围）
-watch([() => filters.value.state, () => filters.value.keyword], () => {
-  _savedFilters.value = {
-    state: filters.value.state,
-    keyword: filters.value.keyword,
-  };
+watch(() => filters.value.state, () => {
+  _savedFilters.value = { state: filters.value.state };
 });
 
 /**
@@ -394,8 +440,7 @@ function onSearch(): void {
 function onReset(): void {
   filters.value.range = [];
   filters.value.state = "";
-  filters.value.keyword = "";
-  _savedFilters.value = { state: "", keyword: "" };
+  _savedFilters.value = { state: "" };
   currentPage.value = 1;
   fetchData();
 }
@@ -422,20 +467,18 @@ function onPageSizeChange(size: number): void {
 }
 
 /**
- * 加载广告组列表数据，调用后端 /ads/ad-groups 接口。
- * campaign_id / profile_id 由父页面通过 props 传入。
+ * 加载自动投放条款列表，调用后端 /ads/auto-targeting 接口。
  */
 function fetchData(): void {
   if (!props.campaignId || !props.profileId) return;
 
   loading.value = true;
-  getAdGroups({
+  getAutoTargeting({
     campaign_id: props.campaignId,
     profile_id: props.profileId,
     date_start: filters.value.range?.[0] || undefined,
     date_end: filters.value.range?.[1] || undefined,
     state: filters.value.state || undefined,
-    keyword: filters.value.keyword || undefined,
     pageNum: currentPage.value,
     pageSize: pageSize.value,
   })
@@ -446,7 +489,7 @@ function fetchData(): void {
       currencyIcon.value = res.currency_icon ?? "$";
     })
     .catch(() => {
-      ElMessage.error("广告组数据加载失败");
+      ElMessage.error("自动投放数据加载失败");
     })
     .finally(() => {
       loading.value = false;
@@ -454,18 +497,13 @@ function fetchData(): void {
 }
 
 /**
- * 默认竞价修改占位处理（后端接口待实现）。
- * 当前仅本地更新 row.default_bid，不提交后端。
+ * 竞价修改占位处理（后端接口待实现）。
  *
- * @param {any} _row - 当前行数据对象，包含 ad_group_id 与最新 default_bid
+ * @param {any} _row - 当前行数据对象
  */
-function onBidChange(row: any): void {
-  // TODO(后端联调): 调用修改广告组默认竞价接口，提交 ad_group_id + default_bid
-  void row;
+function onBidChange(_row: any): void {
+  // TODO(后端联调): 调用修改自动投放竞价接口，提交 target_id + bid
 }
-
-/** 当前已勾选的广告组行 */
-const selectedRows = ref<any[]>([]);
 
 /**
  * 表格勾选变化回调。
@@ -477,18 +515,12 @@ function onSelectionChange(rows: any[]): void {
 }
 
 /**
- * 复制文本到剪贴板，成功后弹出提示。
- *
- * @param {string | undefined} text - 要复制的文本内容
- */
-/**
  * 粗估文本是否会溢出指定显示宽度，用于按需启用 tooltip。
- * 以 9px/字符为均值（中文 ≈12px，英文 ≈7px），超出 maxLines 行则认为溢出。
  *
  * @param {string | null | undefined} text - 显示文本
- * @param {number} displayWidth - 可用文本宽度（px，已扣除 padding / 图标占用）
+ * @param {number} displayWidth - 可用文本宽度（px）
  * @param {number} maxLines - 最大行数，默认 2
- * @returns {boolean} 可能溢出返回 true
+ * @returns {boolean}
  */
 function isLikelyOverflow(
   text: string | null | undefined,
@@ -500,6 +532,11 @@ function isLikelyOverflow(
   return text.length > charsPerLine * maxLines;
 }
 
+/**
+ * 复制文本到剪贴板，成功后弹出提示。
+ *
+ * @param {string | undefined} text - 要复制的文本内容
+ */
 async function copyText(text: string | undefined): Promise<void> {
   if (!text) return;
   try {
@@ -515,7 +552,7 @@ async function copyText(text: string | undefined): Promise<void> {
  *
  * @param {number} newWidth - 拖拽后的新宽度
  * @param {number} _oldWidth - 拖拽前的旧宽度
- * @param {any} column - Element Plus 内部列对象（含 minWidth 属性）
+ * @param {any} column - Element Plus 内部列对象
  */
 function onHeaderDragEnd(newWidth: number, _oldWidth: number, column: any): void {
   const minW = column.minWidth ? Number(column.minWidth) : 80;
@@ -533,12 +570,6 @@ onMounted(() => {
 <style scoped lang="scss">
 /* 通用筛选栏、表格、徽标、分页样式 → src/styles/ads-panel.scss → .ads-detail-panel */
 
-/* keyword-input 宽度（广告组面板专属：180px） */
-.keyword-input {
-  flex: 0 0 180px;
-  width: 180px;
-}
-
 /* 图标按钮（列配置触发器） */
 .btn-icon-only {
   padding: 0 9px;
@@ -546,12 +577,12 @@ onMounted(() => {
   border-color: #dcdfe6;
 }
 
-/* 单元格行高：广告组面板 9px 上下留白 */
+/* 单元格行高 */
 :deep(.el-table .el-table__cell) {
   padding: 9px 0 !important;
 }
 
-/* 默认竞价可编辑小框 */
+/* 竞价可编辑小框 */
 .bid-cell {
   display: inline-flex;
   gap: 3px;
@@ -581,5 +612,12 @@ onMounted(() => {
       text-align: right;
     }
   }
+}
+
+/* 建议竞价文字 */
+.recommended-bid {
+  font-size: 13px;
+  color: #409eff;
+  cursor: default;
 }
 </style>

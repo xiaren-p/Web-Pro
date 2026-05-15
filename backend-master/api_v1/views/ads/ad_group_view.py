@@ -83,13 +83,13 @@ class AdGroupViewSet(viewsets.ViewSet):
 
         # 父广告活动基础信息（同 campaign 下所有广告组共用，单次点查）
         campaign_name = ""
-        campaign_state_type = "default"
+        campaign_state = ""
         try:
             c_obj = LxCampaignInfo.objects.get(
                 campaign_id=campaign_id, profile_id=profile_id
             )
             campaign_name = c_obj.name or ""
-            campaign_state_type = resolve_service_status(c_obj.service_status)["type"]
+            campaign_state = c_obj.state or ""
         except LxCampaignInfo.DoesNotExist:
             pass
 
@@ -125,7 +125,7 @@ class AdGroupViewSet(viewsets.ViewSet):
                     if item.portfolio_id else ""
                 ),
                 "campaign_name": campaign_name,
-                "campaign_state_type": campaign_state_type,
+                "campaign_state": campaign_state,
                 "default_bid": (
                     float(item.default_bid) if item.default_bid is not None else None
                 ),
