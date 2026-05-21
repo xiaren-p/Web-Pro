@@ -626,3 +626,226 @@ def build_auto_targeting_metrics_map(
     )
     summary["is"] = "-"
     return metrics_map, summary
+
+
+# ────────────────────────────────────────────────────────────
+#   否定投放公共指标计算（否定商品 + 否定关键词共用）
+#   指标仅含 sales / orders / spends，无 clicks / impressions
+# ────────────────────────────────────────────────────────────
+
+def _compute_negative_row(
+    r_sales: float,
+    r_orders: int,
+    r_spends: float,
+    icon: str,
+) -> dict[str, Any]:
+    """
+    根据单行聚合值计算否定投放指标字典。
+
+    否定定向行无点击 / 曝光数据，只输出花费、销售额、订单数、ACoS 四项。
+
+    Args:
+        r_sales (float): 广告销售额。
+        r_orders (int): 广告订单数。
+        r_spends (float): 花费。
+        icon (str): 货币符号。
+
+    Returns:
+        dict[str, Any]: 含 spends / adsSales / adsOrders / acos 的指标字典。
+    """
+    acos = f"{round(r_spends / r_sales * 100, 2)}%" if r_sales > 0 else "-"
+    return {
+        "spends": _fmt_money(r_spends, icon),
+        "adsSales": _fmt_money(r_sales, icon),
+        "adsOrders": r_orders,
+        "acos": acos,
+    }
+
+
+def _build_negative_summary_row(
+    tot_sales: float,
+    tot_orders: int,
+    tot_spends: float,
+    icon: str,
+) -> dict[str, Any]:
+    """
+    根据全量合计值构建否定投放汇总行。
+
+    Args:
+        tot_sales (float): 广告销售额合计。
+        tot_orders (int): 广告订单合计。
+        tot_spends (float): 花费合计。
+        icon (str): 货币符号。
+
+    Returns:
+        dict[str, Any]: 汇总行展示字典。
+    """
+    acos = f"{round(tot_spends / tot_sales * 100, 2)}%" if tot_sales > 0 else "-"
+    return {
+        "spends": _fmt_money(tot_spends, icon),
+        "adsSales": _fmt_money(tot_sales, icon),
+        "adsOrders": tot_orders,
+        "acos": acos,
+    }
+
+
+def empty_negative_metrics() -> dict[str, Any]:
+    """
+    返回否定投放指标字段的空默认值，供无指标数据的行填充占位。
+
+    Returns:
+        dict[str, Any]: 含 spends / adsSales / adsOrders / acos 的 "-" 占位字典。
+    """
+    return {
+        "spends": "-",
+        "adsSales": "-",
+        "adsOrders": "-",
+        "acos": "-",
+    }
+
+
+def build_auto_negative_targeting_metrics_map(
+    target_ids: list[str],
+    campaign_id: str,
+    profile_id: str,
+    date_start: str | None,
+    date_end: str | None,
+    currency_icon: str,
+) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    """
+    按 target_id 聚合自动广告否定定向指标，返回 per-target 映射与汇总行。
+
+    为什么用 Python 侧聚合而非 DB Sum()：
+        lx_auto_negative_targeting_metrics 表的指标字段均为 VARCHAR，
+        Django ORM Sum() 在 CharField 上不能做数值求和，
+        与 build_auto_targeting_metrics_map 处理方式一致。
+
+    Args:
+        target_ids (list[str]): 需要查询指标的 target_id 列表。
+        campaign_id (str): 广告活动 ID，用于隔离指标数据。
+        profile_id (str): 店铺 Profile ID，防止跨店碰撞。
+        date_start (str | None): 起始日期 YYYY-MM-DD，None 则不限。
+        date_end (str | None): 截止日期 YYYY-MM-DD，None 则不限。
+        currency_icon (str): 货币符号，用于金额格式化。
+
+    Returns:
+        tuple[dict, dict]:
+            - metrics_map: target_id → 指标展示字典。
+            - summary: 全量合计汇总行字典。
+    """
+    from api_v1.models.ads.lx_auto_negative_targeting_metrics import (
+        LxAutoNegativeTargetingMetrics,
+    )
+
+    if not target_ids:
+        return {}, _build_negative_summary_row(0.0, 0, 0.0, currency_icon)
+
+    qs = LxAutoNegativeTargetingMetrics.objects.filter(
+        target_id__in=target_ids,
+        campaign_id=campaign_id,
+        profile_id=profile_id,
+    )
+    if date_start:
+        qs = qs.filter(timestamp__gte=date_start)
+    if date_end:
+        qs = qs.filter(timestamp__lte=date_end)
+
+    rows = qs.values("target_id", "sales", "orders", "spends")
+
+    # 按 target_id 在 Python 侧累加（VARCHAR 字段无法走 DB Sum）
+    agg: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        tid = str(row["target_id"])
+        if tid not in agg:
+            agg[tid] = {"sales": 0.0, "orders": 0, "spends": 0.0}
+        agg[tid]["sales"] += _safe_float(row["sales"])
+        agg[tid]["orders"] += _safe_int(row["orders"])
+        agg[tid]["spends"] += _safe_float(row["spends"])
+
+    # 全量合计
+    tot_sales = tot_spends = 0.0
+    tot_orders = 0
+    for a in agg.values():
+        tot_sales += a["sales"]
+        tot_spends += a["spends"]
+        tot_orders += a["orders"]
+
+    metrics_map: dict[str, dict[str, Any]] = {
+        tid: _compute_negative_row(a["sales"], a["orders"], a["spends"], currency_icon)
+        for tid, a in agg.items()
+    }
+    summary = _build_negative_summary_row(tot_sales, tot_orders, tot_spends, currency_icon)
+    return metrics_map, summary
+
+
+def build_negative_keyword_metrics_map(
+    keyword_ids: list[str],
+    campaign_id: str,
+    profile_id: str,
+    date_start: str | None,
+    date_end: str | None,
+    currency_icon: str,
+) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    """
+    按 keyword_id 聚合否定关键词指标，返回 per-keyword 映射与汇总行。
+
+    lx_negative_keyword_metrics 的指标字段为原生数值类型（decimal / int），
+    直接使用 DB 端 GROUP BY + Sum() 聚合，效率优于 Python 侧逐行遍历。
+
+    Args:
+        keyword_ids (list[str]): 需要查询指标的 keyword_id 列表。
+        campaign_id (str): 广告活动 ID，用于隔离指标数据。
+        profile_id (str): 店铺 Profile ID，防止跨店碰撞。
+        date_start (str | None): 起始日期 YYYY-MM-DD，None 则不限。
+        date_end (str | None): 截止日期 YYYY-MM-DD，None 则不限。
+        currency_icon (str): 货币符号，用于金额格式化。
+
+    Returns:
+        tuple[dict, dict]:
+            - metrics_map: keyword_id → 指标展示字典。
+            - summary: 全量合计汇总行字典。
+    """
+    from api_v1.models.ads.lx_negative_keyword_metrics import LxNegativeKeywordMetrics
+
+    if not keyword_ids:
+        return {}, _build_negative_summary_row(0.0, 0, 0.0, currency_icon)
+
+    qs = LxNegativeKeywordMetrics.objects.filter(
+        keyword_id__in=keyword_ids,
+        campaign_id=campaign_id,
+        profile_id=profile_id,
+    )
+    if date_start:
+        qs = qs.filter(timestamp__gte=date_start)
+    if date_end:
+        qs = qs.filter(timestamp__lte=date_end)
+
+    agg_rows = list(
+        qs.values("keyword_id").annotate(
+            total_sales=Sum("sales"),
+            total_orders=Sum("orders"),
+            total_spends=Sum("spends"),
+        )
+    )
+
+    if not agg_rows:
+        return {}, _build_negative_summary_row(0.0, 0, 0.0, currency_icon)
+
+    tot_sales = tot_spends = 0.0
+    tot_orders = 0
+    for row in agg_rows:
+        tot_sales += float(row["total_sales"] or 0)
+        tot_spends += float(row["total_spends"] or 0)
+        tot_orders += int(row["total_orders"] or 0)
+
+    metrics_map: dict[str, dict[str, Any]] = {
+        str(row["keyword_id"]): _compute_negative_row(
+            float(row["total_sales"] or 0),
+            int(row["total_orders"] or 0),
+            float(row["total_spends"] or 0),
+            currency_icon,
+        )
+        for row in agg_rows
+    }
+    summary = _build_negative_summary_row(tot_sales, tot_orders, tot_spends, currency_icon)
+    return metrics_map, summary

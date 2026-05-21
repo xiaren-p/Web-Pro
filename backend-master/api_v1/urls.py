@@ -62,6 +62,8 @@ urlpatterns = [
     path('ads/ad-groups', views.AdGroupViewSet.as_view({'post': 'list_groups', }), name='ads-adgroups-list'),
     path('ads/ads', views.AdViewSet.as_view({'post': 'list_ads', }), name='ads-ads-list'),
     path('ads/auto-targeting', views.AutoTargetingViewSet.as_view({'post': 'list_auto_targeting', }), name='ads-auto-targeting-list'),
+    path('ads/auto-negative-targeting', views.AutoNegativeTargetingViewSet.as_view({'post': 'list_auto_negative_targeting', }), name='ads-auto-negative-targeting-list'),
+    path('ads/negative-keywords', views.NegativeKeywordViewSet.as_view({'post': 'list_negative_keywords', }), name='ads-negative-keywords-list'),
 
     path('users/email', views.ProfileViewSet.as_view({'put': 'bind_email'}), name='user-bind-email'),
     # moved above

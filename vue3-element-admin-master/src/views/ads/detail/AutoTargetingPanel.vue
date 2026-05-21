@@ -79,28 +79,11 @@
           </template>
         </el-table-column>
 
-        <!-- 固定左侧：自动定位组（targeting_text + 状态图标） -->
-        <el-table-column label="自动定位组" width="150" fixed="left" align="left" sortable>
+        <!-- 固定左侧：自动定位组（targeting_text） -->
+        <el-table-column label="自动定位组" width="120" fixed="left" align="left" sortable>
           <template #default="{ row }">
             <span v-if="row._isSummary" class="summary-label">汇总</span>
-            <div v-else class="msku-cell">
-              <!-- 服务状态徽标 -->
-              <span
-                class="campaign-state-icon"
-                :class="`state-${row.state || 'unknown'}`"
-              >
-                <template v-if="row.state === 'enabled'">
-                  <span class="dot-circle" />
-                </template>
-                <template v-else-if="row.state === 'paused'">
-                  <el-icon><VideoPause /></el-icon>
-                </template>
-                <template v-else-if="row.state === 'archived'">
-                  <el-icon><CircleClose /></el-icon>
-                </template>
-              </span>
-              <span class="msku-text msku-text--dark">{{ row.targeting_text || "-" }}</span>
-            </div>
+            <span v-else class="msku-text msku-text--dark">{{ row.targeting_text || "-" }}</span>
           </template>
         </el-table-column>
 

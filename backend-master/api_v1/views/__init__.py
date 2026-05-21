@@ -25,7 +25,7 @@ from api_v1.utils.responses import drf_ok
 def root_index(request):
     return drf_ok({"name": "api_v1"})
 
-from api_v1.views.ads import AdCampaignViewSet, AdPortfolioViewSet, ShopProfileViewSet, AdGroupViewSet, AdViewSet, AutoTargetingViewSet
+from api_v1.views.ads import AdCampaignViewSet, AdPortfolioViewSet, ShopProfileViewSet, AdGroupViewSet, AdViewSet, AutoTargetingViewSet, AutoNegativeTargetingViewSet, NegativeKeywordViewSet
 
 from api_v1.views.work_report import WorkReportViewSet
 

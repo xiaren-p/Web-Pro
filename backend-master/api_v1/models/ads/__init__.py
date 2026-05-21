@@ -7,6 +7,10 @@ from api_v1.models.ads.lx_ad_info import LxAdInfo
 from api_v1.models.ads.lx_ad_metrics import LxAdMetrics
 from api_v1.models.ads.lx_auto_targeting_info import LxAutoTargetingInfo
 from api_v1.models.ads.lx_auto_targeting_metrics import LxAutoTargetingMetrics
+from api_v1.models.ads.lx_auto_negative_targeting_info import LxAutoNegativeTargetingInfo
+from api_v1.models.ads.lx_auto_negative_targeting_metrics import LxAutoNegativeTargetingMetrics
+from api_v1.models.ads.lx_negative_keyword_info import LxNegativeKeywordInfo
+from api_v1.models.ads.lx_negative_keyword_metrics import LxNegativeKeywordMetrics
 
 __all__ = [
     'LxAdPortfolios',
@@ -18,4 +22,8 @@ __all__ = [
     'LxAdMetrics',
     'LxAutoTargetingInfo',
     'LxAutoTargetingMetrics',
+    'LxAutoNegativeTargetingInfo',
+    'LxAutoNegativeTargetingMetrics',
+    'LxNegativeKeywordInfo',
+    'LxNegativeKeywordMetrics',
 ]

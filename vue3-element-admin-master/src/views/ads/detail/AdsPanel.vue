@@ -101,7 +101,23 @@
         <!-- 固定左：图片 -->
         <el-table-column label="图片" width="68" fixed="left" align="center" :resizable="false">
           <template #default="{ row }">
-            <img v-if="row.image_url" :src="row.image_url" class="product-thumb" alt="商品图片" />
+            <el-tooltip
+              v-if="row.image_url"
+              placement="right"
+              effect="light"
+              :show-after="150"
+              :hide-after="0"
+              popper-class="product-thumb-popper"
+            >
+              <template #content>
+                <img
+                  :src="toPreviewUrl(row.image_url)"
+                  style="width: 160px; height: 160px; object-fit: cover; border-radius: 4px"
+                  alt="商品图片"
+                />
+              </template>
+              <img :src="row.image_url" class="product-thumb" alt="商品图片" />
+            </el-tooltip>
             <span v-else-if="!row._isSummary" class="thumb-placeholder" />
           </template>
         </el-table-column>
@@ -542,6 +558,17 @@ function onPageSizeChange(size: number): void {
 }
 
 /**
+ * 将亚马逊商品图片 URL 的尺寸标识替换为 400px，用于悬浮预览大图。
+ * 支持常见格式：_SL36_、_SS600_、_SX300_ 等任意 [大写字母]+[数字] 组合。
+ *
+ * @param {string} url - 原始图片 URL
+ * @returns {string} 替换尺寸后的高清图 URL
+ */
+function toPreviewUrl(url: string): string {
+  return url.replace(/(_[A-Z]+)\d+_/, '$1400_');
+}
+
+/**
  * 加载广告投放列表数据，调用后端 /ads/ads 接口。
  * campaign_id / profile_id 由父页面通过 props 传入。
  */
@@ -638,6 +665,13 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+/* 图片放大 tooltip：白底、无内边距，让大图紧贴气泡边缘 */
+:global(.product-thumb-popper.el-popper.is-light) {
+  padding: 4px !important;
+  background: #fff !important;
+  border: 1px solid #e4e7ed !important;
+}
+
 /* 通用筛选栏、表格、徽标、分页样式 → src/styles/ads-panel.scss → .ads-detail-panel */
 
 /* keyword-input 宽度（广告投放面板专属：200px） */

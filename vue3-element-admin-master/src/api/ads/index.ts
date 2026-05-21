@@ -165,3 +165,77 @@ export function getAutoTargeting(data: AutoTargetingParams): Promise<AutoTargeti
     data,
   });
 }
+
+/** 自动广告否定定向（否定商品）列表请求参数 */
+export interface AutoNegativeTargetingParams {
+  campaign_id: string;
+  profile_id: string;
+  date_start?: string;
+  date_end?: string;
+  state?: string;
+  exp_type?: string;
+  keyword?: string;
+  pageNum?: number;
+  pageSize?: number;
+}
+
+/** 自动广告否定定向列表分页响应结构 */
+export interface AutoNegativeTargetingResponse {
+  list: any[];
+  total: number;
+  summary?: Record<string, unknown>;
+  currency_icon?: string;
+  pageNum: number;
+  pageSize: number;
+}
+
+/**
+ * 获取自动广告否定定向（否定商品）列表及聚合指标。
+ *
+ * @param {AutoNegativeTargetingParams} data - 查询参数，campaign_id 和 profile_id 为必填
+ * @returns {Promise<AutoNegativeTargetingResponse>} 否定定向分页列表
+ */
+export function getAutoNegativeTargeting(data: AutoNegativeTargetingParams): Promise<AutoNegativeTargetingResponse> {
+  return request({
+    url: "/ads/auto-negative-targeting",
+    method: "post",
+    data,
+  });
+}
+
+/** 否定关键词列表请求参数 */
+export interface NegativeKeywordParams {
+  campaign_id: string;
+  profile_id: string;
+  date_start?: string;
+  date_end?: string;
+  state?: string;
+  match_type?: string;
+  keyword?: string;
+  pageNum?: number;
+  pageSize?: number;
+}
+
+/** 否定关键词列表分页响应结构 */
+export interface NegativeKeywordResponse {
+  list: any[];
+  total: number;
+  summary?: Record<string, unknown>;
+  currency_icon?: string;
+  pageNum: number;
+  pageSize: number;
+}
+
+/**
+ * 获取否定关键词列表及聚合指标。
+ *
+ * @param {NegativeKeywordParams} data - 查询参数，campaign_id 和 profile_id 为必填
+ * @returns {Promise<NegativeKeywordResponse>} 否定关键词分页列表
+ */
+export function getNegativeKeywords(data: NegativeKeywordParams): Promise<NegativeKeywordResponse> {
+  return request({
+    url: "/ads/negative-keywords",
+    method: "post",
+    data,
+  });
+}

@@ -67,7 +67,11 @@
       </el-tab-pane>
       <el-tab-pane label="否定投放" name="negative">
         <template v-if="campaignInfo?.targeting_type?.toUpperCase() === 'AUTO'">
-          <div class="tab-placeholder">自动 · 否定投放（占位）</div>
+          <AutoNegativePanel
+            :campaign-id="campaignId"
+            :profile-id="profileId"
+            :initial-date-range="inheritedDateRange"
+          />
         </template>
         <template v-else>
           <div class="tab-placeholder">手动 · 否定投放（占位）</div>
@@ -94,6 +98,7 @@ import { getAdCampaignDetail, type AdCampaignDetailResponse } from "@/api/ads";
 import AdGroupsPanel from "@/views/ads/detail/AdGroupsPanel.vue";
 import AdsPanel from "@/views/ads/detail/AdsPanel.vue";
 import AutoTargetingPanel from "@/views/ads/detail/AutoTargetingPanel.vue";
+import AutoNegativePanel from "@/views/ads/detail/AutoNegativePanel.vue";
 
 defineOptions({ name: "AdCampaignDetail" });
 
