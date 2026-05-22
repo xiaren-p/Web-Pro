@@ -65,7 +65,14 @@ class Command(BaseCommand):
 
         nc_host: str = options["nc_host"].rstrip("/")
         reset_secret: bool = options["reset_secret"]
-        redirect_uri: str = f"{nc_host}/apps/user_oidc/code"
+        # NC 根据是否启用「漂亮 URL」，callback 有两种格式：
+        # 1. 启用漂亮 URL：/apps/user_oidc/code
+        # 2. 未启用（默认）：/index.php/apps/user_oidc/code
+        # Application.redirect_uris 支持换行分隔，同时注册两种避免不匹配。
+        redirect_uri: str = (
+            f"{nc_host}/apps/user_oidc/code"
+            f"\n{nc_host}/index.php/apps/user_oidc/code"
+        )
 
         # 必须有超级用户作为 Application.user 归属
         owner = User.objects.filter(is_superuser=True).order_by("id").first()

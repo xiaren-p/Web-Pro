@@ -353,6 +353,10 @@ OAUTH2_PROVIDER = {
     'ID_TOKEN_EXPIRE_SECONDS': 3600,
     # 授权码有效期 60 秒
     'AUTHORIZATION_CODE_EXPIRE_SECONDS': 60,
+    # client_secret 明文存储（不哈希）：内网部署 DB 有防火墙保护；
+    # 明文存储可彻底消除哈希比对链路复杂度，排查 invalid_client 更直接。
+    # 重要：变更此项后必须重新执行 setup_nc_oidc_client --reset-secret。
+    'CLIENT_SECRET_HASHED': False,
     # 支持的 Scope
     'SCOPES': {
         'openid': 'OpenID Connect 标识',
