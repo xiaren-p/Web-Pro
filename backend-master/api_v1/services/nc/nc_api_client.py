@@ -17,8 +17,10 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# OCS API 成功状态码（NC OCS 规范：100=OK，200=已存在等）
-_OCS_OK_CODES = {100, 102}
+# OCS API 成功状态码
+# v1 路径（/ocs/v1.php/）：100=OK，102=已存在
+# v2 路径（/ocs/v2.php/）：200=OK（Group Folders 等应用使用 v2）
+_OCS_OK_CODES = {100, 102, 200}
 
 
 class NcApiClient:
@@ -365,7 +367,7 @@ class NcApiClient:
             int: NC 分配的 Group Folder ID（后续权限授权需要此 ID）。
         """
         logger.info("[NcApiClient][create_group_folder] mount_point=%s", mount_point)
-        data = self._post("/apps/groupfolders/folders", {"mountpoint": mount_point})
+        data = self._post("/ocs/v2.php/apps/groupfolders/folders", {"mountpoint": mount_point})
         folder_id = data.get("id")
         if folder_id is None:
             raise RuntimeError(f"[NcApiClient] create_group_folder 返回数据中缺少 id: {data}")
@@ -384,9 +386,9 @@ class NcApiClient:
             folder_id, group_id, permissions,
         )
         # 先确保群组已加入该 Folder
-        self._post(f"/apps/groupfolders/folders/{folder_id}/groups", {"group": group_id})
+        self._post(f"/ocs/v2.php/apps/groupfolders/folders/{folder_id}/groups", {"group": group_id})
         # 再设置权限
         self._post(
-            f"/apps/groupfolders/folders/{folder_id}/groups/{group_id}",
+            f"/ocs/v2.php/apps/groupfolders/folders/{folder_id}/groups/{group_id}",
             {"permissions": permissions},
         )
