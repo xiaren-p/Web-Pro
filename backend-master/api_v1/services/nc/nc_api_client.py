@@ -155,6 +155,42 @@ class NcApiClient:
             raise RuntimeError(f"[NcApiClient] GET {path} 网络错误: {exc}") from exc
         return self._parse_ocs(resp, path)
 
+    def _post_app(self, path: str, data: dict) -> dict:
+        """发送 POST 到普通 App 路由（非 OCS 路由），不携带 OCS-APIRequest 头。
+
+        Group Folders v21 使用 /apps/groupfolders/... 路由，不经过 OCS 框架。
+        若携带 OCS-APIRequest: true，NC 的 OCS 中间件会拦截并返回 998 路由未找到。
+
+        Args:
+            path (str): API 路径（相对于 server_url）。
+            data (dict): 表单请求体。
+
+        Returns:
+            dict: NC 返回的原始 JSON 内容。
+
+        Raises:
+            RuntimeError: HTTP 错误或响应非 JSON 时抛出。
+        """
+        url = f"{self._base}{path}"
+        try:
+            # headers 中将 OCS-APIRequest 设为 None 可覆盖掉 Session 级别的同名 header
+            resp = self._session.post(
+                url,
+                data=data,
+                verify=self._verify,
+                timeout=15,
+                headers={"OCS-APIRequest": None},
+            )
+            resp.raise_for_status()
+        except requests.RequestException as exc:
+            raise RuntimeError(f"[NcApiClient] POST {path} 网络错误: {exc}") from exc
+        try:
+            return resp.json()
+        except Exception as exc:
+            raise RuntimeError(
+                f"[NcApiClient] {path} 响应无法解析为 JSON: {resp.text[:200]}"
+            ) from exc
+
     @staticmethod
     def _parse_ocs(resp: requests.Response, path: str) -> dict:
         """解析 OCS 响应，校验 statuscode，返回 data 字典。
@@ -367,7 +403,7 @@ class NcApiClient:
             int: NC 分配的 Group Folder ID（后续权限授权需要此 ID）。
         """
         logger.info("[NcApiClient][create_group_folder] mount_point=%s", mount_point)
-        data = self._post("/ocs/v2.php/apps/groupfolders/folders", {"mountpoint": mount_point})
+        data = self._post_app("/apps/groupfolders/folders", {"mountpoint": mount_point})
         folder_id = data.get("id")
         if folder_id is None:
             raise RuntimeError(f"[NcApiClient] create_group_folder 返回数据中缺少 id: {data}")
@@ -386,9 +422,9 @@ class NcApiClient:
             folder_id, group_id, permissions,
         )
         # 先确保群组已加入该 Folder
-        self._post(f"/ocs/v2.php/apps/groupfolders/folders/{folder_id}/groups", {"group": group_id})
+        self._post_app(f"/apps/groupfolders/folders/{folder_id}/groups", {"group": group_id})
         # 再设置权限
-        self._post(
-            f"/ocs/v2.php/apps/groupfolders/folders/{folder_id}/groups/{group_id}",
+        self._post_app(
+            f"/apps/groupfolders/folders/{folder_id}/groups/{group_id}",
             {"permissions": permissions},
         )
