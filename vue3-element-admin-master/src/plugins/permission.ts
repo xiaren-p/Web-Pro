@@ -2,6 +2,7 @@ import type { RouteRecordRaw } from "vue-router";
 import NProgress from "@/utils/nprogress";
 import router from "@/router";
 import { usePermissionStore, useUserStore } from "@/store";
+import { AuthAPI } from "@/api/auth";
 
 export function setupPermission() {
   const whiteList = ["/login"]; // 登录白名单
@@ -39,6 +40,9 @@ export function setupPermission() {
         if (!userStore.userInfo?.roles?.length) {
           await userStore.getUserInfo();
         }
+        // 页面初始化时静默建立 Django Session Cookie，
+        // 保证用户刺齮页面或带已有 JWT 进入时同样无感完成 Nextcloud OIDC SSO。
+        AuthAPI.ssoSession();
 
         const dynamicRoutes = await permissionStore.generateRoutes();
         dynamicRoutes.forEach((route: RouteRecordRaw) => {
