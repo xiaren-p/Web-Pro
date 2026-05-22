@@ -28,6 +28,9 @@ export const useUserStore = defineStore("user", () => {
           // 保存记住我状态和token
           rememberMe.value = !!formData.rememberMe;
           AuthStorage.setTokens(accessToken, refreshToken, rememberMe.value);
+          // 静默建立 Django Session Cookie，使 /o/authorize/ 识别已登录，
+          // 用户直接打开 Nextcloud 地址时无需二次输入密码（OIDC SSO 无感跳转）
+          AuthAPI.ssoSession();
           try {
             // 向已打开的外链窗口广播新 token，支持自动注入（若外部前端仍使用该机制）
             // 1) postMessage 给允许域名的已打开窗口（外部接入端会监听 message）

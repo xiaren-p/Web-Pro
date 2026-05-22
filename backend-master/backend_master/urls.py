@@ -22,8 +22,12 @@ from django.conf.urls.static import static
 from django.urls import re_path
 from django.views.static import serve
 
+from api_v1.views.oidc.oidc_login_view import oidc_login_view
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # OIDC SSO 登录页：oauth2_provider 未登录时重定向至此（settings.LOGIN_URL 默认值）
+    path('accounts/login/', oidc_login_view, name='login'),
     # OIDC Provider 端点（/o/authorize/, /o/token/, /o/userinfo/, /o/.well-known/...）
     path('o/', include('oauth2_provider.urls', namespace='oauth2_provider')),
     # 业务接口入口（v1）：所有系统管理与认证相关的接口都在此下方

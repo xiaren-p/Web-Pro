@@ -3,7 +3,9 @@
 模块说明：提供用户登录、刷新 token、登出与图形验证码接口。
 """
 
-from django.contrib.auth import authenticate
+import logging
+
+from django.contrib.auth import authenticate, login as django_login
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -15,6 +17,8 @@ from api_v1.utils.responses import drf_ok, drf_error
 # note: write_log calls removed per request; use centralized logging if needed
 from api_v1.utils.captcha import generate_captcha, validate_captcha
 from django.views.decorators.csrf import csrf_exempt
+
+logger = logging.getLogger(__name__)
 
 class AuthViewSet(viewsets.ViewSet):
     """身份认证相关接口（登录/登出/刷新 token 等）"""
@@ -167,3 +171,24 @@ class AuthViewSet(viewsets.ViewSet):
         except Exception:
             pass
         return drf_ok({"img": img_b64, "uuid": key})
+
+    @action(detail=False, methods=["post"], url_path="sso-session")
+    def sso_session(self, request):
+        """用已有 Bearer JWT 换取 Django Session Cookie，以便完成 OIDC 授权码流程。
+
+        前端在打开 Nextcloud SSO 链接前调用此接口（携带 Authorization: Bearer <token>），
+        后端验证通过后建立 Django Session，浏览器后续请求 /o/authorize/ 时即被识别为已登录。
+
+        Returns:
+            200 {"detail": "session 已建立"} + Set-Cookie: sessionid=...
+            401 若 token 无效或已过期。
+        """
+        user = request.user
+        if not user or not user.is_authenticated:
+            return drf_error("认证失败，请先登录系统", status=401)
+
+        django_login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        logger.info(
+            "[AuthViewSet][sso_session] 用户 %s 换取 Django Session 成功", user.username,
+        )
+        return drf_ok({"detail": "session 已建立，可继续 OIDC 授权"})
