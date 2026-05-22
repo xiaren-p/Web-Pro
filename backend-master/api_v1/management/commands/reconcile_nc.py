@@ -125,6 +125,19 @@ class Command(BaseCommand):
                     NcSyncService.enqueue_disable_user(username)
                     enqueued += 1
 
+        # 对账部门 Group Folder：有 NcGroup 但 folder_id 为空的部门
+        if not target_username:
+            dept_missing_folder = NcGroup.objects.filter(
+                group_type=NcGroupType.DEPT,
+                folder_id__isnull=True,
+                dept__isnull=False,
+            ).select_related("dept")
+            for nc_group in dept_missing_folder:
+                self.stdout.write(f"  → 部门群组缺少 Group Folder: {nc_group.code}")
+                if not dry_run:
+                    NcSyncService.enqueue_create_group_folder(nc_group.code, nc_group.dept.name)
+                    enqueued += 1
+
         # 重置失败任务
         failed_qs = NcSyncTask.objects.filter(
             status=SyncStatus.FAILED,

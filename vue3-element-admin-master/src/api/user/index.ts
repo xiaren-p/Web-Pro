@@ -82,27 +82,6 @@ export const UserAPI = {
   deleteByIds(ids: string) {
     return request({ url: `${USER_BASE_URL}/${ids}`, method: "delete" });
   },
-  downloadTemplate() {
-    return request({ url: `${USER_BASE_URL}/template`, method: "get", responseType: "blob" });
-  },
-  export(queryParams: UserPageQuery) {
-    return request({
-      url: `${USER_BASE_URL}/export`,
-      method: "get",
-      params: queryParams,
-      responseType: "blob",
-    });
-  },
-  import(deptId: string, file: File) {
-    const formData = new FormData();
-    formData.append("file", file);
-    return request<any, any>({
-      url: `${USER_BASE_URL}/import`,
-      method: "post",
-      params: { deptId },
-      data: formData,
-    });
-  },
   getProfile() {
     return request<any, any>({ url: `${USER_BASE_URL}/profile`, method: "get" });
   },

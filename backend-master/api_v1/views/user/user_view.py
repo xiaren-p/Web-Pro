@@ -1,23 +1,18 @@
 """用户相关视图。
 
-模块说明：提供用户查询、创建、更新、删除、导入导出、密码重置等接口。
+模块说明：提供用户查询、创建、更新、删除、密码重置等接口。
 权限体系：基于 admin_level（管理级别）+ position（岗位）三轴模型，不再依赖 Role M2M。
 """
 
 import logging
 import os
 import uuid
-import csv
-import io
-import time
 from datetime import datetime, timedelta
 
 from django.db.models import Q
 from django.contrib.auth.models import User
-from django.http import HttpResponse
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.views.decorators.csrf import csrf_exempt
 
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -37,10 +32,9 @@ class UserViewSet(viewsets.ViewSet):
     """用户相关接口
 
     路由前缀：/users
-    支持：分页、详情、创建、更新、删除、导入导出、密码修改/重置、个人资料、下拉选项
+    支持：分页、详情、创建、更新、删除、密码修改/重置、个人资料、下拉选项
     """
 
-    @csrf_exempt
     @action(detail=False, methods=["get"], url_path="me")
     def me(self, request):
         """返回当前登录用户基础信息、角色标识与权限点。
@@ -191,7 +185,6 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="")
     def create(self, request):
-        t0 = time.perf_counter()
         payload = request.data.copy()
         username = payload.get("username")
         password = payload.get("password") or "123456"
@@ -201,7 +194,6 @@ class UserViewSet(viewsets.ViewSet):
         # 若未显式传入 avatar，使用 settings.DEFAULT_AVATAR_URL
         avatar = payload.get("avatar") or getattr(settings, 'DEFAULT_AVATAR_URL', '') or ""
         dept_id = payload.get("deptId")
-        role_ids = payload.get("roleIds") or []
         status_num = payload.get("status", 1)
         gender = payload.get("gender")
         if not username:
@@ -248,7 +240,6 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["put"], url_path=r"(?P<id>[^/]+)")
     def update(self, request, id: str):
-        t0 = time.perf_counter()
         try:
             user = User.objects.get(pk=id)
         except User.DoesNotExist:
@@ -260,6 +251,7 @@ class UserViewSet(viewsets.ViewSet):
         user.save()
         profile = getattr(user, "profile", None)
         if profile:
+            _old_dept_id = profile.dept_id
             profile.nickname = payload.get("nickname", profile.nickname)
             profile.mobile = payload.get("mobile", profile.mobile)
             profile.avatar = payload.get("avatar", profile.avatar)
@@ -331,78 +323,6 @@ class UserViewSet(viewsets.ViewSet):
         user.save()
         return drf_ok({"message": "password reset"})
 
-    @action(detail=False, methods=["get"], url_path="template")
-    def template(self, request):
-        t0 = time.perf_counter()
-        # 返回一个简单的 CSV 模板
-        content = "username,email,nickname,mobile,deptId,roleIds\n"
-        response = HttpResponse(content, content_type="text/csv")
-        response["Content-Disposition"] = "attachment; filename=users_template.csv"
-        # write_log removed: 下载用户导入模板
-        return response
-
-    @action(detail=False, methods=["get"], url_path="export")
-    def export(self, request):
-        t0 = time.perf_counter()
-        # 导出所有用户为 CSV
-        users = User.objects.all().order_by("id")
-        content = "username,email,nickname,mobile,deptId,positionId,adminLevel\n"
-        for u in users:
-            profile = getattr(u, "profile", None)
-            dept_id_v = profile.dept_id if profile else ""
-            position_id_v = profile.position_id if profile else ""
-            admin_level_v = profile.admin_level if profile else AdminLevel.MEMBER
-            content += (
-                f"{u.username},{u.email},{profile.nickname if profile else ''},"
-                f"{profile.mobile if profile else ''},{dept_id_v},{position_id_v},{admin_level_v}\n"
-            )
-        response = HttpResponse(content, content_type="text/csv")
-        response["Content-Disposition"] = "attachment; filename=users_export.csv"
-        try:
-            cnt = users.count()
-        except Exception:
-            cnt = 0
-        # write_log removed: 导出用户列表：{cnt} 条
-        return response
-
-    @action(detail=False, methods=["post"], url_path="import")
-    def import_users(self, request):
-        t0 = time.perf_counter()
-        # 支持 CSV 文件导入
-        file = request.FILES.get("file")
-        if not file:
-            return drf_error("未上传文件", status=400)
-        reader = csv.DictReader(io.StringIO(file.read().decode()))
-        count = 0
-        default_avatar = getattr(settings, 'DEFAULT_AVATAR_URL', '')
-        for row in reader:
-            username = row.get("username")
-            if not username or User.objects.filter(username=username).exists():
-                continue
-            user = User.objects.create(username=username, email=row.get("email", ""), is_active=True)
-            user.set_password("123456")
-            user.save()
-            # 导入时若无头像，使用默认头像
-            avatar = row.get("avatar") or default_avatar
-            position_id_imp = row.get("positionId")
-            profile = UserProfile.objects.create(
-                user=user,
-                nickname=row.get("nickname", ""),
-                mobile=row.get("mobile", ""),
-                dept_id=row.get("deptId") or None,
-                avatar=avatar,
-            )
-            if position_id_imp:
-                try:
-                    profile.position = Position.objects.get(pk=position_id_imp)
-                    profile.save()
-                except Position.DoesNotExist:
-                    pass
-            count += 1
-        # logging removed
-        return drf_ok({"success": True, "count": count})
-
-
     @action(detail=False, methods=["get"], url_path="profile")
     def profile_get(self, request):
         user = request.user
@@ -452,7 +372,6 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["put"], url_path="password")
     def change_password(self, request):
-        t0 = time.perf_counter()
         user = request.user
         if not user.is_authenticated:
             return drf_error("未登录", status=401)

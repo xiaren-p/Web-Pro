@@ -29,9 +29,6 @@ urlpatterns = [
     path('users/page', views.UserViewSet.as_view({'get': 'page'}), name='user-page'),
     path('users/<str:user_id>/form', views.UserViewSet.as_view({'get': 'form'}), name='user-form'),
     # 将所有静态子路径放在 catch-all 之前，避免被 users/<str:id> 抢占
-    path('users/template', views.UserViewSet.as_view({'get': 'template'}), name='user-template'),
-    path('users/export', views.UserViewSet.as_view({'get': 'export'}), name='user-export'),
-    path('users/import', views.UserViewSet.as_view({'post': 'import_users'}), name='user-import'),
     path('users/profile', views.UserViewSet.as_view({'get': 'profile_get', 'put': 'profile_put'}), name='user-profile'),
     path('users/password', views.UserViewSet.as_view({'put': 'change_password'}), name='user-change-password'),
     path('users/avatar', views.UserViewSet.as_view({'post': 'upload_avatar'}), name='user-upload-avatar'),

@@ -73,19 +73,6 @@
                 删除
               </el-button>
             </div>
-            <div class="data-table__toolbar--tools">
-              <el-button
-                v-hasPerm="'sys:user:import'"
-                icon="upload"
-                @click="handleOpenImportDialog"
-              >
-                导入
-              </el-button>
-
-              <el-button v-hasPerm="'sys:user:export'" icon="download" @click="handleExport">
-                导出
-              </el-button>
-            </div>
           </div>
 
           <el-table
@@ -167,9 +154,6 @@
 
     <!-- 用户表单 -->
     <UserFormDrawer ref="userFormDrawerRef" @success="handleResetQuery" />
-
-    <!-- 用户导入 -->
-    <UserImport v-model="importDialogVisible" @import-success="handleQuery()" />
   </div>
 </template>
 
@@ -178,7 +162,6 @@ import { UserAPI, type UserPageQuery, type UserPageVO } from "@/api/user";
 import { useUserStore } from "@/store";
 
 import DeptTree from "./components/DeptTree.vue";
-import UserImport from "./components/UserImport.vue";
 import UserFormDrawer from "./components/UserFormDrawer.vue";
 
 const userStore = useUserStore();
@@ -201,9 +184,6 @@ const loading = ref(false);
 
 // 选中的用户ID
 const selectIds = ref<number[]>([]);
-
-// 导入弹窗显示状态
-const importDialogVisible = ref(false);
 
 // 获取数据
 async function fetchData() {
@@ -335,34 +315,6 @@ function handleDelete(id?: number) {
       ElMessage.info("已取消删除");
     }
   );
-}
-
-// 打开导入弹窗
-function handleOpenImportDialog() {
-  importDialogVisible.value = true;
-}
-
-// 导出用户
-function handleExport() {
-  UserAPI.export(queryParams).then((response: any) => {
-    const fileData = response.data;
-    const fileName = decodeURI(response.headers["content-disposition"].split(";")[1].split("=")[1]);
-    const fileType =
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8";
-
-    const blob = new Blob([fileData], { type: fileType });
-    const downloadUrl = window.URL.createObjectURL(blob);
-
-    const downloadLink = document.createElement("a");
-    downloadLink.href = downloadUrl;
-    downloadLink.download = fileName;
-
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-
-    document.body.removeChild(downloadLink);
-    window.URL.revokeObjectURL(downloadUrl);
-  });
 }
 
 onMounted(() => {
