@@ -287,6 +287,40 @@ class Command(BaseCommand):
                     NcSyncService.enqueue_create_group_folder(nc_group.code, nc_group.dept.name)
                     enqueued += 1
 
+        # 对账上级部门对下级文件夹的授权
+        # 确保父部门 NC 群组已被加入所有子部门的 Group Folder（使上级成员可访问下级文件夹）
+        if not target_username:
+            dept_groups_with_folder = NcGroup.objects.filter(
+                group_type=NcGroupType.DEPT,
+                folder_id__isnull=False,
+                dept__isnull=False,
+            ).select_related("dept__parent")
+            if dept_groups_with_folder.exists():
+                try:
+                    nc_folders = client.list_group_folders()
+                except RuntimeError as exc:
+                    logger.warning("[reconcile_nc] 无法获取 NC 文件夹列表，跳过上级授权对账: %s", exc)
+                    nc_folders = {}
+                for nc_group in dept_groups_with_folder:
+                    folder_info = nc_folders.get(nc_group.folder_id)
+                    if not folder_info:
+                        continue
+                    current_groups: set[str] = set(folder_info.get("groups", {}).keys())
+                    parent_dept = nc_group.dept.parent
+                    while parent_dept:
+                        parent_nc_group = NcGroup.objects.filter(dept=parent_dept).first()
+                        if parent_nc_group and parent_nc_group.code not in current_groups:
+                            self.stdout.write(
+                                f"  → 上级授权缺失: folder_id={nc_group.folder_id} "
+                                f"({nc_group.code}) ← ancestor={parent_nc_group.code}"
+                            )
+                            if not dry_run:
+                                NcSyncService.enqueue_grant_group_folder(
+                                    nc_group.folder_id, parent_nc_group.code
+                                )
+                                enqueued += 1
+                        parent_dept = parent_dept.parent
+
         # 重置失败任务
         failed_qs = NcSyncTask.objects.filter(
             status=SyncStatus.FAILED,

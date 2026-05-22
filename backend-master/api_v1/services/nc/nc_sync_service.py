@@ -541,6 +541,21 @@ class NcSyncService:
                         "[NcSyncService][_dispatch] CREATE_GROUP_FOLDER group=%s folder_id=%s 已入队授权",
                         group_code, folder_id,
                     )
+                    # 同时为所有上级部门的 NC 群组入队授权，使上级部门成员可访问下级文件夹
+                    try:
+                        nc_group_obj = NcGroup.objects.select_related("dept__parent").get(code=group_code)
+                        parent_dept = nc_group_obj.dept.parent if nc_group_obj.dept else None
+                        while parent_dept:
+                            parent_nc_group = NcGroup.objects.filter(dept=parent_dept).first()
+                            if parent_nc_group:
+                                NcSyncService.enqueue_grant_group_folder(folder_id, parent_nc_group.code)
+                                logger.info(
+                                    "[NcSyncService][_dispatch] CREATE_GROUP_FOLDER 入队上级授权 folder_id=%s ancestor=%s",
+                                    folder_id, parent_nc_group.code,
+                                )
+                            parent_dept = parent_dept.parent
+                    except NcGroup.DoesNotExist:
+                        pass
         elif op == SyncOperation.GRANT_GROUP_FOLDER:
             client.grant_group_folder(
                 folder_id=int(p["folder_id"]),
