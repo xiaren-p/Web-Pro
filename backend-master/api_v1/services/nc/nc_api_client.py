@@ -167,19 +167,18 @@ class NcApiClient:
         - /ocs/v1.php/、/ocs/v2.php/ → OCS Router
         - /apps/{appid}/...          → 普通 App Router（本方法使用）
 
-        OCS-APIRequest: true 头的作用是告知 NC SecurityMiddleware 跳过 CSRF requesttoken
-        校验，与路由选择无关。Group Folders v21 的 FolderController 是普通 Controller，
-        返回原始 DataResponse（非 OCS 包装格式），response.json() 可直接拿到业务数据。
+        OCS-APIRequest: true 头使 NC 以 OCS 格式返回响应（包含 ocs.meta / ocs.data），
+        同时绕过 SecurityMiddleware 的 CSRF requesttoken 校验，与路由选择无关。
 
         Args:
             path (str): API 路径（相对于 server_url），如 /apps/groupfolders/folders。
             data (dict): 表单请求体。
 
         Returns:
-            dict: NC FolderController 返回的原始 JSON 内容。
+            dict: ocs.data 字段内容（与 _post() 返回格式一致）。
 
         Raises:
-            RuntimeError: HTTP 错误或响应非 JSON 时抛出。
+            RuntimeError: HTTP 错误、OCS statuscode 不合法或响应非 JSON 时抛出。
         """
         url = f"{self._base}{path}"
         try:
@@ -198,12 +197,7 @@ class NcApiClient:
             resp.raise_for_status()
         except requests.RequestException as exc:
             raise RuntimeError(f"[NcApiClient] POST {path} 网络错误: {exc}") from exc
-        try:
-            return resp.json()
-        except Exception as exc:
-            raise RuntimeError(
-                f"[NcApiClient] {path} 响应无法解析为 JSON: {resp.text[:200]}"
-            ) from exc
+        return self._parse_ocs(resp, path)
 
     @staticmethod
     def _parse_ocs(resp: requests.Response, path: str) -> dict:
@@ -407,16 +401,44 @@ class NcApiClient:
     #  Group Folders 操作                                                  #
     # ------------------------------------------------------------------ #
 
+    def list_group_folders(self) -> dict[int, dict]:
+        """列出 NC 中所有已存在的 Group Folders。
+
+        Returns:
+            dict[int, dict]: 以 folder_id（int）为键、folder 信息字典为值的映射。
+                             folder 信息包含 mount_point、quota、groups 等字段。
+
+        Raises:
+            RuntimeError: HTTP 错误或 OCS 响应异常时抛出。
+        """
+        logger.info("[NcApiClient][list_group_folders] 查询所有 Group Folders")
+        raw = self._get("/apps/groupfolders/folders")
+        # NC 返回 ocs.data 为 {"1": {folder_info}, "2": {...}} 格式
+        return {int(k): v for k, v in raw.items()}
+
     def create_group_folder(self, mount_point: str) -> int:
-        """创建 Group Folder。
+        """创建 Group Folder，若同名挂载点已存在则直接返回已有 ID（幂等）。
 
         Args:
             mount_point (str): 挂载点路径，如 "/部门文档/技术部"。
 
         Returns:
             int: NC 分配的 Group Folder ID（后续权限授权需要此 ID）。
+
+        Raises:
+            RuntimeError: NC 响应异常或返回数据缺少 id 时抛出。
         """
         logger.info("[NcApiClient][create_group_folder] mount_point=%s", mount_point)
+        # 先检查是否已存在同名挂载点，避免重复创建（任务重试时保证幂等性）
+        existing = self.list_group_folders()
+        for folder_id, info in existing.items():
+            if info.get("mount_point") == mount_point:
+                logger.info(
+                    "[NcApiClient][create_group_folder] 已存在，复用 folder_id=%s mount_point=%s",
+                    folder_id,
+                    mount_point,
+                )
+                return folder_id
         data = self._post_app("/apps/groupfolders/folders", {"mountpoint": mount_point})
         folder_id = data.get("id")
         if folder_id is None:
