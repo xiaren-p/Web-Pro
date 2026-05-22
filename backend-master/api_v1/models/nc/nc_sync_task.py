@@ -24,6 +24,7 @@ class SyncStatus(models.TextChoices):
     """NC 同步任务状态枚举。"""
 
     PENDING = "pending", "待执行"
+    PROCESSING = "processing", "执行中"
     SUCCESS = "success", "已成功"
     FAILED = "failed", "已失败"
 
@@ -49,7 +50,7 @@ class NcSyncTask(TimeStampedModel):
     )
 
     status = models.CharField(
-        max_length=10,
+        max_length=15,
         choices=SyncStatus.choices,
         default=SyncStatus.PENDING,
         verbose_name="任务状态",

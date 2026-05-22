@@ -10,8 +10,11 @@ Celery Beat 推荐配置（在 settings.py 中追加 CELERY_BEAT_SCHEDULE）：
 """
 import logging
 import time
+from datetime import timedelta
 
 from celery import shared_task
+from django.db import transaction
+from django.utils import timezone
 
 from api_v1.models.nc.nc_sync_task import NcSyncTask, SyncStatus
 from api_v1.services.nc.nc_sync_service import NcSyncService
@@ -34,13 +37,24 @@ _REQUEST_INTERVAL = 0.5
 def process_pending_nc_tasks(self) -> dict:
     """处理 NcSyncTask 队列中所有 PENDING 状态的任务（每批最多 _BATCH_SIZE 条）。
 
+    使用 select_for_update(skip_locked=True) 原子抢占任务，防止多 Worker 重复执行同一条任务。
+
     Returns:
         dict: 执行摘要，包含 total/success/failed 计数。
     """
-    tasks = list(
-        NcSyncTask.objects.filter(status=SyncStatus.PENDING)
-        .order_by("id")[:_BATCH_SIZE]
-    )
+    with transaction.atomic():
+        task_ids = list(
+            NcSyncTask.objects.select_for_update(skip_locked=True)
+            .filter(status=SyncStatus.PENDING)
+            .order_by("id")
+            .values_list("id", flat=True)[:_BATCH_SIZE]
+        )
+        if not task_ids:
+            return {"total": 0, "success": 0, "failed": 0}
+        # 原子标记为执行中，防止其它 Worker 在本事务结束后重复抢占
+        NcSyncTask.objects.filter(id__in=task_ids).update(status=SyncStatus.PROCESSING)
+
+    tasks = list(NcSyncTask.objects.filter(id__in=task_ids))
     total = len(tasks)
     success = 0
     failed = 0
@@ -68,13 +82,30 @@ def process_pending_nc_tasks(self) -> dict:
 def retry_failed_nc_tasks(self) -> dict:
     """将 FAILED 且未超出最大重试次数的任务重置为 PENDING，由下一轮 process 再次执行。
 
+    同时清理因 Worker 意外崩溃而卡死在 PROCESSING 状态超过 5 分钟的孤儿任务。
+
     Returns:
-        dict: 执行摘要，包含 reset_count 计数。
+        dict: 执行摘要，包含 reset_count/stuck_reset_count 计数。
     """
-    qs = NcSyncTask.objects.filter(
+    failed_count = NcSyncTask.objects.filter(
         status=SyncStatus.FAILED,
         retry_count__lt=NcSyncTask.MAX_RETRIES,
+    ).update(status=SyncStatus.PENDING)
+
+    # 清理卡死的 PROCESSING 任务（Worker 崩溃后遗留）
+    stuck_threshold = timezone.now() - timedelta(minutes=5)
+    stuck_count = NcSyncTask.objects.filter(
+        status=SyncStatus.PROCESSING,
+        updated_at__lt=stuck_threshold,
+    ).update(status=SyncStatus.PENDING)
+
+    if stuck_count:
+        logger.warning(
+            "[nc_sync_tasks][retry_failed] 发现 %s 条卡死的 PROCESSING 任务，已重置为 PENDING",
+            stuck_count,
+        )
+    logger.info(
+        "[nc_sync_tasks][retry_failed] reset_count=%s stuck_reset=%s",
+        failed_count, stuck_count,
     )
-    count = qs.update(status=SyncStatus.PENDING)
-    logger.info("[nc_sync_tasks][retry_failed] reset_count=%s", count)
-    return {"reset_count": count}
+    return {"reset_count": failed_count, "stuck_reset_count": stuck_count}

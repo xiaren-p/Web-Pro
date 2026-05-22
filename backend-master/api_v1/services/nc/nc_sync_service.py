@@ -15,6 +15,8 @@
 - 直接执行模式供对账命令（reconcile_nc）使用，不经过队列。
 """
 import logging
+import secrets
+import string
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -385,9 +387,12 @@ class NcSyncService:
         except Exception as exc:
             task.retry_count += 1
             task.error_msg = str(exc)[:1000]
+            task.executed_at = timezone.now()
             if task.retry_count >= NcSyncTask.MAX_RETRIES:
                 task.status = SyncStatus.FAILED
-            task.executed_at = timezone.now()
+            else:
+                # 未超出重试上限，回退为 PENDING 等待下一轮调度
+                task.status = SyncStatus.PENDING
             task.save(update_fields=["status", "retry_count", "error_msg", "executed_at"])
             logger.error(
                 "[NcSyncService][execute_task] task_id=%s op=%s 执行失败（第%s次）: %s",
@@ -411,9 +416,15 @@ class NcSyncService:
         p = task.payload
 
         if op == SyncOperation.CREATE_USER:
+            # payload 中可追加 password 字段；若无则生成一个符合 NC 密码策略的随机强密码
+            if not p.get("password"):
+                _chars = string.ascii_uppercase + string.ascii_lowercase + string.digits + "!@#$"
+                nc_password = "".join(secrets.choice(_chars) for _ in range(20))
+            else:
+                nc_password = p["password"]
             client.create_user(
                 username=p["username"],
-                password=p.get("password", "TmpPass@2024!"),
+                password=nc_password,
                 display_name=p.get("display_name", ""),
                 email=p.get("email", ""),
             )
