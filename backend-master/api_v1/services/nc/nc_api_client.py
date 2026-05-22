@@ -3,11 +3,16 @@
 封装所有与 NC OCS Provisioning API / Group Folders API 的 HTTP 通信。
 调用方无需关心 URL 拼接、认证头、SSL 配置，只需调用语义方法。
 
-NC OCS API 基础路径：
-    /ocs/v1.php/cloud/users/...
-    /ocs/v2.php/apps/groupfolders/folders/...
+NC 路由体系说明：
+  OCS 路由  ：URL 以 /ocs/v1.php/ 或 /ocs/v2.php/ 开头，由 OCS Router 处理。
+              使用 _post() 方法，响应为 OCS 格式 {ocs: {meta, data}}。
+  App 路由  ：URL 以 /apps/{appid}/ 开头，由 App Router 处理（如 Group Folders）。
+              使用 _post_app() 方法，响应为 Controller DataResponse 的原始 JSON。
 
-所有请求均带 OCS-APIRequest: true 头，使 NC 以 JSON 返回响应。
+所有请求均带 OCS-APIRequest: true 头：
+  - 对 OCS 路由：声明客户端期望 OCS JSON 格式响应。
+  - 对 App 路由：绕过 NC SecurityMiddleware 的 CSRF requesttoken 校验。
+  两者的路由选择均由 URL 前缀决定，与此头无关。
 """
 import logging
 
@@ -156,30 +161,39 @@ class NcApiClient:
         return self._parse_ocs(resp, path)
 
     def _post_app(self, path: str, data: dict) -> dict:
-        """发送 POST 到普通 App 路由（非 OCS 路由），不携带 OCS-APIRequest 头。
+        """发送 POST 到普通 App 路由（/apps/...），携带 OCS-APIRequest: true 绕过 CSRF。
 
-        Group Folders v21 使用 /apps/groupfolders/... 路由，不经过 OCS 框架。
-        若携带 OCS-APIRequest: true，NC 的 OCS 中间件会拦截并返回 998 路由未找到。
+        NC 的路由决策完全基于 URL 前缀：
+        - /ocs/v1.php/、/ocs/v2.php/ → OCS Router
+        - /apps/{appid}/...          → 普通 App Router（本方法使用）
+
+        OCS-APIRequest: true 头的作用是告知 NC SecurityMiddleware 跳过 CSRF requesttoken
+        校验，与路由选择无关。Group Folders v21 的 FolderController 是普通 Controller，
+        返回原始 DataResponse（非 OCS 包装格式），response.json() 可直接拿到业务数据。
 
         Args:
-            path (str): API 路径（相对于 server_url）。
+            path (str): API 路径（相对于 server_url），如 /apps/groupfolders/folders。
             data (dict): 表单请求体。
 
         Returns:
-            dict: NC 返回的原始 JSON 内容。
+            dict: NC FolderController 返回的原始 JSON 内容。
 
         Raises:
             RuntimeError: HTTP 错误或响应非 JSON 时抛出。
         """
         url = f"{self._base}{path}"
         try:
-            # headers 中将 OCS-APIRequest 设为 None 可覆盖掉 Session 级别的同名 header
             resp = self._session.post(
                 url,
                 data=data,
                 verify=self._verify,
                 timeout=15,
-                headers={"OCS-APIRequest": None},
+            )
+            logger.debug(
+                "[NcApiClient][_post_app] %s -> HTTP %s | body=%s",
+                path,
+                resp.status_code,
+                resp.text[:300],
             )
             resp.raise_for_status()
         except requests.RequestException as exc:
