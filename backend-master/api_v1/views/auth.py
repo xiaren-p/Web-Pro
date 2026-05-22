@@ -5,7 +5,7 @@
 
 import logging
 
-from django.contrib.auth import authenticate, login as django_login
+from django.contrib.auth import authenticate, login as django_login, logout as django_logout
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -30,6 +30,20 @@ class AuthViewSet(viewsets.ViewSet):
         if action in ("login", "captcha", "refresh_token"):
             return [AllowAny()]
         return super().get_permissions()
+
+    def get_authenticators(self):
+        """login / captcha / refresh_token 动作排除 SessionAuthentication。
+
+        ssoSession 会在浏览器留下持久 Session Cookie，用户退出后该 Cookie 仍在。
+        若登录请求被 SessionAuthentication 可见，就会强制校验 CSRF token，
+        而前端 login 请求未携带 CSRF token → CSRF Failed。
+        """
+        from rest_framework.authentication import SessionAuthentication
+        base = super().get_authenticators()
+        action = getattr(self, 'action', None)
+        if action in ('login', 'captcha', 'refresh_token'):
+            return [a for a in base if not isinstance(a, SessionAuthentication)]
+        return base
 
     @action(detail=False, methods=["post"], url_path="login")
     def login(self, request):  # pragma: no cover
@@ -140,7 +154,7 @@ class AuthViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["delete", "get", "post"], url_path="logout")
     def logout(self, request):  # pragma: no cover
-        # 从 Authorization 提取当前 access token 并撤销
+        # 撤销 JWT access token
         try:
             from rest_framework.authentication import get_authorization_header
             parts = get_authorization_header(request).split()
@@ -149,7 +163,12 @@ class AuthViewSet(viewsets.ViewSet):
                 AuthToken.objects.filter(access_token=tok, revoked=False).update(revoked=True)
         except Exception:
             pass
-        # logout logging removed
+        # 同时清除 Django Session，防止 ssoSession 建立的 Session Cookie
+        # 尋达退出后残留并导致下次登录被 SessionAuthentication 强制校验 CSRF。
+        try:
+            django_logout(request)
+        except Exception:
+            pass
         return drf_ok(status=204)
 
     @action(detail=False, methods=["get"], url_path="captcha")
