@@ -6,7 +6,7 @@
         <el-form-item prop="keywords" label="关键字">
           <el-input
             v-model="queryParams.keywords"
-            placeholder="角色名称"
+            placeholder="岗位名称/编码"
             clearable
             @keyup.enter="handleQuery"
           />
@@ -23,7 +23,7 @@
       <div class="data-table__toolbar">
         <div class="data-table__toolbar--actions">
           <el-button
-            v-hasPerm="['sys:role:add']"
+            v-hasPerm="['sys:position:add']"
             type="success"
             icon="plus"
             @click="handleOpenDialog()"
@@ -31,7 +31,7 @@
             新增
           </el-button>
           <el-button
-            v-hasPerm="['sys:role:delete']"
+            v-hasPerm="['sys:position:delete']"
             type="danger"
             :disabled="ids.length === 0"
             icon="delete"
@@ -45,15 +45,22 @@
       <el-table
         ref="dataTableRef"
         v-loading="loading"
-        :data="roleList"
+        :data="positionList"
         highlight-current-row
         border
         class="data-table__content"
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="角色名称" prop="name" min-width="100" />
-        <el-table-column label="角色编码" prop="code" width="150" />
+        <el-table-column label="岗位名称" prop="name" min-width="120" />
+        <el-table-column label="岗位编码" prop="code" width="160" />
+
+        <el-table-column label="内置" align="center" width="80">
+          <template #default="scope">
+            <el-tag v-if="scope.row.isBuiltin" type="warning" size="small">内置</el-tag>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
 
         <el-table-column label="状态" align="center" width="100">
           <template #default="scope">
@@ -67,17 +74,17 @@
         <el-table-column fixed="right" label="操作" width="220">
           <template #default="scope">
             <el-button
-              v-hasPerm="['sys:role:edit']"
+              v-hasPerm="['sys:position:edit']"
               type="primary"
               size="small"
               link
               icon="position"
-              @click="handleOpenAssignPermDialog(scope.row)"
+              @click="handleOpenPermDrawer(scope.row)"
             >
               分配权限
             </el-button>
             <el-button
-              v-hasPerm="['sys:role:edit']"
+              v-hasPerm="['sys:position:edit']"
               type="primary"
               size="small"
               link
@@ -87,7 +94,8 @@
               编辑
             </el-button>
             <el-button
-              v-hasPerm="['sys:role:delete']"
+              v-if="!scope.row.isBuiltin"
+              v-hasPerm="['sys:position:delete']"
               type="danger"
               size="small"
               link
@@ -109,46 +117,50 @@
       />
     </el-card>
 
-    <!-- 角色表单弹窗 -->
-    <RoleDialog ref="roleDialogRef" @success="handleResetQuery" />
+    <!-- 岗位表单弹窗 -->
+    <position-dialog ref="positionDialogRef" @success="handleResetQuery" />
 
-    <!-- 分配权限弹窗 -->
-    <RolePermDrawer ref="rolePermDrawerRef" @success="handleResetQuery" />
+    <!-- 分配权限抽屉 -->
+    <position-perm-drawer ref="positionPermDrawerRef" @success="handleResetQuery" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { RoleAPI, type RolePageVO, type RolePageQuery } from "@/api/role";
-import RoleDialog from "./components/RoleDialog.vue";
-import RolePermDrawer from "./components/RolePermDrawer.vue";
+/**
+ * 岗位管理列表页：展示所有岗位、支持增删改及菜单权限分配。
+ * 所属板块：system。
+ */
+import { PositionAPI, type PositionPageVO, type PositionPageQuery } from "@/api/position";
+import PositionDialog from "./components/PositionDialog.vue";
+import PositionPermDrawer from "./components/PositionPermDrawer.vue";
 
 defineOptions({
-  name: "Role",
+  name: "Position",
   inheritAttrs: false,
 });
 
 const queryFormRef = ref();
-const roleDialogRef = ref();
-const rolePermDrawerRef = ref();
+const positionDialogRef = ref();
+const positionPermDrawerRef = ref();
 
 const loading = ref(false);
-const ids = ref<number[]>([]);
+const ids = ref<string[]>([]);
 const total = ref(0);
 
-const queryParams = reactive<RolePageQuery>({
+const queryParams = reactive<PositionPageQuery>({
   pageNum: 1,
   pageSize: 10,
 });
 
-// 角色表格数据
-const roleList = ref<RolePageVO[]>();
+/** 岗位表格数据 */
+const positionList = ref<PositionPageVO[]>();
 
-// 获取数据
+/** 获取分页数据 */
 function fetchData() {
   loading.value = true;
-  RoleAPI.getPage(queryParams)
+  PositionAPI.getPage(queryParams)
     .then((data) => {
-      roleList.value = data.list;
+      positionList.value = data.list;
       total.value = data.total;
     })
     .finally(() => {
@@ -156,63 +168,58 @@ function fetchData() {
     });
 }
 
-// 查询（重置页码后获取数据）
+/** 查询（重置页码后获取数据） */
 function handleQuery() {
   queryParams.pageNum = 1;
   fetchData();
 }
 
-// 重置查询
+/** 重置查询 */
 function handleResetQuery() {
   queryFormRef.value.resetFields();
   queryParams.pageNum = 1;
   fetchData();
 }
 
-// 行复选框选中
-function handleSelectionChange(selection: any) {
-  ids.value = selection.map((item: any) => item.id);
+/** 行复选框选中 */
+function handleSelectionChange(selection: PositionPageVO[]) {
+  ids.value = selection.filter((item) => !item.isBuiltin).map((item) => item.id);
 }
 
-// 打开角色弹窗
-function handleOpenDialog(roleId?: string) {
-  roleDialogRef.value.open(roleId);
+/** 打开岗位表单弹窗 */
+function handleOpenDialog(positionId?: string) {
+  positionDialogRef.value.open(positionId);
 }
 
-// 删除角色
-function handleDelete(roleId?: number) {
-  const roleIds = [roleId || ids.value].join(",");
-  if (!roleIds) {
-    ElMessage.warning("请勾选删除项");
+/** 打开岗位权限分配抽屉 */
+function handleOpenPermDrawer(row: PositionPageVO) {
+  positionPermDrawerRef.value.open(row);
+}
+
+/** 删除岗位 */
+function handleDelete(positionId?: string) {
+  const positionIds = positionId ? positionId : ids.value.join(",");
+  if (!positionIds) {
+    ElMessage.warning("请勾选需要删除的非内置岗位");
     return;
   }
 
-  ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
+  ElMessageBox.confirm("确认删除已选中的数据项？", "警告", {
     confirmButtonText: "确定",
     cancelButtonText: "取消",
     type: "warning",
-  }).then(
-    () => {
-      loading.value = true;
-      RoleAPI.deleteByIds(roleIds)
-        .then(() => {
-          ElMessage.success("删除成功");
-          handleResetQuery();
-        })
-        .finally(() => (loading.value = false));
-    },
-    () => {
-      ElMessage.info("已取消删除");
-    }
-  );
+  }).then(() => {
+    loading.value = true;
+    PositionAPI.deleteByIds(positionIds)
+      .then(() => {
+        ElMessage.success("删除成功");
+        handleResetQuery();
+      })
+      .finally(() => {
+        loading.value = false;
+      });
+  });
 }
 
-// 打开分配菜单权限弹窗
-function handleOpenAssignPermDialog(row: RolePageVO) {
-  rolePermDrawerRef.value.open(row);
-}
-
-onMounted(() => {
-  handleQuery();
-});
+onMounted(fetchData);
 </script>

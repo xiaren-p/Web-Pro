@@ -1,17 +1,15 @@
 """用户相关视图。
 
-模块说明：提供用户查询、创建、更新、删除、导入导出、密码重置与 Seafile Cloud 创建等接口。
+模块说明：提供用户查询、创建、更新、删除、导入导出、密码重置等接口。
+权限体系：基于 admin_level（管理级别）+ position（岗位）三轴模型，不再依赖 Role M2M。
 """
 
+import logging
 import os
-import re
 import uuid
-import json
 import csv
 import io
 import time
-import requests
-from urllib.parse import quote
 from datetime import datetime, timedelta
 
 from django.db.models import Q
@@ -23,19 +21,16 @@ from django.views.decorators.csrf import csrf_exempt
 
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 
-from api_v1.models import (
-    Role, Department, UserProfile, Config
-)
-from api_v1.serializers import (
-    UserSerializer, MobileCodeSendSerializer, MobileBindSerializer, 
-    EmailCodeSendSerializer, EmailBindSerializer
-)
+from api_v1.models import Department, UserProfile, Config
+from api_v1.models.system.position import Position
+from api_v1.models.system.user_profile import AdminLevel
+from api_v1.serializers import UserSerializer
 from api_v1.utils.responses import drf_ok, drf_error
-from api_v1.utils.seafile import get_or_refresh_admin_token, invalidate_admin_token, delete_seafile_account
 from api_v1.utils.pagination import paginate_queryset
-# write_log 调用已移除
+
+logger = logging.getLogger(__name__)
 
 class UserViewSet(viewsets.ViewSet):
     """用户相关接口
@@ -47,65 +42,66 @@ class UserViewSet(viewsets.ViewSet):
     @csrf_exempt
     @action(detail=False, methods=["get"], url_path="me")
     def me(self, request):
-        t0 = time.perf_counter()
+        """返回当前登录用户基础信息、角色标识与权限点。
+
+        roles 字段由 admin_level 派生（保持前端兼容格式）：
+            COMPANY_ADMIN → ["admin", "ROOT"]
+            DEPT_ADMIN    → ["dept_admin"]
+            MEMBER        → []
+        perms 字段来自 position.menus 关联的 perms 字段聚合。
+        """
         user = request.user
         if not user.is_authenticated:
             return drf_error("未登录", status=401)
         profile = getattr(user, "profile", None)
-        roles = list(profile.roles.values_list("code", flat=True)) if profile else []
-        # 若为 Django 超级用户或拥有 admin 角色，追加 ROOT 角色，前端将视为超级管理员
-        try:
-            is_admin_role = profile.roles.filter(code='admin').exists() if profile else False
-        except Exception:
-            is_admin_role = False
-        if user.is_superuser or is_admin_role:
-            if "ROOT" not in roles:
-                roles.append("ROOT")
 
-        # 聚合基于角色的菜单权限点（供前端按钮级权限使用）
-        perms_set = set()
+        # 由 admin_level 派生前端角色标识
+        level = profile.admin_level if profile else AdminLevel.MEMBER
+        if user.is_superuser or level == AdminLevel.COMPANY_ADMIN:
+            roles = ["admin", "ROOT"]
+        elif level == AdminLevel.DEPT_ADMIN:
+            roles = ["dept_admin"]
+        else:
+            roles = []
+
+        # 聚合 position 关联菜单的权限点
+        perms_set: set[str] = set()
         try:
-            if profile:
-                role_ids = list(profile.roles.values_list('id', flat=True))
-                if role_ids:
-                    from api_v1.models import Menu
-                    for p in Menu.objects.filter(status=True, roles__in=role_ids).exclude(perms="").values_list("perms", flat=True).distinct():
-                        # 支持以逗号/空格分隔的多权限配置
-                        for token in str(p).replace('\n', ' ').replace('\t', ' ').split(','):
-                            token = token.strip()
-                            if token:
-                                perms_set.add(token)
+            if profile and profile.position_id:
+                from api_v1.models.system.menu import Menu
+                menu_qs = Menu.objects.filter(
+                    status=True,
+                    positions__id=profile.position_id,
+                ).exclude(perms="").values_list("perms", flat=True).distinct()
+                for raw in menu_qs:
+                    for token in str(raw).replace("\n", " ").replace("\t", " ").split(","):
+                        token = token.strip()
+                        if token:
+                            perms_set.add(token)
         except Exception:
-            pass
+            logger.warning("[UserViewSet] [me] 聚合权限点失败", exc_info=True)
 
         perms = sorted(perms_set)
-        # 将头像转换为绝对 URL（避免前端在不同端口下 /media 相对路径无法加载）
+
         def abs_avatar(v: str) -> str:
+            """将相对头像路径补齐为绝对 URL。"""
             try:
                 if not v:
-                    # 若未配置用户头像，回退到 settings 中的 DEFAULT_AVATAR_URL（若有）
-                    default_avatar = getattr(settings, 'DEFAULT_AVATAR_URL', '') or ''
-                    return default_avatar
-                if str(v).startswith("http://") or str(v).startswith("https://"):
+                    return getattr(settings, "DEFAULT_AVATAR_URL", "") or ""
+                if str(v).startswith(("http://", "https://")):
                     return v
-                # 统一补齐到 MEDIA_URL
-                base = settings.MEDIA_URL.rstrip('/')
+                base = settings.MEDIA_URL.rstrip("/")
                 p = str(v)
-                if p.startswith('/media/'):
+                if p.startswith("/media/"):
                     rel = p
-                elif p.startswith('media/'):
-                    rel = '/' + p
-                elif p.startswith('uploads/'):
-                    rel = base + '/' + p
+                elif p.startswith("media/"):
+                    rel = "/" + p
+                elif p.startswith("uploads/"):
+                    rel = base + "/" + p
                 else:
-                    rel = p if p.startswith('/') else ('/' + p)
-                # 如果设置了对外可访问的后端 URL（BACKEND_EXTERNAL_URL），优先使用该值构建外部可访问链接
-                external = getattr(settings, 'BACKEND_EXTERNAL_URL', '') or ''
-                external = external.rstrip('/')
-                if external:
-                    return external + rel
-                # 否则使用 request 的 Host 构建绝对 URI（兼容本地/代理调试）
-                return request.build_absolute_uri(rel)
+                    rel = p if p.startswith("/") else ("/" + p)
+                external = (getattr(settings, "BACKEND_EXTERNAL_URL", "") or "").rstrip("/")
+                return (external + rel) if external else request.build_absolute_uri(rel)
             except Exception:
                 return v or ""
 
@@ -117,7 +113,6 @@ class UserViewSet(viewsets.ViewSet):
             "roles": roles,
             "perms": perms,
         })
-        # logging removed
         return resp
 
     @action(detail=False, methods=["get"], url_path="page")
@@ -160,45 +155,27 @@ class UserViewSet(viewsets.ViewSet):
             except Exception:
                 pass
 
-        # 数据权限过滤：基于当前登录用户的所有角色 data_scope 计算可访问用户集合
-        # 优先：超级用户 或 拥有 admin 角色 -> 不限制
-        user = getattr(request, 'user', None)
-        if user and getattr(user, 'is_authenticated', False):
-            if not user.is_superuser:
-                profile = getattr(user, 'profile', None)
-                is_admin_role = False
-                try:
-                    if profile:
-                        is_admin_role = profile.roles.filter(code='admin').exists()
-                except Exception:
-                    is_admin_role = False
-                if not is_admin_role and profile:
-                    # 汇总所有角色的 data_scope，采用“并集”策略：若任一角色拥有更广泛范围则扩大可见性
-                    scopes = list(profile.roles.values_list('data_scope', flat=True)) or []
-                    # 默认无角色则最小范围=本人
-                    scopes = scopes or [4]
-                    # 若包含 1 (全部数据) 直接跳过限制
-                    if 1 not in scopes:
-                        # 预取当前用户所属部门及所有子部门
-                        dept_ids_union = set()
-                        if profile.dept_id:
-                            def collect(did):
-                                if did in dept_ids_union:
-                                    return
-                                dept_ids_union.add(did)
-                                for cid in Department.objects.filter(parent_id=did).values_list('id', flat=True):
-                                    collect(cid)
-                            collect(profile.dept_id)
-                        # 构造 Q 条件并集
-                        perm_q = Q(pk__in=[user.id])  # 本人
-                        # 若存在 3 (本部门)，允许同部门用户
-                        if 3 in scopes and profile.dept_id:
-                            perm_q |= Q(profile__dept_id=profile.dept_id)
-                        # 若存在 2 (部门及子部门)，允许当前部门及其子孙
-                        if 2 in scopes and dept_ids_union:
-                            perm_q |= Q(profile__dept_id__in=list(dept_ids_union))
-                        # 将过滤应用（若仅本人则 perm_q 只是本人）
-                        qs = qs.filter(perm_q)
+        # admin_level data scope filter
+        req_user = getattr(request, "user", None)
+        if req_user and getattr(req_user, "is_authenticated", False) and not req_user.is_superuser:
+            _profile = getattr(req_user, "profile", None)
+            level = _profile.admin_level if _profile else AdminLevel.MEMBER
+            if level == AdminLevel.COMPANY_ADMIN:
+                pass
+            elif level == AdminLevel.DEPT_ADMIN and _profile and _profile.dept_id:
+                _dept_ids: set[int] = set()
+
+                def _collect_dept(did: int) -> None:
+                    if did in _dept_ids:
+                        return
+                    _dept_ids.add(did)
+                    for cid in Department.objects.filter(parent_id=did).values_list("id", flat=True):
+                        _collect_dept(cid)
+
+                _collect_dept(_profile.dept_id)
+                qs = qs.filter(profile__dept_id__in=list(_dept_ids))
+            else:
+                qs = qs.filter(pk=req_user.id)
         total, items, _, _ = paginate_queryset(request, qs)
         data = UserSerializer(items, many=True).data
         return drf_ok({"total": total, "list": data})
@@ -237,16 +214,34 @@ class UserViewSet(viewsets.ViewSet):
         user = User.objects.create(username=username, email=email, is_active=bool(int(status_num)))
         user.set_password(password)
         user.save()
-        profile = UserProfile.objects.create(user=user, nickname=nickname, mobile=mobile, avatar=avatar, dept_id=dept_id, cloud_id=payload.get("cloudId", "") or "")
+        position_id = payload.get("positionId")
+        admin_level_val = payload.get("adminLevel", AdminLevel.MEMBER)
+        try:
+            admin_level_val = int(admin_level_val)
+            if admin_level_val not in AdminLevel.values:
+                admin_level_val = AdminLevel.MEMBER
+        except (ValueError, TypeError):
+            admin_level_val = AdminLevel.MEMBER
+        profile = UserProfile.objects.create(
+            user=user,
+            nickname=nickname,
+            mobile=mobile,
+            avatar=avatar,
+            dept_id=dept_id,
+            admin_level=admin_level_val,
+        )
         if gender is not None:
             try:
                 profile.gender = int(gender)
-            except Exception:
+            except (ValueError, TypeError):
                 pass
-        if role_ids:
-            profile.roles.set(Role.objects.filter(id__in=role_ids))
+        if position_id:
+            try:
+                profile.position = Position.objects.get(pk=position_id)
+            except Position.DoesNotExist:
+                pass
         profile.save()
-        # logging removed
+        logger.info("[UserViewSet] [create] user=%s", username)
         return drf_ok(UserSerializer(user).data, status=201)
 
     @action(detail=False, methods=["put"], url_path=r"(?P<id>[^/]+)")
@@ -261,29 +256,35 @@ class UserViewSet(viewsets.ViewSet):
         user.is_active = bool(int(payload.get("status", 1)))
         user.save()
         profile = getattr(user, "profile", None)
-        seafile_sync = None
         if profile:
             profile.nickname = payload.get("nickname", profile.nickname)
             profile.mobile = payload.get("mobile", profile.mobile)
             profile.avatar = payload.get("avatar", profile.avatar)
             profile.dept_id = payload.get("deptId", profile.dept_id)
-            # 支持通过 API 写入 cloudId（用于手动回填 Seafile 的 cloud identifier）
-            if "cloudId" in payload:
-                try:
-                    profile.cloud_id = payload.get("cloudId") or ""
-                except Exception:
-                    pass
             if payload.get("gender") is not None:
                 try:
                     profile.gender = int(payload.get("gender"))
-                except Exception:
+                except (ValueError, TypeError):
                     pass
-            role_ids = payload.get("roleIds") or []
-            if role_ids:
-                profile.roles.set(Role.objects.filter(id__in=role_ids))
+            if "positionId" in payload:
+                pid = payload.get("positionId")
+                if pid:
+                    try:
+                        profile.position = Position.objects.get(pk=pid)
+                    except Position.DoesNotExist:
+                        pass
+                else:
+                    profile.position = None
+            if "adminLevel" in payload:
+                try:
+                    lvl = int(payload.get("adminLevel"))
+                    if lvl in AdminLevel.values:
+                        profile.admin_level = lvl
+                except (ValueError, TypeError):
+                    pass
             profile.save()
-        resp_data = UserSerializer(user).data
-        return drf_ok(resp_data)
+        logger.info("[UserViewSet] [update] id=%s", id)
+        return drf_ok(UserSerializer(user).data)
 
     @action(detail=False, methods=["delete"], url_path=r"(?P<id>[^/]+)")
     def delete(self, request, id: str):
@@ -297,45 +298,10 @@ class UserViewSet(viewsets.ViewSet):
             if not users_qs.exists():
                 return drf_error("未找到用户", status=404)
 
-            # ── 同步删除 Seafile 账号 ──────────────────────────────────────
-            # 尝试读取 Seafile 管理员配置；若未配置则跳过 cloud 删除，不影响本地删除
-            def _cfg(key: str) -> str:
-                try:
-                    obj = Config.objects.filter(key=key, status=True).first()
-                    return (obj.value or "").strip() if obj else ""
-                except Exception:
-                    return ""
-
-            site = _cfg("SEAFILE_SITE")
-            admin_user = _cfg("SEAFILE_ADMIN_USER")
-            admin_pass = _cfg("SEAFILE_ADMIN_PASSWORD")
-            ttl_str = _cfg("SEAFILE_ADMIN_TOKEN_TTL")
-            try:
-                token_ttl = int(ttl_str) if ttl_str else 3600
-            except ValueError:
-                token_ttl = 3600
-
-            if site and admin_user and admin_pass:
-                token, token_err = get_or_refresh_admin_token(site, admin_user, admin_pass, ttl=token_ttl)
-                if token and not token_err:
-                    for u in users_qs.select_related("profile"):
-                        # 优先使用 cloud_id，其次用邮箱
-                        cloud_email = ""
-                        try:
-                            cloud_email = (getattr(u.profile, "cloud_id", None) or u.email or "").strip()
-                        except Exception:
-                            cloud_email = (u.email or "").strip()
-                        if cloud_email:
-                            ok, err = delete_seafile_account(site, token, cloud_email)
-                            if not ok and err and "401" in str(err):
-                                # token 失效，刷新后重试一次
-                                invalidate_admin_token(site)
-                                token, _ = get_or_refresh_admin_token(site, admin_user, admin_pass, ttl=token_ttl)
-                                if token:
-                                    delete_seafile_account(site, token, cloud_email)
-
             count = users_qs.count()
+            usernames_del = list(users_qs.values_list("username", flat=True))
             users_qs.delete()
+            logger.info("[UserViewSet] [delete] %s, count=%d", usernames_del, count)
             return drf_ok({"deletedCount": count})
         except User.DoesNotExist:
             return drf_error("未找到用户", status=404)
@@ -370,12 +336,16 @@ class UserViewSet(viewsets.ViewSet):
         t0 = time.perf_counter()
         # 导出所有用户为 CSV
         users = User.objects.all().order_by("id")
-        content = "username,email,nickname,mobile,deptId,roleIds\n"
+        content = "username,email,nickname,mobile,deptId,positionId,adminLevel\n"
         for u in users:
             profile = getattr(u, "profile", None)
-            role_ids = ",".join(str(r.id) for r in profile.roles.all()) if profile else ""
-            dept_id = profile.dept_id if profile else ""
-            content += f"{u.username},{u.email},{profile.nickname if profile else ''},{profile.mobile if profile else ''},{dept_id},{role_ids}\n"
+            dept_id_v = profile.dept_id if profile else ""
+            position_id_v = profile.position_id if profile else ""
+            admin_level_v = profile.admin_level if profile else AdminLevel.MEMBER
+            content += (
+                f"{u.username},{u.email},{profile.nickname if profile else ''},"
+                f"{profile.mobile if profile else ''},{dept_id_v},{position_id_v},{admin_level_v}\n"
+            )
         response = HttpResponse(content, content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename=users_export.csv"
         try:
@@ -404,154 +374,24 @@ class UserViewSet(viewsets.ViewSet):
             user.save()
             # 导入时若无头像，使用默认头像
             avatar = row.get("avatar") or default_avatar
-            profile = UserProfile.objects.create(user=user, nickname=row.get("nickname", ""), mobile=row.get("mobile", ""), dept_id=row.get("deptId"), avatar=avatar)
-            role_ids = row.get("roleIds", "").split(",") if row.get("roleIds") else []
-            if role_ids:
-                profile.roles.set(Role.objects.filter(id__in=role_ids))
-            profile.save()
+            position_id_imp = row.get("positionId")
+            profile = UserProfile.objects.create(
+                user=user,
+                nickname=row.get("nickname", ""),
+                mobile=row.get("mobile", ""),
+                dept_id=row.get("deptId") or None,
+                avatar=avatar,
+            )
+            if position_id_imp:
+                try:
+                    profile.position = Position.objects.get(pk=position_id_imp)
+                    profile.save()
+                except Position.DoesNotExist:
+                    pass
             count += 1
         # logging removed
         return drf_ok({"success": True, "count": count})
 
-    @action(detail=False, methods=["post"], url_path="cloud-create", permission_classes=[IsAuthenticated])
-    def cloud_create(self, request):
-        """后端代理：为选中用户在 Seafile 上批量创建账号。
-
-        管理员凭据从参数配置表（Config）读取，token 由 seafile 工具模块自动缓存刷新。
-        Seafile 账号密码必须由调用方显式传入，与系统账号密码保持一致。
-
-        请求 JSON:
-        {
-            "ids": [1, 2, 3],
-            "passwords": {"1": "明文密码", "2": "明文密码"}  // 键为用户 ID 字符串
-        }
-
-        返回:
-        { results: [{id, email, username, success, msg}], successCount, failCount }
-        """
-        data = request.data or {}
-        ids = data.get("ids") or data.get("userIds") or []
-        if isinstance(ids, str):
-            ids = [x.strip() for x in ids.split(",") if x.strip()]
-
-        # passwords 字典：{ str(user_id): "明文密码" }
-        passwords: dict = data.get("passwords") or {}
-
-        # 从参数配置表（Config）读取 Seafile 管理员凭据及 token TTL
-        def _cfg(key: str) -> str:
-            try:
-                obj = Config.objects.filter(key=key, status=True).first()
-                return (obj.value or "").strip() if obj else ""
-            except Exception:
-                return ""
-
-        site = _cfg("SEAFILE_SITE")
-        admin_user = _cfg("SEAFILE_ADMIN_USER")
-        admin_pass = _cfg("SEAFILE_ADMIN_PASSWORD")
-        ttl_str = _cfg("SEAFILE_ADMIN_TOKEN_TTL")
-        try:
-            token_ttl = int(ttl_str) if ttl_str else 3600
-        except ValueError:
-            token_ttl = 3600
-
-        if not site or not admin_user or not admin_pass:
-            return drf_error(
-                "未在参数配置中找到完整的 Seafile 站点和管理员凭据，"
-                "请在参数配置中配置 SEAFILE_SITE / SEAFILE_ADMIN_USER / SEAFILE_ADMIN_PASSWORD",
-                status=400,
-            )
-
-        base_site = str(site).strip()
-        if not re.match(r"^https?://", base_site, re.I):
-            base_site = "https://" + base_site
-
-        # 获取管理员 token（优先从 Redis cache 读取，过期自动刷新）
-        token, token_err = get_or_refresh_admin_token(site, admin_user, admin_pass, ttl=token_ttl)
-        if token_err or not token:
-            return drf_error(f"获取 Seafile 管理员 token 失败: {token_err}", status=502)
-
-        results = []
-        success = 0
-        fail = 0
-        headers = {"Authorization": f"Token {token}", "Content-Type": "application/x-www-form-urlencoded"}
-        for uid in ids:
-            uid_str = str(uid)
-            user_password = passwords.get(uid_str) or passwords.get(uid)
-            if not user_password:
-                results.append({"id": uid, "success": False, "msg": "未提供密码"})
-                fail += 1
-                continue
-            try:
-                u = User.objects.get(pk=uid)
-            except Exception:
-                results.append({"id": uid, "success": False, "msg": "未找到用户"})
-                fail += 1
-                continue
-            email = (u.email or "").strip()
-            if not email:
-                results.append({"id": uid, "username": u.username, "success": False, "msg": "未配置邮箱"})
-                fail += 1
-                continue
-
-            account_url = base_site.rstrip("/") + f"/api2/accounts/{quote(email)}/"
-            form = {
-                "password": user_password,
-                "is_staff": "false",
-                "is_active": ("true" if getattr(u, 'is_active', True) else "false"),
-                "name": (u.profile.nickname if getattr(u, 'profile', None) else u.username),
-            }
-            try:
-                r = requests.put(account_url, data=form, headers=headers, timeout=10)
-            except Exception as e:
-                results.append({"id": uid, "email": email, "username": u.username, "success": False, "msg": f"请求创建失败: {e}"})
-                fail += 1
-                continue
-
-            # 若收到 401，可能是 token 已被 Seafile 端清除，主动清除本地缓存
-            if r.status_code == 401:
-                invalidate_admin_token(site)
-
-            if 200 <= r.status_code < 300:
-                # 解析返回 JSON，尝试读取 Seafile 返回的 email 作为 cloud_id 并保存到 profile
-                returned_email = None
-                try:
-                    jr = r.json()
-                    returned_email = jr.get("email") if isinstance(jr, dict) else None
-                except Exception:
-                    returned_email = None
-                try:
-                    profile = getattr(u, 'profile', None)
-                    if profile and returned_email:
-                        profile.cloud_id = returned_email
-                        profile.save()
-                except Exception:
-                    pass
-                # 若成功创建并获得 returned_email，则向 admin users 接口绑定 login_id
-                admin_bind = {"success": None, "msg": "skipped"}
-                if returned_email:
-                    try:
-                        admin_put_url = base_site.rstrip("/") + f"/api/v2.1/admin/users/{quote(returned_email)}/"
-                        try:
-                            # 以 form-data 方式提交 login_id
-                            ap = requests.put(admin_put_url, data={"login_id": u.username}, headers=headers, timeout=10)
-                            if 200 <= ap.status_code < 300:
-                                admin_bind = {"success": True, "msg": f"{ap.status_code}"}
-                            else:
-                                admin_bind = {"success": False, "msg": f"{ap.status_code} {getattr(ap, 'text', '')}"}
-                        except Exception as e:
-                            admin_bind = {"success": False, "msg": f"请求失败: {e}"}
-                    except Exception:
-                        admin_bind = {"success": False, "msg": "构建 admin_put_url 失败"}
-
-                results.append({"id": uid, "email": email, "username": u.username, "cloudId": returned_email, "success": True, "msg": "created", "adminBind": admin_bind})
-                success += 1
-            else:
-                txt = r.text if hasattr(r, 'text') else ''
-                results.append({"id": uid, "email": email, "username": u.username, "success": False, "msg": f"{r.status_code} {txt}"})
-                fail += 1
-
-        # write_log removed: 批量创建 cloud 用户：成功 {success}，失败 {fail}
-        return drf_ok({"results": results, "successCount": success, "failCount": fail})
 
     @action(detail=False, methods=["get"], url_path="profile")
     def profile_get(self, request):
@@ -559,16 +399,10 @@ class UserViewSet(viewsets.ViewSet):
         if not user.is_authenticated:
             return drf_error("未登录", status=401)
         # 补充前端常用聚合字段（与 /users/me 保持一致但包含更详细的角色/部门信息）
-        profile = getattr(user, 'profile', None)
-        dept_name = ''
-        role_names = ''
-        if profile:
-            if profile.dept:
-                dept_name = profile.dept.name
-            try:
-                role_names = ','.join(profile.roles.values_list('name', flat=True))
-            except Exception:
-                role_names = ''
+        profile = getattr(user, "profile", None)
+        dept_name = ""
+        if profile and getattr(profile, "dept", None):
+            dept_name = profile.dept.name
         data = UserSerializer(user).data
         # 头像补齐为绝对 URL
         try:
@@ -586,9 +420,7 @@ class UserViewSet(viewsets.ViewSet):
                 data['avatar'] = request.build_absolute_uri(rel)
         except Exception:
             pass
-        data['deptName'] = dept_name or data.get('deptName', '')
-        data['roleNames'] = role_names or data.get('roleNames', '')
-        # write_log removed: 查看个人资料
+        data["deptName"] = dept_name or data.get("deptName", "")
         return drf_ok(data)
 
     @action(detail=False, methods=["put"], url_path="profile")
@@ -603,9 +435,6 @@ class UserViewSet(viewsets.ViewSet):
             profile.mobile = payload.get("mobile", profile.mobile)
             profile.avatar = payload.get("avatar", profile.avatar)
             profile.dept_id = payload.get("deptId", profile.dept_id)
-            role_ids = payload.get("roleIds") or []
-            if role_ids:
-                profile.roles.set(Role.objects.filter(id__in=role_ids))
             profile.save()
         user.email = payload.get("email", user.email)
         user.save()
@@ -632,7 +461,7 @@ class UserViewSet(viewsets.ViewSet):
         """上传头像，仅用于用户头像，不恢复通用文件上传模块。
 
         请求：multipart/form-data，字段名 file
-        响应：{ url, name, seafileAvatarSync? }
+        响应：{ url, name, suggestCrop }
         """
         user = request.user
         if not getattr(user, 'is_authenticated', False):

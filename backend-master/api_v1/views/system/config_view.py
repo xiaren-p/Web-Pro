@@ -19,6 +19,7 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 
 from api_v1.models import Config
+from api_v1.models.system.config import ConfigType
 from api_v1.permissions import MenuPermRequired
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_error, drf_ok
@@ -53,13 +54,15 @@ class ConfigViewSet(viewsets.ViewSet):
     def _serialize(conf: Config) -> dict[str, Any]:
         """单条参数序列化为前端可直接渲染结构。
 
-        简化处理：使用 ``key`` 作为 ``configName`` 名称展示。
+        PASSWORD 类型的 configValue 返回掩码，不暴露密文或明文。
         """
+        is_pwd = getattr(conf, "config_type", ConfigType.TEXT) == ConfigType.PASSWORD
         return {
             "id": conf.id,
             "configName": conf.key,
             "configKey": conf.key,
-            "configValue": conf.value,
+            "configValue": "******" if is_pwd else conf.value,
+            "configType": getattr(conf, "config_type", ConfigType.TEXT),
             "status": 1 if conf.status else 0,
             "remark": conf.remark,
         }
@@ -83,13 +86,22 @@ class ConfigViewSet(viewsets.ViewSet):
 
         p = request.data.copy()
         key = p.get("configKey") or p.get("key") or p.get("configName")
-        value = p.get("configValue") or p.get("value") or ""
+        raw_value = p.get("configValue") or p.get("value") or ""
         remark = p.get("remark") or ""
         status = p.get("status", 1)
+        config_type = p.get("configType", ConfigType.TEXT)
         c = Config.objects.create(
-            key=key or "", value=value, remark=remark,
+            key=key or "",
+            value="",
+            remark=remark,
+            config_type=config_type,
             status=bool(int(status)) if isinstance(status, (str, int)) else bool(status),
         )
+        if config_type == ConfigType.PASSWORD:
+            c.set_plaintext_value(raw_value)
+        else:
+            c.value = raw_value
+        c.save()
         return drf_ok(self._serialize(c), status=201)
 
     @action(detail=False, methods=["get"], url_path=r"(?P<id>[^/]+)/form")
@@ -114,7 +126,15 @@ class ConfigViewSet(viewsets.ViewSet):
             if "configKey" in p or "key" in p or "configName" in p:
                 c.key = p.get("configKey") or p.get("key") or p.get("configName") or c.key
             if "configValue" in p or "value" in p:
-                c.value = p.get("configValue") or p.get("value") or c.value
+                raw = p.get("configValue") or p.get("value") or ""
+                if raw == "******":
+                    pass  # 前端未修改密码，跳过
+                elif getattr(c, "config_type", ConfigType.TEXT) == ConfigType.PASSWORD:
+                    c.set_plaintext_value(raw)
+                else:
+                    c.value = raw
+            if "configType" in p:
+                c.config_type = p.get("configType") or ConfigType.TEXT
             if "remark" in p:
                 c.remark = p.get("remark") or c.remark
             if "status" in p:

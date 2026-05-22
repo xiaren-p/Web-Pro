@@ -8,7 +8,7 @@ from api_v1.views.system.dept_view import DeptViewSet
 from api_v1.views.system.dict_view import DictViewSet
 from api_v1.views.system.log_view import LogViewSet
 from api_v1.views.system.config_view import ConfigViewSet
-from api_v1.views.system.role_view import RoleViewSet
+from api_v1.views.system.position_view import PositionViewSet
 
 __all__ = [
     "MenuViewSet",
@@ -16,5 +16,5 @@ __all__ = [
     "DictViewSet",
     "LogViewSet",
     "ConfigViewSet",
-    "RoleViewSet",
+    "PositionViewSet",
 ]

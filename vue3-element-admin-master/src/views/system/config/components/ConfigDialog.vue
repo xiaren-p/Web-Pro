@@ -7,8 +7,20 @@
       <el-form-item label="配置键" prop="configKey">
         <el-input v-model="formData.configKey" placeholder="请输入配置键" :maxlength="50" />
       </el-form-item>
+      <el-form-item label="配置类型" prop="configType">
+        <el-select v-model="formData.configType" placeholder="请选择配置类型">
+          <el-option value="TEXT" label="文本" />
+          <el-option value="PASSWORD" label="密码" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="配置值" prop="configValue">
-        <el-input v-model="formData.configValue" placeholder="请输入配置值" :maxlength="100" />
+        <el-input
+          v-model="formData.configValue"
+          :type="formData.configType === 'PASSWORD' ? 'password' : 'text'"
+          :show-password="formData.configType === 'PASSWORD'"
+          placeholder="请输入配置值"
+          :maxlength="100"
+        />
       </el-form-item>
       <el-form-item label="描述" prop="remark">
         <el-input
@@ -45,6 +57,7 @@ const formData = reactive<ConfigForm>({
   configName: "",
   configKey: "",
   configValue: "",
+  configType: "TEXT",
   remark: "",
 });
 
@@ -70,6 +83,7 @@ function open(id?: string) {
     formData.configName = "";
     formData.configKey = "";
     formData.configValue = "";
+    formData.configType = "TEXT";
     formData.remark = "";
   }
 }

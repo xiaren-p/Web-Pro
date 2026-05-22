@@ -72,15 +72,6 @@
               >
                 删除
               </el-button>
-              <el-button
-                v-hasPerm="'sys:user:add'"
-                type="primary"
-                icon="plus"
-                :disabled="selectIds.length === 0"
-                @click="handleCreateCloudUser"
-              >
-                创建 cloud 用户
-              </el-button>
             </div>
             <div class="data-table__toolbar--tools">
               <el-button
@@ -115,6 +106,8 @@
               </template>
             </el-table-column>
             <el-table-column label="部门" width="120" align="center" prop="deptName" />
+            <el-table-column label="岗位" width="120" align="center" prop="positionName" />
+            <el-table-column label="管理级别" width="100" align="center" prop="adminLevelLabel" />
             <el-table-column label="手机号码" align="center" prop="mobile" width="120" />
             <el-table-column label="邮箱" align="center" prop="email" width="160" />
             <el-table-column label="状态" align="center" prop="status" width="80">
@@ -332,32 +325,8 @@ function handleDelete(id?: number) {
     () => {
       loading.value = true;
       UserAPI.deleteByIds(userIds)
-        .then((resp: any) => {
-          const data = resp?.data || resp || {};
-          // 先显示本地删除成功提示
+        .then(() => {
           ElMessage.success("删除成功");
-          // 若后端返回 cloud 删除结果，则展示详细结果
-          const cloudResults = data.cloudResults || [];
-          if (cloudResults.length > 0) {
-            const successes = cloudResults.filter((r: any) => r.success);
-            const fails = cloudResults.filter((r: any) => !r.success);
-            if (fails.length === 0) {
-              ElMessage.success(`成功删除${successes.length}个cloud用户！`);
-            } else {
-              // 构建失败详情文本并弹窗展示
-              const lines = fails.map((f: any) => `邮箱: ${f.email || ""} -> ${f.msg || "error"}`);
-              ElMessageBox.alert(
-                `云端删除失败 ${fails.length} 条：\n` + lines.join("\n"),
-                "云端删除结果",
-                {
-                  type: "warning",
-                  confirmButtonText: "确定",
-                  showClose: true,
-                  dangerouslyUseHTMLString: false,
-                }
-              );
-            }
-          }
           handleResetQuery();
         })
         .finally(() => (loading.value = false));
@@ -366,57 +335,6 @@ function handleDelete(id?: number) {
       ElMessage.info("已取消删除");
     }
   );
-}
-
-// 创建 Seafile cloud 用户（为选中用户）
-async function handleCreateCloudUser() {
-  if (!selectIds.value || selectIds.value.length === 0) {
-    ElMessage.warning("请先勾选需要创建 cloud 用户的用户行");
-    return;
-  }
-
-  // 弹输入框获取统一密码（与系统账号密码一致，需管理员确认）
-  let inputPassword: string;
-  try {
-    const { value } = await ElMessageBox.prompt(
-      `将为选中的 ${selectIds.value.length} 位用户在 Seafile 创建账号，请输入其系统账号密码（统一密码，各用户密码须保持一致）`,
-      "创建 Cloud 账号",
-      {
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
-        inputType: "password",
-        inputValidator: (val: string) => {
-          if (!val || val.length < 6) return "密码至少 6 位";
-          return true;
-        },
-      }
-    );
-    inputPassword = value;
-  } catch {
-    // 用户点击取消，静默退出
-    return;
-  }
-
-  loading.value = true;
-  try {
-    const ids: Array<string | number> = [...selectIds.value];
-    // 构造 passwords 字典：{ "userId": "password" }
-    const passwords: Record<string, string> = {};
-    for (const id of ids) {
-      passwords[String(id)] = inputPassword;
-    }
-    const resp = await UserAPI.createCloudUsers(ids, passwords);
-    const data = resp?.data || resp || {};
-    const fail = data.failCount || 0;
-    if (fail === 0) {
-      ElMessage.success("创建成功！");
-    } else {
-      ElMessage.error("创建失败，或者用户已经创建！请联系管理员！");
-    }
-  } finally {
-    loading.value = false;
-    fetchData();
-  }
 }
 
 // 打开导入弹窗

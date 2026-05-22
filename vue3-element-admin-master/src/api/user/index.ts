@@ -20,7 +20,8 @@ export interface UserPageVO {
   mobile?: string;
   gender?: number;
   deptName?: string;
-  roleNames?: string;
+  positionName?: string;
+  adminLevelLabel?: string;
   status?: number;
   createTime?: Date;
 }
@@ -33,7 +34,8 @@ export interface UserForm {
   gender?: number;
   mobile?: string;
   nickname?: string;
-  roleIds?: number[];
+  positionId?: string;
+  adminLevel?: number;
   status?: number;
   username?: string;
   password?: string;
@@ -132,13 +134,6 @@ export const UserAPI = {
       url: `${USER_BASE_URL}/avatar`,
       method: "post",
       data: form,
-    });
-  },
-  createCloudUsers(ids: Array<string | number>, passwords: Record<string, string> = {}) {
-    return request<any, any>({
-      url: `${USER_BASE_URL}/cloud-create`,
-      method: "post",
-      data: { ids, passwords },
     });
   },
 };

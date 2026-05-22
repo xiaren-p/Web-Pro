@@ -44,14 +44,22 @@
         <Dict v-model="formData.gender" code="gender" type="radio" />
       </el-form-item>
 
-      <el-form-item label="角色" prop="roleIds">
-        <el-select v-model="formData.roleIds" multiple placeholder="请选择">
+      <el-form-item label="岗位" prop="positionId">
+        <el-select v-model="formData.positionId" placeholder="请选择岗位" clearable>
           <el-option
-            v-for="item in roleOptions"
+            v-for="item in positionOptions"
             :key="item.value"
             :label="item.label"
             :value="item.value"
           />
+        </el-select>
+      </el-form-item>
+
+      <el-form-item label="管理级别" prop="adminLevel">
+        <el-select v-model="formData.adminLevel" placeholder="请选择管理级别">
+          <el-option :value="1" label="公司管理员" />
+          <el-option :value="2" label="部门管理员" />
+          <el-option :value="3" label="普通成员" />
         </el-select>
       </el-form-item>
 
@@ -74,15 +82,6 @@
         />
       </el-form-item>
 
-      <el-form-item v-if="!formData.id" prop="createCloud">
-        <template #label>
-          <span style="font-size: 12px; white-space: nowrap">创建cloud账号</span>
-        </template>
-        <el-radio-group v-model="formData.createCloud">
-          <el-radio :label="true">是</el-radio>
-          <el-radio :label="false">否</el-radio>
-        </el-radio-group>
-      </el-form-item>
     </el-form>
 
     <template #footer>
@@ -99,7 +98,7 @@ import { useAppStore } from "@/store/modules/app-store";
 import { DeviceEnum } from "@/enums/settings/device-enum";
 import { UserAPI } from "@/api/user";
 import { DeptAPI } from "@/api/dept";
-import { RoleAPI } from "@/api/role";
+import { PositionAPI } from "@/api/position";
 
 const appStore = useAppStore();
 const emit = defineEmits(["success"]);
@@ -113,7 +112,7 @@ const drawerSize = computed(() => (appStore.device === DeviceEnum.DESKTOP ? "600
 
 const formData = reactive<any>({
   status: 1,
-  createCloud: false,
+  adminLevel: 3,
 });
 
 const rules = reactive({
@@ -124,7 +123,7 @@ const rules = reactive({
   ],
   nickname: [{ required: true, message: "用户昵称不能为空", trigger: "blur" }],
   deptId: [{ required: true, message: "所属部门不能为空", trigger: "blur" }],
-  roleIds: [{ required: true, message: "用户角色不能为空", trigger: "blur" }],
+  adminLevel: [{ required: true, message: "请选择管理级别", trigger: "blur" }],
   email: [
     { required: true, message: "邮箱不能为空", trigger: "blur" },
     {
@@ -143,7 +142,7 @@ const rules = reactive({
 });
 
 const deptOptions = ref<OptionType[]>([]);
-const roleOptions = ref<OptionType[]>([]);
+const positionOptions = ref<OptionType[]>([]);
 
 /**
  * 打开弹窗
@@ -151,8 +150,8 @@ const roleOptions = ref<OptionType[]>([]);
  */
 async function open(id?: string) {
   visible.value = true;
-  // 加载角色下拉数据源
-  roleOptions.value = await RoleAPI.getOptions();
+  // 加载岗位下拉数据源
+  positionOptions.value = await PositionAPI.getOptions();
   // 加载部门下拉数据源
   deptOptions.value = await DeptAPI.getOptions();
 
@@ -169,9 +168,8 @@ async function open(id?: string) {
     formData.deptId = undefined;
     formData.mobile = undefined;
     formData.email = undefined;
-    formData.roleIds = undefined;
-
-    formData.createCloud = false;
+    formData.positionId = undefined;
+    formData.adminLevel = 3;
     formData.password = undefined;
     formData.status = 1;
   }
@@ -205,30 +203,8 @@ const handleSubmit = useDebounceFn(() => {
           return;
         }
         UserAPI.create(payload)
-          .then(async (res: any) => {
+          .then(() => {
             ElMessage.success("新增用户成功");
-            // 如果勾选了同时创建 cloud 账号，调用后端代理创建
-            try {
-              if (payload.createCloud) {
-                const userId = res?.id || res?.data?.id;
-                if (userId) {
-                  const resp = await UserAPI.createCloudUsers([userId], {
-                    [String(userId)]: payload.password,
-                  });
-                  const d = resp?.data || resp || {};
-                  const fail = d.failCount || 0;
-                  if (fail === 0) {
-                    ElMessage.success("创建成功！");
-                  } else {
-                    ElMessage.error("创建失败，联系管理员！");
-                  }
-                } else {
-                  ElMessage.error("创建 cloud 账号失败：未获取到新用户 ID");
-                }
-              }
-            } catch {
-              ElMessage.error("创建 cloud 账号时发生错误，请联系管理员");
-            }
             emit("success");
             handleClose();
           })

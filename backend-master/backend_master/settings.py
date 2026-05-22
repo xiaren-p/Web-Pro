@@ -52,6 +52,14 @@ env = environ.Env(
     SESSION_COOKIE_SECURE=(bool, False),
     CSRF_COOKIE_SECURE=(bool, False),
     SECURE_HSTS_SECONDS=(int, 0),
+    # Nextcloud 集成
+    # NC_VERIFY_SSL=false 仅在内网自签名证书环境下使用；生产环境务必改为 true
+    NC_VERIFY_SSL=(bool, False),
+    # Fernet 对称加密密钥（用于 Config PASSWORD 类型值加密存储）
+    # 生成命令：python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    FERNET_SECRET_KEY=(str, ''),
+    # Celery Broker（复用 REDIS_URL；也可单独指定 CELERY_BROKER_URL）
+    CELERY_BROKER_URL=(str, ''),
 )
 
 env_file = BASE_DIR / '.env'
@@ -69,6 +77,30 @@ IMAGE_SYNC_URL = env('IMAGE_SYNC_URL')
 AMAP_BASE = env('AMAP_BASE')
 AMAP_KEY = env('AMAP_KEY')
 AMAP_CITY = env('AMAP_CITY')
+# Nextcloud 集成配置
+NC_VERIFY_SSL = env('NC_VERIFY_SSL')
+FERNET_SECRET_KEY = env('FERNET_SECRET_KEY')
+
+# Celery 配置
+_celery_broker = env('CELERY_BROKER_URL') or (REDIS_URL if False else env('REDIS_URL'))
+CELERY_BROKER_URL = _celery_broker or 'redis://127.0.0.1:6379/1'
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Shanghai'
+CELERY_BEAT_SCHEDULE = {
+    # NC 同步：每 30 秒处理一次 PENDING 队列
+    'nc-process-pending': {
+        'task': 'api_v1.tasks.nc_sync_tasks.process_pending_nc_tasks',
+        'schedule': 30.0,
+    },
+    # NC 同步：每 5 分钟将可重试的 FAILED 任务重置为 PENDING
+    'nc-retry-failed': {
+        'task': 'api_v1.tasks.nc_sync_tasks.retry_failed_nc_tasks',
+        'schedule': 300.0,
+    },
+}
 
 _allowed_from_env = os.environ.get('DJANGO_ALLOWED_HOSTS') or env('DJANGO_ALLOWED_HOSTS')
 if _allowed_from_env:
@@ -89,6 +121,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',      # DRF
     'corsheaders',         # CORS（开发）
+    'django_celery_results',  # Celery 任务结果存储
+    'django_celery_beat',     # Celery 定时任务
+    'oauth2_provider',        # OIDC Provider（django-oauth-toolkit）
     'api_v1',              # 业务接口 v1
 ]
 
@@ -296,5 +331,45 @@ LOGGING = {
     'formatters': {'verbose': {'format': '[%(asctime)s] %(levelname)s %(name)s %(message)s'}},
     'handlers': {'console': {'class': 'logging.StreamHandler', 'formatter': 'verbose'}},
     'root': {'handlers': ['console'], 'level': LOG_LEVEL},
+}
+
+# ---- OIDC Provider（django-oauth-toolkit 3.x）----
+# RSA 私鑰文件：不存在时 OIDC 功能自动关闭。
+# 生成命令： python manage.py generate_oidc_key
+_oidc_key_file = BASE_DIR / 'backend_master' / 'oidc_private.pem'
+_oidc_rsa_private_key = _oidc_key_file.read_text(encoding='utf-8') if _oidc_key_file.exists() else ''
+
+OAUTH2_PROVIDER = {
+    # OIDC 启用开关：私鑰文件存在时才真正启用
+    'OIDC_ENABLED': bool(_oidc_rsa_private_key),
+    'OIDC_RSA_PRIVATE_KEY': _oidc_rsa_private_key,
+    # ID Token 有效期 1 小时
+    'ID_TOKEN_EXPIRE_SECONDS': 3600,
+    # 授权码有效期 60 秒
+    'AUTHORIZATION_CODE_EXPIRE_SECONDS': 60,
+    # 支持的 Scope
+    'SCOPES': {
+        'openid': 'OpenID Connect 标识',
+        'profile': '个人资料（名称、手机号、群组、管理员标志）',
+        'email': '邮符1地址',
+        'phone': '手机号',
+        'groups': 'Nextcloud 群组成员关系',
+    },
+    'DEFAULT_SCOPES': ['openid', 'profile', 'email'],
+    # 请求 scope 验证：请求的 scope 必须是 SCOPES 的子集
+    'REQUEST_APPROVAL_PROMPT': 'auto',
+    # 自定义验证器（添加 NC 业务声明）
+    'OAUTH2_VALIDATOR_CLASS': 'api_v1.services.oidc.oidc_validator.CustomOAuth2Validator',
+    # 支持的授权类型
+    'ALLOWED_GRANT_TYPES': [
+        'authorization_code',
+        'implicit',
+        'password',
+        'client_credentials',
+        'refresh_token',
+        'openid_hybrid',
+    ],
+    # NC user_oidc 不必须 PKCE，内网环境可以不强制
+    'PKCE_REQUIRED': False,
 }
 

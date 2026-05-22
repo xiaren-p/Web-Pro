@@ -71,7 +71,13 @@ export const constantRoutes: RouteRecordRaw[] = [
         meta: { title: "详情页缓存", icon: "user", hidden: true, keepAlive: true },
       },
       {
-        path: "/system/dict-item",
+        path: "/system/position",
+        name: "Position",
+        component: () => import("@/views/system/position/index.vue"),
+        meta: { title: "岗位管理", hidden: false, keepAlive: false },
+      },
+      {
+        path: "/system/dict/:dictCode",
         name: "DictItem",
         component: () => import("@/views/system/dict/dict-item.vue"),
         meta: { title: "字典数据", hidden: true, keepAlive: false },

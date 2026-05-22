@@ -54,7 +54,11 @@
         <el-table-column type="index" label="序号" width="60" />
         <el-table-column key="configName" label="配置名称" prop="configName" min-width="100" />
         <el-table-column key="configKey" label="配置键" prop="configKey" min-width="100" />
-        <el-table-column key="configValue" label="配置值" prop="configValue" min-width="100" />
+        <el-table-column key="configValue" label="配置值" min-width="100">
+          <template #default="scope">
+            <span>{{ scope.row.configType === 'PASSWORD' ? '******' : scope.row.configValue }}</span>
+          </template>
+        </el-table-column>
         <el-table-column key="remark" label="描述" prop="remark" min-width="100" />
         <el-table-column fixed="right" label="操作" width="220">
           <template #default="scope">

@@ -4,7 +4,7 @@
 范围：
 - UserProfile.dept 是否指向不存在的 Department
 - DictItem.dict_type 是否指向不存在的 DictType
-- Role.menus（M2M）是否存在指向不存在的 Menu 的行（通过 through 表校验）
+- Position.menus（M2M）是否存在指向不存在的 Menu 的行（通过 through 表校验）
 - AuthToken.user 是否指向不存在的 User
 
 注意：不修改任何数据，仅输出报告，退出码总是 0。
@@ -15,7 +15,7 @@
 from django.core.management.base import BaseCommand
 from django.db import connection
 from django.contrib.auth.models import User
-from api_v1.models import Department, UserProfile, DictType, DictItem, Menu, Role, AuthToken
+from api_v1.models import Department, UserProfile, DictType, DictItem, Menu, Position, AuthToken
 
 
 class Command(BaseCommand):
@@ -41,13 +41,13 @@ class Command(BaseCommand):
         if cnt2:
             problems.append(("DictItem.dict_type -> DictType", cnt2))
 
-        # 3) Role.menus through table
-        through = Role.menus.through
+        # 3) Position.menus through table
+        through = Position.menus.through
         all_menu_ids = set(Menu.objects.values_list("id", flat=True))
         orphan_m2m = through.objects.exclude(menu_id__in=all_menu_ids)
         cnt3 = orphan_m2m.count()
         if cnt3:
-            problems.append(("Role.menus -> Menu (through)", cnt3))
+            problems.append(("Position.menus -> Menu (through)", cnt3))
 
         # 4) AuthToken.user
         all_user_ids = set(User.objects.values_list("id", flat=True))

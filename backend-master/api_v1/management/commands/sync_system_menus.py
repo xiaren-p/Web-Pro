@@ -1,12 +1,12 @@
 """Simplified sync_system_menus 管理命令
 
-用途：初始化/更新“系统管理”菜单（父菜单 /system、其下子菜单与按钮），并将这些菜单绑定到 admin 角色。
-此文件已精简为仅执行菜单的创建/更新与 admin 绑定，便于在部署或初始化时使用。
+用途：初始化/更新"系统管理"菜单（父菜单 /system、其下子菜单与按钮），并将这些菜单绑定到 admin 岗位。
+此文件已精简为仅执行菜单的创建/更新与 admin 岗位绑定，便于在部署或初始化时使用。
 """
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from api_v1.models import Menu, Role
+from api_v1.models import Menu, Position
 
 
 SYSTEM_PARENT_DEF = {
@@ -20,7 +20,7 @@ SYSTEM_PARENT_DEF = {
 
 CHILD_MENU_DEFS = [
     {"name": "用户管理", "path": "/system/user", "component": "system/user/index", "perms": "", "order_num": 1, "icon": "el-icon-User"},
-    {"name": "角色管理", "path": "/system/role", "component": "system/role/index", "perms": "", "order_num": 2, "icon": "role"},
+    {"name": "岗位管理", "path": "/system/position", "component": "system/position/index", "perms": "", "order_num": 2, "icon": "position"},
     {"name": "部门管理", "path": "/system/dept", "component": "system/dept/index", "perms": "", "order_num": 3, "icon": "tree"},
     {"name": "菜单管理", "path": "/system/menu", "component": "system/menu/index", "perms": "", "order_num": 4, "icon": "menu"},
     {"name": "字典管理", "path": "/system/dict", "component": "system/dict/index", "perms": "", "order_num": 5, "icon": "dict"},
@@ -56,11 +56,11 @@ BUTTON_DEFS = {
         {"name": "用户导入", "perms": "sys:user:import", "order_num": 6},
         {"name": "用户导出", "perms": "sys:user:export", "order_num": 7},
     ],
-    "角色管理": [
-        {"name": "角色查询", "perms": "sys:role:query", "order_num": 1},
-        {"name": "角色新增", "perms": "sys:role:add", "order_num": 2},
-        {"name": "角色编辑", "perms": "sys:role:edit", "order_num": 3},
-        {"name": "角色删除", "perms": "sys:role:delete", "order_num": 4},
+    "岗位管理": [
+        {"name": "岗位查询", "perms": "sys:position:query", "order_num": 1},
+        {"name": "岗位新增", "perms": "sys:position:add", "order_num": 2},
+        {"name": "岗位编辑", "perms": "sys:position:edit", "order_num": 3},
+        {"name": "岗位删除", "perms": "sys:position:delete", "order_num": 4},
     ],
     "部门管理": [
         {"name": "部门查询", "perms": "sys:dept:query", "order_num": 1},
@@ -253,8 +253,8 @@ class Command(BaseCommand):
                         if changed:
                             cbm.save()
 
-        # Bind all created/updated menus (parent and descendants) to admin role
-        admin_role, _ = Role.objects.get_or_create(code="admin", defaults={"name": "管理员", "status": True})
+        # 将所有创建/更新的菜单绑定到 admin 岗位
+        admin_position, _ = Position.objects.get_or_create(code="admin", defaults={"name": "管理员", "status": True})
 
         def collect_ids(node):
             ids = [node.id]
@@ -271,7 +271,7 @@ class Command(BaseCommand):
                 pass
         all_ids = list(all_ids_set)
         if all_ids:
-            admin_role.menus.add(*all_ids)
+            admin_position.menus.add(*all_ids)
 
         self.stdout.write(self.style.SUCCESS(
             f"System menus synced. parent_created={created} children_created={created_children} children_updated={updated_children}"

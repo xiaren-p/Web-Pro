@@ -1,6 +1,4 @@
 """system 板块序列化器子包。"""
-from api_v1.serializers.system.role_serializer import RoleSerializer
-from api_v1.serializers.system.role_write_serializer import RoleWriteSerializer
 from api_v1.serializers.system.dept_serializer import DeptSerializer
 from api_v1.serializers.system.menu_serializer import MenuSerializer
 from api_v1.serializers.system.oper_log_serializer import OperLogSerializer

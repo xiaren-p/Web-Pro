@@ -6,7 +6,7 @@ from api_v1.views.system import (
     DictViewSet,
     LogViewSet,
     ConfigViewSet,
-    RoleViewSet,
+    PositionViewSet,
 )
 from api_v1.views.notice import NoticeViewSet
 from api_v1.views.codegen import CodegenViewSet

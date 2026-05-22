@@ -40,7 +40,7 @@
                 <Edit />
               </el-icon>
             </div>
-            <div class="user-role">{{ userProfile.roleNames }}</div>
+            <div class="user-role">{{ userProfile.positionName }}</div>
           </div>
           <el-divider />
           <div class="user-stats">
@@ -251,7 +251,7 @@ interface UserProfileVO {
   mobile?: string;
   gender?: number;
   deptName?: string;
-  roleNames?: string;
+  positionName?: string;
   createTime?: string;
 }
 interface PasswordChangeForm {

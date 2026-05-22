@@ -96,11 +96,13 @@ class NoticeViewSet(viewsets.ViewSet):
         支持 ``isRead=0`` 仅查询当前用户未读公告。
         """
         user = getattr(request, "user", None)
-        is_admin_role = False
+        from api_v1.models.system.user_profile import AdminLevel
         try:
             profile = getattr(user, "profile", None)
-            if profile:
-                is_admin_role = profile.roles.filter(code="admin").exists()
+            is_admin_role = (
+                getattr(user, "is_superuser", False)
+                or (profile and profile.admin_level == AdminLevel.COMPANY_ADMIN)
+            )
         except Exception:
             is_admin_role = False
 

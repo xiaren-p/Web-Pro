@@ -32,7 +32,7 @@ class MenuViewSet(viewsets.ViewSet):
         if action_name in ("list_or_create", "tree", "form") and method == "GET":
             required = ["sys:menu:query"]
         elif action_name == "options" and method == "GET":
-            required = ["sys:menu:query", "sys:role:edit"]
+            required = ["sys:menu:query", "sys:position:edit"]
         elif action_name == "list_or_create" and method == "POST":
             required = ["sys:menu:add"]
         elif action_name == "update_or_delete" and method == "PUT":
@@ -131,26 +131,22 @@ class MenuViewSet(viewsets.ViewSet):
         if not user or not getattr(user, "is_authenticated", False):
             return drf_error("未登录", status=401)
 
-        # 管理员（Django 超级用户 或 角色 code=admin）返回全部
-        is_admin_role = False
+        # COMPANY_ADMIN 或超级用户返回全部菜单
+        from api_v1.models.system.user_profile import AdminLevel
         profile = None
         try:
             profile = getattr(user, "profile", None)
-            if profile:
-                is_admin_role = profile.roles.filter(code="admin").exists()
         except Exception:
-            is_admin_role = False
+            pass
+        level = profile.admin_level if profile else AdminLevel.MEMBER
 
-        if user.is_superuser or is_admin_role:
+        if user.is_superuser or level == AdminLevel.COMPANY_ADMIN:
             return drf_ok(self._build_routes(all_active))
 
-        # 计算用户角色关联到的菜单，并补齐所有上级目录，保证树结构完整
-        role_ids: list[int] = []
-        if profile:
-            role_ids = list(profile.roles.values_list("id", flat=True))
-        if not role_ids:
+        # 岗位关联菜单
+        if not profile or not profile.position_id:
             return drf_ok([])
-        assigned = list(Menu.objects.filter(status=True, roles__in=role_ids).distinct())
+        assigned = list(Menu.objects.filter(status=True, positions__id=profile.position_id).distinct())
         if not assigned:
             return drf_ok([])
 

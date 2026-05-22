@@ -2,7 +2,7 @@
 
 用途：一次性清理已经下线的“文件管理”模块在数据库中可能残留的：
 - 菜单(Menu) 记录：名称/路径/组件/权限包含文件管理标识（sys:file:*）
-- 角色(Role).menus 关系中指向上述菜单的关联
+- 岗位(Position).menus 关系中指向上述菜单的关联
 - 操作日志(OperLog) 中 module='文件' / '文件管理' 的旧记录（可选）
 
 默认仅执行菜单与关系清理；如需同时删除旧日志，添加 --with-logs。
@@ -15,7 +15,7 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.db.models import Q
-from api_v1.models import Menu, Role, OperLog
+from api_v1.models import Menu, Position, OperLog
 
 
 class Command(BaseCommand):
@@ -50,13 +50,13 @@ class Command(BaseCommand):
         deleted_menu_count = 0
         if target_ids:
             # Remove M2M relations first (Django will cascade, but clearing improves clarity for output)
-            roles = Role.objects.filter(menus__id__in=target_ids).distinct()
-            affected_role_count = roles.count()
-            for role in roles:
-                role.menus.remove(*list(target_ids))
+            positions = Position.objects.filter(menus__id__in=target_ids).distinct()
+            affected_position_count = positions.count()
+            for position in positions:
+                position.menus.remove(*list(target_ids))
             deleted_menu_count, _ = Menu.objects.filter(id__in=target_ids).delete()
         else:
-            affected_role_count = 0
+            affected_position_count = 0
         # 2. Optionally delete old logs
         deleted_log_count = 0
         if with_logs:
@@ -64,6 +64,6 @@ class Command(BaseCommand):
             deleted_log_count, _ = log_qs.delete()
         self.stdout.write(
             self.style.SUCCESS(
-                f"purge complete: menus_deleted={deleted_menu_count} roles_affected={affected_role_count} logs_deleted={deleted_log_count}"
+                f"purge complete: menus_deleted={deleted_menu_count} positions_affected={affected_position_count} logs_deleted={deleted_log_count}"
             )
         )

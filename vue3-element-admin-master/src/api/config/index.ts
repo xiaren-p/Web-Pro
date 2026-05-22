@@ -13,6 +13,7 @@ export interface ConfigPageVO {
   configName?: string;
   configKey?: string;
   configValue?: string;
+  configType?: string;
   status?: number;
   remark?: string;
 }
@@ -22,6 +23,7 @@ export interface ConfigForm {
   configName?: string;
   configKey?: string;
   configValue?: string;
+  configType?: string;
   status?: number;
   remark?: string;
 }

@@ -38,16 +38,18 @@ class MenuPermRequired(BasePermission):
             profile = None
         if not profile:
             return False
+        from api_v1.models.system.user_profile import AdminLevel
         try:
-            if profile.roles.filter(code="admin").exists():
-                return True
+            level = profile.admin_level
         except Exception:
-            pass
-        # 汇总角色关联菜单 perms
+            level = AdminLevel.MEMBER
+        if level == AdminLevel.COMPANY_ADMIN:
+            return True
+        # 聚合岗位关联菜单 perms
         menus = []
         try:
-            for role in profile.roles.all():
-                menus.extend(list(role.menus.all()))
+            if profile.position_id:
+                menus = list(profile.position.menus.all())
         except Exception:
             return False
         perm_values = set()

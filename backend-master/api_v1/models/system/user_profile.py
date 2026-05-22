@@ -3,7 +3,6 @@ from django.contrib.auth.models import User
 from django.db import models
 
 from api_v1.models._base import TimeStampedModel
-from api_v1.models.system.role import Role
 
 
 class Gender(models.IntegerChoices):
@@ -12,6 +11,14 @@ class Gender(models.IntegerChoices):
     UNKNOWN = 0, "保密"
     MALE = 1, "男"
     FEMALE = 2, "女"
+
+
+class AdminLevel(models.IntegerChoices):
+    """用户管理级别枚举：决定数据可见范围和 NC 管理员标志。"""
+
+    COMPANY_ADMIN = 1, "公司管理员"
+    DEPT_ADMIN = 2, "部门管理员"
+    MEMBER = 3, "普通成员"
 
 
 class UserProfile(TimeStampedModel):
@@ -45,14 +52,6 @@ class UserProfile(TimeStampedModel):
         verbose_name="头像地址",
     )
 
-    cloud_id = models.CharField(
-        max_length=255,
-        blank=True,
-        default="",
-        verbose_name="云账号标识",
-        help_text="第三方 Seafile 返回的 account email/ID，后续同步删除使用",
-    )
-
     dept = models.ForeignKey(
         "Department",
         on_delete=models.SET_NULL,
@@ -67,11 +66,35 @@ class UserProfile(TimeStampedModel):
         verbose_name="性别",
     )
 
-    roles = models.ManyToManyField(
-        Role,
+    position = models.ForeignKey(
+        "Position",
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name="users",
-        verbose_name="角色列表",
+        verbose_name="岗位",
+        help_text="决定系统菜单权限，由管理员分配",
+    )
+
+    admin_level = models.IntegerField(
+        choices=AdminLevel.choices,
+        default=AdminLevel.MEMBER,
+        verbose_name="管理级别",
+        help_text="COMPANY_ADMIN=全数据+NC管理员；DEPT_ADMIN=本部门数据；MEMBER=仅本人数据",
+    )
+
+    extra_nc_groups = models.ManyToManyField(
+        "NcGroup",
+        blank=True,
+        related_name="extra_users",
+        verbose_name="额外 NC 群组",
+        help_text="除部门群组外额外加入的 NC 群组（如项目组、公司共享等）",
+    )
+
+    nc_synced = models.BooleanField(
+        default=False,
+        verbose_name="NC 已同步",
+        help_text="True=该用户已成功同步到 Nextcloud",
     )
 
     class Meta:

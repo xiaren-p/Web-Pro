@@ -38,7 +38,6 @@ urlpatterns = [
     path('users/upload-image', views.UserViewSet.as_view({'post': 'upload_image'}), name='user-upload-image'),
     # 静态子路径需置于 catch-all 之前
     path('users/options', views.UserViewSet.as_view({'get': 'options'}), name='user-options'),
-    path('users/cloud-create', views.UserViewSet.as_view({'post': 'cloud_create'}), name='user-cloud-create'),
     # 列表/创建
     path('users', views.UserViewSet.as_view({'get': 'generic_get', 'post': 'create'}), name='users-create-or-template'),
     # 最后放置 catch-all 的单资源路径
@@ -68,14 +67,14 @@ urlpatterns = [
     path('users/email', views.ProfileViewSet.as_view({'put': 'bind_email'}), name='user-bind-email'),
     # moved above
 
-    # 角色模块（已接入 ORM）
-    path('roles/page', views.RoleViewSet.as_view({'get': 'page'}), name='roles-page'),
-    path('roles/options', views.RoleViewSet.as_view({'get': 'options'}), name='roles-options'),
-    path('roles', views.RoleViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='roles-list-create'),
-    path('roles/<str:role_id>/form', views.RoleViewSet.as_view({'get': 'form'}), name='role-form'),
-    path('roles/<str:ids>', views.RoleViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='role-update-delete'),
-    path('roles/<str:role_id>/menuIds', views.RoleViewSet.as_view({'get': 'menu_ids'}), name='role-menu-ids'),
-    path('roles/<str:role_id>/menus', views.RoleViewSet.as_view({'put': 'update_menus'}), name='role-update-menus'),
+    # 岗位管理（替代 Role 的菜单权限容器）
+    path('positions/page', views.PositionViewSet.as_view({'get': 'page'}), name='positions-page'),
+    path('positions/options', views.PositionViewSet.as_view({'get': 'options'}), name='positions-options'),
+    path('positions', views.PositionViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='positions-list-create'),
+    path('positions/<str:position_id>/form', views.PositionViewSet.as_view({'get': 'form'}), name='position-form'),
+    path('positions/<str:ids>', views.PositionViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='position-update-delete'),
+    path('positions/<str:position_id>/menuIds', views.PositionViewSet.as_view({'get': 'menu_ids'}), name='position-menu-ids'),
+    path('positions/<str:position_id>/menus', views.PositionViewSet.as_view({'put': 'update_menus'}), name='position-update-menus'),
 
     # 通知公告
     path('notices/page', views.NoticeViewSet.as_view({'get': 'page'}), name='notices-page'),
@@ -133,9 +132,6 @@ urlpatterns = [
     path('crawler/category/sites', views.CrawlerCategoryViewSet.as_view({'get': 'sites'}), name='crawler-category-sites'),
     path('crawler/category', views.CrawlerCategoryViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='crawler-category-list'),
     path('crawler/category/<str:id>/form', views.CrawlerCategoryViewSet.as_view({'get': 'form'}), name='crawler-category-form'),
-    path('crawler/category/<str:id>/times', views.CrawlerCategoryViewSet.as_view({'get': 'times'}), name='crawler-category-times'),
-    path('crawler/category/<str:id>/file/check', views.CrawlerCategoryViewSet.as_view({'get': 'file_check'}), name='crawler-category-file-check'),
-    path('crawler/category/<str:id>/file', views.CrawlerCategoryViewSet.as_view({'get': 'file'}), name='crawler-category-file'),
     path('crawler/category/<str:ids>', views.CrawlerCategoryViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='crawler-category-update-delete'),
 
 

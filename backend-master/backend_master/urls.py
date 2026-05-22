@@ -24,6 +24,8 @@ from django.views.static import serve
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # OIDC Provider 端点（/o/authorize/, /o/token/, /o/userinfo/, /o/.well-known/...）
+    path('o/', include('oauth2_provider.urls', namespace='oauth2_provider')),
     # 业务接口入口（v1）：所有系统管理与认证相关的接口都在此下方
     path('api/v1/', include('api_v1.urls')),
     # 兼容前端在构建时使用 `/prod-api` 前缀的部署方式：

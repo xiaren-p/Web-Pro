@@ -7,8 +7,7 @@ api_v1 序列化器包
 """
 
 # system 板块
-from api_v1.serializers.system.role_serializer import RoleSerializer
-from api_v1.serializers.system.role_write_serializer import RoleWriteSerializer
+from api_v1.serializers.system.position_serializer import PositionSerializer, PositionWriteSerializer, PositionOptionSerializer
 from api_v1.serializers.system.dept_serializer import DeptSerializer
 from api_v1.serializers.system.menu_serializer import MenuSerializer
 from api_v1.serializers.system.oper_log_serializer import OperLogSerializer
@@ -46,7 +45,8 @@ from api_v1.serializers.work import WorkReportSerializer
 from api_v1.serializers.ads import LxCampaignInfoSerializer
 
 __all__ = [
-    "RoleSerializer", "RoleWriteSerializer", "DeptSerializer", "MenuSerializer",
+    "PositionSerializer", "PositionWriteSerializer", "PositionOptionSerializer",
+    "DeptSerializer", "MenuSerializer",
     "OperLogSerializer", "UserSerializer", "DictTypeSerializer", "DictItemSerializer",
     "ConfigSerializer", "MobileCodeSendSerializer", "MobileBindSerializer",
     "EmailCodeSendSerializer", "EmailBindSerializer",
