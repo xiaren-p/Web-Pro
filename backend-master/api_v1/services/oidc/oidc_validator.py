@@ -31,6 +31,7 @@ class CustomOAuth2Validator(OAuth2Validator):
     # 扩展父类的 claim→scope 映射，追加自定义声明
     oidc_claim_scope = {
         **OAuth2Validator.oidc_claim_scope,
+        "preferred_username": "profile",
         "groups": "profile",
         "is_admin": "profile",
         "mobile": "phone",
@@ -43,11 +44,19 @@ class CustomOAuth2Validator(OAuth2Validator):
             request: OAuthLib 请求对象，request.user 为已认证的 Django User 实例。
 
         Returns:
-            dict: 包含 name/email/phone_number/groups/is_admin 的声明字典。
+            dict: 包含 preferred_username/name/email/phone_number/groups/is_admin 的声明字典。
                   任何字段查询失败时静默忽略，保证不影响 OIDC 正常流程。
+
+        说明：
+            - sub 字段由父类自动生成（user.id 字符串化），符合 OIDC "稳定唯一标识不可变" 规范。
+            - preferred_username 输出 Django username，与 NcSyncService 创建 NC 用户时使用的 UID 一致。
+              NC user_oidc 端 User ID mapping 必须配置为 preferred_username，才能正确匹配现有 NC 用户。
         """
         user = request.user
         claims: dict = {}
+
+        # preferred_username：Django username，与 NC 用户 UID 一致，供 NC 做用户映射
+        claims["preferred_username"] = user.username
 
         try:
             profile = getattr(user, "profile", None)

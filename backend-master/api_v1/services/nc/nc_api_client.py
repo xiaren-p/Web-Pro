@@ -322,6 +322,15 @@ class NcApiClient:
             "displayname": display_name or group_id,
         })
 
+    def delete_group(self, group_id: str) -> None:
+        """在 NC 中删除群组（不删除组内用户）。
+
+        Args:
+            group_id (str): 群组 ID（NcGroup.code）。
+        """
+        logger.info("[NcApiClient][delete_group] group_id=%s", group_id)
+        self._delete(f"/ocs/v1.php/cloud/groups/{group_id}")
+
     def add_user_to_group(self, username: str, group_id: str) -> None:
         """将用户加入 NC 群组。
 

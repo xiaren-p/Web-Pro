@@ -234,7 +234,7 @@ class UserViewSet(viewsets.ViewSet):
             except Position.DoesNotExist:
                 pass
         profile.save()
-        NcSyncService.on_user_created(profile)
+        # extra_nc_groups M2M\uff1a\u4ec5\u5728\u524d\u7aef\u4f20 extraGroupIds \u65f6\u8bbe\u7f6e\uff08\u9700\u5728 on_user_created \u524d\u5b8c\u6210\uff0c\u4ee5\u4f7f _enqueue_extra_groups \u8bfb\u5230\uff09\n        if \"extraGroupIds\" in payload:\n            extra_ids = payload.get(\"extraGroupIds\") or []\n            if isinstance(extra_ids, str):\n                extra_ids = [s.strip() for s in extra_ids.split(\",\") if s.strip()]\n            try:\n                profile.extra_nc_groups.set(extra_ids)\n            except Exception as exc:\n                logger.warning(\"[UserViewSet][create] \u8bbe\u7f6e extra_nc_groups \u5931\u8d25: %s\", exc)\n        NcSyncService.on_user_created(profile)
         logger.info("[UserViewSet] [create] user=%s", username)
         return drf_ok(UserSerializer(user).data, status=201)
 
@@ -245,8 +245,10 @@ class UserViewSet(viewsets.ViewSet):
         except User.DoesNotExist:
             return drf_error("未找到用户", status=404)
         payload = request.data.copy()
-        user.email = payload.get("email", user.email)
+        # 在任何字段被覆写前捕获旧值，以供 NC 同步差量判定
+        _old_email = user.email
         _old_is_active = user.is_active
+        user.email = payload.get("email", user.email)
         # 保留原值为默认，防止前端未传 status 时意外激活被禁用用户
         new_status = payload.get("status")
         if new_status is not None:
@@ -258,6 +260,8 @@ class UserViewSet(viewsets.ViewSet):
         profile = getattr(user, "profile", None)
         if profile:
             _old_dept_id = profile.dept_id
+            _old_display_name = profile.nickname or user.username
+            _old_extra_codes = set(profile.extra_nc_groups.values_list("code", flat=True))
             profile.nickname = payload.get("nickname", profile.nickname)
             profile.mobile = payload.get("mobile", profile.mobile)
             profile.avatar = payload.get("avatar", profile.avatar)
@@ -285,9 +289,25 @@ class UserViewSet(viewsets.ViewSet):
                 except (ValueError, TypeError):
                     pass
             profile.save()
-            NcSyncService.on_user_updated(profile, old_admin_level=_old_admin_level, old_dept_id=_old_dept_id)
-            if user.is_active != _old_is_active:
-                NcSyncService.on_user_status_changed(profile, enabled=user.is_active)
+            # extra_nc_groups M2M 更新（仅当前端传 extraGroupIds 时才处理）
+            if "extraGroupIds" in payload:
+                extra_ids = payload.get("extraGroupIds") or []
+                if isinstance(extra_ids, str):
+                    extra_ids = [s.strip() for s in extra_ids.split(",") if s.strip()]
+                try:
+                    profile.extra_nc_groups.set(extra_ids)
+                except Exception as exc:
+                    logger.warning("[UserViewSet][update] 设置 extra_nc_groups 失败: %s", exc)
+            NcSyncService.on_user_updated(
+                profile,
+                old_admin_level=_old_admin_level,
+                old_dept_id=_old_dept_id,
+                old_display_name=_old_display_name,
+                old_email=_old_email,
+                old_extra_group_codes=_old_extra_codes if "extraGroupIds" in payload else None,
+            )
+        if user.is_active != _old_is_active:
+            NcSyncService.on_user_status_changed(profile, enabled=user.is_active)
         logger.info("[UserViewSet] [update] id=%s", id)
         return drf_ok(UserSerializer(user).data)
 

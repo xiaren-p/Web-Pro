@@ -175,5 +175,11 @@ class DeptViewSet(viewsets.ViewSet):
             return drf_ok({"id": d.id})
 
         id_list = [i for i in ids.split(",") if i]
+        # \u5148\u5165\u961f NC \u7fa4\u7ec4\u5220\u9664\uff08\u672c\u5730 NcGroup \u955c\u50cf\u4e5f\u4f1a\u88ab\u540c\u6b65\u5220\u9664\uff09\uff0c\u518d\u5220\u9664\u90e8\u95e8\u8bb0\u5f55\n        for dept_id in id_list:
+            try:
+                NcSyncService.on_dept_deleted(int(dept_id))
+            except Exception:
+                # \u4e0d\u963b\u65ad\u90e8\u95e8\u5220\u9664\u4e3b\u6d41\u7a0b
+                pass
         Department.objects.filter(id__in=id_list).delete()
         return drf_ok(status=204)

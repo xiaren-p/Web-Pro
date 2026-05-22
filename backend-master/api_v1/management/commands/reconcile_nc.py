@@ -7,10 +7,15 @@
     python manage.py reconcile_nc [--dry-run] [--user <username>]
 """
 import logging
+import os
+import tempfile
+import time
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
+from django.db import IntegrityError
 
+from api_v1.models import Department
 from api_v1.models.nc.nc_group import NcGroup, NcGroupType
 from api_v1.models.nc.nc_sync_task import NcSyncTask, SyncOperation, SyncStatus
 from api_v1.models.system.user_profile import AdminLevel, UserProfile
@@ -59,11 +64,47 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-        """命令入口：执行对账逻辑。
+        """命令入口：执行对账逻辑（带文件锁防止并发）。
 
         Args:
             *args: 不使用。
             **options (dict): 命令行选项字典，包含 dry_run / username / execute。
+
+        Raises:
+            CommandError: NC API 初始化失败或已有实例正在运行时抛出。
+        """
+        # 并发锁：避免多个 reconcile_nc 同时跑导致任务重复入队 / 抢任务
+        lock_path = os.path.join(tempfile.gettempdir(), "reconcile_nc.lock")
+        if os.path.exists(lock_path):
+            try:
+                with open(lock_path, "r", encoding="utf-8") as f:
+                    old_pid = int((f.read() or "0").strip() or "0")
+                if old_pid > 0:
+                    try:
+                        os.kill(old_pid, 0)  # 仅探测进程存活
+                        raise CommandError(
+                            f"另一个 reconcile_nc 进程正在运行 (pid={old_pid})，请等待其完成后重试。"
+                        )
+                    except ProcessLookupError:
+                        pass  # 旧进程已退出，可覆写锁
+            except (ValueError, OSError):
+                pass
+        try:
+            with open(lock_path, "w", encoding="utf-8") as f:
+                f.write(str(os.getpid()))
+            self._run(options)
+        finally:
+            try:
+                if os.path.exists(lock_path):
+                    os.remove(lock_path)
+            except OSError:
+                pass
+
+    def _run(self, options: dict) -> None:
+        """对账主流程（在并发锁保护下运行）。
+
+        Args:
+            options (dict): 命令行选项。
 
         Raises:
             CommandError: NC API 初始化失败时抛出。
@@ -90,6 +131,46 @@ class Command(BaseCommand):
 
         enqueued = 0
         skipped = 0
+
+        # ------------------------------------------------------------ #
+        # Step 0: 为没有 NcGroup 镜像记录的部门补建本地记录
+        # 适用场景：部门在 NC 同步功能上线前就已存在，on_dept_created 未被调用
+        # ------------------------------------------------------------ #
+        if not target_username:
+            depts_without_group = Department.objects.filter(nc_group__isnull=True)
+            for dept in depts_without_group:
+                base_code = (dept.code or "").strip() or f"dept_{dept.id}"
+                code = base_code
+                # 唯一性兜底：若 code 冲突，回退至 dept_{id}，仍冲突则附时间戳
+                if NcGroup.objects.filter(code=code).exists():
+                    fallback = f"dept_{dept.id}"
+                    if not NcGroup.objects.filter(code=fallback).exists():
+                        code = fallback
+                    else:
+                        code = f"dept_{dept.id}_{int(time.time())}"
+                try:
+                    nc_group = NcGroup.objects.create(
+                        dept=dept,
+                        code=code,
+                        name=dept.name,
+                        group_type=NcGroupType.DEPT,
+                    )
+                except IntegrityError as exc:
+                    logger.warning(
+                        "[reconcile_nc] 补建 NcGroup 失败 dept_id=%s code=%s err=%s",
+                        dept.id, code, exc,
+                    )
+                    skipped += 1
+                    continue
+                self.stdout.write(f"  → 补建 NcGroup 本地记录: [{dept.name}] → code={nc_group.code}")
+                logger.info(
+                    "[reconcile_nc] 补建 NcGroup dept_id=%s code=%s", dept.id, nc_group.code,
+                )
+                # 立即入队 NC 群组与 Group Folder 创建，避免依赖 Step 1 才发现
+                if not dry_run:
+                    NcSyncService.enqueue_create_group(nc_group.code, nc_group.name)
+                    NcSyncService.enqueue_create_group_folder(nc_group.code, dept.name)
+                    enqueued += 2
 
         # ------------------------------------------------------------ #
         # Step 1: 对账 NC 群组是否存在（本地 NcGroup 记录 vs NC 实际状态）
@@ -175,6 +256,17 @@ class Command(BaseCommand):
                         NcSyncService.enqueue_add_to_group(username, missing_group)
                         enqueued += 1
 
+                # 反向差集：NC 中存在但本地不再期望的群组（admin 由 admin_level 单独管控，跳过）
+                # 仅清理本地 NcGroup 知道的群组，避免误删 NC 中其它系统群组
+                known_codes: set = set(NcGroup.objects.values_list("code", flat=True))
+                extra_groups = (nc_groups - expected_groups) & known_codes
+                extra_groups.discard("admin")
+                for stale_group in extra_groups:
+                    self.stdout.write(f"  → 用户 {username} 多余群组 {stale_group}，需移除")
+                    if not dry_run:
+                        NcSyncService.enqueue_remove_from_group(username, stale_group)
+                        enqueued += 1
+
             elif not is_active and nc_exists:
                 # 需要禁用
                 self.stdout.write(f"  → 需禁用 NC 用户: {username}")
@@ -214,17 +306,23 @@ class Command(BaseCommand):
             self._execute_pending()
 
     def _execute_pending(self) -> None:
-        """立即执行所有 PENDING 任务（不经 Celery，适合一次性对账场景）。"""
+        """立即执行所有 PENDING 任务（不经 Celery，适合一次性对账场景）。
+
+        说明：每条任务间插入 0.5s 间隔，避免短时间内对 NC 发起过密请求触发限流或锁竞争。
+        """
         pending = list(NcSyncTask.objects.filter(status=SyncStatus.PENDING).order_by("id"))
         self.stdout.write(self.style.NOTICE(f"[reconcile_nc] 开始直接执行 {len(pending)} 条 PENDING 任务..."))
         success = 0
         failed = 0
-        for task in pending:
+        for idx, task in enumerate(pending):
             ok = NcSyncService.execute_task(task)
             if ok:
                 success += 1
             else:
                 failed += 1
+            # 限流：最后一条不再 sleep
+            if idx < len(pending) - 1:
+                time.sleep(0.5)
         self.stdout.write(self.style.SUCCESS(
             f"[reconcile_nc] 执行完毕 | success={success} failed={failed}"
         ))

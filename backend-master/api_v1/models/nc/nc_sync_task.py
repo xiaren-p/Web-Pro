@@ -14,6 +14,7 @@ class SyncOperation(models.TextChoices):
     ADD_TO_GROUP = "add_to_group", "加入 NC 群组"
     REMOVE_FROM_GROUP = "remove_from_group", "移出 NC 群组"
     CREATE_GROUP = "create_group", "创建 NC 群组"
+    DELETE_GROUP = "delete_group", "删除 NC 群组"
     SET_ADMIN = "set_admin", "设置 NC 管理员"
     REVOKE_ADMIN = "revoke_admin", "撤销 NC 管理员"
     CREATE_GROUP_FOLDER = "create_group_folder", "创建 Group Folder"

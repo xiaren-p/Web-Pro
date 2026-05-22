@@ -188,6 +188,21 @@ class NcSyncService:
         )
 
     @staticmethod
+    def enqueue_delete_group(group_code: str) -> NcSyncTask:
+        """入队：在 NC 中删除群组。
+
+        Args:
+            group_code (str): NcGroup.code（即 NC group_id）。
+
+        Returns:
+            NcSyncTask: 已创建的任务记录。
+        """
+        return NcSyncTask.objects.create(
+            operation=SyncOperation.DELETE_GROUP,
+            payload={"group": group_code},
+        )
+
+    @staticmethod
     def enqueue_create_group_folder(group_code: str, mount_point: str) -> NcSyncTask:
         """入队：在 NC 中创建 Group Folder 并将挂载点与群组绑定。
 
@@ -250,20 +265,38 @@ class NcSyncService:
         logger.info("[NcSyncService][on_user_created] username=%s 同步任务已入队", user.username)
 
     @classmethod
-    def on_user_updated(cls, profile, old_admin_level: int | None = None, old_dept_id: int | None = None) -> None:
-        """用户信息更新后调用：入队 update_user、admin 变更及部门群组变更任务。
+    def on_user_updated(
+        cls,
+        profile,
+        old_admin_level: int | None = None,
+        old_dept_id: int | None = None,
+        old_display_name: str | None = None,
+        old_email: str | None = None,
+        old_extra_group_codes: set[str] | None = None,
+    ) -> None:
+        """用户信息更新后调用：入队 update_user、admin 变更、部门群组及额外群组变更任务。
 
         Args:
             profile: 更新后的 UserProfile 实例。
             old_admin_level (int | None): 变更前的 admin_level（用于判断是否需要升/降 admin）。
             old_dept_id (int | None): 变更前的 dept_id（用于判断是否需要退出旧部门群组）。
+            old_display_name (str | None): 变更前的显示名称；为 None 时强制入队 update_user。
+            old_email (str | None): 变更前的邮箱；为 None 时强制入队 update_user。
+            old_extra_group_codes (set[str] | None): 变更前的额外 NcGroup.code 集合；为 None 时不做差异对比。
         """
         user = profile.user
-        cls.enqueue_update_user(
-            username=user.username,
-            display_name=profile.nickname or user.username,
-            email=user.email or "",
-        )
+        new_display_name = profile.nickname or user.username
+        new_email = user.email or ""
+        # 仅当 display_name 或 email 真实变更时才入队 update_user，避免队列冗余
+        if (
+            old_display_name is None or old_email is None
+            or old_display_name != new_display_name or old_email != new_email
+        ):
+            cls.enqueue_update_user(
+                username=user.username,
+                display_name=new_display_name,
+                email=new_email,
+            )
         if old_admin_level is not None and old_admin_level != profile.admin_level:
             if profile.admin_level == AdminLevel.COMPANY_ADMIN:
                 cls.enqueue_set_admin(user.username)
@@ -279,6 +312,20 @@ class NcSyncService:
                 if old_nc_group:
                     cls.enqueue_remove_from_group(user.username, old_nc_group.code)
             cls._enqueue_dept_group(user.username, profile)
+        # 额外群组变更：仅当调用方显式传入 old_extra_group_codes 时对比差集
+        if old_extra_group_codes is not None:
+            try:
+                new_codes = set(profile.extra_nc_groups.values_list("code", flat=True))
+            except Exception as exc:
+                logger.warning(
+                    "[NcSyncService][on_user_updated] username=%s 读取 extra_nc_groups 失败: %s",
+                    user.username, exc,
+                )
+                new_codes = set()
+            for code in new_codes - old_extra_group_codes:
+                cls.enqueue_add_to_group(user.username, code)
+            for code in old_extra_group_codes - new_codes:
+                cls.enqueue_remove_from_group(user.username, code)
         logger.info("[NcSyncService][on_user_updated] username=%s 同步任务已入队", user.username)
 
     @classmethod
@@ -344,6 +391,23 @@ class NcSyncService:
                     "[NcSyncService][on_dept_created] dept_id=%s NcGroup 已存在，跳过", dept.id,
                 )
         return nc_group
+
+    @classmethod
+    def on_dept_deleted(cls, dept_id: int) -> None:
+        """部门删除前/后调用：入队 NC 群组删除任务并清理本地 NcGroup 镜像。
+
+        Args:
+            dept_id (int): 被删除部门的 ID（部门记录可能已被 delete，传 id 即可）。
+        """
+        nc_groups = list(NcGroup.objects.filter(dept_id=dept_id, group_type=NcGroupType.DEPT))
+        for nc_group in nc_groups:
+            cls.enqueue_delete_group(nc_group.code)
+            logger.info(
+                "[NcSyncService][on_dept_deleted] dept_id=%s code=%s 入队 DELETE_GROUP",
+                dept_id, nc_group.code,
+            )
+        # 本地镜像随即清理，避免后续 reconcile 重复处理
+        NcGroup.objects.filter(id__in=[g.id for g in nc_groups]).delete()
 
     @classmethod
     def on_dept_updated(cls, dept) -> None:
@@ -448,18 +512,35 @@ class NcSyncService:
         elif op == SyncOperation.REMOVE_FROM_GROUP:
             client.remove_user_from_group(p["username"], p["group"])
         elif op == SyncOperation.CREATE_GROUP:
-            client.create_group(p["group"], p.get("display_name", ""))
+            # 幂等：NC 中已存在则跳过，避免 102 冲突反复失败
+            if not client.group_exists(p["group"]):
+                client.create_group(p["group"], p.get("display_name", ""))
+            else:
+                logger.info("[NcSyncService][_dispatch] group=%s 已存在，跳过 CREATE_GROUP", p["group"])
+        elif op == SyncOperation.DELETE_GROUP:
+            # 幂等：群组不存在则视为已删除
+            if client.group_exists(p["group"]):
+                client.delete_group(p["group"])
+            else:
+                logger.info("[NcSyncService][_dispatch] group=%s 不存在，跳过 DELETE_GROUP", p["group"])
         elif op == SyncOperation.CREATE_GROUP_FOLDER:
-            folder_id = client.create_group_folder(p["mount_point"])
-            # 回写 folder_id 到 NcGroup，并自动入队授权任务
+            # 幂等：若本地 NcGroup 已记录 folder_id，说明此前已创建过，跳过避免 NC 侧重复 folder
             group_code = p.get("group_code", "")
-            if group_code:
-                NcGroup.objects.filter(code=group_code).update(folder_id=folder_id)
-                NcSyncService.enqueue_grant_group_folder(folder_id, group_code)
+            existing = NcGroup.objects.filter(code=group_code).first() if group_code else None
+            if existing and existing.folder_id:
                 logger.info(
-                    "[NcSyncService][_dispatch] CREATE_GROUP_FOLDER group=%s folder_id=%s 已入队授权",
-                    group_code, folder_id,
+                    "[NcSyncService][_dispatch] group=%s folder_id=%s 已存在，跳过 CREATE_GROUP_FOLDER",
+                    group_code, existing.folder_id,
                 )
+            else:
+                folder_id = client.create_group_folder(p["mount_point"])
+                if group_code:
+                    NcGroup.objects.filter(code=group_code).update(folder_id=folder_id)
+                    NcSyncService.enqueue_grant_group_folder(folder_id, group_code)
+                    logger.info(
+                        "[NcSyncService][_dispatch] CREATE_GROUP_FOLDER group=%s folder_id=%s 已入队授权",
+                        group_code, folder_id,
+                    )
         elif op == SyncOperation.GRANT_GROUP_FOLDER:
             client.grant_group_folder(
                 folder_id=int(p["folder_id"]),
