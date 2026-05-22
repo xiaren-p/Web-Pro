@@ -72,11 +72,17 @@ class Command(BaseCommand):
         if not owner:
             raise CommandError("未找到超级用户，请先创建一个 superuser 再执行此命令。")
 
+        # django-oauth-toolkit 3.x 默认 CLIENT_SECRET_HASHED=True，save() 后
+        # app.client_secret 会变成不可逆的哈希串，因此必须在 save 之前生成明文并缓存。
+        from oauth2_provider.generators import generate_client_secret
+
         app = Application.objects.filter(name=APP_NAME).first()
         created = False
+        plain_secret: str | None = None
         if app is None:
-            # 首次创建：让 ORM 自动生成 client_id / client_secret
-            app = Application.objects.create(
+            # 首次创建：手工生成明文 secret 后写入，save 后哈希；本地保留明文用于打印
+            plain_secret = generate_client_secret()
+            app = Application(
                 name=APP_NAME,
                 user=owner,
                 client_type=Application.CLIENT_CONFIDENTIAL,
@@ -85,6 +91,8 @@ class Command(BaseCommand):
                 algorithm=Application.RS256_ALGORITHM,
                 skip_authorization=True,
             )
+            app.client_secret = plain_secret
+            app.save()
             created = True
             logger.info(
                 "[setup_nc_oidc_client] 创建 OAuth Application client_id=%s", app.client_id,
@@ -95,21 +103,25 @@ class Command(BaseCommand):
             app.algorithm = Application.RS256_ALGORITHM
             app.skip_authorization = True
             if reset_secret:
-                # django-oauth-toolkit 3.x：直接置空 client_secret 后 save() 会自动生成新值
-                from oauth2_provider.generators import generate_client_secret
-                app.client_secret = generate_client_secret()
+                plain_secret = generate_client_secret()
+                app.client_secret = plain_secret
                 logger.warning(
                     "[setup_nc_oidc_client] 已重置 client_secret，NC 端必须同步更新。",
                 )
             app.save()
 
-        # 打印 NC 端需要填的配置
+        # 打印 NC 端需要填的配置（client_secret 仅在创建 / reset 时有明文可显示）
         self.stdout.write(self.style.SUCCESS(
             f"\n=== Nextcloud user_oidc 配置（{'新建' if created else '已更新'}）===\n"
         ))
         self.stdout.write(f"Identifier        : Django")
         self.stdout.write(f"Client ID         : {app.client_id}")
-        self.stdout.write(f"Client secret     : {app.client_secret}")
+        if plain_secret is not None:
+            self.stdout.write(f"Client secret     : {plain_secret}")
+        else:
+            self.stdout.write(self.style.WARNING(
+                "Client secret     : (已哈希存储，无法回显，请加 --reset-secret 重新生成)"
+            ))
         self.stdout.write(
             "Discovery endpoint: <DJANGO_HOST>/o/.well-known/openid-configuration"
         )
