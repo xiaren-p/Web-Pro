@@ -18,6 +18,7 @@ import logging
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.utils import timezone
 
 from api_v1.models.nc.nc_group import NcGroup, NcGroupType
 from api_v1.models.nc.nc_sync_task import NcSyncTask, SyncOperation, SyncStatus
@@ -378,14 +379,16 @@ class NcSyncService:
             NcSyncService._dispatch(client, task)
             task.status = SyncStatus.SUCCESS
             task.error_msg = ""
-            task.save(update_fields=["status", "error_msg", "updated_time"])
+            task.executed_at = timezone.now()
+            task.save(update_fields=["status", "error_msg", "executed_at"])
             return True
         except Exception as exc:
             task.retry_count += 1
             task.error_msg = str(exc)[:1000]
             if task.retry_count >= NcSyncTask.MAX_RETRIES:
                 task.status = SyncStatus.FAILED
-            task.save(update_fields=["status", "retry_count", "error_msg", "updated_time"])
+            task.executed_at = timezone.now()
+            task.save(update_fields=["status", "retry_count", "error_msg", "executed_at"])
             logger.error(
                 "[NcSyncService][execute_task] task_id=%s op=%s 执行失败（第%s次）: %s",
                 task.id, task.operation, task.retry_count, exc,
