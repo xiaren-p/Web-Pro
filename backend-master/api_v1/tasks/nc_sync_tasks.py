@@ -9,6 +9,7 @@ Celery Beat 推荐配置（在 settings.py 中追加 CELERY_BEAT_SCHEDULE）：
     'nc-retry-failed':    每 5  分钟执行一次 retry_failed_nc_tasks
 """
 import logging
+import time
 
 from celery import shared_task
 
@@ -19,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 # 单批最大处理任务数，防止单次任务执行时间过长
 _BATCH_SIZE = 50
+# 每条任务执行后的间隔秒数，防止触发 Nextcloud 暴力破解限速（429）
+_REQUEST_INTERVAL = 0.5
 
 
 @shared_task(
@@ -47,6 +50,7 @@ def process_pending_nc_tasks(self) -> dict:
             success += 1
         else:
             failed += 1
+        time.sleep(_REQUEST_INTERVAL)
     logger.info(
         "[nc_sync_tasks][process_pending] total=%s success=%s failed=%s",
         total, success, failed,
