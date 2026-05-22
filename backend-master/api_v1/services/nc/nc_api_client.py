@@ -75,10 +75,10 @@ class NcApiClient:
             RuntimeError: 配置项不存在或值为空时抛出。
         """
         from api_v1.models.system.config import Config
-        obj = Config.objects.filter(config_key=key).first()
-        if not obj or not obj.config_value:
+        obj = Config.objects.filter(key=key).first()
+        if not obj or not obj.value:
             raise RuntimeError(f"[NcApiClient] Config 表中缺少必要配置项: {key}")
-        return obj.config_value.strip()
+        return obj.value.strip()
 
     @staticmethod
     def _read_config_plaintext(key: str) -> str:
@@ -94,7 +94,7 @@ class NcApiClient:
             RuntimeError: 配置项不存在或解密失败时抛出。
         """
         from api_v1.models.system.config import Config
-        obj = Config.objects.filter(config_key=key).first()
+        obj = Config.objects.filter(key=key).first()
         if not obj:
             raise RuntimeError(f"[NcApiClient] Config 表中缺少必要配置项: {key}")
         value = obj.get_plaintext_value()
