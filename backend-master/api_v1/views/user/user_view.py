@@ -247,7 +247,13 @@ class UserViewSet(viewsets.ViewSet):
         payload = request.data.copy()
         user.email = payload.get("email", user.email)
         _old_is_active = user.is_active
-        user.is_active = bool(int(payload.get("status", 1)))
+        # 保留原值为默认，防止前端未传 status 时意外激活被禁用用户
+        new_status = payload.get("status")
+        if new_status is not None:
+            try:
+                user.is_active = bool(int(new_status))
+            except (ValueError, TypeError):
+                pass
         user.save()
         profile = getattr(user, "profile", None)
         if profile:

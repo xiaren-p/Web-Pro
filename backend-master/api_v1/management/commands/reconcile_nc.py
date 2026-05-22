@@ -91,6 +91,25 @@ class Command(BaseCommand):
         enqueued = 0
         skipped = 0
 
+        # ------------------------------------------------------------ #
+        # Step 1: 对账 NC 群组是否存在（本地 NcGroup 记录 vs NC 实际状态）
+        # ------------------------------------------------------------ #
+        if not target_username:
+            for nc_group in NcGroup.objects.all():
+                try:
+                    nc_group_exists = client.group_exists(nc_group.code)
+                except Exception as exc:
+                    logger.warning("[reconcile_nc] 查询 NC 群组 %s 失败，跳过: %s", nc_group.code, exc)
+                    continue
+                if not nc_group_exists:
+                    self.stdout.write(f"  → NC 群组不存在，需创建: {nc_group.code}")
+                    if not dry_run:
+                        NcSyncService.enqueue_create_group(nc_group.code, nc_group.name)
+                        enqueued += 1
+
+        # ------------------------------------------------------------ #
+        # Step 2: 逐用户对账
+        # ------------------------------------------------------------ #
         for profile in profiles:
             username = profile.user.username
             is_active = profile.user.is_active
@@ -117,6 +136,44 @@ class Command(BaseCommand):
                     NcSyncService._enqueue_dept_group(username, profile)
                     NcSyncService._enqueue_extra_groups(username, profile)
                     enqueued += 1
+
+            elif is_active and nc_exists:
+                # 用户已在 NC 中：对账启用状态与群组成员关系
+                try:
+                    nc_user_data = client.get_user(username)
+                    nc_enabled: bool = nc_user_data.get("enabled", True)
+                    nc_groups: set = set(nc_user_data.get("groups", []))
+                except Exception as exc:
+                    logger.warning("[reconcile_nc] 获取 NC 用户 %s 详情失败，跳过: %s", username, exc)
+                    skipped += 1
+                    continue
+
+                # 对账启用状态
+                if not nc_enabled:
+                    self.stdout.write(f"  → NC 用户已被禁用但本地活跃，需重新启用: {username}")
+                    if not dry_run:
+                        NcSyncService.enqueue_enable_user(username)
+                        enqueued += 1
+
+                # 对账群组成员关系
+                expected_groups: set = set()
+                if profile.dept_id:
+                    dept_nc_group = NcGroup.objects.filter(
+                        dept_id=profile.dept_id,
+                        group_type=NcGroupType.DEPT,
+                    ).first()
+                    if dept_nc_group:
+                        expected_groups.add(dept_nc_group.code)
+                for extra_g in profile.extra_nc_groups.all():
+                    expected_groups.add(extra_g.code)
+                if profile.admin_level == AdminLevel.COMPANY_ADMIN:
+                    expected_groups.add("admin")
+
+                for missing_group in expected_groups - nc_groups:
+                    self.stdout.write(f"  → 用户 {username} 未在群组 {missing_group}，需加入")
+                    if not dry_run:
+                        NcSyncService.enqueue_add_to_group(username, missing_group)
+                        enqueued += 1
 
             elif not is_active and nc_exists:
                 # 需要禁用

@@ -270,12 +270,14 @@ class NcSyncService:
             elif old_admin_level == AdminLevel.COMPANY_ADMIN:
                 cls.enqueue_revoke_admin(user.username)
         # 部门变更：退出旧部门群组，加入新部门群组
-        if old_dept_id is not None and old_dept_id != profile.dept_id:
-            old_nc_group = NcGroup.objects.filter(
-                dept_id=old_dept_id, group_type=NcGroupType.DEPT,
-            ).first()
-            if old_nc_group:
-                cls.enqueue_remove_from_group(user.username, old_nc_group.code)
+        # 注意：old_dept_id 可能为 None（用户原本无部门），此时条件仅判断是否与新値不同
+        if old_dept_id != profile.dept_id:
+            if old_dept_id:
+                old_nc_group = NcGroup.objects.filter(
+                    dept_id=old_dept_id, group_type=NcGroupType.DEPT,
+                ).first()
+                if old_nc_group:
+                    cls.enqueue_remove_from_group(user.username, old_nc_group.code)
             cls._enqueue_dept_group(user.username, profile)
         logger.info("[NcSyncService][on_user_updated] username=%s 同步任务已入队", user.username)
 

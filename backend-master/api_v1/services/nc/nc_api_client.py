@@ -290,6 +290,21 @@ class NcApiClient:
         except RuntimeError:
             return False
 
+    def group_exists(self, group_id: str) -> bool:
+        """判断 NC 群组是否存在。
+
+        Args:
+            group_id (str): 群组 ID（NcGroup.code）。
+
+        Returns:
+            bool: 存在返回 True，否则 False。
+        """
+        try:
+            self._get(f"/ocs/v1.php/cloud/groups/{group_id}")
+            return True
+        except RuntimeError:
+            return False
+
     # ------------------------------------------------------------------ #
     #  群组操作                                                            #
     # ------------------------------------------------------------------ #
