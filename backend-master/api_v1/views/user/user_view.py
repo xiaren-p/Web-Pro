@@ -234,7 +234,16 @@ class UserViewSet(viewsets.ViewSet):
             except Position.DoesNotExist:
                 pass
         profile.save()
-        # extra_nc_groups M2M\uff1a\u4ec5\u5728\u524d\u7aef\u4f20 extraGroupIds \u65f6\u8bbe\u7f6e\uff08\u9700\u5728 on_user_created \u524d\u5b8c\u6210\uff0c\u4ee5\u4f7f _enqueue_extra_groups \u8bfb\u5230\uff09\n        if \"extraGroupIds\" in payload:\n            extra_ids = payload.get(\"extraGroupIds\") or []\n            if isinstance(extra_ids, str):\n                extra_ids = [s.strip() for s in extra_ids.split(\",\") if s.strip()]\n            try:\n                profile.extra_nc_groups.set(extra_ids)\n            except Exception as exc:\n                logger.warning(\"[UserViewSet][create] \u8bbe\u7f6e extra_nc_groups \u5931\u8d25: %s\", exc)\n        NcSyncService.on_user_created(profile)
+        # extra_nc_groups M2M：仅在前端传 extraGroupIds 时设置（需在 on_user_created 前完成，以便 _enqueue_extra_groups 读到）
+        if "extraGroupIds" in payload:
+            extra_ids = payload.get("extraGroupIds") or []
+            if isinstance(extra_ids, str):
+                extra_ids = [s.strip() for s in extra_ids.split(",") if s.strip()]
+            try:
+                profile.extra_nc_groups.set(extra_ids)
+            except Exception as exc:
+                logger.warning("[UserViewSet][create] 设置 extra_nc_groups 失败: %s", exc)
+        NcSyncService.on_user_created(profile)
         logger.info("[UserViewSet] [create] user=%s", username)
         return drf_ok(UserSerializer(user).data, status=201)
 
