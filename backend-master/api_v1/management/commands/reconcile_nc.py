@@ -308,21 +308,32 @@ class Command(BaseCommand):
     def _execute_pending(self) -> None:
         """立即执行所有 PENDING 任务（不经 Celery，适合一次性对账场景）。
 
-        说明：每条任务间插入 0.5s 间隔，避免短时间内对 NC 发起过密请求触发限流或锁竞争。
+        说明：
+        - 每条任务间插入 0.5s 间隔，避免短时间内对 NC 发起过密请求触发限流或锁竞争。
+        - 采用循环快照策略：每轮从 DB 重新拉取 PENDING 列表，直到没有新任务为止。
+          这样执行过程中入队的子任务（如 CREATE_GROUP_FOLDER 派生的 GRANT_GROUP_FOLDER）
+          会在下一轮被自动拾起，无需依赖 Celery 或手动二次执行。
         """
-        pending = list(NcSyncTask.objects.filter(status=SyncStatus.PENDING).order_by("id"))
-        self.stdout.write(self.style.NOTICE(f"[reconcile_nc] 开始直接执行 {len(pending)} 条 PENDING 任务..."))
         success = 0
         failed = 0
-        for idx, task in enumerate(pending):
-            ok = NcSyncService.execute_task(task)
-            if ok:
-                success += 1
-            else:
-                failed += 1
-            # 限流：最后一条不再 sleep
-            if idx < len(pending) - 1:
-                time.sleep(0.5)
+        round_num = 0
+        while True:
+            round_num += 1
+            pending = list(NcSyncTask.objects.filter(status=SyncStatus.PENDING).order_by("id"))
+            if not pending:
+                break
+            self.stdout.write(self.style.NOTICE(
+                f"[reconcile_nc] 第 {round_num} 轮：执行 {len(pending)} 条 PENDING 任务..."
+            ))
+            for idx, task in enumerate(pending):
+                ok = NcSyncService.execute_task(task)
+                if ok:
+                    success += 1
+                else:
+                    failed += 1
+                # 限流：最后一条不再 sleep
+                if idx < len(pending) - 1:
+                    time.sleep(0.5)
         self.stdout.write(self.style.SUCCESS(
             f"[reconcile_nc] 执行完毕 | success={success} failed={failed}"
         ))
