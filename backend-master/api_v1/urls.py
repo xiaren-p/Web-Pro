@@ -15,6 +15,7 @@ urlpatterns = [
     path('auth/refresh-token', csrf_exempt(views.AuthViewSet.as_view({'post': 'refresh_token'})), name='auth-refresh'),
     path('auth/logout', views.AuthViewSet.as_view({'delete': 'logout', 'get': 'logout', 'post': 'logout'}), name='auth-logout'),
     path('auth/captcha', views.AuthViewSet.as_view({'get': 'captcha'}), name='auth-captcha'),
+    path('auth/sso-session', views.AuthViewSet.as_view({'post': 'sso_session'}), name='auth-sso-session'),
 
     # 文件管理模块已移除（文件上传/目录/分享/去重/哈希任务）。如需恢复请参考历史版本。
 

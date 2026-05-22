@@ -316,6 +316,10 @@ except Exception:
 SECURE_SSL_REDIRECT = env('SECURE_SSL_REDIRECT')
 SESSION_COOKIE_SECURE = env('SESSION_COOKIE_SECURE')
 CSRF_COOKIE_SECURE = env('CSRF_COOKIE_SECURE')
+# OIDC SSO 跨站 Session：NC 开启 SSO 时浏览器从 NC 域跳到 api.hanlis.cn，
+# SameSite=None 才能在该跳转请求中自动携带 sessionid cookie。
+# 必须配合 SESSION_COOKIE_SECURE=True（HTTPS）一起使用。
+SESSION_COOKIE_SAMESITE = 'None'
 SECURE_HSTS_SECONDS = env('SECURE_HSTS_SECONDS')
 # 反向代理 HTTPS 透传：告知 Django 外层已是 HTTPS，修复 Admin CSRF 403
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
