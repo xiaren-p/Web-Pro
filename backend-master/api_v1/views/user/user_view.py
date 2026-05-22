@@ -29,6 +29,7 @@ from api_v1.models.system.user_profile import AdminLevel
 from api_v1.serializers import UserSerializer
 from api_v1.utils.responses import drf_ok, drf_error
 from api_v1.utils.pagination import paginate_queryset
+from api_v1.services.nc.nc_sync_service import NcSyncService
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +242,7 @@ class UserViewSet(viewsets.ViewSet):
             except Position.DoesNotExist:
                 pass
         profile.save()
+        NcSyncService.on_user_created(profile)
         logger.info("[UserViewSet] [create] user=%s", username)
         return drf_ok(UserSerializer(user).data, status=201)
 
@@ -253,6 +255,7 @@ class UserViewSet(viewsets.ViewSet):
             return drf_error("未找到用户", status=404)
         payload = request.data.copy()
         user.email = payload.get("email", user.email)
+        _old_is_active = user.is_active
         user.is_active = bool(int(payload.get("status", 1)))
         user.save()
         profile = getattr(user, "profile", None)
@@ -275,6 +278,7 @@ class UserViewSet(viewsets.ViewSet):
                         pass
                 else:
                     profile.position = None
+            _old_admin_level = profile.admin_level
             if "adminLevel" in payload:
                 try:
                     lvl = int(payload.get("adminLevel"))
@@ -283,6 +287,9 @@ class UserViewSet(viewsets.ViewSet):
                 except (ValueError, TypeError):
                     pass
             profile.save()
+            NcSyncService.on_user_updated(profile, old_admin_level=_old_admin_level, old_dept_id=_old_dept_id)
+            if user.is_active != _old_is_active:
+                NcSyncService.on_user_status_changed(profile, enabled=user.is_active)
         logger.info("[UserViewSet] [update] id=%s", id)
         return drf_ok(UserSerializer(user).data)
 
@@ -300,6 +307,9 @@ class UserViewSet(viewsets.ViewSet):
 
             count = users_qs.count()
             usernames_del = list(users_qs.values_list("username", flat=True))
+            # 先入队 NC disable，再删除 Django 用户（保证 username 在入队时仍有效）
+            for uname in usernames_del:
+                NcSyncService.on_user_deleted(uname)
             users_qs.delete()
             logger.info("[UserViewSet] [delete] %s, count=%d", usernames_del, count)
             return drf_ok({"deletedCount": count})

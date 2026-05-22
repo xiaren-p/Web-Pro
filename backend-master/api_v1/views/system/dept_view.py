@@ -12,6 +12,7 @@ from api_v1.models import Department
 from api_v1.permissions import MenuPermRequired
 from api_v1.serializers import DeptSerializer
 from api_v1.utils.responses import drf_error, drf_ok
+from api_v1.services.nc.nc_sync_service import NcSyncService
 
 
 class DeptViewSet(viewsets.ViewSet):
@@ -100,6 +101,7 @@ class DeptViewSet(viewsets.ViewSet):
             code=code or "",
             status=bool(int(status)) if isinstance(status, (str, int)) else bool(status),
         )
+        NcSyncService.on_dept_created(dept)
         return drf_ok({"id": dept.id}, status=201)
 
     @action(detail=False, methods=["get"], url_path="tree")
@@ -169,6 +171,7 @@ class DeptViewSet(viewsets.ViewSet):
                 s = payload.get("status")
                 d.status = bool(int(s)) if isinstance(s, (str, int)) else bool(s)
             d.save()
+            NcSyncService.on_dept_updated(d)
             return drf_ok({"id": d.id})
 
         id_list = [i for i in ids.split(",") if i]

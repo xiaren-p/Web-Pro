@@ -184,6 +184,42 @@ class NcSyncService:
             payload={"group": group_code, "display_name": display_name},
         )
 
+    @staticmethod
+    def enqueue_create_group_folder(group_code: str, mount_point: str) -> NcSyncTask:
+        """入队：在 NC 中创建 Group Folder 并将挂载点与群组绑定。
+
+        任务执行后会自动将 NC 返回的 folder_id 回写到 NcGroup，
+        并自动入队一条 GRANT_GROUP_FOLDER 任务完成权限授予。
+
+        Args:
+            group_code (str): NcGroup.code，用于执行后回写 folder_id。
+            mount_point (str): Folder 挂载路径，如 "技术部"。
+
+        Returns:
+            NcSyncTask: 已创建的任务记录。
+        """
+        return NcSyncTask.objects.create(
+            operation=SyncOperation.CREATE_GROUP_FOLDER,
+            payload={"group_code": group_code, "mount_point": mount_point},
+        )
+
+    @staticmethod
+    def enqueue_grant_group_folder(folder_id: int, group_code: str, permissions: int = 31) -> NcSyncTask:
+        """入队：为 Group Folder 授权指定群组。
+
+        Args:
+            folder_id (int): NC Group Folder ID。
+            group_code (str): NcGroup.code（即 NC group_id）。
+            permissions (int): 权限位（READ=1 WRITE=2 CREATE=4 DELETE=8 SHARE=16，默认 31=全部）。
+
+        Returns:
+            NcSyncTask: 已创建的任务记录。
+        """
+        return NcSyncTask.objects.create(
+            operation=SyncOperation.GRANT_GROUP_FOLDER,
+            payload={"folder_id": folder_id, "group": group_code, "permissions": permissions},
+        )
+
     # ------------------------------------------------------------------ #
     #  高级语义方法：用户状态变更入队（供 view 层调用）                     #
     # ------------------------------------------------------------------ #
@@ -211,12 +247,13 @@ class NcSyncService:
         logger.info("[NcSyncService][on_user_created] username=%s 同步任务已入队", user.username)
 
     @classmethod
-    def on_user_updated(cls, profile, old_admin_level: int | None = None) -> None:
-        """用户信息更新后调用：入队 update_user 及可能的 admin 变更任务。
+    def on_user_updated(cls, profile, old_admin_level: int | None = None, old_dept_id: int | None = None) -> None:
+        """用户信息更新后调用：入队 update_user、admin 变更及部门群组变更任务。
 
         Args:
             profile: 更新后的 UserProfile 实例。
             old_admin_level (int | None): 变更前的 admin_level（用于判断是否需要升/降 admin）。
+            old_dept_id (int | None): 变更前的 dept_id（用于判断是否需要退出旧部门群组）。
         """
         user = profile.user
         cls.enqueue_update_user(
@@ -229,6 +266,14 @@ class NcSyncService:
                 cls.enqueue_set_admin(user.username)
             elif old_admin_level == AdminLevel.COMPANY_ADMIN:
                 cls.enqueue_revoke_admin(user.username)
+        # 部门变更：退出旧部门群组，加入新部门群组
+        if old_dept_id is not None and old_dept_id != profile.dept_id:
+            old_nc_group = NcGroup.objects.filter(
+                dept_id=old_dept_id, group_type=NcGroupType.DEPT,
+            ).first()
+            if old_nc_group:
+                cls.enqueue_remove_from_group(user.username, old_nc_group.code)
+            cls._enqueue_dept_group(user.username, profile)
         logger.info("[NcSyncService][on_user_updated] username=%s 同步任务已入队", user.username)
 
     @classmethod
@@ -245,6 +290,73 @@ class NcSyncService:
         else:
             cls.enqueue_disable_user(username)
         logger.info("[NcSyncService][on_user_status_changed] username=%s enabled=%s", username, enabled)
+
+    @classmethod
+    def on_user_deleted(cls, username: str) -> None:
+        """用户在 Django 中删除后调用：入队 disable_user 使其在 NC 侧失效。
+
+        NC 不支持通过 OCS API 直接删除用户（删除会清空数据），
+        因此仅禁用账号保留其文件数据，由管理员手动决定是否彻底删除。
+
+        Args:
+            username (str): 被删除的 Django 用户名。
+        """
+        cls.enqueue_disable_user(username)
+        logger.info("[NcSyncService][on_user_deleted] username=%s 入队 disable_user", username)
+
+    @classmethod
+    def on_dept_created(cls, dept) -> NcGroup:
+        """部门新建后调用：自动创建 NcGroup 镜像并入队 CREATE_GROUP 任务。
+
+        NC group_id（即 NcGroup.code）优先取 dept.code，若为空则回退为 dept_{dept.id}。
+        该方法在同一事务内完成 NcGroup 写入，CREATE_GROUP 任务入队后由 Celery 异步执行。
+
+        Args:
+            dept: Department 实例（已 save，id 已赋值）。
+
+        Returns:
+            NcGroup: 刚创建的 NcGroup 记录。
+        """
+        code = (dept.code or "").strip() or f"dept_{dept.id}"
+        with transaction.atomic():
+            nc_group, created = NcGroup.objects.get_or_create(
+                dept=dept,
+                defaults={
+                    "code": code,
+                    "name": dept.name,
+                    "group_type": NcGroupType.DEPT,
+                },
+            )
+            if created:
+                cls.enqueue_create_group(nc_group.code, nc_group.name)
+                cls.enqueue_create_group_folder(nc_group.code, dept.name)
+                logger.info(
+                    "[NcSyncService][on_dept_created] dept_id=%s code=%s 入队 CREATE_GROUP + CREATE_GROUP_FOLDER",
+                    dept.id, nc_group.code,
+                )
+            else:
+                logger.info(
+                    "[NcSyncService][on_dept_created] dept_id=%s NcGroup 已存在，跳过", dept.id,
+                )
+        return nc_group
+
+    @classmethod
+    def on_dept_updated(cls, dept) -> None:
+        """部门名称变更后调用：同步更新 NcGroup 的显示名称（本地镜像）。
+
+        注：NC OCS API 暂不支持直接修改 group displayname，仅更新本地镜像记录。
+
+        Args:
+            dept: 已保存的 Department 实例。
+        """
+        updated = NcGroup.objects.filter(dept=dept, group_type=NcGroupType.DEPT).update(
+            name=dept.name,
+        )
+        if updated:
+            logger.info(
+                "[NcSyncService][on_dept_updated] dept_id=%s name=%s 本地镜像已更新",
+                dept.id, dept.name,
+            )
 
     # ------------------------------------------------------------------ #
     #  直接执行方法（供对账命令使用，绕过任务队列）                          #
@@ -322,7 +434,16 @@ class NcSyncService:
         elif op == SyncOperation.CREATE_GROUP:
             client.create_group(p["group"], p.get("display_name", ""))
         elif op == SyncOperation.CREATE_GROUP_FOLDER:
-            client.create_group_folder(p["mount_point"])
+            folder_id = client.create_group_folder(p["mount_point"])
+            # 回写 folder_id 到 NcGroup，并自动入队授权任务
+            group_code = p.get("group_code", "")
+            if group_code:
+                NcGroup.objects.filter(code=group_code).update(folder_id=folder_id)
+                NcSyncService.enqueue_grant_group_folder(folder_id, group_code)
+                logger.info(
+                    "[NcSyncService][_dispatch] CREATE_GROUP_FOLDER group=%s folder_id=%s 已入队授权",
+                    group_code, folder_id,
+                )
         elif op == SyncOperation.GRANT_GROUP_FOLDER:
             client.grant_group_folder(
                 folder_id=int(p["folder_id"]),

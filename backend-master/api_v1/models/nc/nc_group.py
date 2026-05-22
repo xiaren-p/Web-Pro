@@ -44,6 +44,13 @@ class NcGroup(TimeStampedModel):
         help_text="仅 DEPT 类型时绑定对应部门",
     )
 
+    folder_id = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="NC Group Folder ID",
+        help_text="create_group_folder 返回的 folder id，用于后续 grant_group_folder 授权",
+    )
+
     class Meta:
         verbose_name = "NC 群组"
         verbose_name_plural = "NC 群组"
