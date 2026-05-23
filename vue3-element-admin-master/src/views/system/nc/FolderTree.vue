@@ -256,11 +256,16 @@ const treeProps = {
 /**
  * el-tree 懒加载回调，拉取指定节点下的直属子目录。
  *
- * @param {unknown} node el-tree 内部节点对象
+ * @param {{ level: number; data: Record<string, unknown> }} node el-tree 内部节点对象
  * @param {Function} resolve 数据注入回调
+ *
+ * 参数类型使用 Record<string, unknown> 而非 FolderItem：
+ * LoadFunction 的 node.data 实际类型为 TreeNodeData = Record<string, any>，
+ * 若写成 FolderItem 会违反函数参数逆变规则导致 TS2322，
+ * 因此在函数体内通过类型断言获取具体字段。
  */
 async function loadNode(
-  node: { level: number; data: FolderItem },
+  node: { level: number; data: Record<string, unknown> },
   resolve: (items: FolderItem[]) => void
 ): Promise<void> {
   if (!selectedGroup.value) {
@@ -271,8 +276,9 @@ async function loadNode(
   // level===0 为虚根节点，path 传空串加载 Group Folder 根目录
   let path = "";
   if (node.level > 0) {
+    // node.data 运行时为 FolderItem，通过断言取 ncPath
     // ncPath = "mountPoint/a/b" → path = "a/b"（去掉挂载点前缀）
-    const ncPath = node.data.ncPath;
+    const ncPath = (node.data as FolderItem).ncPath;
     const slashIdx = ncPath.indexOf("/");
     path = slashIdx >= 0 ? ncPath.substring(slashIdx + 1) : "";
   }
