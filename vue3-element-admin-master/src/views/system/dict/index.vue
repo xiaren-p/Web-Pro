@@ -64,7 +64,6 @@
         <el-table-column fixed="right" label="操作" align="center" width="220">
           <template #default="scope">
             <el-button
-              v-hasPerm="['sys:dict:item']"
               type="primary"
               link
               size="small"

@@ -11,6 +11,7 @@ from rest_framework.decorators import action
 
 from api_v1.models.system.position import Position
 from api_v1.models.system.menu import Menu
+from api_v1.models.system.user_profile import AdminLevel
 from api_v1.serializers.system.position_serializer import (
     PositionSerializer,
     PositionWriteSerializer,
@@ -19,6 +20,27 @@ from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_error, drf_ok
 
 logger = logging.getLogger(__name__)
+
+
+def _is_company_admin(request) -> bool:
+    """判断请求者是否为公司管理员或超级用户。
+
+    Args:
+        request: DRF Request 对象。
+
+    Returns:
+        bool: True 表示有公司管理员权限。
+    """
+    user = getattr(request, "user", None)
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    try:
+        profile = getattr(user, "profile", None)
+        return bool(profile and profile.admin_level == AdminLevel.COMPANY_ADMIN)
+    except Exception:
+        return False
 
 
 class PositionViewSet(viewsets.ViewSet):
@@ -76,6 +98,8 @@ class PositionViewSet(viewsets.ViewSet):
             qs = Position.objects.all().order_by("order_num", "id")
             return drf_ok(PositionSerializer(qs, many=True).data)
 
+        if not _is_company_admin(request):
+            return drf_error("仅公司管理员可新建岗位", status=403)
         ser = PositionWriteSerializer(data=request.data)
         if not ser.is_valid():
             return drf_error(str(ser.errors), status=400)
@@ -86,6 +110,8 @@ class PositionViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["put", "delete"], url_path=r"(?P<ids>[^/]+)")
     def update_or_delete(self, request, ids: str):
         """PUT=更新单个岗位；DELETE=批量删除（逗号分隔 ID）。"""
+        if not _is_company_admin(request):
+            return drf_error("仅公司管理员可修改或删除岗位", status=403)
         if request.method == "DELETE":
             id_list = [s.strip() for s in ids.split(",") if s.strip()]
             protected = list(Position.objects.filter(id__in=id_list, is_builtin=True).values_list("code", flat=True))
@@ -126,6 +152,8 @@ class PositionViewSet(viewsets.ViewSet):
 
         Body: {"menuIds": [1, 2, 3]}
         """
+        if not _is_company_admin(request):
+            return drf_error("仅公司管理员可修改岗位菜单权限", status=403)
         try:
             position = Position.objects.get(pk=position_id)
         except Position.DoesNotExist:

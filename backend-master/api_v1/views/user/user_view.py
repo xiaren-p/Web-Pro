@@ -215,6 +215,17 @@ class UserViewSet(viewsets.ViewSet):
                 admin_level_val = AdminLevel.MEMBER
         except (ValueError, TypeError):
             admin_level_val = AdminLevel.MEMBER
+        # 权限封顶：请求者无法创建权限高于自身的用户。
+        # AdminLevel 数字越小权限越高：COMPANY_ADMIN=1 > DEPT_ADMIN=2 > MEMBER=3
+        if not request.user.is_superuser:
+            try:
+                _req_profile = getattr(request.user, "profile", None)
+                _req_level = _req_profile.admin_level if _req_profile else AdminLevel.MEMBER
+            except Exception:
+                _req_level = AdminLevel.MEMBER
+            if admin_level_val < _req_level:
+                # 请求创建的级别高于自身，强制降至与自身相同级别
+                admin_level_val = _req_level
         profile = UserProfile.objects.create(
             user=user,
             nickname=nickname,
@@ -304,6 +315,19 @@ class UserViewSet(viewsets.ViewSet):
                 try:
                     lvl = int(payload.get("adminLevel"))
                     if lvl in AdminLevel.values:
+                        # 权限封顶：非超级用户不允许将用户级别设置高于自身
+                        if not request.user.is_superuser:
+                            try:
+                                _req_profile = getattr(request.user, "profile", None)
+                                _req_level = _req_profile.admin_level if _req_profile else AdminLevel.MEMBER
+                            except Exception:
+                                _req_level = AdminLevel.MEMBER
+                            if lvl < _req_level:
+                                # 越权设置，拒绝修改并返回 403
+                                return drf_error(
+                                    "无权设置高于自身权限的管理级别",
+                                    status=403,
+                                )
                         profile.admin_level = lvl
                 except (ValueError, TypeError):
                     pass
