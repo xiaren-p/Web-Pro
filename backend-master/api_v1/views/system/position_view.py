@@ -14,7 +14,6 @@ from api_v1.models.system.menu import Menu
 from api_v1.serializers.system.position_serializer import (
     PositionSerializer,
     PositionWriteSerializer,
-    PositionOptionSerializer,
 )
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_error, drf_ok
@@ -53,14 +52,13 @@ class PositionViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="options")
     def options(self, request):
-        """获取岗位下拉选项（轻量，仅返回 id/code/name）。
+        """获取岗位下拉选项（轻量，仅返回 id/name）。
 
         内置岗位（is_builtin=True，如系统管理员）不出现在选项中，
         防止被手动分配给任意用户。
         """
         qs = Position.objects.filter(status=True, is_builtin=False).order_by("order_num", "id")
-        data = PositionOptionSerializer(qs, many=True).data
-        return drf_ok(data)
+        return drf_ok([{"label": p.name, "value": p.id} for p in qs])
 
     @action(detail=False, methods=["get"], url_path=r"(?P<position_id>[^/]+)/form")
     def form(self, request, position_id: str):
