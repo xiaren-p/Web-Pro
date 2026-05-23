@@ -54,11 +54,38 @@ class PositionViewSet(viewsets.ViewSet):
     def page(self, request):
         """分页查询岗位列表。
 
+        权限范围：
+            - 公司管理员/超管：全量岗位。
+            - 部门管理员：仅返回本部门成员所属的岗位。
+            - 普通成员：无数据（返回空列表）。
+
         Query Params:
             keywords (str): 模糊匹配岗位名称或编码。
             status (int): 1=启用，0=禁用。
         """
+        from api_v1.models.system.user_profile import UserProfile as _UserProfile
+
+        user = request.user
+        _profile = getattr(user, "profile", None)
+        _level = _profile.admin_level if _profile else AdminLevel.MEMBER
+
         qs = Position.objects.all().order_by("order_num", "id")
+
+        if not user.is_superuser and _level != AdminLevel.COMPANY_ADMIN:
+            if _level == AdminLevel.DEPT_ADMIN and _profile and _profile.dept_id:
+                # 仅展示本部门成员所归属的岗位
+                _dept_pos_ids = (
+                    _UserProfile.objects.filter(
+                        dept_id=_profile.dept_id,
+                        position__isnull=False,
+                    )
+                    .values_list("position_id", flat=True)
+                    .distinct()
+                )
+                qs = qs.filter(id__in=_dept_pos_ids)
+            else:
+                # 普通成员不返回任何数据
+                qs = qs.none()
         kw = request.query_params.get("keywords")
         if kw:
             qs = qs.filter(Q(name__icontains=kw) | Q(code__icontains=kw))
@@ -150,10 +177,29 @@ class PositionViewSet(viewsets.ViewSet):
     def update_menus(self, request, position_id: str):
         """覆盖更新岗位的菜单权限（全量替换）。内置岗位权限不可修改。
 
+        权限范围：
+            - 公司管理员/超管：任意岗位。
+            - 部门管理员：仅限本部门成员所属的岗位。
+
         Body: {"menuIds": [1, 2, 3]}
         """
-        if not _is_company_admin(request):
-            return drf_error("仅公司管理员可修改岗位菜单权限", status=403)
+        from api_v1.models.system.user_profile import UserProfile as _UserProfile
+
+        user = request.user
+        _profile = getattr(user, "profile", None)
+        _is_company = _is_company_admin(request)
+
+        if not _is_company:
+            _level = _profile.admin_level if _profile else AdminLevel.MEMBER
+            if _level != AdminLevel.DEPT_ADMIN or not (_profile and _profile.dept_id):
+                return drf_error("仅公司管理员可修改岗位菜单权限", status=403)
+            # 部门管理员仅可操作本部门成员归属的岗位
+            _in_dept = _UserProfile.objects.filter(
+                dept_id=_profile.dept_id,
+                position_id=position_id,
+            ).exists()
+            if not _in_dept:
+                return drf_error("无权修改非本部门岗位的权限", status=403)
         try:
             position = Position.objects.get(pk=position_id)
         except Position.DoesNotExist:

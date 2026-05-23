@@ -48,6 +48,10 @@ export interface UserInfo {
   avatar?: string;
   roles: string[];
   perms: string[];
+  /** 管理级别：1=公司管理员，2=部门管理员，3=普通成员 */
+  adminLevel?: number;
+  /** 当前用户所属部门 ID */
+  deptId?: number | null;
 }
 
 const USER_BASE_URL = "/users";

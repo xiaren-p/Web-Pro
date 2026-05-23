@@ -23,7 +23,7 @@
       <div class="data-table__toolbar">
         <div class="data-table__toolbar--actions">
           <el-button
-            v-hasPerm="['sys:position:add']"
+            v-if="isCompanyAdmin"
             type="success"
             icon="plus"
             @click="handleOpenDialog()"
@@ -31,7 +31,7 @@
             新增
           </el-button>
           <el-button
-            v-hasPerm="['sys:position:delete']"
+            v-if="isCompanyAdmin"
             type="danger"
             :disabled="ids.length === 0"
             icon="delete"
@@ -67,7 +67,7 @@
         <el-table-column fixed="right" label="操作" width="220">
           <template #default="scope">
             <el-button
-              v-hasPerm="['sys:position:edit']"
+              v-if="(isCompanyAdmin || isDeptAdmin) && !scope.row.isBuiltin"
               type="primary"
               size="small"
               link
@@ -77,7 +77,7 @@
               分配权限
             </el-button>
             <el-button
-              v-hasPerm="['sys:position:edit']"
+              v-if="isCompanyAdmin"
               type="primary"
               size="small"
               link
@@ -87,8 +87,7 @@
               编辑
             </el-button>
             <el-button
-              v-if="!scope.row.isBuiltin"
-              v-hasPerm="['sys:position:delete']"
+              v-if="isCompanyAdmin && !scope.row.isBuiltin"
               type="danger"
               size="small"
               link
@@ -123,6 +122,9 @@
  * 岗位管理列表页：展示所有岗位、支持增删改及菜单权限分配。
  * 所属板块：system。
  */
+import { computed } from 'vue';
+
+import { useUserStore } from '@/store/modules/user-store';
 import { PositionAPI, type PositionPageVO, type PositionPageQuery } from "@/api/position";
 import PositionDialog from "./components/PositionDialog.vue";
 import PositionPermDrawer from "./components/PositionPermDrawer.vue";
@@ -144,6 +146,14 @@ const queryParams = reactive<PositionPageQuery>({
   pageNum: 1,
   pageSize: 10,
 });
+
+const userStore = useUserStore();
+
+/** 是否为公司管理员（含超管） */
+const isCompanyAdmin = computed(() => userStore.userInfo.roles?.includes('ROOT') ?? false);
+
+/** 是否为部门管理员 */
+const isDeptAdmin = computed(() => userStore.userInfo.roles?.includes('dept_admin') ?? false);
 
 /** 岗位表格数据 */
 const positionList = ref<PositionPageVO[]>();

@@ -107,6 +107,8 @@ class UserViewSet(viewsets.ViewSet):
             "avatar": abs_avatar(profile.avatar if profile else ""),
             "roles": roles,
             "perms": perms,
+            "adminLevel": level,
+            "deptId": profile.dept_id if profile else None,
         })
         return resp
 

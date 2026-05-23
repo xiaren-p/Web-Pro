@@ -31,7 +31,7 @@
       <div class="data-table__toolbar">
         <div class="data-table__toolbar--actions">
           <el-button
-            v-hasPerm="['sys:dept:add']"
+            v-if="isCompanyAdmin"
             type="success"
             icon="plus"
             @click="handleOpenDialog()"
@@ -39,7 +39,7 @@
             新增
           </el-button>
           <el-button
-            v-hasPerm="['sys:dept:delete']"
+            v-if="isCompanyAdmin"
             type="danger"
             :disabled="selectIds.length === 0"
             icon="delete"
@@ -59,7 +59,7 @@
         class="data-table__content"
         @selection-change="handleSelectionChange"
       >
-        <el-table-column type="selection" width="55" align="center" />
+        <el-table-column v-if="isCompanyAdmin" type="selection" width="55" align="center" />
         <el-table-column prop="name" label="部门名称" min-width="200" />
         <el-table-column prop="code" label="部门编号" width="200" />
         <el-table-column prop="status" label="状态" width="100">
@@ -74,7 +74,7 @@
         <el-table-column label="操作" fixed="right" align="left" width="200">
           <template #default="scope">
             <el-button
-              v-hasPerm="['sys:dept:add']"
+              v-if="isCompanyAdmin"
               type="primary"
               link
               size="small"
@@ -84,7 +84,7 @@
               新增
             </el-button>
             <el-button
-              v-hasPerm="['sys:dept:edit']"
+              v-if="isCompanyAdmin || (isDeptAdmin && scope.row.id === myDeptId)"
               type="primary"
               link
               size="small"
@@ -94,7 +94,7 @@
               编辑
             </el-button>
             <el-button
-              v-hasPerm="['sys:dept:delete']"
+              v-if="isCompanyAdmin"
               type="danger"
               link
               size="small"
@@ -113,6 +113,9 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+
+import { useUserStore } from '@/store/modules/user-store';
 import { DeptAPI, type DeptVO, type DeptQuery } from "@/api/dept";
 import DeptFormDialog from "./components/DeptFormDialog.vue";
 
@@ -123,6 +126,17 @@ defineOptions({
 
 const queryFormRef = ref();
 const deptFormDialogRef = ref();
+
+const userStore = useUserStore();
+
+/** 是否为公司管理员（含超管） */
+const isCompanyAdmin = computed(() => userStore.userInfo.roles?.includes('ROOT') ?? false);
+
+/** 是否为部门管理员 */
+const isDeptAdmin = computed(() => userStore.userInfo.roles?.includes('dept_admin') ?? false);
+
+/** 当前用户所属部门 ID */
+const myDeptId = computed(() => userStore.userInfo.deptId ?? null);
 
 const loading = ref(false);
 const selectIds = ref<number[]>([]);
