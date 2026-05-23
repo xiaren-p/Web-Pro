@@ -125,10 +125,6 @@ class LogViewSet(viewsets.ViewSet):
         required: list[str] | None = None
         if action_name == "page" and method == "GET":
             required = ["sys:log:view"]
-        elif action_name == "visit_trend" and method == "GET":
-            required = ["sys:log:trend"]
-        elif action_name == "visit_stats" and method == "GET":
-            required = ["sys:log:stats"]
         setattr(self, "required_perms", required)
         return super().get_permissions()
 

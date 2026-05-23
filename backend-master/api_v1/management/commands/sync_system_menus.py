@@ -79,7 +79,6 @@ BUTTON_DEFS = {
         {"name": "字典新增", "perms": "sys:dict:add", "order_num": 2},
         {"name": "字典编辑", "perms": "sys:dict:edit", "order_num": 3},
         {"name": "字典删除", "perms": "sys:dict:delete", "order_num": 4},
-        {"name": "字典数据访问", "perms": "sys:dict:item", "order_num": 5},
         {"name": "字典数据查询", "perms": "sys:dict:item:query", "order_num": 6},
         {"name": "字典数据新增", "perms": "sys:dict:item:add", "order_num": 7},
         {"name": "字典数据编辑", "perms": "sys:dict:item:edit", "order_num": 8},
@@ -95,8 +94,6 @@ BUTTON_DEFS = {
     ],
     "操作日志": [
         {"name": "日志查看", "perms": "sys:log:view", "order_num": 1},
-        {"name": "访问趋势", "perms": "sys:log:trend", "order_num": 2},
-        {"name": "访问统计", "perms": "sys:log:stats", "order_num": 3},
     ],
     "参数配置": [
         {"name": "参数查询", "perms": "sys:config:query", "order_num": 1},

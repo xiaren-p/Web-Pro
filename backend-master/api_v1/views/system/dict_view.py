@@ -41,9 +41,6 @@ class DictViewSet(viewsets.ViewSet):
         required: list[str] | None = None
         if action_name in ("page", "list_or_create", "form", "items_page", "item_form") and method == "GET":
             required = ["sys:dict:query"]
-        # 字典项选项接口单独使用 sys:dict:item 更细粒度权限
-        elif action_name == "item_options" and method == "GET":
-            required = ["sys:dict:item"]
         elif action_name == "list_or_create" and method == "POST":
             required = ["sys:dict:add"]
         elif action_name == "update_or_delete" and method == "PUT":
