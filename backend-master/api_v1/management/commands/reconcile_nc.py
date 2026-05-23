@@ -347,7 +347,8 @@ class Command(BaseCommand):
                     folder_groups: dict = folder_info.get("groups", {})
 
                     # 检查自身 DEPT 群组权限是否正确（存量降权）
-                    own_perms = folder_groups.get(nc_group.code, {}).get("permissions", -1)
+                    # NC groups 字段格式为 {group_code: permissions_int}，直接取整数值
+                    own_perms = folder_groups.get(nc_group.code, -1)
                     if nc_group.code in folder_groups and own_perms != _PERM_READ_ONLY:
                         self.stdout.write(
                             f"  → DEPT 群组权限不符，重新授权: {nc_group.code} "
@@ -364,7 +365,7 @@ class Command(BaseCommand):
                         dept_id=nc_group.dept_id, group_type=NcGroupType.DEPT_ADMIN,
                     ).first()
                     if dept_admin_ng:
-                        admin_perms = folder_groups.get(dept_admin_ng.code, {}).get("permissions", -1)
+                        admin_perms = folder_groups.get(dept_admin_ng.code, -1)
                         if admin_perms != _PERM_FULL:
                             self.stdout.write(
                                 f"  → DEPT_ADMIN 群组权限不符，重新授权: {dept_admin_ng.code} "
@@ -383,7 +384,7 @@ class Command(BaseCommand):
                             dept=parent_dept, group_type=NcGroupType.DEPT,
                         ).first()
                         if parent_dept_ng:
-                            p_perms = folder_groups.get(parent_dept_ng.code, {}).get("permissions", -1)
+                            p_perms = folder_groups.get(parent_dept_ng.code, -1)
                             if p_perms != _PERM_READ_ONLY:
                                 self.stdout.write(
                                     f"  → 上级 DEPT 授权不符: folder_id={nc_group.folder_id} "
@@ -400,7 +401,7 @@ class Command(BaseCommand):
                             dept=parent_dept, group_type=NcGroupType.DEPT_ADMIN,
                         ).first()
                         if parent_admin_ng:
-                            pa_perms = folder_groups.get(parent_admin_ng.code, {}).get("permissions", -1)
+                            pa_perms = folder_groups.get(parent_admin_ng.code, -1)
                             if pa_perms != _PERM_FULL:
                                 self.stdout.write(
                                     f"  → 上级 DEPT_ADMIN 授权不符: folder_id={nc_group.folder_id} "
