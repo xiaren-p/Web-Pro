@@ -9,12 +9,14 @@ import logging
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
 
 from api_v1.models.nc.nc_file_access_rule import NcFileAccessRule
 from api_v1.models.nc.nc_group import NcGroup, NcGroupType
+from api_v1.models.nc.nc_sync_task import NcSyncTask
 from api_v1.models.system.department import Department
 from api_v1.models.system.user_profile import AdminLevel
 from api_v1.permissions import MenuPermRequired
@@ -54,7 +56,7 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             required = ["nc:folder:query"]
         elif action_name == "mkdir" and method == "POST":
             required = ["nc:folder:mkdir"]
-        elif action_name == "set_rule" and method == "POST":
+        elif action_name in ("set_rule", "set_rules_batch") and method == "POST":
             required = ["nc:folder:setperm"]
         elif action_name == "delete_rule" and method == "DELETE":
             required = ["nc:folder:delete"]
@@ -292,8 +294,99 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             permission_bits,
         )
         rule.user = target_user  # 确保实例上已经载入关联对象
-        _enqueue_acl_for_rule(rule)
+        _enqueue_acl_for_rule(rule, nc_group)
         return drf_ok(NcFileRuleReadSerializer(rule).data)
+
+    # ------------------------------------------------------------------ #
+    #  批量设置权限规则                                                      #
+    # ------------------------------------------------------------------ #
+
+    @action(detail=False, methods=["post"], url_path="set-rules-batch")
+    def set_rules_batch(self, request: Request):
+        """批量为多个用户设置同一 NC 路径的 ACL 权限规则（update_or_create）。
+
+        支持一次传入多个用户 ID，每个用户对指定路径执行 upsert。
+        常用于批量授权（如一次性为某部门所有成员添加访问权限）。
+
+        Body:
+            groupId (int): NcGroup ID（用于作用域校验）。
+            ncPath (str): 完整路径（含挂载点），如 "技术部/机密文档"。
+            userIds (list[int]): 目标用户 ID 列表，不可为空。
+            permissionBits (int): 权限位，范围 1~31。
+            status (bool, optional): 是否生效，默认 True。
+
+        Returns:
+            dict: { created: int, updated: int, rules: [...] }
+        """
+        body = request.data
+        group_id_str = str(body.get("groupId", ""))
+        nc_path = (body.get("ncPath") or "").strip("/")
+        user_ids = body.get("userIds") or []
+        permission_bits_raw = body.get("permissionBits")
+        status = body.get("status", True)
+
+        if not nc_path:
+            return drf_error("ncPath 不能为空")
+        if not isinstance(user_ids, list) or not user_ids:
+            return drf_error("userIds 不能为空")
+
+        nc_group, grp_error = _resolve_dept_admin_group(group_id_str)
+        if grp_error:
+            return drf_error(grp_error)
+        scope_error = _check_group_scope(request.user, nc_group)
+        if scope_error:
+            return drf_error(scope_error, code=403)
+
+        try:
+            permission_bits = int(permission_bits_raw)
+            if not (1 <= permission_bits <= 31):
+                raise ValueError
+        except (ValueError, TypeError):
+            return drf_error("permissionBits 必须在 1~31 之间")
+
+        # 批量解析用户，过滤非法 ID
+        valid_ids = [int(uid) for uid in user_ids if str(uid).lstrip("-").isdigit()]
+        users = list(
+            User.objects.select_related("profile", "profile__dept").filter(pk__in=valid_ids)
+        )
+        if not users:
+            return drf_error("未找到有效用户")
+
+        created_count = 0
+        updated_count = 0
+        saved_rules: list[NcFileAccessRule] = []
+
+        with transaction.atomic():
+            for target_user in users:
+                rule, created = NcFileAccessRule.objects.update_or_create(
+                    user=target_user,
+                    nc_path=nc_path,
+                    defaults={
+                        "permission_bits": permission_bits,
+                        "status": bool(status),
+                    },
+                )
+                rule.user = target_user
+                saved_rules.append(rule)
+                if created:
+                    created_count += 1
+                else:
+                    updated_count += 1
+
+        for rule in saved_rules:
+            _enqueue_acl_for_rule(rule, nc_group)
+
+        logger.info(
+            "[NcFolderTreeViewSet][set_rules_batch] ncPath=%s 新建=%d 更新=%d",
+            nc_path,
+            created_count,
+            updated_count,
+        )
+        return drf_ok({
+            "created": created_count,
+            "updated": updated_count,
+            "rules": NcFileRuleReadSerializer(saved_rules, many=True).data,
+        })
 
     # ------------------------------------------------------------------ #
     #  删除权限规则                                                         #
@@ -316,9 +409,46 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
 
         nc_path = rule.nc_path
         username = rule.user.username
+        mount_point = nc_path.split("/")[0]
+        target_user = rule.user
         rule.delete()
+
+        last_task_id = NcSyncTask.objects.order_by("-id").values_list("id", flat=True).first() or 0
         NcSyncService.enqueue_revoke_path_acl(nc_path, username)
 
+        # 若该用户在此 Group Folder 内已无任何剩余规则，将其从对应 DEPT 群组移出（撤销文件夹可见性）
+        has_remaining = NcFileAccessRule.objects.filter(
+            user=target_user,
+        ).filter(
+            Q(nc_path=mount_point) | Q(nc_path__startswith=mount_point + "/")
+        ).exists()
+        if not has_remaining:
+            # 通过 NC API 将 mount_point 映射到 folder_id，再按 folder_id 定位 DEPT 群组，
+            # 避免 dept.name 与 NC mount_point 因重命名而不一致导致查找失败
+            try:
+                _nc_client = NcApiClient.from_settings()
+                _folders = _nc_client.list_group_folders()
+                _folder_id = next(
+                    (
+                        fid
+                        for fid, info in _folders.items()
+                        if info.get("mount_point", "").strip("/") == mount_point
+                    ),
+                    None,
+                )
+                if _folder_id:
+                    dept_ng = NcGroup.objects.filter(
+                        group_type=NcGroupType.DEPT,
+                        folder_id=_folder_id,
+                    ).first()
+                    if dept_ng:
+                        NcSyncService.enqueue_remove_from_group(username, dept_ng.code)
+            except RuntimeError:
+                logger.warning(
+                    "[NcFolderTreeViewSet][delete_rule] 查询 NC Group Folder 列表失败，跳过 remove_from_group"
+                )
+
+        NcSyncService._flush_tasks_after(last_task_id)
         logger.info(
             "[NcFolderTreeViewSet][delete_rule] pk=%s ncPath=%s user=%s",
             pk, nc_path, username,
@@ -513,23 +643,39 @@ def _serialize_rule(rule: NcFileAccessRule | None) -> dict | None:
     return NcFileRuleReadSerializer(rule).data
 
 
-def _enqueue_acl_for_rule(rule: NcFileAccessRule) -> None:
-    """为规则入队 ENABLE_FOLDER_ACL + SET_PATH_ACL 同步任务。
+def _enqueue_acl_for_rule(rule: NcFileAccessRule, nc_group: NcGroup) -> None:
+    """为规则入队 ADD_TO_GROUP + ENABLE_FOLDER_ACL + SET_PATH_ACL 同步任务。
 
-    folder_id 从 nc_path 首段（即挂载点名）匹配同名部门的 DEPT NcGroup 获取。
-    读取失败时仅跳过 ENABLE_FOLDER_ACL，不阻断 ACL 序列化入队。
+    NC Group Folder 要求用户必须属于某个已被 grant_group_folder 授权的群组，
+    才能在 Files 中看到该文件夹。因此在设置路径 ACL 前，先将用户加入目标 Group Folder
+    对应的 DEPT 群组（幂等，NC 不报错重复入组），赋予文件夹可见性后再下发细粒度 ACL 规则。
+    任务入队完毕后立即通过后台线程刷新执行（与用户同步任务等级相同）。
+
+    通过 nc_group（DEPT_ADMIN 群组）的 dept_id 定位 DEPT 群组，而非 dept__name=mount_point，
+    避免部门重命名后 NC 挂载点与 Django dept.name 不一致导致群组查找失败。
 
     Args:
         rule (NcFileAccessRule): 已保存的规则实例。
+        nc_group (NcGroup): 请求上下文中的 DEPT_ADMIN 群组（用于定位同部门的 DEPT 群组）。
     """
-    mount_point = rule.nc_path.split("/")[0]
     dept_ng = NcGroup.objects.filter(
         group_type=NcGroupType.DEPT,
-        dept__name=mount_point,
+        dept_id=nc_group.dept_id,
     ).first()
-    if dept_ng and dept_ng.folder_id:
-        NcSyncService.enqueue_enable_folder_acl(dept_ng.folder_id)
+
+    from api_v1.models.nc.nc_sync_task import NcSyncTask  # noqa: PLC0415 避免循环导入
+    last_task_id = NcSyncTask.objects.order_by("-id").values_list("id", flat=True).first() or 0
+
+    if dept_ng:
+        if dept_ng.folder_id:
+            # 开启 ACL 模式（幂等），必须在 set_path_acl 之前执行
+            NcSyncService.enqueue_enable_folder_acl(dept_ng.folder_id)
+        # 确保用户加入 DEPT 群组 —— 这是用户能看到 Group Folder 的充分必要条件
+        NcSyncService.enqueue_add_to_group(rule.user.username, dept_ng.code)
+
     NcSyncService.enqueue_set_path_acl(rule)
+    # 立即通过后台线程执行，不依赖 Celery Beat 每 30 秒轮询
+    NcSyncService._flush_tasks_after(last_task_id)
 
 
 def _get_caller_dept_ids(user) -> set[int] | None:

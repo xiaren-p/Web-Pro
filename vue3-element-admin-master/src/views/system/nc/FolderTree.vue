@@ -135,20 +135,17 @@
                 :props="userTreeProps"
                 :filter-node-method="filterUserNode"
                 node-key="nodeKey"
-                highlight-current
+                show-checkbox
                 :expand-on-click-node="false"
                 default-expand-all
-                @node-click="handleUserNodeClick"
+                @check="handleUserTreeCheck"
               >
                 <template #default="{ data: nodeData }: { data: UserTreeNode }">
                   <span v-if="nodeData.type === 'dept'" class="tree-dept-node">
                     <el-icon><OfficeBuilding /></el-icon>
                     {{ nodeData.name }}
                   </span>
-                  <span
-                    v-else
-                    :class="['tree-user-node', { selected: ruleForm.userId === nodeData.id }]"
-                  >
+                  <span v-else class="tree-user-node">
                     <el-icon><User /></el-icon>
                     {{ nodeData.nickname }}
                     <span class="tree-user-un">@{{ nodeData.username }}</span>
@@ -158,8 +155,13 @@
               <div v-if="userTreeLoading" class="tree-loading">加载中…</div>
               <div v-else-if="!userTreeData.length" class="tree-empty">暂无已同步 NC 的用户</div>
             </div>
-            <div v-if="ruleForm.userId" class="selected-user-tip">
-              已选：{{ ruleForm.selectedUserLabel }}
+            <div class="selected-user-tip" :class="{ active: ruleForm.userIds.length > 0 }">
+              <template v-if="ruleForm.userIds.length">
+                已勾选 <strong>{{ ruleForm.userIds.length }}</strong> 个用户
+              </template>
+              <template v-else>
+                请勾选用户，或勾选部门节点自动选中该部门所有成员
+              </template>
             </div>
           </template>
         </el-form-item>
@@ -187,7 +189,12 @@
       </el-form>
       <template #footer>
         <el-button @click="ruleDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="ruleDialog.loading" @click="submitRule">确定</el-button>
+        <el-button
+          type="primary"
+          :loading="ruleDialog.loading"
+          :disabled="!ruleDialog.ruleId && ruleForm.userIds.length === 0"
+          @click="submitRule"
+        >确定</el-button>
       </template>
     </el-dialog>
 
@@ -237,6 +244,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { Folder, FolderOpened, Lock, OfficeBuilding, User } from "@element-plus/icons-vue";
 
 import {
+  batchSetFolderRules,
   createFolder,
   deleteFolderRule,
   fetchFolderList,
@@ -406,11 +414,15 @@ watch(userSearchQuery, (val) => {
   userTreeRef.value?.filter(val);
 });
 
-function handleUserNodeClick(data: UserTreeNode): void {
-  if (data.type !== "user") return;
-  const u = data as UserTreeUser & { nodeKey: string };
-  ruleForm.userId = u.id;
-  ruleForm.selectedUserLabel = `${u.nickname}（${u.username}）`;
+// TODO(类型): el-tree @check 的 checkedInfo 参数类型为 CheckedInfo（含 TreeNodeData），使用 any 过渡
+function handleUserTreeCheck(
+  _data: unknown,
+  state: { checkedNodes: unknown[] },
+): void {
+  const users = (state.checkedNodes as UserTreeNode[]).filter((n) => n.type === "user") as (UserTreeUser & {
+    nodeKey: string;
+  })[];
+  ruleForm.userIds = users.map((u) => u.id);
 }
 
 // ─── 规则弹窗 ─────────────────────────────────────────────────────────────────
@@ -421,6 +433,9 @@ const ruleDialog = reactive({
   ruleId: null as number | null,
 });
 const ruleForm = reactive({
+  /** 添加模式：多选用户 ID 列表 */
+  userIds: [] as number[],
+  /** 编辑模式：单个用户 ID */
   userId: null as number | null,
   selectedUserLabel: "",
   preset: "read" as "read" | "write" | "full" | "custom",
@@ -445,6 +460,7 @@ function computePermBits(): number {
 
 async function openAddRule(): Promise<void> {
   ruleDialog.ruleId = null;
+  ruleForm.userIds = [];
   ruleForm.userId = null;
   ruleForm.selectedUserLabel = "";
   ruleForm.preset = "read";
@@ -467,19 +483,40 @@ function openEditRule(row: FolderRuleVO): void {
 }
 
 async function submitRule(): Promise<void> {
-  if (!ruleForm.userId || !activeNode.value?.ncPath || ruleDialog.loading) return;
+  if (!activeNode.value?.ncPath || ruleDialog.loading) return;
+  // 前置校验
+  if (ruleDialog.ruleId && !ruleForm.userId) return;
+  if (!ruleDialog.ruleId && !ruleForm.userIds.length) {
+    ElMessage.warning("请至少劾选一个用户");
+    return;
+  }
   ruleDialog.loading = true;
   try {
-    await setFolderRule({
-      groupId: activeNode.value.groupId,
-      userId: ruleForm.userId,
-      ncPath: activeNode.value.ncPath,
-      permissionBits: computePermBits(),
-      status: ruleForm.status,
-    });
+    if (ruleDialog.ruleId) {
+      // 编辑模式：单用户更新
+      await setFolderRule({
+        groupId: activeNode.value.groupId,
+        userId: ruleForm.userId!,
+        ncPath: activeNode.value.ncPath,
+        permissionBits: computePermBits(),
+        status: ruleForm.status,
+      });
+      ElMessage.success("规则已保存，ACL 同步任务已入队");
+    } else {
+      // 添加模式：批量多用户
+      const result = await batchSetFolderRules({
+        groupId: activeNode.value.groupId,
+        userIds: [...ruleForm.userIds],
+        ncPath: activeNode.value.ncPath,
+        permissionBits: computePermBits(),
+        status: ruleForm.status,
+      });
+      ElMessage.success(
+        `已处理 ${result.created + result.updated} 条规则（新建 ${result.created}，更新 ${result.updated}）`,
+      );
+    }
     ruleDialog.visible = false;
     await loadRules(activeNode.value.ncPath);
-    ElMessage.success("规则已保存，ACL 同步任务已入队");
   } catch {
     ElMessage.error("保存失败");
   } finally {
@@ -698,7 +735,12 @@ async function submitMkdir(): Promise<void> {
 .selected-user-tip {
   margin-top: 6px;
   font-size: 12px;
-  color: var(--el-color-primary);
+  color: var(--el-text-color-placeholder);
+
+  &.active {
+    color: var(--el-color-primary);
+    font-weight: 500;
+  }
 }
 
 .readonly-user {

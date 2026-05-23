@@ -193,3 +193,34 @@ export function fetchUserTree(): Promise<UserTreeDept[]> {
   return request.get("/nc/folder-tree/user-tree");
 }
 
+/** 批量设置权限规则请求体 */
+export interface BatchSetRuleForm {
+  /** NcGroup ID（用于后端作用域校验） */
+  groupId: number;
+  /** 完整 NC 路径（含挂载点） */
+  ncPath: string;
+  /** 目标用户 ID 列表 */
+  userIds: number[];
+  /** 权限位（1~31） */
+  permissionBits: number;
+  /** 是否生效，默认 true */
+  status?: boolean;
+}
+
+/** 批量设置权限规则响应 */
+export interface BatchSetRuleResult {
+  created: number;
+  updated: number;
+  rules: FolderRuleVO[];
+}
+
+/**
+ * 批量为多个用户设置同一 NC 路径的 ACL 权限规则（upsert）。
+ *
+ * @param {BatchSetRuleForm} data 批量规则表单
+ * @returns {Promise<BatchSetRuleResult>} 批量处理结果（新建数、更新数、规则列表）
+ */
+export function batchSetFolderRules(data: BatchSetRuleForm): Promise<BatchSetRuleResult> {
+  return request.post("/nc/folder-tree/set-rules-batch", data);
+}
+
