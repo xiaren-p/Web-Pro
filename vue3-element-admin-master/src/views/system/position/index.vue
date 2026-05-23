@@ -55,13 +55,6 @@
         <el-table-column label="岗位名称" prop="name" min-width="120" />
         <el-table-column label="岗位编码" prop="code" width="160" />
 
-        <el-table-column label="内置" align="center" width="80">
-          <template #default="scope">
-            <el-tag v-if="scope.row.isBuiltin" type="warning" size="small">内置</el-tag>
-            <span v-else>—</span>
-          </template>
-        </el-table-column>
-
         <el-table-column label="状态" align="center" width="100">
           <template #default="scope">
             <el-tag v-if="scope.row.status === 1" type="success">正常</el-tag>

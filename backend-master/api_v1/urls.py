@@ -96,11 +96,6 @@ urlpatterns = [
     path('nc/folder-tree/path-rules', views.NcFolderTreeViewSet.as_view({'get': 'path_rules'}), name='nc-folder-tree-path-rules'),
     path('nc/folder-tree/user-tree', views.NcFolderTreeViewSet.as_view({'get': 'user_tree'}), name='nc-folder-tree-user-tree'),
 
-    # NC 部门群组初始化与对账
-    path('nc/dept-groups', views.NcDeptGroupViewSet.as_view({'get': 'dept_status'}), name='nc-dept-groups-list'),
-    path('nc/dept-groups/provision-all', views.NcDeptGroupViewSet.as_view({'post': 'provision_all'}), name='nc-dept-groups-provision-all'),
-    re_path(r'^nc/dept-groups/(?P<dept_id>\d+)/provision$', views.NcDeptGroupViewSet.as_view({'post': 'provision'}), name='nc-dept-groups-provision'),
-
     # 菜单与动态路由
     path('menus/routes', views.MenuViewSet.as_view({'get': 'routes'}), name='menus-routes'),
     path('menus/tree', views.MenuViewSet.as_view({'get': 'tree'}), name='menus-tree'),

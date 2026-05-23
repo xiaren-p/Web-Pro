@@ -281,9 +281,10 @@ async function loadNode(node: any, resolve: (data: FolderTreeNode[]) => void): P
         hasRule: false,
       }));
       resolve(roots);
-      // 自动展开并选中第一个根节点
+      // 自动展开并选中第一个根节点，设置 activeNode 使展开后自动加载规则
       if (roots.length > 0) {
         nextTick(() => {
+          activeNode.value = roots[0];
           treeRef.value?.setCurrentKey(roots[0].key);
           treeRef.value?.getNode(roots[0].key)?.expand();
         });

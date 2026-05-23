@@ -26,7 +26,7 @@ class Position(TimeStampedModel):
     is_builtin = models.BooleanField(
         default=False,
         verbose_name="是否内置",
-        help_text="内置岗位不可删除，如 sys_admin、member",
+        help_text="内置岗位不可删除，如 sys_admin",
     )
 
     remark = models.CharField(

@@ -1,8 +1,7 @@
 """api_v1.views.nc 板块视图包。
 
-NC 权限规则管理视图：NcFolderTreeViewSet、NcDeptGroupViewSet
+NC 文件夹树与路径权限视图。
 """
 from api_v1.views.nc.nc_folder_tree_view import NcFolderTreeViewSet
-from api_v1.views.nc.nc_dept_group_view import NcDeptGroupViewSet
 
-__all__ = ["NcFolderTreeViewSet", "NcDeptGroupViewSet"]
+__all__ = ["NcFolderTreeViewSet"]
