@@ -471,6 +471,7 @@ async function submitRule(): Promise<void> {
   ruleDialog.loading = true;
   try {
     await setFolderRule({
+      groupId: activeNode.value.groupId,
       userId: ruleForm.userId,
       ncPath: activeNode.value.ncPath,
       permissionBits: computePermBits(),

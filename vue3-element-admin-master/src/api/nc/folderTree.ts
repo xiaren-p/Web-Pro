@@ -91,6 +91,8 @@ export interface MkdirResult {
 
 /** 设置权限规则请求体 */
 export interface SetRuleForm {
+  /** NcGroup ID（用于后端作用域校验） */
+  groupId: number;
   /** 目标用户 ID */
   userId: number;
   /** 完整 NC 路径（含挂载点），如 "技术部/机密文档" */

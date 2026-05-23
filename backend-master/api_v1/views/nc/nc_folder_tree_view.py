@@ -16,6 +16,7 @@ from rest_framework.request import Request
 from api_v1.models.nc.nc_file_access_rule import NcFileAccessRule
 from api_v1.models.nc.nc_group import NcGroup, NcGroupType
 from api_v1.models.system.department import Department
+from api_v1.models.system.user_profile import AdminLevel
 from api_v1.permissions import MenuPermRequired
 from api_v1.serializers.nc.nc_file_rule_serializer import NcFileRuleReadSerializer
 from api_v1.services.nc.nc_api_client import NcApiClient
@@ -66,16 +67,21 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="groups")
     def group_list(self, request: Request):
-        """获取所有 DEPT_ADMIN NC 群组列表。
+        """获取调用方有权管理的 DEPT_ADMIN NC 群组列表。
+
+        公司管理员返回全量；部门管理员只返回自身部门及子部门对应的群组。
 
         Returns:
             list[dict]: [{id, code, name, deptName}]，按部门排序顺序排列。
         """
-        groups = (
+        qs = (
             NcGroup.objects.filter(group_type=NcGroupType.DEPT_ADMIN)
             .select_related("dept")
             .order_by("dept__order_num", "name")
         )
+        allowed = _get_caller_dept_ids(request.user)
+        if allowed is not None:
+            qs = qs.filter(dept_id__in=list(allowed))
         result = [
             {
                 "id": g.id,
@@ -83,7 +89,7 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
                 "name": g.name,
                 "deptName": g.dept.name if g.dept else "",
             }
-            for g in groups
+            for g in qs
         ]
         return drf_ok(result)
 
@@ -114,6 +120,9 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
         nc_group, error = _resolve_dept_admin_group(group_id_str)
         if error:
             return drf_error(error)
+        scope_error = _check_group_scope(request.user, nc_group)
+        if scope_error:
+            return drf_error(scope_error, code=403)
 
         client, mount_point, fetch_error = _get_mount_point(nc_group)
         if fetch_error:
@@ -184,6 +193,9 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
         nc_group, error = _resolve_dept_admin_group(group_id_str)
         if error:
             return drf_error(error)
+        scope_error = _check_group_scope(request.user, nc_group)
+        if scope_error:
+            return drf_error(scope_error, code=403)
 
         client, mount_point, fetch_error = _get_mount_point(nc_group)
         if fetch_error:
@@ -236,9 +248,18 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
         nc_path = (body_data.get("ncPath") or "").strip("/")
         permission_bits_raw = body_data.get("permissionBits")
         status = body_data.get("status", True)
+        group_id_str = str(body_data.get("groupId", ""))
 
         if not nc_path:
             return drf_error("ncPath 不能为空")
+
+        # 校验调用方是否有权限操作该群组对应的目录
+        nc_group, grp_error = _resolve_dept_admin_group(group_id_str)
+        if grp_error:
+            return drf_error(grp_error)
+        scope_error = _check_group_scope(request.user, nc_group)
+        if scope_error:
+            return drf_error(scope_error, code=403)
         try:
             permission_bits = int(permission_bits_raw)
             if not (1 <= permission_bits <= 31):
@@ -352,10 +373,13 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
         """
         from api_v1.models.system.user_profile import UserProfile
 
-        # 取所有活跃用户（无论是否同步 NC），带部门与昵称
+        # 取有权管理的活跃用户（部门管理员只能看自身部门及子部门的用户）
+        allowed = _get_caller_dept_ids(request.user)
+        user_qs = UserProfile.objects.filter(user__is_active=True)
+        if allowed is not None:
+            user_qs = user_qs.filter(dept_id__in=list(allowed))
         profiles = (
-            UserProfile.objects
-            .filter(user__is_active=True)
+            user_qs
             .select_related("user", "dept")
             .order_by("dept__order_num", "dept_id", "user__username")
         )
@@ -506,3 +530,56 @@ def _enqueue_acl_for_rule(rule: NcFileAccessRule) -> None:
     if dept_ng and dept_ng.folder_id:
         NcSyncService.enqueue_enable_folder_acl(dept_ng.folder_id)
     NcSyncService.enqueue_set_path_acl(rule)
+
+
+def _get_caller_dept_ids(user) -> set[int] | None:
+    """返回调用方有权管理的部门 ID 集合。
+
+    Args:
+        user: Django 登录用户对象（request.user）。
+
+    Returns:
+        None  → 公司管理员 / superuser，不受部门限制。
+        set   → DEPT_ADMIN 可管辖的部门 ID（含自身及所有子部门）。
+        空集  → 普通成员，无权操作任何群组。
+    """
+    if user.is_superuser:
+        return None
+    profile = getattr(user, "profile", None)
+    if profile is None:
+        return set()
+    level = profile.admin_level
+    if level == AdminLevel.COMPANY_ADMIN:
+        return None
+    if level == AdminLevel.DEPT_ADMIN and profile.dept_id:
+        dept_ids: set[int] = set()
+
+        def _collect(did: int) -> None:
+            if did in dept_ids:
+                return
+            dept_ids.add(did)
+            for cid in Department.objects.filter(parent_id=did).values_list("id", flat=True):
+                _collect(cid)
+
+        _collect(profile.dept_id)
+        return dept_ids
+    return set()
+
+
+def _check_group_scope(user, nc_group: NcGroup) -> str | None:
+    """校验调用方是否有权操作指定 NC 群组。
+
+    Args:
+        user: Django 登录用户对象。
+        nc_group (NcGroup): 被操作的 DEPT_ADMIN 群组。
+
+    Returns:
+        None    → 有权限，可继续操作。
+        str     → 无权限，错误提示文字。
+    """
+    allowed = _get_caller_dept_ids(user)
+    if allowed is None:
+        return None
+    if nc_group.dept_id not in allowed:
+        return "无权限操作该部门的群组文件夹"
+    return None
