@@ -92,6 +92,7 @@ urlpatterns = [
     path('nc/folder-tree/list', views.NcFolderTreeViewSet.as_view({'get': 'list_folder'}), name='nc-folder-tree-list'),
     path('nc/folder-tree/mkdir', views.NcFolderTreeViewSet.as_view({'post': 'mkdir'}), name='nc-folder-tree-mkdir'),
     path('nc/folder-tree/set-rule', views.NcFolderTreeViewSet.as_view({'post': 'set_rule'}), name='nc-folder-tree-set-rule'),
+    path('nc/folder-tree/set-rules-batch', views.NcFolderTreeViewSet.as_view({'post': 'set_rules_batch'}), name='nc-folder-tree-set-rules-batch'),
     re_path(r'^nc/folder-tree/rule/(?P<pk>\d+)$', views.NcFolderTreeViewSet.as_view({'delete': 'delete_rule'}), name='nc-folder-tree-delete-rule'),
     path('nc/folder-tree/path-rules', views.NcFolderTreeViewSet.as_view({'get': 'path_rules'}), name='nc-folder-tree-path-rules'),
     path('nc/folder-tree/user-tree', views.NcFolderTreeViewSet.as_view({'get': 'user_tree'}), name='nc-folder-tree-user-tree'),
