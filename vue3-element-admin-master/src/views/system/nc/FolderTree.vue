@@ -19,9 +19,7 @@
           <div class="group-item__dept">{{ group.deptName }}</div>
           <div class="group-item__name">{{ group.name }}</div>
         </div>
-        <div v-if="groupList.length === 0" class="sidebar__empty">
-          暂无 DEPT_ADMIN 群组
-        </div>
+        <div v-if="groupList.length === 0" class="sidebar__empty">暂无 DEPT_ADMIN 群组</div>
       </el-scrollbar>
     </div>
 
@@ -67,17 +65,10 @@
                   {{ permBitsLabel(data.rule.permissionBits) }}
                 </el-tag>
                 <div class="tree-node__actions" @click.stop>
-                  <el-button
-                    size="small"
-                    type="primary"
-                    link
-                    @click="handleSetRule(data)"
-                  >
-                    {{ data.rule ? '改权限' : '设权限' }}
+                  <el-button size="small" type="primary" link @click="handleSetRule(data)">
+                    {{ data.rule ? "改权限" : "设权限" }}
                   </el-button>
-                  <el-button size="small" link @click="handleMkdir(data)">
-                    新建子目录
-                  </el-button>
+                  <el-button size="small" link @click="handleMkdir(data)">新建子目录</el-button>
                   <el-button
                     v-if="data.rule"
                     size="small"
@@ -130,9 +121,7 @@
             <el-checkbox :value="8">删除 DELETE</el-checkbox>
             <el-checkbox :value="16">分享 SHARE</el-checkbox>
           </el-checkbox-group>
-          <div v-if="computedPermBits > 0" class="perm-preview">
-            权限位：{{ computedPermBits }}
-          </div>
+          <div v-if="computedPermBits > 0" class="perm-preview">权限位：{{ computedPermBits }}</div>
         </el-form-item>
         <el-form-item label="是否生效">
           <el-switch v-model="ruleForm.status" />
@@ -161,7 +150,7 @@
       <el-form label-width="80px" class="mkdir-form">
         <el-form-item label="父目录">
           <span class="form-text">
-            {{ mkdirDialog.parentPath ? `/${mkdirDialog.parentPath}` : '/ (根目录)' }}
+            {{ mkdirDialog.parentPath ? `/${mkdirDialog.parentPath}` : "/ (根目录)" }}
           </span>
         </el-form-item>
         <el-form-item label="文件夹名">
@@ -278,7 +267,7 @@ async function loadNode(
   if (node.level > 0) {
     // node.data 运行时为 FolderItem，通过断言取 ncPath
     // ncPath = "mountPoint/a/b" → path = "a/b"（去掉挂载点前缀）
-    const ncPath = (node.data as FolderItem).ncPath;
+    const ncPath = (node.data as unknown as FolderItem).ncPath;
     const slashIdx = ncPath.indexOf("/");
     path = slashIdx >= 0 ? ncPath.substring(slashIdx + 1) : "";
   }
@@ -407,8 +396,7 @@ function handleMkdir(data: FolderItem): void {
   mkdirDialog.parentNcPath = data.ncPath;
   // parentPath = ncPath 去掉挂载点前缀
   const slashIdx = data.ncPath.indexOf("/");
-  mkdirDialog.parentPath =
-    slashIdx >= 0 ? data.ncPath.substring(slashIdx + 1) : "";
+  mkdirDialog.parentPath = slashIdx >= 0 ? data.ncPath.substring(slashIdx + 1) : "";
   mkdirForm.folderName = "";
   mkdirDialog.visible = true;
   nextTick(() => folderNameInputRef.value?.focus());
