@@ -26,6 +26,7 @@ from django.utils import timezone
 from api_v1.models.nc.nc_file_access_rule import NcFileAccessRule
 from api_v1.models.nc.nc_group import NcGroup, NcGroupType
 from api_v1.models.nc.nc_sync_task import NcSyncTask, SyncOperation, SyncStatus
+from api_v1.models.system.department import Department
 from api_v1.models.system.user_profile import AdminLevel
 
 logger = logging.getLogger(__name__)
@@ -780,6 +781,11 @@ class NcSyncService:
     def _enqueue_dept_group(cls, username: str, profile) -> None:
         """根据用户部门入队 add_to_group（部门 DEPT 群组）。
 
+        若目标部门尚无 NcGroup 记录（如部门在 NC 集成上线前创建），
+        则自动调用 on_dept_created 补建 NcGroup 及 create_group /
+        create_group_folder 任务，之后再入队 add_to_group，
+        确保任务执行顺序正确（create_group 先于 add_to_group）。
+
         Args:
             username (str): 目标用户名。
             profile: UserProfile 实例。
@@ -791,6 +797,33 @@ class NcSyncService:
                 dept_id=profile.dept_id,
                 group_type=NcGroupType.DEPT,
             ).first()
+            if not nc_group:
+                # 目标部门缺少 NcGroup（常见于 NC 集成上线前已存在的部门）
+                logger.warning(
+                    "[NcSyncService][_enqueue_dept_group] dept_id=%s 无对应 DEPT NcGroup，"
+                    "尝试自动补建以完成用户 %s 的部门同步",
+                    profile.dept_id, username,
+                )
+                try:
+                    dept_obj = Department.objects.get(pk=profile.dept_id)
+                    # on_dept_created 内部使用 get_or_create，幂等安全；
+                    # 同时入队 create_group + create_group_folder（ID 低于后续
+                    # add_to_group，后台线程按 ID 顺序执行可保证依赖关系）。
+                    nc_group = cls.on_dept_created(dept_obj)
+                except Department.DoesNotExist:
+                    logger.error(
+                        "[NcSyncService][_enqueue_dept_group] dept_id=%s 部门记录不存在，"
+                        "无法补建 NcGroup，跳过 username=%s 的入组任务",
+                        profile.dept_id, username,
+                    )
+                    return
+                except Exception as exc:
+                    logger.error(
+                        "[NcSyncService][_enqueue_dept_group] dept_id=%s 自动补建 NcGroup 失败: %s，"
+                        "跳过 username=%s 的入组任务",
+                        profile.dept_id, exc, username,
+                    )
+                    return
             if nc_group:
                 cls.enqueue_add_to_group(username, nc_group.code)
         except Exception as exc:
@@ -818,6 +851,15 @@ class NcSyncService:
             ).first()
             if admin_ng:
                 cls.enqueue_add_to_group(username, admin_ng.code)
+            else:
+                # DEPT_ADMIN NcGroup 缺失：通常在 _enqueue_dept_group 调用
+                # on_dept_created 后应已补建；若仍缺失则记录警告供运维排查。
+                logger.warning(
+                    "[NcSyncService][_enqueue_dept_admin_group] dept_id=%s 无对应 "
+                    "DEPT_ADMIN NcGroup，跳过 username=%s 的管理员入组任务。"
+                    "请运行 manage.py reconcile_nc 进行全量对账。",
+                    profile.dept_id, username,
+                )
         except Exception as exc:
             logger.warning(
                 "[NcSyncService][_enqueue_dept_admin_group] username=%s 获取部门管理员群组失败: %s",
