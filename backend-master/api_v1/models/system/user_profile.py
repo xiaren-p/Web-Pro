@@ -91,12 +91,6 @@ class UserProfile(TimeStampedModel):
         help_text="除部门群组外额外加入的 NC 群组（如项目组、公司共享等）",
     )
 
-    nc_synced = models.BooleanField(
-        default=False,
-        verbose_name="NC 已同步",
-        help_text="True=该用户已成功同步到 Nextcloud",
-    )
-
     class Meta:
         verbose_name = "用户扩展"
         verbose_name_plural = "用户扩展"

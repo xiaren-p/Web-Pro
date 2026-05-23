@@ -338,8 +338,6 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
     def user_tree(self, request: Request):
         """返回按部门树组织的用户列表，供添加规则弹窗的用户选择器使用。
 
-        只包含已同步 NC 用户（nc_synced=True）的庐员。
-
         Returns:
             list[dict]: [
                 {
@@ -354,10 +352,10 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
         """
         from api_v1.models.system.user_profile import UserProfile
 
-        # 取所有已同步 NC 的用户，带部门与昵称
+        # 取所有活跃用户（无论是否同步 NC），带部门与昵称
         profiles = (
             UserProfile.objects
-            .filter(nc_synced=True, user__is_active=True)
+            .filter(user__is_active=True)
             .select_related("user", "dept")
             .order_by("dept__order_num", "dept_id", "user__username")
         )

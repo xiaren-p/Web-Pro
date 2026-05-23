@@ -35,9 +35,9 @@
         <el-empty description="点击左侧文件夹查看权限配置" :image-size="80" />
       </div>
 
-      <!-- 根节点未展开（ncPath 为空） -->
+      <!-- 根节点正在加载 ncPath -->
       <div v-else-if="!activeNode.ncPath" class="empty-hint">
-        <el-empty description="请先展开目录以加载路径信息" :image-size="80" />
+        <el-empty description="正在加载目录信息…" :image-size="80" />
       </div>
 
       <!-- 已选中具体路径 -->
@@ -308,6 +308,10 @@ async function loadNode(node: any, resolve: (data: FolderTreeNode[]) => void): P
       // 回填根节点的实际 ncPath（Group Folder 挂载点名）
       data.ncPath = result.fullNcPath;
       data.key = result.fullNcPath;
+      // 若该根节点正被用户选中（点击后触发展开），立即加载其规则
+      if (activeNode.value?.groupId === data.groupId) {
+        loadRules(data.ncPath);
+      }
     }
     resolve(
       result.items.map((item) => ({
@@ -333,6 +337,9 @@ function handleNodeClick(data: FolderTreeNode): void {
   rules.value = [];
   if (data.ncPath) {
     loadRules(data.ncPath);
+  } else if (data.isRoot) {
+    // 根节点尚未展开：自动触发展开，loadNode 完成后会回调 loadRules
+    treeRef.value?.getNode(data.key)?.expand();
   }
 }
 
