@@ -522,18 +522,18 @@ class NcApiClient:
     def set_path_acl(
         self,
         nc_path: str,
-        group_id: str,
+        username: str,
         mask: int,
         permissions: int,
     ) -> None:
-        """**为 Group Folder 内子目录设置群组 ACL 规则**（WebDAV PROPPATCH）。
+        """**为 Group Folder 内子目录设置用户 ACL 规则**（WebDAV PROPPATCH）。
 
         ACL 规则视该路径的 Group Folder GRANT 基线权限，实现子目录级别的细粒度控制。
 
         Args:
             nc_path (str): 从 Group Folder 挂载点开始的完整子路径，
                            如 "技术部/机密文档" 或 "技术部"；首尾斜杠自动忽略。
-            group_id (str): NC 群组 ID（NcGroup.code）。
+            username (str): NC 用户名（Django User.username）。
             mask (int): ACL 掩码（全位生效传 31；传 0 表示展透/移除该条规则的效果）。
             permissions (int): 实际授予的权限位（READ=1 WRITE=2 CREATE=4 DELETE=8 SHARE=16）。
 
@@ -547,8 +547,8 @@ class NcApiClient:
             '<d:propertyupdate xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">'
             "<d:set><d:prop><oc:acl-list>"
             "<oc:acl>"
-            "<oc:acl-mapping-type>group</oc:acl-mapping-type>"
-            f"<oc:acl-mapping-id>{group_id}</oc:acl-mapping-id>"
+            "<oc:acl-mapping-type>user</oc:acl-mapping-type>"
+            f"<oc:acl-mapping-id>{username}</oc:acl-mapping-id>"
             f"<oc:acl-mask>{mask}</oc:acl-mask>"
             f"<oc:acl-permissions>{permissions}</oc:acl-permissions>"
             "</oc:acl>"
@@ -556,8 +556,8 @@ class NcApiClient:
             "</d:propertyupdate>"
         )
         logger.info(
-            "[NcApiClient][set_path_acl] path=%s group=%s mask=%s perms=%s",
-            dav_path, group_id, mask, permissions,
+            "[NcApiClient][set_path_acl] path=%s user=%s mask=%s perms=%s",
+            dav_path, username, mask, permissions,
         )
         self._proppatch(dav_path, xml_body)
 

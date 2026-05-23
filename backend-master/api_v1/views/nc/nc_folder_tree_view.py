@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -14,12 +15,14 @@ from rest_framework.request import Request
 
 from api_v1.models.nc.nc_file_access_rule import NcFileAccessRule
 from api_v1.models.nc.nc_group import NcGroup, NcGroupType
+from api_v1.models.system.department import Department
 from api_v1.permissions import MenuPermRequired
 from api_v1.serializers.nc.nc_file_rule_serializer import NcFileRuleReadSerializer
 from api_v1.services.nc.nc_api_client import NcApiClient
 from api_v1.services.nc.nc_sync_service import NcSyncService
 from api_v1.utils.responses import drf_error, drf_ok
 
+User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
@@ -46,7 +49,7 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             if hasattr(self, "request") else ""
         )
         required: list[str] | None = None
-        if action_name in ("group_list", "list_folder", "path_rules", "all_groups") and method == "GET":
+        if action_name in ("group_list", "list_folder", "path_rules", "user_tree") and method == "GET":
             required = ["nc:folder:query"]
         elif action_name == "mkdir" and method == "POST":
             required = ["nc:folder:mkdir"]
@@ -126,18 +129,15 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             return drf_error(f"读取文件夹列表失败: {exc}")
 
         # 批量查询该层下已有规则，以 nc_path 为索引加速节点匹配
-        rules_map: dict[str, NcFileAccessRule] = {
-            r.nc_path: r
-            for r in NcFileAccessRule.objects.filter(
-                nc_group=nc_group,
-                nc_path__startswith=full_nc_path + "/",
-            )
-        }
+        rules_map: dict[str, NcFileAccessRule] = {}
+        for r in NcFileAccessRule.objects.filter(
+            nc_path__startswith=full_nc_path + "/",
+        ).select_related("user", "user__profile", "user__profile__dept"):
+            rules_map[r.nc_path] = r
         # 当前路径自身的规则（用于顶层配置展示）
         current_rule = NcFileAccessRule.objects.filter(
-            nc_group=nc_group,
             nc_path=full_nc_path,
-        ).first()
+        ).select_related("user", "user__profile", "user__profile__dept").first()
 
         items = [
             {
@@ -231,10 +231,11 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
         Returns:
             dict: NcFileRuleReadSerializer 格式的规则数据（更新或新建后的结果）。
         """
-        group_id_str = str(request.data.get("groupId", ""))
-        nc_path = (request.data.get("ncPath") or "").strip("/")
-        permission_bits_raw = request.data.get("permissionBits")
-        status = request.data.get("status", True)
+        body_data = request.data
+        user_id_str = str(body_data.get("userId", ""))
+        nc_path = (body_data.get("ncPath") or "").strip("/")
+        permission_bits_raw = body_data.get("permissionBits")
+        status = body_data.get("status", True)
 
         if not nc_path:
             return drf_error("ncPath 不能为空")
@@ -246,27 +247,30 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             return drf_error("permissionBits 必须在 1~31 之间")
 
         try:
-            nc_group = NcGroup.objects.select_related("dept").get(pk=int(group_id_str))
-        except (NcGroup.DoesNotExist, ValueError, TypeError):
-            return drf_error("群组不存在")
+            target_user = User.objects.select_related(
+                "profile", "profile__dept"
+            ).get(pk=int(user_id_str))
+        except (User.DoesNotExist, ValueError, TypeError):
+            return drf_error("用户不存在")
 
         with transaction.atomic():
             rule, created = NcFileAccessRule.objects.update_or_create(
-                nc_group=nc_group,
+                user=target_user,
                 nc_path=nc_path,
                 defaults={
                     "permission_bits": permission_bits,
-                    "is_group_folder": True,
                     "status": bool(status),
                 },
             )
 
         logger.info(
-            "[NcFolderTreeViewSet][set_rule] %s ncPath=%s permBits=%s",
+            "[NcFolderTreeViewSet][set_rule] %s ncPath=%s user=%s permBits=%s",
             "新建" if created else "更新",
             nc_path,
+            target_user.username,
             permission_bits,
         )
+        rule.user = target_user  # 确保实例上已经载入关联对象
         _enqueue_acl_for_rule(rule)
         return drf_ok(NcFileRuleReadSerializer(rule).data)
 
@@ -285,18 +289,18 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             dict: 空 dict。
         """
         try:
-            rule = NcFileAccessRule.objects.select_related("nc_group").get(pk=pk)
+            rule = NcFileAccessRule.objects.select_related("user").get(pk=pk)
         except NcFileAccessRule.DoesNotExist:
             return drf_error("规则不存在", code=404)
 
         nc_path = rule.nc_path
-        group_code = rule.nc_group.code
+        username = rule.user.username
         rule.delete()
-        NcSyncService.enqueue_revoke_path_acl(nc_path, group_code)
+        NcSyncService.enqueue_revoke_path_acl(nc_path, username)
 
         logger.info(
-            "[NcFolderTreeViewSet][delete_rule] pk=%s ncPath=%s group=%s",
-            pk, nc_path, group_code,
+            "[NcFolderTreeViewSet][delete_rule] pk=%s ncPath=%s user=%s",
+            pk, nc_path, username,
         )
         return drf_ok({})
 
@@ -321,37 +325,68 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
         rules = (
             NcFileAccessRule.objects
             .filter(nc_path=nc_path)
-            .select_related("nc_group", "nc_group__dept")
-            .order_by("nc_group__dept__order_num", "nc_group__name")
+            .select_related("user", "user__profile", "user__profile__dept")
+            .order_by("user__profile__dept__order_num", "user__username")
         )
         return drf_ok(NcFileRuleReadSerializer(rules, many=True).data)
 
     # ------------------------------------------------------------------ #
-    #  获取所有 NC 群组（规则弹窗群组选择器数据源）                           #
+    #  用户树（添加规则弹窗用户选择器数据源）                         #
     # ------------------------------------------------------------------ #
 
-    @action(detail=False, methods=["get"], url_path="all-groups")
-    def all_groups(self, request: Request):
-        """获取所有 NC 群组（不限类型），供添加 ACL 规则时选择目标群组。
+    @action(detail=False, methods=["get"], url_path="user-tree")
+    def user_tree(self, request: Request):
+        """返回按部门树组织的用户列表，供添加规则弹窗的用户选择器使用。
+
+        只包含已同步 NC 用户（nc_synced=True）的庐员。
 
         Returns:
-            list[dict]: [{id, code, name, groupType, deptName}]，按部门排序。
+            list[dict]: [
+                {
+                    "id": 1,
+                    "name": "技术部",
+                    "type": "dept",
+                    "children": [
+                        {"id": 101, "username": "zhangsan", "nickname": "张三", "type": "user"}
+                    ]
+                }
+            ]
         """
-        groups = (
-            NcGroup.objects
-            .select_related("dept")
-            .order_by("dept__order_num", "group_type", "name")
+        from api_v1.models.system.user_profile import UserProfile
+
+        # 取所有已同步 NC 的用户，带部门与昵称
+        profiles = (
+            UserProfile.objects
+            .filter(nc_synced=True, user__is_active=True)
+            .select_related("user", "dept")
+            .order_by("dept__order_num", "dept_id", "user__username")
         )
-        result = [
-            {
-                "id": g.id,
-                "code": g.code,
-                "name": g.name,
-                "groupType": g.group_type,
-                "deptName": g.dept.name if g.dept else "",
-            }
-            for g in groups
-        ]
+
+        # 按部门分组构建树结构
+        dept_map: dict[int | None, dict] = {}
+        result: list[dict] = []
+
+        for profile in profiles:
+            dept = profile.dept
+            dept_key = dept.id if dept else None
+
+            if dept_key not in dept_map:
+                dept_node: dict = {
+                    "id": dept_key,
+                    "name": dept.name if dept else "无部门",
+                    "type": "dept",
+                    "children": [],
+                }
+                dept_map[dept_key] = dept_node
+                result.append(dept_node)
+
+            dept_map[dept_key]["children"].append({
+                "id": profile.user_id,
+                "username": profile.user.username,
+                "nickname": profile.nickname or profile.user.username,
+                "type": "user",
+            })
+
         return drf_ok(result)
 
 
@@ -459,20 +494,17 @@ def _serialize_rule(rule: NcFileAccessRule | None) -> dict | None:
 def _enqueue_acl_for_rule(rule: NcFileAccessRule) -> None:
     """为规则入队 ENABLE_FOLDER_ACL + SET_PATH_ACL 同步任务。
 
-    folder_id 从同部门 DEPT 类型群组获取，与 reconcile 逻辑保持一致。
+    folder_id 从 nc_path 首段（即挂载点名）匹配同名部门的 DEPT NcGroup 获取。
+    读取失败时仅跳过 ENABLE_FOLDER_ACL，不阻断 ACL 序列化入队。
 
     Args:
         rule (NcFileAccessRule): 已保存的规则实例。
     """
-    folder_id: int | None = None
-    if rule.nc_group.dept_id:
-        dept_ng = NcGroup.objects.filter(
-            dept_id=rule.nc_group.dept_id,
-            group_type=NcGroupType.DEPT,
-        ).first()
-        if dept_ng:
-            folder_id = dept_ng.folder_id
-
-    if folder_id:
-        NcSyncService.enqueue_enable_folder_acl(folder_id)
+    mount_point = rule.nc_path.split("/")[0]
+    dept_ng = NcGroup.objects.filter(
+        group_type=NcGroupType.DEPT,
+        dept__name=mount_point,
+    ).first()
+    if dept_ng and dept_ng.folder_id:
+        NcSyncService.enqueue_enable_folder_acl(dept_ng.folder_id)
     NcSyncService.enqueue_set_path_acl(rule)

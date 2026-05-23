@@ -1,11 +1,12 @@
 """Nextcloud 文件夹访问权限规则模型（nc_file_access_rule）。"""
+from django.conf import settings
 from django.db import models
 
 from api_v1.models._base import TimeStampedModel
 
 
 class NcFileAccessRule(TimeStampedModel):
-    """NC 群组与文件夹的权限绑定规则表。
+    """NC 用户与文件夹的 ACL 权限绑定规则表。
 
     使用位图描述权限（与 NC OCS Share API permission 字段对齐）：
         READ=1  WRITE=2  CREATE=4  DELETE=8  SHARE=16
@@ -20,11 +21,11 @@ class NcFileAccessRule(TimeStampedModel):
     PERM_SHARE: int = 16
     PERM_FULL: int = 31  # READ + WRITE + CREATE + DELETE + SHARE
 
-    nc_group = models.ForeignKey(
-        "NcGroup",
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="file_rules",
-        verbose_name="NC 群组",
+        related_name="nc_file_rules",
+        verbose_name="用户",
     )
 
     nc_path = models.CharField(
@@ -39,12 +40,6 @@ class NcFileAccessRule(TimeStampedModel):
         help_text="READ=1 WRITE=2 CREATE=4 DELETE=8 SHARE=16，组合相加",
     )
 
-    is_group_folder = models.BooleanField(
-        default=True,
-        verbose_name="是否 Group Folder",
-        help_text="True=通过 Group Folders 插件管理；False=OCS 普通共享",
-    )
-
     status = models.BooleanField(
         default=True,
         verbose_name="是否生效",
@@ -53,8 +48,8 @@ class NcFileAccessRule(TimeStampedModel):
     class Meta:
         verbose_name = "NC 文件访问规则"
         verbose_name_plural = "NC 文件访问规则"
-        unique_together = ("nc_group", "nc_path")
-        ordering = ("nc_group_id", "nc_path")
+        unique_together = ("user", "nc_path")
+        ordering = ("user_id", "nc_path")
 
     def __str__(self) -> str:
-        return f"{self.nc_group.code} → {self.nc_path} [{self.permission_bits}]"
+        return f"{self.user.username} → {self.nc_path} [{self.permission_bits}]"

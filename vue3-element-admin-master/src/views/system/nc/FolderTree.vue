@@ -57,12 +57,17 @@
 
         <!-- 规则表格 -->
         <el-table v-loading="rulesLoading" :data="rules" border size="small">
-          <el-table-column label="群组" min-width="200">
+          <el-table-column label="用户" min-width="200">
             <template #default="{ row }: { row: FolderRuleVO }">
-              <el-tag :type="row.ncGroupType === 'DEPT_ADMIN' ? 'warning' : 'info'" size="small">
-                {{ row.ncGroupCode }}
-              </el-tag>
-              <span class="ml-2 text-xs text-gray-400">{{ row.ncGroupName }}</span>
+              <span class="user-cell">
+                <span class="user-name">{{ row.username }}</span>
+                <span v-if="row.userNickname !== row.username" class="user-nick">
+                  {{ row.userNickname }}
+                </span>
+                <el-tag v-if="row.deptName" type="info" size="small" class="dept-tag">
+                  {{ row.deptName }}
+                </el-tag>
+              </span>
             </template>
           </el-table-column>
           <el-table-column label="权限" min-width="160">
@@ -101,26 +106,64 @@
     <el-dialog
       v-model="ruleDialog.visible"
       :title="ruleDialog.ruleId ? '编辑权限规则' : '添加权限规则'"
-      width="480px"
+      width="500px"
       :close-on-click-modal="false"
     >
       <el-form :model="ruleForm" label-width="80px">
-        <el-form-item label="目标群组">
-          <el-select
-            v-model="ruleForm.groupId"
-            filterable
-            placeholder="选择 NC 群组"
-            style="width: 100%"
-            :disabled="!!ruleDialog.ruleId"
-          >
-            <el-option
-              v-for="g in allGroups"
-              :key="g.id"
-              :label="`${g.code} — ${g.deptName}`"
-              :value="g.id"
+        <!-- 用户选择器（仅新增时可选；编辑时展示只读信息） -->
+        <el-form-item label="目标用户">
+          <template v-if="ruleDialog.ruleId">
+            <span class="readonly-user">
+              {{ ruleForm.selectedUserLabel || "—" }}
+            </span>
+          </template>
+          <template v-else>
+            <!-- 搜索输入 -->
+            <el-input
+              v-model="userSearchQuery"
+              placeholder="搜索用户名/昵称"
+              clearable
+              prefix-icon="Search"
+              size="small"
+              style="margin-bottom: 6px"
             />
-          </el-select>
+            <!-- 部门-用户树 -->
+            <div class="user-tree-wrap">
+              <el-tree
+                ref="userTreeRef"
+                :data="userTreeData"
+                :props="userTreeProps"
+                :filter-node-method="filterUserNode"
+                node-key="nodeKey"
+                highlight-current
+                :expand-on-click-node="false"
+                default-expand-all
+                @node-click="handleUserNodeClick"
+              >
+                <template #default="{ data: nodeData }: { data: UserTreeNode }">
+                  <span v-if="nodeData.type === 'dept'" class="tree-dept-node">
+                    <el-icon><OfficeBuilding /></el-icon>
+                    {{ nodeData.name }}
+                  </span>
+                  <span
+                    v-else
+                    :class="['tree-user-node', { selected: ruleForm.userId === nodeData.id }]"
+                  >
+                    <el-icon><User /></el-icon>
+                    {{ nodeData.nickname }}
+                    <span class="tree-user-un">@{{ nodeData.username }}</span>
+                  </span>
+                </template>
+              </el-tree>
+              <div v-if="userTreeLoading" class="tree-loading">加载中…</div>
+              <div v-else-if="!userTreeData.length" class="tree-empty">暂无已同步 NC 的用户</div>
+            </div>
+            <div v-if="ruleForm.userId" class="selected-user-tip">
+              已选：{{ ruleForm.selectedUserLabel }}
+            </div>
+          </template>
         </el-form-item>
+
         <el-form-item label="权限预设">
           <el-radio-group v-model="ruleForm.preset" @change="applyPreset">
             <el-radio-button value="read">只读</el-radio-button>
@@ -187,19 +230,19 @@
  * NC 文件夹权限配置页面：左侧文件夹树 + 右侧 ACL 规则管理面板。
  * 所属板块：nc / 文件权限管理。
  */
-import type { FolderRuleVO, NcGroupOption } from "@/api/nc/folderTree";
+import type { FolderRuleVO, UserTreeDept, UserTreeUser } from "@/api/nc/folderTree";
 
-import { computed, reactive, ref } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Folder, FolderOpened, Lock } from "@element-plus/icons-vue";
+import { Folder, FolderOpened, Lock, OfficeBuilding, User } from "@element-plus/icons-vue";
 
 import {
   createFolder,
   deleteFolderRule,
-  fetchAllNcGroups,
   fetchFolderList,
   fetchNcGroupList,
   fetchPathRules,
+  fetchUserTree,
   setFolderRule,
 } from "@/api/nc/folderTree";
 
@@ -214,6 +257,11 @@ interface FolderTreeNode {
   hasRule: boolean;
 }
 
+/** 用于 el-tree 渲染的联合节点类型（部门或用户） */
+type UserTreeNode =
+  | (UserTreeDept & { nodeKey: string; children: UserTreeNode[] })
+  | (UserTreeUser & { nodeKey: string });
+
 // ─── 文件夹树 ─────────────────────────────────────────────────────────────────
 
 const treeRef = ref();
@@ -224,16 +272,22 @@ async function loadNode(node: any, resolve: (data: FolderTreeNode[]) => void): P
   if (node.level === 0) {
     try {
       const groups = await fetchNcGroupList();
-      resolve(
-        groups.map((g) => ({
-          key: `root-${g.id}`,
-          name: g.deptName,
-          ncPath: "",
-          groupId: g.id,
-          isRoot: true,
-          hasRule: false,
-        }))
-      );
+      const roots = groups.map((g) => ({
+        key: `root-${g.id}`,
+        name: g.deptName,
+        ncPath: "",
+        groupId: g.id,
+        isRoot: true,
+        hasRule: false,
+      }));
+      resolve(roots);
+      // 自动展开并选中第一个根节点
+      if (roots.length > 0) {
+        nextTick(() => {
+          treeRef.value?.setCurrentKey(roots[0].key);
+          treeRef.value?.getNode(roots[0].key)?.expand();
+        });
+      }
     } catch {
       resolve([]);
     }
@@ -297,16 +351,70 @@ async function loadRules(ncPath: string): Promise<void> {
   }
 }
 
+// ─── 用户树（规则弹窗数据源） ─────────────────────────────────────────────────
+
+const userTreeRef = ref();
+const userTreeData = ref<UserTreeNode[]>([]);
+const userTreeLoading = ref(false);
+const userSearchQuery = ref("");
+const userTreeProps = { label: "name", children: "children" };
+
+/** 将后端返回的 UserTreeDept[] 适配为 el-tree 节点格式 */
+function buildUserTreeNodes(depts: UserTreeDept[]): UserTreeNode[] {
+  return depts.map((dept) => ({
+    ...dept,
+    nodeKey: `dept-${dept.id ?? "none"}`,
+    children: dept.children.map((u) => ({
+      ...u,
+      nodeKey: `user-${u.id}`,
+    })) as UserTreeNode[],
+  })) as UserTreeNode[];
+}
+
+async function loadUserTree(): Promise<void> {
+  if (userTreeData.value.length) return;
+  userTreeLoading.value = true;
+  try {
+    const raw = await fetchUserTree();
+    userTreeData.value = buildUserTreeNodes(raw);
+  } finally {
+    userTreeLoading.value = false;
+  }
+}
+
+/** el-tree filter-node-method：搜索用户名或昵称，同时保留部门父节点 */
+// TODO(类型): FilterNodeMethodFunction 的 data 参数为 TreeNodeData（any-like），使用断言处理
+function filterUserNode(query: string, data: unknown): boolean {
+  if (!query) return true;
+  const node = data as UserTreeNode;
+  if (node.type === "dept") return true; // 部门节点始终显示
+  const u = node as UserTreeUser & { nodeKey: string };
+  const q = query.toLowerCase();
+  return u.username.toLowerCase().includes(q) || u.nickname.toLowerCase().includes(q);
+}
+
+// 搜索词变化时触发 el-tree 过滤
+watch(userSearchQuery, (val) => {
+  userTreeRef.value?.filter(val);
+});
+
+function handleUserNodeClick(data: UserTreeNode): void {
+  if (data.type !== "user") return;
+  const u = data as UserTreeUser & { nodeKey: string };
+  ruleForm.userId = u.id;
+  ruleForm.selectedUserLabel = `${u.nickname}（${u.username}）`;
+}
+
 // ─── 规则弹窗 ─────────────────────────────────────────────────────────────────
 
-const allGroups = ref<NcGroupOption[]>([]);
 const ruleDialog = reactive({
   visible: false,
   loading: false,
   ruleId: null as number | null,
 });
 const ruleForm = reactive({
-  groupId: null as number | null,
+  userId: null as number | null,
+  selectedUserLabel: "",
   preset: "read" as "read" | "write" | "full" | "custom",
   permBits: [1] as number[],
   status: true,
@@ -328,18 +436,22 @@ function computePermBits(): number {
 }
 
 async function openAddRule(): Promise<void> {
-  if (!allGroups.value.length) allGroups.value = await fetchAllNcGroups();
   ruleDialog.ruleId = null;
-  ruleForm.groupId = null;
+  ruleForm.userId = null;
+  ruleForm.selectedUserLabel = "";
   ruleForm.preset = "read";
   ruleForm.permBits = [1];
   ruleForm.status = true;
+  userSearchQuery.value = "";
+  userTreeData.value = []; // 强制重新加载，确保数据最新
   ruleDialog.visible = true;
+  await loadUserTree();
 }
 
 function openEditRule(row: FolderRuleVO): void {
   ruleDialog.ruleId = row.id;
-  ruleForm.groupId = row.ncGroupId;
+  ruleForm.userId = row.userId;
+  ruleForm.selectedUserLabel = `${row.userNickname}（${row.username}）`;
   ruleForm.preset = "custom";
   ruleForm.permBits = [1, 2, 4, 8, 16].filter((b) => (row.permissionBits & b) !== 0);
   ruleForm.status = row.status;
@@ -347,11 +459,11 @@ function openEditRule(row: FolderRuleVO): void {
 }
 
 async function submitRule(): Promise<void> {
-  if (!ruleForm.groupId || !activeNode.value?.ncPath || ruleDialog.loading) return;
+  if (!ruleForm.userId || !activeNode.value?.ncPath || ruleDialog.loading) return;
   ruleDialog.loading = true;
   try {
     await setFolderRule({
-      groupId: ruleForm.groupId,
+      userId: ruleForm.userId,
       ncPath: activeNode.value.ncPath,
       permissionBits: computePermBits(),
       status: ruleForm.status,
@@ -367,9 +479,11 @@ async function submitRule(): Promise<void> {
 }
 
 async function handleDeleteRule(row: FolderRuleVO): Promise<void> {
-  await ElMessageBox.confirm(`删除群组 ${row.ncGroupCode} 在此路径的权限规则？`, "确认删除", {
-    type: "warning",
-  });
+  await ElMessageBox.confirm(
+    `删除用户 ${row.userNickname}（${row.username}）在此路径的权限规则？`,
+    "确认删除",
+    { type: "warning" }
+  );
   try {
     await deleteFolderRule(row.id);
     await loadRules(activeNode.value!.ncPath);
@@ -496,5 +610,90 @@ async function submitMkdir(): Promise<void> {
   font-size: 13px;
   background: var(--el-fill-color-lighter);
   border-radius: 4px;
+}
+
+// 规则表格 - 用户列
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.user-name {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.user-nick {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.dept-tag {
+  font-size: 11px;
+}
+
+// 规则弹窗 - 用户树
+.user-tree-wrap {
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  padding: 4px 0;
+  max-height: 240px;
+  overflow-y: auto;
+  width: 100%;
+
+  :deep(.el-tree-node__content) {
+    height: 30px;
+  }
+}
+
+.tree-dept-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--el-text-color-secondary);
+  cursor: default;
+}
+
+.tree-user-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 3px;
+
+  &.selected {
+    color: var(--el-color-primary);
+    font-weight: 500;
+  }
+}
+
+.tree-user-un {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
+}
+
+.tree-loading,
+.tree-empty {
+  text-align: center;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+}
+
+.selected-user-tip {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-color-primary);
+}
+
+.readonly-user {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
 }
 </style>

@@ -1,3 +1,3 @@
-from api_v1.serializers.nc.nc_file_rule_serializer import NcFileRuleReadSerializer, NcFileRuleWriteSerializer
+from api_v1.serializers.nc.nc_file_rule_serializer import NcFileRuleReadSerializer
 
-__all__ = ["NcFileRuleReadSerializer", "NcFileRuleWriteSerializer"]
+__all__ = ["NcFileRuleReadSerializer"]

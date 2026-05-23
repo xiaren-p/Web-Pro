@@ -20,16 +20,18 @@ export interface NcGroupItem {
 export interface FolderRuleVO {
   /** NcFileAccessRule 主键 */
   id: number;
-  ncGroupId: number;
-  ncGroupCode: string;
-  ncGroupName: string;
-  /** NC 群组类型，如 DEPT / DEPT_ADMIN */
-  ncGroupType: string;
+  /** 目标用户 ID */
+  userId: number;
+  /** 目标用户名（NC 用户名） */
+  username: string;
+  /** 用户显示昵称 */
+  userNickname: string;
+  /** 所属部门名称 */
+  deptName: string;
   ncPath: string;
   permissionBits: number;
   /** 权限标签列表，如 ["READ", "WRITE"] */
   permLabels: string[];
-  isGroupFolder: boolean;
   status: boolean;
   createTime: string | null;
   updateTime: string | null;
@@ -87,30 +89,38 @@ export interface MkdirResult {
   ncPath: string;
 }
 
-/** 所有 NC 群组选项（添加规则弹窗群组选择器数据源） */
-export interface NcGroupOption {
-  /** NcGroup 主键 */
-  id: number;
-  /** NC 群组 code */
-  code: string;
-  /** NC 群组显示名称 */
-  name: string;
-  /** 群组类型：DEPT / DEPT_ADMIN */
-  groupType: string;
-  /** 所属部门名称 */
-  deptName: string;
-}
-
 /** 设置权限规则请求体 */
 export interface SetRuleForm {
-  /** NcGroup ID */
-  groupId: number;
+  /** 目标用户 ID */
+  userId: number;
   /** 完整 NC 路径（含挂载点），如 "技术部/机密文档" */
   ncPath: string;
   /** 权限位（1~31） */
   permissionBits: number;
   /** 是否生效，默认 true */
   status?: boolean;
+}
+
+/** 用户树叶子节点（用户） */
+export interface UserTreeUser {
+  /** Django User 主键 */
+  id: number;
+  /** NC 用户名 */
+  username: string;
+  /** 用户显示昵称 */
+  nickname: string;
+  type: "user";
+}
+
+/** 用户树父节点（部门） */
+export interface UserTreeDept {
+  /** Department 主键，无部门时为 null */
+  id: number | null;
+  /** 部门名称 */
+  name: string;
+  type: "dept";
+  /** 该部门下已同步 NC 的用户列表 */
+  children: UserTreeUser[];
 }
 
 /**
@@ -128,9 +138,7 @@ export function fetchNcGroupList(): Promise<NcGroupItem[]> {
  * @param {FolderListQuery} params 查询参数
  * @returns {Promise<FolderListResult>} 文件夹列表与当前层级信息
  */
-export function fetchFolderList(
-  params: FolderListQuery
-): Promise<FolderListResult> {
+export function fetchFolderList(params: FolderListQuery): Promise<FolderListResult> {
   return request.get("/nc/folder-tree/list", { params });
 }
 
@@ -165,7 +173,7 @@ export function deleteFolderRule(id: number): Promise<void> {
 }
 
 /**
- * 查询指定 NC 路径上所有群组的 ACL 规则（跨群组聚合）。
+ * 查询指定 NC 路径上所有用户的 ACL 规则（跨用户聚合）。
  *
  * @param {string} ncPath 完整路径（含挂载点），如 "销售部/报表"
  * @returns {Promise<FolderRuleVO[]>} 规则列表
@@ -175,10 +183,11 @@ export function fetchPathRules(ncPath: string): Promise<FolderRuleVO[]> {
 }
 
 /**
- * 获取所有 NC 群组列表（添加规则弹窗群组选择器数据源）。
+ * 获取按部门分组的已同步 NC 用户树（添加规则弹窗用户选择器数据源）。
  *
- * @returns {Promise<NcGroupOption[]>} 群组列表
+ * @returns {Promise<UserTreeDept[]>} 部门用户树
  */
-export function fetchAllNcGroups(): Promise<NcGroupOption[]> {
-  return request.get("/nc/folder-tree/all-groups");
+export function fetchUserTree(): Promise<UserTreeDept[]> {
+  return request.get("/nc/folder-tree/user-tree");
 }
+

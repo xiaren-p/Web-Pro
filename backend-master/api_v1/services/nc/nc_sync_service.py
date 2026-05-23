@@ -262,12 +262,12 @@ class NcSyncService:
 
     @staticmethod
     def enqueue_set_path_acl(rule: "NcFileAccessRule") -> NcSyncTask:
-        """入队：为 Group Folder 内子路径设置群组 ACL 规则。
+        """入队：为 Group Folder 内子路径设置用户 ACL 规则。
 
         将当前规则的所有属性写入 payload，以免后续执行时再次查询 DB。
 
         Args:
-            rule (NcFileAccessRule): 就绪的 NcFileAccessRule 实例（已关联加载 nc_group）。
+            rule (NcFileAccessRule): 就绪的 NcFileAccessRule 实例（已关联加载 user）。
 
         Returns:
             NcSyncTask: 已创建的任务记录。
@@ -277,21 +277,21 @@ class NcSyncService:
             payload={
                 "rule_id": rule.id,
                 "nc_path": rule.nc_path.strip("/"),
-                "group_id": rule.nc_group.code,
+                "username": rule.user.username,
                 "permissions": rule.permission_bits,
             },
         )
 
     @staticmethod
-    def enqueue_revoke_path_acl(nc_path: str, group_id: str) -> NcSyncTask:
-        """入队：撤销 Group Folder 内子路径对指定群组的 ACL 规则（mask=0 展透）。
+    def enqueue_revoke_path_acl(nc_path: str, username: str) -> NcSyncTask:
+        """入队：撤销 Group Folder 内子路径对指定用户的 ACL 规则（mask=0 展透）。
 
-        通过将 acl-mask 设为 0 使该群组的 ACL 条目失效，
+        通过将 acl-mask 设为 0 使该用户的 ACL 条目失效，
         路径权限回退为 Group Folder GRANT 基线。
 
         Args:
             nc_path (str): 子路径（首尾斜杠将被忽略）。
-            group_id (str): NC 群组 ID。
+            username (str): NC 用户名（Django User.username）。
 
         Returns:
             NcSyncTask: 已创建的任务记录。
@@ -301,7 +301,7 @@ class NcSyncService:
             payload={
                 "rule_id": None,
                 "nc_path": nc_path.strip("/"),
-                "group_id": group_id,
+                "username": username,
                 "permissions": 0,
                 "mask": 0,  # mask=0 展透，移除 ACL 限制
             },
@@ -695,7 +695,7 @@ class NcSyncService:
             mask = int(p.get("mask", 31))
             client.set_path_acl(
                 nc_path=p["nc_path"],
-                group_id=p["group_id"],
+                username=p["username"],
                 mask=mask,
                 permissions=int(p["permissions"]),
             )

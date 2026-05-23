@@ -2,34 +2,27 @@
 from rest_framework import serializers
 
 from api_v1.models.nc.nc_file_access_rule import NcFileAccessRule
-from api_v1.models.nc.nc_group import NcGroup, NcGroupType
 
 
 class NcFileRuleReadSerializer(serializers.ModelSerializer):
-    """NC 文件访问规则读序列化器：包含群组信息与权限标签。
+    """NC 文件访问规则读序列化器：包含用户信息与权限标签。
 
     所有字段名使用 camelCase，与前端约定对齐。
     """
 
-    ncGroupId = serializers.IntegerField(
-        source="nc_group_id",
+    userId = serializers.IntegerField(
+        source="user_id",
         read_only=True,
     )
 
-    ncGroupCode = serializers.CharField(
-        source="nc_group.code",
+    username = serializers.CharField(
+        source="user.username",
         read_only=True,
     )
 
-    ncGroupName = serializers.CharField(
-        source="nc_group.name",
-        read_only=True,
-    )
+    userNickname = serializers.SerializerMethodField()
 
-    ncGroupType = serializers.CharField(
-        source="nc_group.group_type",
-        read_only=True,
-    )
+    deptName = serializers.SerializerMethodField()
 
     ncPath = serializers.CharField(
         source="nc_path",
@@ -42,11 +35,6 @@ class NcFileRuleReadSerializer(serializers.ModelSerializer):
     )
 
     permLabels = serializers.SerializerMethodField()
-
-    isGroupFolder = serializers.BooleanField(
-        source="is_group_folder",
-        read_only=True,
-    )
 
     createTime = serializers.DateTimeField(
         source="created_at",
@@ -64,18 +52,37 @@ class NcFileRuleReadSerializer(serializers.ModelSerializer):
         model = NcFileAccessRule
         fields = [
             "id",
-            "ncGroupId",
-            "ncGroupCode",
-            "ncGroupName",
-            "ncGroupType",
+            "userId",
+            "username",
+            "userNickname",
+            "deptName",
             "ncPath",
             "permissionBits",
             "permLabels",
-            "isGroupFolder",
             "status",
             "createTime",
             "updateTime",
         ]
+
+    def get_userNickname(self, obj: NcFileAccessRule) -> str:
+        """从关联的 UserProfile 取昵称，无则回退到 username。
+
+        Returns:
+            str: 用户昵称。
+        """
+        profile = getattr(obj.user, "profile", None)
+        return profile.nickname if profile and profile.nickname else obj.user.username
+
+    def get_deptName(self, obj: NcFileAccessRule) -> str:
+        """从关联的 UserProfile.dept 取部门名，无则返回空串。
+
+        Returns:
+            str: 部门名称。
+        """
+        profile = getattr(obj.user, "profile", None)
+        if profile and profile.dept:
+            return profile.dept.name
+        return ""
 
     def get_permLabels(self, obj: NcFileAccessRule) -> list[str]:
         """将 permission_bits 位图解析为可读权限标签列表。
@@ -96,53 +103,6 @@ class NcFileRuleReadSerializer(serializers.ModelSerializer):
             if bits & bit:
                 labels.append(label)
         return labels
-
-
-class NcFileRuleWriteSerializer(serializers.ModelSerializer):
-    """NC 文件访问规则写序列化器：接受 nc_group_id、nc_path、permission_bits、status。"""
-
-    ncGroupId = serializers.PrimaryKeyRelatedField(
-        queryset=NcGroup.objects.filter(
-            group_type=NcGroupType.DEPT_ADMIN,
-        ),
-        source="nc_group",
-        write_only=True,
-    )
-
-    ncPath = serializers.CharField(
-        source="nc_path",
-        max_length=500,
-    )
-
-    permissionBits = serializers.IntegerField(
-        source="permission_bits",
-        min_value=1,
-        max_value=31,
-    )
-
-    isGroupFolder = serializers.BooleanField(
-        source="is_group_folder",
-        required=False,
-        default=True,
-    )
-
-    class Meta:
-        model = NcFileAccessRule
-        fields = ["ncGroupId", "ncPath", "permissionBits", "isGroupFolder", "status"]
-        extra_kwargs = {
-            "status": {"required": False, "default": True},
-        }
-
-    def validate_ncPath(self, value: str) -> str:
-        """去除路径首尾斜杠，防止重复记录。
-
-        Args:
-            value (str): 前端传入的路径字符串。
-
-        Returns:
-            str: 清理后的路径字符串。
-        """
-        return value.strip("/")
 
     def validate_permissionBits(self, value: int) -> int:
         """确保权限位为 1-31 之间的有效位图值。
