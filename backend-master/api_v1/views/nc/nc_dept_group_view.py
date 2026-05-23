@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 
+from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -18,6 +19,47 @@ from api_v1.services.nc.nc_sync_service import NcSyncService
 from api_v1.utils.responses import drf_error, drf_ok
 
 logger = logging.getLogger(__name__)
+
+
+def _provision_dept(dept: Department) -> None:
+    """为单个部门幂补所有缺失的 NC 群组记录并入队同步任务（完全幂等）。
+
+    覆盖三种场景：
+      1. none  → 创建 DEPT + DEPT_ADMIN 群组并创建 Group Folder
+      2. partial（DEPT 存在，DEPT_ADMIN 缺失） → 只建 DEPT_ADMIN
+      3. partial（双群组存在但 folder_id 未回写） → 重新入队 folder 创建
+
+    Args:
+        dept (Department): 已保存的部门实例。
+    """
+    base_code = (dept.code or "").strip() or f"dept_{dept.id}"
+    admin_code = f"{base_code}_admin"
+
+    with transaction.atomic():
+        dept_ng, dept_created = NcGroup.objects.get_or_create(
+            dept=dept,
+            group_type=NcGroupType.DEPT,
+            defaults={"code": base_code, "name": dept.name},
+        )
+        admin_ng, admin_created = NcGroup.objects.get_or_create(
+            dept=dept,
+            group_type=NcGroupType.DEPT_ADMIN,
+            defaults={"code": admin_code, "name": f"{dept.name}（管理员）"},
+        )
+
+    # 入队阶段放在 atomic 块外，避免提交前任务被消费
+    if dept_created:
+        NcSyncService.enqueue_create_group(dept_ng.code, dept_ng.name)
+    if admin_created:
+        NcSyncService.enqueue_create_group(admin_ng.code, admin_ng.name)
+    # folder_id 为空表示建空任务未执行或失败，重新入队（NC 候幂）
+    if dept_ng.folder_id is None:
+        NcSyncService.enqueue_create_group_folder(dept_ng.code, dept.name)
+
+    logger.info(
+        "[_provision_dept] dept_id=%s dept_created=%s admin_created=%s folder_id=%s",
+        dept.id, dept_created, admin_created, dept_ng.folder_id,
+    )
 
 
 def _dept_group_row(dept: Department, groups_by_dept: dict) -> dict:
@@ -127,7 +169,7 @@ class NcDeptGroupViewSet(viewsets.ViewSet):
         if not dept:
             return drf_error("部门不存在或已停用", status=404)
         try:
-            NcSyncService.on_dept_created(dept)
+            _provision_dept(dept)
         except Exception as exc:
             logger.error(
                 "[NcDeptGroupViewSet][provision] dept_id=%s 初始化失败: %s",
@@ -147,27 +189,37 @@ class NcDeptGroupViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="provision-all")
     def provision_all(self, request: Request):
-        """批量补全所有未初始化（status=none）的部门 NC 双群组。
-
-        已有 DEPT 群组的部门直接跳过，不重复处理。
+        """批量补全所有 status 不为 ready 的部门 NC 双群组（none + partial 均处理）。
 
         Returns:
             {total: int, success: int, failed: [{deptId, deptName, error}]}
         """
         depts = list(Department.objects.filter(status=True).order_by("order_num", "id"))
-        dept_ids_with_group = set(
-            NcGroup.objects.filter(
-                dept_id__in=[d.id for d in depts],
-                group_type=NcGroupType.DEPT,
-            ).values_list("dept_id", flat=True)
+        dept_ids = [d.id for d in depts]
+
+        # 构建当前状态映射，判断哪些部门需要处理
+        nc_groups = NcGroup.objects.filter(
+            dept_id__in=dept_ids,
+            group_type__in=[NcGroupType.DEPT, NcGroupType.DEPT_ADMIN],
         )
-        pending = [d for d in depts if d.id not in dept_ids_with_group]
+        groups_by_dept: dict[int, dict[str, NcGroup]] = {}
+        for ng in nc_groups:
+            groups_by_dept.setdefault(ng.dept_id, {})[ng.group_type] = ng
+
+        # 只跳过真正 ready 的部门（双群组存在且 folder_id 已回写）
+        def _is_ready(dept: Department) -> bool:
+            pair = groups_by_dept.get(dept.id, {})
+            dept_ng = pair.get(NcGroupType.DEPT)
+            admin_ng = pair.get(NcGroupType.DEPT_ADMIN)
+            return bool(dept_ng and admin_ng and dept_ng.folder_id)
+
+        pending = [d for d in depts if not _is_ready(d)]
         success_count = 0
         failed: list[dict] = []
 
         for dept in pending:
             try:
-                NcSyncService.on_dept_created(dept)
+                _provision_dept(dept)
                 success_count += 1
             except Exception as exc:
                 logger.error(

@@ -4,18 +4,26 @@
     <el-card shadow="never" class="toolbar-card">
       <div class="toolbar">
         <span class="toolbar__title">
-          共 <strong>{{ rows.length }}</strong> 个部门，
-          未初始化 <strong class="text-danger">{{ noneCount }}</strong> 个，
-          不完整 <strong class="text-warning">{{ partialCount }}</strong> 个
+          共
+          <strong>{{ rows.length }}</strong>
+          个部门，未初始化
+          <strong class="text-danger">{{ noneCount }}</strong>
+          个，不完整
+          <strong class="text-warning">{{ partialCount }}</strong>
+          个，就绪
+          <strong class="text-success">{{ readyCount }}</strong>
+          个
         </span>
         <div class="toolbar__actions">
           <el-button :loading="listLoading" @click="loadList">刷新</el-button>
           <el-button
             type="primary"
             :loading="provisionAllLoading"
-            :disabled="noneCount === 0"
+            :disabled="unprovisionedCount === 0"
             @click="handleProvisionAll"
-          >一键初始化全部（{{ noneCount }}）</el-button>
+          >
+            一键初始化全部（{{ unprovisionedCount }}）
+          </el-button>
         </div>
       </div>
     </el-card>
@@ -66,10 +74,12 @@
             <el-button
               v-if="row.status !== 'ready'"
               size="small"
-              type="primary"
+              :type="row.status === 'none' ? 'primary' : 'warning'"
               :loading="provisioningIds.has(row.deptId)"
               @click="handleProvision(row)"
-            >初始化</el-button>
+            >
+              {{ row.status === "none" ? "初始化" : "补全" }}
+            </el-button>
             <el-tag v-else type="success" size="small" effect="plain">✓</el-tag>
           </template>
         </el-table-column>
@@ -133,6 +143,9 @@ const rows = ref<DeptGroupRow[]>([]);
 
 const noneCount = computed(() => rows.value.filter((r) => r.status === "none").length);
 const partialCount = computed(() => rows.value.filter((r) => r.status === "partial").length);
+const readyCount = computed(() => rows.value.filter((r) => r.status === "ready").length);
+/** 未就绪数（none + partial），一键初始化按鈕使用此值 */
+const unprovisionedCount = computed(() => noneCount.value + partialCount.value);
 
 async function loadList(): Promise<void> {
   listLoading.value = true;
@@ -181,10 +194,13 @@ const resultDialog = reactive<{
 });
 
 async function handleProvisionAll(): Promise<void> {
+  const noneText = noneCount.value > 0 ? `${noneCount.value} 个未初始化` : "";
+  const partialText = partialCount.value > 0 ? `${partialCount.value} 个不完整` : "";
+  const desc = [noneText, partialText].filter(Boolean).join("、");
   await ElMessageBox.confirm(
-    `将对 ${noneCount.value} 个未初始化的部门批量入队 NC 群组创建任务，是否继续？`,
+    `将对 ${desc} 的部门入队 NC 群组补全任务，是否继续？`,
     "确认批量初始化",
-    { type: "warning" },
+    { type: "warning" }
   );
 
   provisionAllLoading.value = true;
