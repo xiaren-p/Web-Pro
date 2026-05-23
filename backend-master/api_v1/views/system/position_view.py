@@ -107,17 +107,20 @@ class PositionViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path=r"(?P<position_id>[^/]+)/menuIds")
     def menu_ids(self, request, position_id: str):
-        """获取岗位已分配的菜单 ID 列表。"""
+        """获取岗位已分配的菜单 ID 列表。内置岗位返回全量菜单 ID。"""
         try:
             position = Position.objects.get(pk=position_id)
         except Position.DoesNotExist:
             return drf_error("未找到岗位", status=404)
-        ids = list(position.menus.values_list("id", flat=True))
+        if position.is_builtin:
+            ids = list(Menu.objects.values_list("id", flat=True))
+        else:
+            ids = list(position.menus.values_list("id", flat=True))
         return drf_ok(ids)
 
     @action(detail=False, methods=["put"], url_path=r"(?P<position_id>[^/]+)/menus")
     def update_menus(self, request, position_id: str):
-        """覆盖更新岗位的菜单权限（全量替换）。
+        """覆盖更新岗位的菜单权限（全量替换）。内置岗位权限不可修改。
 
         Body: {"menuIds": [1, 2, 3]}
         """
@@ -125,6 +128,8 @@ class PositionViewSet(viewsets.ViewSet):
             position = Position.objects.get(pk=position_id)
         except Position.DoesNotExist:
             return drf_error("未找到岗位", status=404)
+        if position.is_builtin:
+            return drf_error("内置岗位拥有全部权限，不可修改", status=400)
         menu_ids: list[int] = request.data.get("menuIds") or []
         if not isinstance(menu_ids, list):
             return drf_error("menuIds 必须为数组", status=400)

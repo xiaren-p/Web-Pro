@@ -51,7 +51,7 @@
         class="data-table__content"
         @selection-change="handleSelectionChange"
       >
-        <el-table-column type="selection" width="55" align="center" />
+        <el-table-column type="selection" width="55" align="center" :selectable="(row: PositionPageVO) => !row.isBuiltin" />
         <el-table-column label="岗位名称" prop="name" min-width="120" />
         <el-table-column label="岗位编码" prop="code" width="160" />
 

@@ -100,6 +100,20 @@ export const MenuAPI = {
       params: { onlyParent },
     });
   },
+
+  /**
+   * 获取当前登录用户有权分配的菜单选项树（用于岗位权限分配）。
+   * 超级管理员返回全量，普通管理员仅返回自身岗位权限范围内的菜单。
+   *
+   * @returns 菜单选项树数组
+   */
+  getAssignableOptions() {
+    return request<any, any[]>({
+      url: `${MENU_BASE_URL}/options`,
+      method: "get",
+      params: { scope: "assignable" },
+    });
+  },
   getFormData(id: string) {
     return request<any, MenuForm>({ url: `${MENU_BASE_URL}/${id}/form`, method: "get" });
   },

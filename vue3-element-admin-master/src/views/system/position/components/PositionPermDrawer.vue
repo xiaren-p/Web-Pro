@@ -54,7 +54,16 @@
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button type="primary" :loading="loading" @click="handleAssignPermSubmit">
+        <el-tooltip
+          v-if="checkedPosition.isBuiltin"
+          content="内置岗位拥有全部权限，不可修改"
+          placement="top"
+        >
+          <span>
+            <el-button type="primary" disabled>确 定</el-button>
+          </span>
+        </el-tooltip>
+        <el-button v-else type="primary" :loading="loading" @click="handleAssignPermSubmit">
           确 定
         </el-button>
         <el-button @click="visible = false">取 消</el-button>
@@ -86,6 +95,7 @@ const drawerSize = computed(() => (appStore.device === DeviceEnum.DESKTOP ? "600
 interface CheckedPosition {
   id?: string | number;
   name?: string;
+  isBuiltin?: boolean;
 }
 const checkedPosition = ref<CheckedPosition>({});
 
@@ -107,9 +117,10 @@ async function open(row: PositionPageVO) {
 
     checkedPosition.value.id = positionId;
     checkedPosition.value.name = row.name;
+    checkedPosition.value.isBuiltin = row.isBuiltin;
 
-    // 加载全量菜单树
-    menuPermOptions.value = await MenuAPI.getOptions();
+    // 加载当前用户有权分配的菜单树（范围受登录者岗位限制）
+    menuPermOptions.value = await MenuAPI.getAssignableOptions();
 
     // 回显该岗位已绑定的菜单
     PositionAPI.getMenuIds(positionId)

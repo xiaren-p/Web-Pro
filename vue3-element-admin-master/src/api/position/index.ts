@@ -114,7 +114,7 @@ export const PositionAPI = {
     return request({
       url: `${POSITION_BASE_URL}/${positionId}/menus`,
       method: "put",
-      data: menuIds,
+      data: { menuIds },
     });
   },
 };

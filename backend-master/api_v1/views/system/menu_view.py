@@ -291,9 +291,36 @@ class MenuViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="options")
     def options(self, request: Request) -> Any:
-        """菜单下拉选项（``onlyParent=true`` 时仅返回目录与菜单，用于上级菜单选择）。"""
+        """菜单下拉选项。
+
+        - ``onlyParent=true``: 仅返回目录与菜单（用于上级菜单选择）。
+        - ``scope=assignable``: 仅返回当前登录用户有权分配的菜单范围；
+          超级管理员或 COMPANY_ADMIN 返回全量，其他人返回其岗位菜单。
+        """
+        from api_v1.models.system.user_profile import AdminLevel
+
+        scope = request.query_params.get("scope", "")
         only_parent = request.query_params.get("onlyParent")
-        if only_parent and str(only_parent).lower() == "true":
+
+        if scope == "assignable":
+            user = getattr(request, "user", None)
+            profile = None
+            try:
+                profile = getattr(user, "profile", None)
+            except Exception:
+                pass
+            is_full_admin = (user and user.is_superuser) or (
+                profile and profile.admin_level == AdminLevel.COMPANY_ADMIN
+            )
+            if is_full_admin:
+                qs = Menu.objects.all().order_by("order_num", "id")
+            elif profile and profile.position_id:
+                qs = Menu.objects.filter(
+                    positions__id=profile.position_id
+                ).order_by("order_num", "id")
+            else:
+                return drf_ok([])
+        elif only_parent and str(only_parent).lower() == "true":
             qs = Menu.objects.filter(type__in=[1, 2]).order_by("order_num", "id")
         else:
             qs = Menu.objects.all().order_by("order_num", "id")
