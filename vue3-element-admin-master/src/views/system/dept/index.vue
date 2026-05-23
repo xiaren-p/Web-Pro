@@ -74,7 +74,7 @@
         <el-table-column label="操作" fixed="right" align="left" width="200">
           <template #default="scope">
             <el-button
-              v-if="isCompanyAdmin"
+              v-if="isCompanyAdmin || (isDeptAdmin && scope.row.id === myDeptIdStr)"
               type="primary"
               link
               size="small"
@@ -94,7 +94,7 @@
               编辑
             </el-button>
             <el-button
-              v-if="isCompanyAdmin"
+              v-if="isCompanyAdmin || (isDeptAdmin && myDeptDescendantIds.has(scope.row.id))"
               type="danger"
               link
               size="small"
@@ -137,6 +137,55 @@ const isDeptAdmin = computed(() => userStore.userInfo.roles?.includes('dept_admi
 
 /** 当前用户所属部门 ID */
 const myDeptId = computed(() => userStore.userInfo.deptId ?? null);
+
+/** 当前用户所属部门 ID（字符串，与 DeptVO.id 类型对齐） */
+const myDeptIdStr = computed<string | null>(() =>
+  myDeptId.value != null ? String(myDeptId.value) : null,
+);
+
+/**
+ * 递归将节点树中所有子孙 ID 加入 result。
+ *
+ * @param {DeptVO[] | undefined} children - 当前层子节点列表。
+ * @param {Set<string>} result - 收集结果集合。
+ */
+function addAllDescendants(children: DeptVO[] | undefined, result: Set<string>): void {
+  children?.forEach((c) => {
+    result.add(c.id);
+    addAllDescendants(c.children, result);
+  });
+}
+
+/**
+ * 在 nodes 树中找到 targetId 节点，递归收集其全部子孙 ID（不含自身）。
+ *
+ * @param {DeptVO[]} nodes - 当前层节点列表。
+ * @param {string} targetId - 目标父节点 ID。
+ * @param {Set<string>} result - 收集结果集合。
+ * @returns {boolean} 是否已找到目标节点。
+ */
+function collectDescendantIds(
+  nodes: DeptVO[],
+  targetId: string,
+  result: Set<string>,
+): boolean {
+  for (const node of nodes) {
+    if (node.id === targetId) {
+      addAllDescendants(node.children, result);
+      return true;
+    }
+    if (node.children && collectDescendantIds(node.children, targetId, result)) return true;
+  }
+  return false;
+}
+
+/** 当前用户所属部门的全部子孙部门 ID 集合（不含本级） */
+const myDeptDescendantIds = computed<Set<string>>(() => {
+  const result = new Set<string>();
+  if (!isDeptAdmin.value || !myDeptIdStr.value || !deptList.value) return result;
+  collectDescendantIds(deptList.value, myDeptIdStr.value, result);
+  return result;
+});
 
 const loading = ref(false);
 const selectIds = ref<number[]>([]);
