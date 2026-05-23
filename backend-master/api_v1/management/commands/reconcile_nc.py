@@ -324,6 +324,43 @@ class Command(BaseCommand):
                     NcSyncService.enqueue_create_group_folder(nc_group.code, nc_group.dept.name)
                     enqueued += 1
 
+        # 对账部门 Group Folder：folder_id 有值但 NC 中已被删除（如管理员手动误删）
+        # 注意：CREATE_GROUP_FOLDER 任务有幂等保护（folder_id 非空时跳过），
+        # 必须先清空本地 folder_id 再入队，否则任务会静默跳过。
+        if not target_username:
+            try:
+                _nc_folders_existing = client.list_group_folders()
+                _existing_folder_ids: set[int] = set(_nc_folders_existing.keys())
+            except RuntimeError as exc:
+                logger.warning("[reconcile_nc] 无法获取 NC Group Folder 列表，跳过 folder 删除检测: %s", exc)
+                _existing_folder_ids = set()
+
+            if _existing_folder_ids is not None:
+                dept_deleted_folder = (
+                    NcGroup.objects.filter(
+                        group_type=NcGroupType.DEPT,
+                        folder_id__isnull=False,
+                        dept__isnull=False,
+                    )
+                    .exclude(folder_id__in=_existing_folder_ids)
+                    .select_related("dept")
+                )
+                for nc_group in dept_deleted_folder:
+                    self.stdout.write(
+                        f"  → Group Folder 已从 NC 删除，将重建: {nc_group.code}"
+                        f" (旧 folder_id={nc_group.folder_id})"
+                    )
+                    logger.warning(
+                        "[reconcile_nc] Group Folder 已被删除 group=%s folder_id=%s，清空并重建",
+                        nc_group.code, nc_group.folder_id,
+                    )
+                    if not dry_run:
+                        # 必须先清空 folder_id，CREATE_GROUP_FOLDER 任务才不会被幂等保护跳过
+                        nc_group.folder_id = None
+                        nc_group.save(update_fields=["folder_id"])
+                        NcSyncService.enqueue_create_group_folder(nc_group.code, nc_group.dept.name)
+                        enqueued += 1
+
         # 对账上级部门对下级文件夹的授权
         # DEPT 群组的上级授权应为只读（permissions=1）。
         # DEPT_ADMIN 群组的上级授权应为全权限（permissions=31）。
