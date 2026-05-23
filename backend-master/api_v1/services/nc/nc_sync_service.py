@@ -323,6 +323,7 @@ class NcSyncService:
             profile: UserProfile 实例（已 save）。
         """
         user = profile.user
+        _last_id = NcSyncTask.objects.order_by("-id").values_list("id", flat=True).first() or 0
         cls.enqueue_create_user(
             username=user.username,
             display_name=profile.nickname or user.username,
@@ -333,6 +334,7 @@ class NcSyncService:
         cls._enqueue_dept_group(user.username, profile)
         cls._enqueue_dept_admin_group(user.username, profile)  # 仅 DEPT_ADMIN 级别触发
         cls._enqueue_extra_groups(user.username, profile)
+        cls._flush_tasks_after(_last_id)
         logger.info("[NcSyncService][on_user_created] username=%s 同步任务已入队", user.username)
 
     @classmethod
@@ -356,6 +358,7 @@ class NcSyncService:
             old_extra_group_codes (set[str] | None): 变更前的额外 NcGroup.code 集合；为 None 时不做差异对比。
         """
         user = profile.user
+        _last_id = NcSyncTask.objects.order_by("-id").values_list("id", flat=True).first() or 0
         new_display_name = profile.nickname or user.username
         new_email = user.email or ""
         # 仅当 display_name 或 email 真实变更时才入队 update_user，避免队列冗余
@@ -374,10 +377,13 @@ class NcSyncService:
 
             if new_level == AdminLevel.COMPANY_ADMIN:
                 cls.enqueue_set_admin(user.username)
-                # 公司管理员通过 NC admin 权限控制，无需活跃在部门管理员群组
-                if old_level == AdminLevel.DEPT_ADMIN and profile.dept_id:
+                # 公司管理员通过 NC admin 权限控制，无需活跃在部门管理员群组。
+                # 使用 old_dept_id 而非 profile.dept_id：当部门同时变更时，
+                # profile.dept_id 已是新部门；部门变更块会处理旧部门群组的移出，
+                # 此处只需处理「部门未变更」场景，避免向错误群组发出无效删除请求。
+                if old_level == AdminLevel.DEPT_ADMIN and old_dept_id and old_dept_id == profile.dept_id:
                     admin_ng = NcGroup.objects.filter(
-                        dept_id=profile.dept_id, group_type=NcGroupType.DEPT_ADMIN,
+                        dept_id=old_dept_id, group_type=NcGroupType.DEPT_ADMIN,
                     ).first()
                     if admin_ng:
                         cls.enqueue_remove_from_group(user.username, admin_ng.code)
@@ -387,13 +393,17 @@ class NcSyncService:
                 if new_level == AdminLevel.DEPT_ADMIN and profile.dept_id:
                     cls._enqueue_dept_admin_group(user.username, profile)
             elif new_level == AdminLevel.DEPT_ADMIN and old_level == AdminLevel.MEMBER:
-                # 普通成员 → 部门管理员：加入部门管理员群组
-                cls._enqueue_dept_admin_group(user.username, profile)
+                # 普通成员 → 部门管理员：加入部门管理员群组。
+                # 当部门同时变更时，部门变更块已调用 _enqueue_dept_admin_group，此处跳过避免重复入队。
+                if old_dept_id == profile.dept_id:
+                    cls._enqueue_dept_admin_group(user.username, profile)
             elif new_level == AdminLevel.MEMBER and old_level == AdminLevel.DEPT_ADMIN:
-                # 部门管理员 → 普通成员：移出部门管理员群组
-                if profile.dept_id:
+                # 部门管理员 → 普通成员：移出部门管理员群组。
+                # 使用 old_dept_id：当部门同时变更时，profile.dept_id 已是新部门（用户从未加入），
+                # 此处应移出旧部门的 DEPT_ADMIN 群组；若部门同时变更，该移出已由部门变更块处理，跳过。
+                if old_dept_id and old_dept_id == profile.dept_id:
                     admin_ng = NcGroup.objects.filter(
-                        dept_id=profile.dept_id, group_type=NcGroupType.DEPT_ADMIN,
+                        dept_id=old_dept_id, group_type=NcGroupType.DEPT_ADMIN,
                     ).first()
                     if admin_ng:
                         cls.enqueue_remove_from_group(user.username, admin_ng.code)
@@ -422,6 +432,7 @@ class NcSyncService:
                 cls.enqueue_add_to_group(user.username, code)
             for code in old_extra_group_codes - new_codes:
                 cls.enqueue_remove_from_group(user.username, code)
+        cls._flush_tasks_after(_last_id)
         logger.info("[NcSyncService][on_user_updated] username=%s 同步任务已入队", user.username)
 
     @classmethod
@@ -433,10 +444,12 @@ class NcSyncService:
             enabled (bool): True=启用，False=停用。
         """
         username = profile.user.username
+        _last_id = NcSyncTask.objects.order_by("-id").values_list("id", flat=True).first() or 0
         if enabled:
             cls.enqueue_enable_user(username)
         else:
             cls.enqueue_disable_user(username)
+        cls._flush_tasks_after(_last_id)
         logger.info("[NcSyncService][on_user_status_changed] username=%s enabled=%s", username, enabled)
 
     @classmethod
@@ -449,8 +462,23 @@ class NcSyncService:
         Args:
             username (str): 被删除的 Django 用户名。
         """
+        _last_id = NcSyncTask.objects.order_by("-id").values_list("id", flat=True).first() or 0
         cls.enqueue_disable_user(username)
+        cls._flush_tasks_after(_last_id)
         logger.info("[NcSyncService][on_user_deleted] username=%s 入队 disable_user", username)
+
+    @classmethod
+    def _flush_tasks_after(cls, last_task_id: int) -> None:
+        """将 id > last_task_id 的新入队任务提交给后台线程立即执行。
+
+        Args:
+            last_task_id (int): 本次入队前的最大 NcSyncTask.id（0 表示表为空）。
+        """
+        new_ids = list(
+            NcSyncTask.objects.filter(id__gt=last_task_id).values_list("id", flat=True)
+        )
+        if new_ids:
+            transaction.on_commit(lambda: cls._flush_in_background(new_ids))
 
     @staticmethod
     def _flush_in_background(task_ids: list[int]) -> None:

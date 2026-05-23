@@ -170,16 +170,27 @@ function handleDelete(deptId?: number) {
   }
 
   ElMessageBox.confirm(
-    `<div style="line-height:1.8">
-      <p><b>确认删除所选部门？此操作不可撤销。</b></p>
-      <el-divider style="margin:8px 0"/>
-      <p>⚠️ <b>Nextcloud 同步影响：</b></p>
-      <ul style="margin:4px 0 8px 16px;padding:0;list-style:disc">
-        <li>部门对应的 NC 群组将被立即删除</li>
-        <li>所有成员将<b>即刻失去</b>部门文件夹的访问权限</li>
-        <li>部门文件夹及其中的文件<b>不会被删除</b>，但将变为孤立状态</li>
-      </ul>
-      <p style="color:#e6a23c">💡 建议删除前先在 Nextcloud 中备份或迁移文件夹内的数据，<br>再由 NC 管理员手动清理孤立的 Group Folder。</p>
+    `<div style="font-size:14px;line-height:1.7;color:#303133">
+      <p style="margin:0 0 12px;font-weight:600;font-size:15px">确认删除所选部门？此操作不可撤销。</p>
+      <div style="border-top:1px solid #ebeef5;margin-bottom:12px"></div>
+      <p style="margin:0 0 8px;font-weight:600;color:#606266">Nextcloud 同步影响</p>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <span style="color:#f56c6c;font-size:15px;flex-shrink:0;margin-top:1px">✕</span>
+          <span>部门对应的 NC 群组将被<b>立即删除</b></span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <span style="color:#f56c6c;font-size:15px;flex-shrink:0;margin-top:1px">✕</span>
+          <span>所有成员将<b>即刻失去</b>部门文件夹的访问权限</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <span style="color:#67c23a;font-size:15px;flex-shrink:0;margin-top:1px">✓</span>
+          <span>部门文件夹及文件<b>不会被删除</b>，保留为孤立状态</span>
+        </div>
+      </div>
+      <div style="background:#fffbe6;border:1px solid #ffe58f;border-radius:6px;padding:10px 12px;color:#8a6d00;font-size:13px;line-height:1.6">
+        💡 建议删除前先在 Nextcloud 中备份或迁移文件夹内的数据，再由 NC 管理员手动清理孤立的 Group Folder。
+      </div>
     </div>`,
     "删除部门警告",
     {
