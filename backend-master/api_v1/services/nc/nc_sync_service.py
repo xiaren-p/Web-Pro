@@ -309,6 +309,38 @@ class NcSyncService:
             },
         )
 
+    @staticmethod
+    def enqueue_set_path_acl_raw(
+        nc_path: str,
+        username: str,
+        permissions: int,
+        mask: int = 31,
+    ) -> "NcSyncTask":
+        """入队：直接通过原始参数设置路径 ACL，不依赖 NcFileAccessRule DB 记录。
+
+        与 enqueue_set_path_acl 功能相同，但允许在不创建 DB 规则的情况下
+        下发 ACL 任务（典型场景：根路径全拒绝屏蔽层）。
+
+        Args:
+            nc_path (str): 目标路径（首尾斜杠会被忽略）。
+            username (str): NC 用户名。
+            permissions (int): 权限位（0=拒绝全部，1=只读，31=全权限）。
+            mask (int): ACL mask，默认 31（全量生效）；0 表示展透（移除规则）。
+
+        Returns:
+            NcSyncTask: 已创建的任务记录。
+        """
+        return NcSyncTask.objects.create(
+            operation=SyncOperation.SET_PATH_ACL,
+            payload={
+                "rule_id": None,
+                "nc_path": nc_path.strip("/"),
+                "username": username,
+                "permissions": permissions,
+                "mask": mask,
+            },
+        )
+
     # ------------------------------------------------------------------ #
     #  高级语义方法：用户状态变更入队（供 view 层调用）                     #
     # ------------------------------------------------------------------ #
