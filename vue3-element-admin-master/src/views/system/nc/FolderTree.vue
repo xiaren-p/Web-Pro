@@ -50,8 +50,8 @@
             </el-breadcrumb-item>
           </el-breadcrumb>
           <div class="header-btns">
-            <el-button size="small" @click="openMkdir">新建子目录</el-button>
-            <el-button size="small" type="primary" @click="openAddRule">+ 添加规则</el-button>
+            <el-button v-hasPerm="['nc:folder:mkdir']" size="small" @click="openMkdir">新建子目录</el-button>
+            <el-button v-hasPerm="['nc:folder:setperm']" size="small" type="primary" @click="openAddRule">+ 添加规则</el-button>
           </div>
         </div>
 
@@ -86,10 +86,10 @@
           </el-table-column>
           <el-table-column label="操作" width="120" align="center" fixed="right">
             <template #default="{ row }: { row: FolderRuleVO }">
-              <el-button link type="primary" size="small" @click="openEditRule(row)">
+              <el-button v-hasPerm="['nc:folder:setperm']" link type="primary" size="small" @click="openEditRule(row)">
                 编辑
               </el-button>
-              <el-button link type="danger" size="small" @click="handleDeleteRule(row)">
+              <el-button v-hasPerm="['nc:folder:delete']" link type="danger" size="small" @click="handleDeleteRule(row)">
                 删除
               </el-button>
             </template>
