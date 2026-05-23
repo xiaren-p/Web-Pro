@@ -84,7 +84,7 @@
               新增
             </el-button>
             <el-button
-              v-if="isCompanyAdmin || (isDeptAdmin && String(scope.row.id) === myDeptIdStr)"
+              v-if="isCompanyAdmin || (isDeptAdmin && (String(scope.row.id) === myDeptIdStr || myDeptDescendantIds.has(String(scope.row.id))))"
               type="primary"
               link
               size="small"

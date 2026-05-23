@@ -79,17 +79,24 @@ class DeptViewSet(viewsets.ViewSet):
                 request.query_params.get("keyword")
                 or request.query_params.get("keywords")
             )
+            has_filter = False
             if isinstance(keyword, str):
                 kw = keyword.strip()
                 if kw:
                     qs = qs.filter(Q(name__icontains=kw) | Q(code__icontains=kw))
+                    has_filter = True
             status_val = request.query_params.get("status")
             if status_val is not None and status_val != "":
                 try:
                     qs = qs.filter(status=bool(int(status_val)))
+                    has_filter = True
                 except Exception:
                     pass
-            return drf_ok(DeptSerializer(qs, many=True).data)
+            nodes = list(qs)
+            # 无过滤条件时返回树结构；有过滤时返回平铺列表（保留搜索结果可读性）
+            if has_filter:
+                return drf_ok(DeptSerializer(nodes, many=True).data)
+            return drf_ok(self._build_tree(nodes))
 
         payload = request.data.copy()
         name = payload.get("name")

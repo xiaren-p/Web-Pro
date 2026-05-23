@@ -89,7 +89,7 @@
 
         <el-input v-model="formData.component" placeholder="system/user/index" style="width: 95%" />
       </el-form-item>
-      <el-form-item v-if="formData.type !== MenuTypeEnum.BUTTON" prop="visible" label="显示状态">
+      <el-form-item prop="visible" label="显示状态">
         <el-radio-group v-model="formData.visible">
           <el-radio :value="1">显示</el-radio>
           <el-radio :value="0">隐藏</el-radio>
