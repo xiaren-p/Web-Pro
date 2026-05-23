@@ -74,7 +74,7 @@
         <el-table-column label="操作" fixed="right" align="left" width="200">
           <template #default="scope">
             <el-button
-              v-if="isCompanyAdmin || (isDeptAdmin && scope.row.id === myDeptIdStr)"
+              v-if="isCompanyAdmin || (isDeptAdmin && String(scope.row.id) === myDeptIdStr)"
               type="primary"
               link
               size="small"
@@ -84,7 +84,7 @@
               新增
             </el-button>
             <el-button
-              v-if="isCompanyAdmin || (isDeptAdmin && scope.row.id === myDeptId)"
+              v-if="isCompanyAdmin || (isDeptAdmin && String(scope.row.id) === myDeptIdStr)"
               type="primary"
               link
               size="small"
@@ -94,7 +94,7 @@
               编辑
             </el-button>
             <el-button
-              v-if="isCompanyAdmin || (isDeptAdmin && myDeptDescendantIds.has(scope.row.id))"
+              v-if="isCompanyAdmin || (isDeptAdmin && myDeptDescendantIds.has(String(scope.row.id)))"
               type="danger"
               link
               size="small"
@@ -151,7 +151,7 @@ const myDeptIdStr = computed<string | null>(() =>
  */
 function addAllDescendants(children: DeptVO[] | undefined, result: Set<string>): void {
   children?.forEach((c) => {
-    result.add(c.id);
+    result.add(String(c.id));
     addAllDescendants(c.children, result);
   });
 }
@@ -170,7 +170,7 @@ function collectDescendantIds(
   result: Set<string>,
 ): boolean {
   for (const node of nodes) {
-    if (node.id === targetId) {
+    if (String(node.id) === targetId) {
       addAllDescendants(node.children, result);
       return true;
     }
