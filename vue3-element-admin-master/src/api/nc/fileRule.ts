@@ -7,9 +7,9 @@ import request from "@/utils/request";
 /** NC 文件访问规则列表查询参数 */
 export interface NcFileRulePageQuery {
   /** 页码（从 1 开始） */
-  page?: number;
+  page: number;
   /** 每页条数（最大 100） */
-  pageSize?: number;
+  pageSize: number;
   /** 按群组 ID 筛选 */
   ncGroupId?: number;
   /** 是否生效筛选 */
