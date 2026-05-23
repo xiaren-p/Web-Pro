@@ -541,13 +541,17 @@ class NcSyncService:
             dept_id (int): 被删除部门的 ID。
         """
         nc_groups = list(NcGroup.objects.filter(dept_id=dept_id))
+        queued_task_ids: list[int] = []
         for nc_group in nc_groups:
-            cls.enqueue_delete_group(nc_group.code)
+            task = cls.enqueue_delete_group(nc_group.code)
+            queued_task_ids.append(task.id)
             logger.info(
-                "[NcSyncService][on_dept_deleted] dept_id=%s code=%s type=%s 入队 DELETE_GROUP",
-                dept_id, nc_group.code, nc_group.group_type,
+                "[NcSyncService][on_dept_deleted] dept_id=%s code=%s type=%s 入队 DELETE_GROUP task_id=%s",
+                dept_id, nc_group.code, nc_group.group_type, task.id,
             )
         NcGroup.objects.filter(id__in=[g.id for g in nc_groups]).delete()
+        if queued_task_ids:
+            transaction.on_commit(lambda: cls._flush_in_background(queued_task_ids))
 
     @classmethod
     def on_dept_updated(cls, dept) -> None:

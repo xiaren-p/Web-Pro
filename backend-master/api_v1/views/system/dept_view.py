@@ -1,9 +1,12 @@
 """部门管理 ViewSet。"""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from django.db.models import Q
+
+logger = logging.getLogger(__name__)
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -179,8 +182,11 @@ class DeptViewSet(viewsets.ViewSet):
         for dept_id in id_list:
             try:
                 NcSyncService.on_dept_deleted(int(dept_id))
-            except Exception:
-                # 不阻断部门删除主流程
-                pass
+            except Exception as exc:
+                # NC 同步失败不阻断部门删除主流程，但记录日志便于排查
+                logger.warning(
+                    "[DeptViewSet][delete] dept_id=%s NC 同步入队失败（部门仍会删除）: %s",
+                    dept_id, exc, exc_info=True,
+                )
         Department.objects.filter(id__in=id_list).delete()
         return drf_ok(status=204)

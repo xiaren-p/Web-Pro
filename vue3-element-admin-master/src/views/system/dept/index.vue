@@ -169,11 +169,27 @@ function handleDelete(deptId?: number) {
     return;
   }
 
-  ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-    type: "warning",
-  }).then(
+  ElMessageBox.confirm(
+    `<div style="line-height:1.8">
+      <p><b>确认删除所选部门？此操作不可撤销。</b></p>
+      <el-divider style="margin:8px 0"/>
+      <p>⚠️ <b>Nextcloud 同步影响：</b></p>
+      <ul style="margin:4px 0 8px 16px;padding:0;list-style:disc">
+        <li>部门对应的 NC 群组将被立即删除</li>
+        <li>所有成员将<b>即刻失去</b>部门文件夹的访问权限</li>
+        <li>部门文件夹及其中的文件<b>不会被删除</b>，但将变为孤立状态</li>
+      </ul>
+      <p style="color:#e6a23c">💡 建议删除前先在 Nextcloud 中备份或迁移文件夹内的数据，<br>再由 NC 管理员手动清理孤立的 Group Folder。</p>
+    </div>`,
+    "删除部门警告",
+    {
+      confirmButtonText: "我已知晓，确认删除",
+      cancelButtonText: "取消",
+      type: "warning",
+      dangerouslyUseHTMLString: true,
+      confirmButtonClass: "el-button--danger",
+    }
+  ).then(
     () => {
       loading.value = true;
       DeptAPI.deleteByIds(deptIds)
