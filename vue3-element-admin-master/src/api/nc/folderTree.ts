@@ -23,6 +23,8 @@ export interface FolderRuleVO {
   ncGroupId: number;
   ncGroupCode: string;
   ncGroupName: string;
+  /** NC 群组类型，如 DEPT / DEPT_ADMIN */
+  ncGroupType: string;
   ncPath: string;
   permissionBits: number;
   /** 权限标签列表，如 ["READ", "WRITE"] */
@@ -83,6 +85,20 @@ export interface MkdirResult {
   message: string;
   /** 新目录的完整 nc_path */
   ncPath: string;
+}
+
+/** 所有 NC 群组选项（添加规则弹窗群组选择器数据源） */
+export interface NcGroupOption {
+  /** NcGroup 主键 */
+  id: number;
+  /** NC 群组 code */
+  code: string;
+  /** NC 群组显示名称 */
+  name: string;
+  /** 群组类型：DEPT / DEPT_ADMIN */
+  groupType: string;
+  /** 所属部门名称 */
+  deptName: string;
 }
 
 /** 设置权限规则请求体 */
@@ -146,4 +162,23 @@ export function setFolderRule(data: SetRuleForm): Promise<FolderRuleVO> {
  */
 export function deleteFolderRule(id: number): Promise<void> {
   return request.delete(`/nc/folder-tree/rule/${id}`);
+}
+
+/**
+ * 查询指定 NC 路径上所有群组的 ACL 规则（跨群组聚合）。
+ *
+ * @param {string} ncPath 完整路径（含挂载点），如 "销售部/报表"
+ * @returns {Promise<FolderRuleVO[]>} 规则列表
+ */
+export function fetchPathRules(ncPath: string): Promise<FolderRuleVO[]> {
+  return request.get("/nc/folder-tree/path-rules", { params: { ncPath } });
+}
+
+/**
+ * 获取所有 NC 群组列表（添加规则弹窗群组选择器数据源）。
+ *
+ * @returns {Promise<NcGroupOption[]>} 群组列表
+ */
+export function fetchAllNcGroups(): Promise<NcGroupOption[]> {
+  return request.get("/nc/folder-tree/all-groups");
 }

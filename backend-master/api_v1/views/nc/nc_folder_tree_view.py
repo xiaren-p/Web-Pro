@@ -46,7 +46,7 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             if hasattr(self, "request") else ""
         )
         required: list[str] | None = None
-        if action_name in ("group_list", "list_folder") and method == "GET":
+        if action_name in ("group_list", "list_folder", "path_rules", "all_groups") and method == "GET":
             required = ["nc:folder:query"]
         elif action_name == "mkdir" and method == "POST":
             required = ["nc:folder:mkdir"]
@@ -299,6 +299,60 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             pk, nc_path, group_code,
         )
         return drf_ok({})
+
+    # ------------------------------------------------------------------ #
+    #  查询指定路径上所有群组的规则                                          #
+    # ------------------------------------------------------------------ #
+
+    @action(detail=False, methods=["get"], url_path="path-rules")
+    def path_rules(self, request: Request):
+        """获取指定 NC 路径上所有群组的 ACL 规则（跨群组聚合）。
+
+        Query Params:
+            ncPath (str): 完整路径（含挂载点），如 "销售部/报表"。
+
+        Returns:
+            list[dict]: NcFileRuleReadSerializer 格式的规则列表，按部门排序。
+        """
+        nc_path = (request.query_params.get("ncPath") or "").strip("/")
+        if not nc_path:
+            return drf_error("ncPath 不能为空")
+
+        rules = (
+            NcFileAccessRule.objects
+            .filter(nc_path=nc_path)
+            .select_related("nc_group", "nc_group__dept")
+            .order_by("nc_group__dept__sort", "nc_group__name")
+        )
+        return drf_ok(NcFileRuleReadSerializer(rules, many=True).data)
+
+    # ------------------------------------------------------------------ #
+    #  获取所有 NC 群组（规则弹窗群组选择器数据源）                           #
+    # ------------------------------------------------------------------ #
+
+    @action(detail=False, methods=["get"], url_path="all-groups")
+    def all_groups(self, request: Request):
+        """获取所有 NC 群组（不限类型），供添加 ACL 规则时选择目标群组。
+
+        Returns:
+            list[dict]: [{id, code, name, groupType, deptName}]，按部门排序。
+        """
+        groups = (
+            NcGroup.objects
+            .select_related("dept")
+            .order_by("dept__sort", "group_type", "name")
+        )
+        result = [
+            {
+                "id": g.id,
+                "code": g.code,
+                "name": g.name,
+                "groupType": g.group_type,
+                "deptName": g.dept.name if g.dept else "",
+            }
+            for g in groups
+        ]
+        return drf_ok(result)
 
 
 # ------------------------------------------------------------------ #
