@@ -54,6 +54,7 @@
         <el-table-column type="selection" width="55" align="center" :selectable="(row: PositionPageVO) => !row.isBuiltin" />
         <el-table-column label="岗位名称" prop="name" min-width="120" />
         <el-table-column label="岗位编码" prop="code" width="160" />
+        <el-table-column label="所属部门" prop="deptName" width="140" show-overflow-tooltip />
 
         <el-table-column label="状态" align="center" width="100">
           <template #default="scope">

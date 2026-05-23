@@ -2,6 +2,7 @@
 from django.db import models
 
 from api_v1.models._base import TimeStampedModel
+from api_v1.models.system.department import Department
 
 
 class Position(TimeStampedModel):
@@ -39,6 +40,15 @@ class Position(TimeStampedModel):
     order_num = models.IntegerField(
         default=0,
         verbose_name="排序号",
+    )
+
+    dept = models.ForeignKey(
+        Department,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="positions",
+        verbose_name="所属部门",
     )
 
     menus = models.ManyToManyField(

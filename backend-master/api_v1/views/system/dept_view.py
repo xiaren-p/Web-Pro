@@ -15,6 +15,7 @@ from api_v1.models import Department
 from api_v1.permissions import MenuPermRequired
 from api_v1.serializers import DeptSerializer
 from api_v1.utils.responses import drf_error, drf_ok
+from api_v1.utils.dept_scope import get_caller_dept_ids
 from api_v1.services.nc.nc_sync_service import NcSyncService
 
 
@@ -125,8 +126,11 @@ class DeptViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="options")
     def options(self, request: Request) -> Any:
-        """部门下拉选项。"""
+        """部门下拉选项。部门管理员仅返回自身及子部门，防止跨部门分配用户。"""
+        dept_ids = get_caller_dept_ids(request.user)
         qs = Department.objects.filter(status=True).order_by("order_num", "id")
+        if dept_ids is not None:
+            qs = qs.filter(id__in=dept_ids)
         return drf_ok([{"label": d.name, "value": d.id} for d in qs])
 
     @action(detail=False, methods=["get"], url_path=r"(?P<id>[^/]+)/form")

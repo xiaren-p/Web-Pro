@@ -16,6 +16,8 @@ export interface PositionPageVO {
   sort?: number;
   status?: number;
   isBuiltin?: boolean;
+  deptId?: number | null;
+  deptName?: string | null;
 }
 
 export interface PositionForm {
@@ -25,6 +27,7 @@ export interface PositionForm {
   sort?: number;
   status?: number;
   remark?: string;
+  deptId?: number | null;
 }
 
 const POSITION_BASE_URL = "/positions";

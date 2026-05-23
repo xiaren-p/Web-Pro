@@ -16,6 +16,7 @@ from api_v1.serializers.system.position_serializer import (
     PositionSerializer,
     PositionWriteSerializer,
 )
+from api_v1.utils.dept_scope import get_caller_dept_ids
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_error, drf_ok
 
@@ -56,36 +57,27 @@ class PositionViewSet(viewsets.ViewSet):
 
         权限范围：
             - 公司管理员/超管：全量岗位。
-            - 部门管理员：仅返回本部门成员所属的岗位。
+            - 部门管理员：仅返回本部门（及子部门）的岗位。
             - 普通成员：无数据（返回空列表）。
 
         Query Params:
             keywords (str): 模糊匹配岗位名称或编码。
             status (int): 1=启用，0=禁用。
         """
-        from api_v1.models.system.user_profile import UserProfile as _UserProfile
-
         user = request.user
-        _profile = getattr(user, "profile", None)
-        _level = _profile.admin_level if _profile else AdminLevel.MEMBER
+        dept_ids = get_caller_dept_ids(user)
 
         qs = Position.objects.all().order_by("order_num", "id")
 
-        if not user.is_superuser and _level != AdminLevel.COMPANY_ADMIN:
-            if _level == AdminLevel.DEPT_ADMIN and _profile and _profile.dept_id:
-                # 仅展示本部门成员所归属的岗位
-                _dept_pos_ids = (
-                    _UserProfile.objects.filter(
-                        dept_id=_profile.dept_id,
-                        position__isnull=False,
-                    )
-                    .values_list("position_id", flat=True)
-                    .distinct()
-                )
-                qs = qs.filter(id__in=_dept_pos_ids)
-            else:
-                # 普通成员不返回任何数据
-                qs = qs.none()
+        if dept_ids is None:
+            # 公司管理员/超管：全量不过滤
+            pass
+        elif dept_ids:
+            # DEPT_ADMIN：仅返回属于自身及子部门的岗位
+            qs = qs.filter(dept_id__in=dept_ids)
+        else:
+            # 普通成员无权限
+            qs = qs.none()
         kw = request.query_params.get("keywords")
         if kw:
             qs = qs.filter(Q(name__icontains=kw) | Q(code__icontains=kw))
@@ -105,8 +97,21 @@ class PositionViewSet(viewsets.ViewSet):
 
         内置岗位（is_builtin=True，如系统管理员）不出现在选项中，
         防止被手动分配给任意用户。
+        部门管理员仅可看到本部门（及子部门）的岗位，避免跨部门分配。
         """
+        dept_ids = get_caller_dept_ids(request.user)
+
         qs = Position.objects.filter(status=True, is_builtin=False).order_by("order_num", "id")
+
+        if dept_ids is None:
+            # 公司管理员/超管：全量不过滤
+            pass
+        elif dept_ids:
+            # DEPT_ADMIN：仅返回属于自身及子部门的岗位
+            qs = qs.filter(dept_id__in=dept_ids)
+        else:
+            qs = qs.none()
+
         return drf_ok([{"label": p.name, "value": p.id} for p in qs])
 
     @action(detail=False, methods=["get"], url_path=r"(?P<position_id>[^/]+)/form")
@@ -179,31 +184,32 @@ class PositionViewSet(viewsets.ViewSet):
 
         权限范围：
             - 公司管理员/超管：任意岗位。
-            - 部门管理员：仅限本部门成员所属的岗位。
+            - 部门管理员：仅限属于自身及子部门的岗位。
 
         Body: {"menuIds": [1, 2, 3]}
         """
-        from api_v1.models.system.user_profile import UserProfile as _UserProfile
-
         user = request.user
-        _profile = getattr(user, "profile", None)
         _is_company = _is_company_admin(request)
 
         if not _is_company:
+            _profile = getattr(user, "profile", None)
             _level = _profile.admin_level if _profile else AdminLevel.MEMBER
             if _level != AdminLevel.DEPT_ADMIN or not (_profile and _profile.dept_id):
                 return drf_error("仅公司管理员可修改岗位菜单权限", status=403)
-            # 部门管理员仅可操作本部门成员归属的岗位
-            _in_dept = _UserProfile.objects.filter(
-                dept_id=_profile.dept_id,
-                position_id=position_id,
-            ).exists()
-            if not _in_dept:
+            # 部门管理员：直接通过 dept_id 判断岗位归属权
+            dept_ids = get_caller_dept_ids(user)
+            try:
+                position_obj = Position.objects.get(pk=position_id)
+            except Position.DoesNotExist:
+                return drf_error("未找到岗位", status=404)
+            if dept_ids is not None and position_obj.dept_id not in dept_ids:
                 return drf_error("无权修改非本部门岗位的权限", status=403)
-        try:
-            position = Position.objects.get(pk=position_id)
-        except Position.DoesNotExist:
-            return drf_error("未找到岗位", status=404)
+            position = position_obj
+        else:
+            try:
+                position = Position.objects.get(pk=position_id)
+            except Position.DoesNotExist:
+                return drf_error("未找到岗位", status=404)
         if position.is_builtin:
             return drf_error("内置岗位拥有全部权限，不可修改", status=400)
         menu_ids: list[int] = request.data.get("menuIds") or []

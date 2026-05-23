@@ -14,6 +14,8 @@ class PositionSerializer(serializers.ModelSerializer):
     # 前端字段名为 sort
     sort = serializers.IntegerField(source="order_num", read_only=True)
     menuIds = serializers.SerializerMethodField()
+    deptId = serializers.IntegerField(source="dept_id", allow_null=True, read_only=True)
+    deptName = serializers.SerializerMethodField()
 
     def get_status(self, obj: Position) -> int:
         """将布尔状态转为前端约定的 1/0 整型。
@@ -37,6 +39,17 @@ class PositionSerializer(serializers.ModelSerializer):
         """
         return list(obj.menus.values_list("id", flat=True))
 
+    def get_deptName(self, obj: Position) -> str | None:
+        """返回岗位所属部门名称。
+
+        Args:
+            obj (Position): 当前岗位实例。
+
+        Returns:
+            str | None: 部门名称，无属部门时为 None。
+        """
+        return obj.dept.name if obj.dept_id and obj.dept else None
+
     class Meta:
         model = Position
         fields = [
@@ -47,6 +60,8 @@ class PositionSerializer(serializers.ModelSerializer):
             "isBuiltin",
             "sort",
             "remark",
+            "deptId",
+            "deptName",
             "menuIds",
         ]
 
@@ -61,6 +76,14 @@ class PositionWriteSerializer(serializers.ModelSerializer):
         default=0,
     )
 
+    # 前端传入所属部门 ID
+    deptId = serializers.IntegerField(
+        source="dept_id",
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+
     menuIds = serializers.ListField(
         child=serializers.IntegerField(),
         required=False,
@@ -70,7 +93,7 @@ class PositionWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Position
-        fields = ["code", "name", "status", "sort", "remark", "menuIds"]
+        fields = ["code", "name", "status", "sort", "remark", "deptId", "menuIds"]
 
     def create(self, validated_data: dict) -> Position:
         """新建岗位并关联菜单。

@@ -6,6 +6,22 @@
     @close="handleCloseDialog"
   >
     <el-form ref="formRef" :model="formData" :rules="rules" label-width="100px">
+      <el-form-item label="所属部门" prop="deptId">
+        <el-select
+          v-model="formData.deptId"
+          placeholder="请选择所属部门"
+          clearable
+          style="width: 100%"
+        >
+          <el-option
+            v-for="item in deptOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </el-select>
+      </el-form-item>
+
       <el-form-item label="岗位名称" prop="name">
         <el-input v-model="formData.name" placeholder="请输入岗位名称" />
       </el-form-item>
@@ -53,15 +69,18 @@
 
 <script setup lang="ts">
 /**
- * 岗位新增 / 编辑弹窗：表单包含名称、编码、状态、排序、备注。
+ * 岗位新增 / 编辑弹窗：表单包含所属部门、名称、编码、状态、排序、备注。
  * 所属板块：system。
  */
+import { DeptAPI } from "@/api/dept";
 import { PositionAPI, type PositionForm } from "@/api/position";
 
 const emit = defineEmits(["success"]);
 
 const formRef = ref();
 const loading = ref(false);
+
+const deptOptions = ref<OptionType[]>([]);
 
 const dialog = reactive({
   title: "",
@@ -84,8 +103,9 @@ const rules = reactive({
  *
  * @param positionId 岗位ID（编辑时传入，新增时为空）
  */
-function open(positionId?: string) {
+async function open(positionId?: string) {
   dialog.visible = true;
+  deptOptions.value = await DeptAPI.getOptions();
   if (positionId) {
     dialog.title = "修改岗位";
     PositionAPI.getFormData(positionId).then((data) => {
@@ -132,6 +152,7 @@ function handleCloseDialog() {
   formData.sort = 1;
   formData.status = 1;
   formData.remark = undefined;
+  formData.deptId = undefined;
 }
 
 defineExpose({ open });
