@@ -9,7 +9,6 @@ import logging
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -409,45 +408,11 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
 
         nc_path = rule.nc_path
         username = rule.user.username
-        mount_point = nc_path.split("/")[0]
-        target_user = rule.user
         rule.delete()
 
         last_task_id = NcSyncTask.objects.order_by("-id").values_list("id", flat=True).first() or 0
         NcSyncService.enqueue_revoke_path_acl(nc_path, username)
-
-        # 若该用户在此 Group Folder 内已无任何剩余规则，将其从对应 DEPT 群组移出（撤销文件夹可见性）
-        has_remaining = NcFileAccessRule.objects.filter(
-            user=target_user,
-        ).filter(
-            Q(nc_path=mount_point) | Q(nc_path__startswith=mount_point + "/")
-        ).exists()
-        if not has_remaining:
-            # 通过 NC API 将 mount_point 映射到 folder_id，再按 folder_id 定位 DEPT 群组，
-            # 避免 dept.name 与 NC mount_point 因重命名而不一致导致查找失败
-            try:
-                _nc_client = NcApiClient.from_settings()
-                _folders = _nc_client.list_group_folders()
-                _folder_id = next(
-                    (
-                        fid
-                        for fid, info in _folders.items()
-                        if info.get("mount_point", "").strip("/") == mount_point
-                    ),
-                    None,
-                )
-                if _folder_id:
-                    dept_ng = NcGroup.objects.filter(
-                        group_type=NcGroupType.DEPT,
-                        folder_id=_folder_id,
-                    ).first()
-                    if dept_ng:
-                        NcSyncService.enqueue_remove_from_group(username, dept_ng.code)
-            except RuntimeError:
-                logger.warning(
-                    "[NcFolderTreeViewSet][delete_rule] 查询 NC Group Folder 列表失败，跳过 remove_from_group"
-                )
-
+        # 路径 ACL 仅管细粒度权限，群组成员关系由部门管理模块独立维护，此处不撤出群组
         NcSyncService._flush_tasks_after(last_task_id)
         logger.info(
             "[NcFolderTreeViewSet][delete_rule] pk=%s ncPath=%s user=%s",
@@ -644,15 +609,14 @@ def _serialize_rule(rule: NcFileAccessRule | None) -> dict | None:
 
 
 def _enqueue_acl_for_rule(rule: NcFileAccessRule, nc_group: NcGroup) -> None:
-    """为规则入队 ADD_TO_GROUP + ENABLE_FOLDER_ACL + SET_PATH_ACL 同步任务。
+    """为规则入队 ENABLE_FOLDER_ACL + SET_PATH_ACL 同步任务。
 
-    NC Group Folder 要求用户必须属于某个已被 grant_group_folder 授权的群组，
-    才能在 Files 中看到该文件夹。因此在设置路径 ACL 前，先将用户加入目标 Group Folder
-    对应的 DEPT 群组（幂等，NC 不报错重复入组），赋予文件夹可见性后再下发细粒度 ACL 规则。
+    仅设置路径级别的细粒度 ACL，不修改任何群组成员关系。
+    Group Folder 的成员管理（谁能看到哪个文件夹）由部门 / 群组管理模块独立负责。
     任务入队完毕后立即通过后台线程刷新执行（与用户同步任务等级相同）。
 
-    通过 nc_group（DEPT_ADMIN 群组）的 dept_id 定位 DEPT 群组，而非 dept__name=mount_point，
-    避免部门重命名后 NC 挂载点与 Django dept.name 不一致导致群组查找失败。
+    通过 nc_group（DEPT_ADMIN 群组）的 dept_id 定位 DEPT 群组，
+    取其 folder_id 以便开启 ACL 模式（幂等）。
 
     Args:
         rule (NcFileAccessRule): 已保存的规则实例。
@@ -666,12 +630,9 @@ def _enqueue_acl_for_rule(rule: NcFileAccessRule, nc_group: NcGroup) -> None:
     from api_v1.models.nc.nc_sync_task import NcSyncTask  # noqa: PLC0415 避免循环导入
     last_task_id = NcSyncTask.objects.order_by("-id").values_list("id", flat=True).first() or 0
 
-    if dept_ng:
-        if dept_ng.folder_id:
-            # 开启 ACL 模式（幂等），必须在 set_path_acl 之前执行
-            NcSyncService.enqueue_enable_folder_acl(dept_ng.folder_id)
-        # 确保用户加入 DEPT 群组 —— 这是用户能看到 Group Folder 的充分必要条件
-        NcSyncService.enqueue_add_to_group(rule.user.username, dept_ng.code)
+    if dept_ng and dept_ng.folder_id:
+        # 开启 ACL 模式（幂等），必须在 set_path_acl 之前执行
+        NcSyncService.enqueue_enable_folder_acl(dept_ng.folder_id)
 
     NcSyncService.enqueue_set_path_acl(rule)
     # 立即通过后台线程执行，不依赖 Celery Beat 每 30 秒轮询
