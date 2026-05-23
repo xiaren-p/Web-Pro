@@ -5,9 +5,26 @@ from api_v1.models.system.position import Position
 
 
 class PositionSerializer(serializers.ModelSerializer):
-    """岗位读取序列化器：包含菜单 ID 列表，供前端权限配置页使用。"""
+    """岗位读取序列化器：字段命名与前端 PositionPageVO 保持一致。"""
 
+    # 前端期望 camelCase 字段名
+    isBuiltin = serializers.BooleanField(source="is_builtin", read_only=True)
+    # 前端 status 比较用 === 1，须转为整型
+    status = serializers.SerializerMethodField()
+    # 前端字段名为 sort
+    sort = serializers.IntegerField(source="order_num", read_only=True)
     menuIds = serializers.SerializerMethodField()
+
+    def get_status(self, obj: Position) -> int:
+        """将布尔状态转为前端约定的 1/0 整型。
+
+        Args:
+            obj (Position): 当前岗位实例。
+
+        Returns:
+            int: 1=启用，0=禁用。
+        """
+        return 1 if obj.status else 0
 
     def get_menuIds(self, obj: Position) -> list[int]:
         """返回岗位关联的菜单 ID 列表。
@@ -27,9 +44,9 @@ class PositionSerializer(serializers.ModelSerializer):
             "code",
             "name",
             "status",
-            "is_builtin",
+            "isBuiltin",
+            "sort",
             "remark",
-            "order_num",
             "menuIds",
         ]
 
