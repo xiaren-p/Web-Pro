@@ -87,12 +87,6 @@ urlpatterns = [
     path('notices', views.NoticeViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='notices-list-create'),
     path('notices/<str:ids>', views.NoticeViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='notice-update-delete'),
 
-    # NC 文件访问规则（子路径 ACL 管控）
-    path('nc/rules/page', views.NcFileRuleViewSet.as_view({'get': 'page'}), name='nc-rules-page'),
-    path('nc/rules/group-options', views.NcFileRuleViewSet.as_view({'get': 'group_options'}), name='nc-rules-group-options'),
-    path('nc/rules/create', views.NcFileRuleViewSet.as_view({'post': 'create_rule'}), name='nc-rules-create'),
-    re_path(r'^nc/rules/(?P<pk>\d+)$', views.NcFileRuleViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='nc-rules-update-delete'),
-
     # NC 文件夹树管理（文件夹浏览、新建、权限分配）
     path('nc/folder-tree/groups', views.NcFolderTreeViewSet.as_view({'get': 'group_list'}), name='nc-folder-tree-groups'),
     path('nc/folder-tree/list', views.NcFolderTreeViewSet.as_view({'get': 'list_folder'}), name='nc-folder-tree-list'),

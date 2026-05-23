@@ -56,7 +56,7 @@
         </el-table-column>
         <el-table-column label="Group Folder ID" width="140" align="center">
           <template #default="{ row }: { row: DeptGroupRow }">
-            <span v-if="row.deptGroup?.folderId !== null && row.deptGroup?.folderId !== undefined">
+            <span v-if="row.deptGroup?.folderId != null">
               <el-tag type="info" size="small">#{{ row.deptGroup.folderId }}</el-tag>
             </span>
             <span v-else class="text-muted">—</span>
@@ -159,10 +159,10 @@ async function loadList(): Promise<void> {
 }
 
 // ── 单部门初始化 ──────────────────────────────────────────────────────────────
-const provisioningIds = ref<Set<number>>(new Set());
+const provisioningIds = reactive(new Set<number>());
 
 async function handleProvision(row: DeptGroupRow): Promise<void> {
-  provisioningIds.value = new Set([...provisioningIds.value, row.deptId]);
+  provisioningIds.add(row.deptId);
   try {
     const updated = await provisionDeptGroup(row.deptId);
     // 就地更新当前行，避免全量刷新
@@ -172,9 +172,7 @@ async function handleProvision(row: DeptGroupRow): Promise<void> {
   } catch {
     ElMessage.error(`${row.deptName} 初始化失败`);
   } finally {
-    const next = new Set(provisioningIds.value);
-    next.delete(row.deptId);
-    provisioningIds.value = next;
+    provisioningIds.delete(row.deptId);
   }
 }
 
