@@ -560,3 +560,126 @@ class NcApiClient:
             dav_path, group_id, mask, permissions,
         )
         self._proppatch(dav_path, xml_body)
+
+    # ------------------------------------------------------------------ #
+    #  WebDAV 目录浏览与创建                                               #
+    # ------------------------------------------------------------------ #
+
+    def list_dav_folder(self, dav_path: str) -> list[dict]:
+        """通过 WebDAV PROPFIND（Depth: 1）列出指定目录的直属子目录。
+
+        仅返回 resourcetype 为 collection（目录）的条目，文件被过滤掉；
+        同时过滤掉首条 response（即请求路径自身）。
+
+        Args:
+            dav_path (str): 相对于 NC server 根的 WebDAV 路径，
+                            如 /remote.php/dav/files/admin/技术部/ 。
+
+        Returns:
+            list[dict]: 子目录列表，每项含 {"name": str, "href": str}。
+
+        Raises:
+            RuntimeError: 网络错误或非 207 响应时抛出。
+        """
+        import xml.etree.ElementTree as ET
+        from urllib.parse import unquote
+
+        url = f"{self._base}{dav_path}"
+        xml_body = (
+            '<?xml version="1.0"?>'
+            '<d:propfind xmlns:d="DAV:">'
+            "<d:prop><d:resourcetype/><d:displayname/></d:prop>"
+            "</d:propfind>"
+        )
+        logger.info("[NcApiClient][list_dav_folder] %s", dav_path)
+        try:
+            resp = self._session.request(
+                "PROPFIND",
+                url,
+                data=xml_body.encode("utf-8"),
+                headers={
+                    "Content-Type": "application/xml; charset=utf-8",
+                    "Depth": "1",
+                },
+                verify=self._verify,
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"[NcApiClient] PROPFIND {dav_path} 网络错误: {exc}"
+            ) from exc
+        if resp.status_code != 207:
+            raise RuntimeError(
+                f"[NcApiClient] PROPFIND {dav_path} 返回状态码 "
+                f"{resp.status_code}: {resp.text[:200]}"
+            )
+        try:
+            root = ET.fromstring(resp.text)
+        except ET.ParseError as exc:
+            raise RuntimeError(
+                f"[NcApiClient] PROPFIND 响应 XML 解析失败: {exc}"
+            ) from exc
+
+        ns = {"d": "DAV:"}
+        entries: list[dict] = []
+        responses = root.findall("d:response", ns)
+
+        for response in responses[1:]:  # 跳过首条（当前目录自身）
+            href_el = response.find("d:href", ns)
+            if href_el is None:
+                continue
+            href = href_el.text or ""
+            propstat = response.find("d:propstat", ns)
+            if propstat is None:
+                continue
+            prop = propstat.find("d:prop", ns)
+            if prop is None:
+                continue
+            resourcetype = prop.find("d:resourcetype", ns)
+            is_collection = (
+                resourcetype is not None
+                and resourcetype.find("d:collection", ns) is not None
+            )
+            if not is_collection:
+                continue
+            displayname_el = prop.find("d:displayname", ns)
+            if displayname_el is not None and displayname_el.text:
+                name = displayname_el.text
+            else:
+                # 从 href 推导名称（URL 解码后取最后一段）
+                name = unquote(href.rstrip("/").split("/")[-1])
+            entries.append({"name": name, "href": href})
+
+        return entries
+
+    def create_dav_folder(self, dav_path: str) -> None:
+        """通过 WebDAV MKCOL 创建目录（幂等：已存在返回 405 时静默通过）。
+
+        Args:
+            dav_path (str): 相对于 NC server 根的新目录 WebDAV 路径，
+                            如 /remote.php/dav/files/admin/技术部/新文件夹 。
+
+        Raises:
+            RuntimeError: 网络错误或非 201/405 响应时抛出。
+        """
+        url = f"{self._base}{dav_path}"
+        logger.info("[NcApiClient][create_dav_folder] %s", dav_path)
+        try:
+            resp = self._session.request(
+                "MKCOL", url, verify=self._verify, timeout=15
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"[NcApiClient] MKCOL {dav_path} 网络错误: {exc}"
+            ) from exc
+        if resp.status_code == 405:
+            logger.info(
+                "[NcApiClient][create_dav_folder] 目录已存在，幂等跳过: %s",
+                dav_path,
+            )
+            return
+        if resp.status_code != 201:
+            raise RuntimeError(
+                f"[NcApiClient] MKCOL {dav_path} 返回状态码 "
+                f"{resp.status_code}: {resp.text[:200]}"
+            )

@@ -93,6 +93,13 @@ urlpatterns = [
     path('nc/rules/create', views.NcFileRuleViewSet.as_view({'post': 'create_rule'}), name='nc-rules-create'),
     re_path(r'^nc/rules/(?P<pk>\d+)$', views.NcFileRuleViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='nc-rules-update-delete'),
 
+    # NC 文件夹树管理（文件夹浏览、新建、权限分配）
+    path('nc/folder-tree/groups', views.NcFolderTreeViewSet.as_view({'get': 'group_list'}), name='nc-folder-tree-groups'),
+    path('nc/folder-tree/list', views.NcFolderTreeViewSet.as_view({'get': 'list_folder'}), name='nc-folder-tree-list'),
+    path('nc/folder-tree/mkdir', views.NcFolderTreeViewSet.as_view({'post': 'mkdir'}), name='nc-folder-tree-mkdir'),
+    path('nc/folder-tree/set-rule', views.NcFolderTreeViewSet.as_view({'post': 'set_rule'}), name='nc-folder-tree-set-rule'),
+    re_path(r'^nc/folder-tree/rule/(?P<pk>\d+)$', views.NcFolderTreeViewSet.as_view({'delete': 'delete_rule'}), name='nc-folder-tree-delete-rule'),
+
     # 菜单与动态路由
     path('menus/routes', views.MenuViewSet.as_view({'get': 'routes'}), name='menus-routes'),
     path('menus/tree', views.MenuViewSet.as_view({'get': 'tree'}), name='menus-tree'),

@@ -8,7 +8,7 @@ from api_v1.views.system import (
     ConfigViewSet,
     PositionViewSet,
 )
-from api_v1.views.nc import NcFileRuleViewSet
+from api_v1.views.nc import NcFileRuleViewSet, NcFolderTreeViewSet
 from api_v1.views.notice import NoticeViewSet
 from api_v1.views.codegen import CodegenViewSet
 from api_v1.views.crawler import (
