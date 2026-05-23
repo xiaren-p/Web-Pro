@@ -67,10 +67,8 @@ export interface NcFileRuleForm {
  * @param {NcFileRulePageQuery} params - 分页与筛选参数。
  * @returns {Promise<NcFileRulePageResult>} 分页结果。
  */
-export function getNcFileRulePage(
-  params: NcFileRulePageQuery
-): Promise<NcFileRulePageResult> {
-  return request.get("/api/v1/nc/rules/page", { params });
+export function getNcFileRulePage(params: NcFileRulePageQuery): Promise<NcFileRulePageResult> {
+  return request.get("/nc/rules/page", { params });
 }
 
 /**
@@ -79,7 +77,7 @@ export function getNcFileRulePage(
  * @returns {Promise<NcGroupOption[]>} 群组选项列表。
  */
 export function getNcGroupOptions(): Promise<NcGroupOption[]> {
-  return request.get("/api/v1/nc/rules/group-options");
+  return request.get("/nc/rules/group-options");
 }
 
 /**
@@ -89,7 +87,7 @@ export function getNcGroupOptions(): Promise<NcGroupOption[]> {
  * @returns {Promise<NcFileRuleVO>} 新建成功的规则数据。
  */
 export function createNcFileRule(data: NcFileRuleForm): Promise<NcFileRuleVO> {
-  return request.post("/api/v1/nc/rules/create", data);
+  return request.post("/nc/rules/create", data);
 }
 
 /**
@@ -99,11 +97,8 @@ export function createNcFileRule(data: NcFileRuleForm): Promise<NcFileRuleVO> {
  * @param {Partial<NcFileRuleForm>} data - 需要更新的字段。
  * @returns {Promise<NcFileRuleVO>} 更新后的规则数据。
  */
-export function updateNcFileRule(
-  id: number,
-  data: Partial<NcFileRuleForm>
-): Promise<NcFileRuleVO> {
-  return request.put(`/api/v1/nc/rules/${id}`, data);
+export function updateNcFileRule(id: number, data: Partial<NcFileRuleForm>): Promise<NcFileRuleVO> {
+  return request.put(`/nc/rules/${id}`, data);
 }
 
 /**
@@ -113,5 +108,5 @@ export function updateNcFileRule(
  * @returns {Promise<void>}
  */
 export function deleteNcFileRule(id: number): Promise<void> {
-  return request.delete(`/api/v1/nc/rules/${id}`);
+  return request.delete(`/nc/rules/${id}`);
 }
