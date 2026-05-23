@@ -454,15 +454,28 @@ class NcSyncService:
 
     @staticmethod
     def _flush_in_background(task_ids: list[int]) -> None:
-        """\u5728后台守护线程中执行指定的 NcSyncTask，不阻塞 HTTP 响应。
+        """在后台守护线程中执行指定的 NcSyncTask，不阻塞 HTTP 响应。
 
         Args:
             task_ids (list[int]): 需要立即执行的 NcSyncTask ID 列表。
         """
         def _run() -> None:
-            tasks = list(NcSyncTask.objects.filter(id__in=task_ids).order_by("id"))
-            for task in tasks:
-                NcSyncService.execute_task(task)
+            # 非请求线程必须先关闭旧连接，避免复用已超时的主线程连接导致静默崩溃
+            from django.db import close_old_connections, connection
+            close_old_connections()
+            try:
+                tasks = list(NcSyncTask.objects.filter(id__in=task_ids).order_by("id"))
+                for task in tasks:
+                    NcSyncService.execute_task(task)
+            except Exception as exc:
+                logger.error(
+                    "[NcSyncService][_flush_in_background] 后台线程执行异常: %s",
+                    exc,
+                    exc_info=True,
+                )
+            finally:
+                # 释放线程独占的 DB 连接，防止连接池泄漏
+                connection.close()
 
         thread = threading.Thread(target=_run, daemon=True, name="nc-sync-flush")
         thread.start()
