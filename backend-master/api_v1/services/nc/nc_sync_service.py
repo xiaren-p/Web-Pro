@@ -17,6 +17,7 @@
 import logging
 import secrets
 import string
+import threading
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -451,6 +452,25 @@ class NcSyncService:
         cls.enqueue_disable_user(username)
         logger.info("[NcSyncService][on_user_deleted] username=%s 入队 disable_user", username)
 
+    @staticmethod
+    def _flush_in_background(task_ids: list[int]) -> None:
+        """\u5728后台守护线程中执行指定的 NcSyncTask，不阻塞 HTTP 响应。
+
+        Args:
+            task_ids (list[int]): 需要立即执行的 NcSyncTask ID 列表。
+        """
+        def _run() -> None:
+            tasks = list(NcSyncTask.objects.filter(id__in=task_ids).order_by("id"))
+            for task in tasks:
+                NcSyncService.execute_task(task)
+
+        thread = threading.Thread(target=_run, daemon=True, name="nc-sync-flush")
+        thread.start()
+        logger.info(
+            "[NcSyncService][_flush_in_background] 已启动后台线程，任务 IDs=%s",
+            task_ids,
+        )
+
     @classmethod
     def on_dept_created(cls, dept) -> NcGroup:
         """部门新建后调用：同时创建 DEPT + DEPT_ADMIN 双群组并入队同步任务。
@@ -467,6 +487,7 @@ class NcSyncService:
         """
         base_code = (dept.code or "").strip() or f"dept_{dept.id}"
         admin_code = f"{base_code}_admin"
+        queued_task_ids: list[int] = []
         with transaction.atomic():
             nc_group, created = NcGroup.objects.get_or_create(
                 dept=dept,
@@ -479,18 +500,22 @@ class NcSyncService:
                     group_type=NcGroupType.DEPT_ADMIN,
                     defaults={"code": admin_code, "name": f"{dept.name}（管理员）"},
                 )
-                cls.enqueue_create_group(nc_group.code, nc_group.name)
-                cls.enqueue_create_group(admin_nc_group.code, admin_nc_group.name)
-                cls.enqueue_create_group_folder(nc_group.code, dept.name)
+                t1 = cls.enqueue_create_group(nc_group.code, nc_group.name)
+                t2 = cls.enqueue_create_group(admin_nc_group.code, admin_nc_group.name)
+                t3 = cls.enqueue_create_group_folder(nc_group.code, dept.name)
+                queued_task_ids = [t1.id, t2.id, t3.id]
                 logger.info(
                     "[NcSyncService][on_dept_created] dept_id=%s code=%s admin_code=%s "
-                    "入队 CREATE_GROUP×2 + CREATE_GROUP_FOLDER",
-                    dept.id, nc_group.code, admin_nc_group.code,
+                    "入队 CREATE_GROUP×2 + CREATE_GROUP_FOLDER，task_ids=%s",
+                    dept.id, nc_group.code, admin_nc_group.code, queued_task_ids,
                 )
             else:
                 logger.info(
                     "[NcSyncService][on_dept_created] dept_id=%s NcGroup 已存在，跳过", dept.id,
                 )
+        # 事务提交后立即在后台线程执行入队任务，无需等待 reconcile_nc
+        if queued_task_ids:
+            transaction.on_commit(lambda: cls._flush_in_background(queued_task_ids))
         return nc_group
 
     @classmethod

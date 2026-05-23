@@ -54,6 +54,13 @@ class PositionSerializer(serializers.ModelSerializer):
 class PositionWriteSerializer(serializers.ModelSerializer):
     """岗位写操作序列化器：支持同步更新关联菜单。"""
 
+    # 前端字段名为 sort，映射到模型的 order_num
+    sort = serializers.IntegerField(
+        source="order_num",
+        required=False,
+        default=0,
+    )
+
     menuIds = serializers.ListField(
         child=serializers.IntegerField(),
         required=False,
@@ -63,7 +70,7 @@ class PositionWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Position
-        fields = ["code", "name", "status", "remark", "order_num", "menuIds"]
+        fields = ["code", "name", "status", "sort", "remark", "menuIds"]
 
     def create(self, validated_data: dict) -> Position:
         """新建岗位并关联菜单。

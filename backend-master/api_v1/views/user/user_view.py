@@ -230,7 +230,10 @@ class UserViewSet(viewsets.ViewSet):
                 pass
         if position_id:
             try:
-                profile.position = Position.objects.get(pk=position_id)
+                pos = Position.objects.get(pk=position_id)
+                if pos.is_builtin:
+                    return drf_error("内置岗位不可手动分配给用户", status=400)
+                profile.position = pos
             except Position.DoesNotExist:
                 pass
         profile.save()
@@ -281,14 +284,21 @@ class UserViewSet(viewsets.ViewSet):
                 except (ValueError, TypeError):
                     pass
             if "positionId" in payload:
-                pid = payload.get("positionId")
-                if pid:
-                    try:
-                        profile.position = Position.objects.get(pk=pid)
-                    except Position.DoesNotExist:
-                        pass
+                # admin 账号的岗位绑定不可修改，跳过
+                if user.username == "admin":
+                    pass
                 else:
-                    profile.position = None
+                    pid = payload.get("positionId")
+                    if pid:
+                        try:
+                            pos = Position.objects.get(pk=pid)
+                            if pos.is_builtin:
+                                return drf_error("内置岗位不可手动分配给用户", status=400)
+                            profile.position = pos
+                        except Position.DoesNotExist:
+                            pass
+                    else:
+                        profile.position = None
             _old_admin_level = profile.admin_level
             if "adminLevel" in payload:
                 try:

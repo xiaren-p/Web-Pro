@@ -53,8 +53,12 @@ class PositionViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="options")
     def options(self, request):
-        """获取岗位下拉选项（轻量，仅返回 id/code/name）。"""
-        qs = Position.objects.filter(status=True).order_by("order_num", "id")
+        """获取岗位下拉选项（轻量，仅返回 id/code/name）。
+
+        内置岗位（is_builtin=True，如系统管理员）不出现在选项中，
+        防止被手动分配给任意用户。
+        """
+        qs = Position.objects.filter(status=True, is_builtin=False).order_by("order_num", "id")
         data = PositionOptionSerializer(qs, many=True).data
         return drf_ok(data)
 
