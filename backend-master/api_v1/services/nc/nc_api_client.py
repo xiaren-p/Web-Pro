@@ -529,7 +529,7 @@ class NcApiClient:
             RuntimeError: NC 响应异常时抛出。
         """
         logger.info("[NcApiClient][enable_folder_acl] folder_id=%s", folder_id)
-        self._put(f"/apps/groupfolders/folders/{folder_id}/acl", {"acl": 1})
+        self._post_app(f"/apps/groupfolders/folders/{folder_id}/acl", {"acl": 1})
 
     def set_path_acl(
         self,
