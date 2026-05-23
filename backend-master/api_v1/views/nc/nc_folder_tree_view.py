@@ -69,9 +69,11 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="groups")
     def group_list(self, request: Request):
-        """获取调用方有权管理的 DEPT_ADMIN NC 群组列表。
+        """获取调用方有权管理的 NC 群组列表。
 
-        公司管理员返回全量；部门管理员只返回自身部门及子部门对应的群组。
+        公司管理员返回：① 全量 DEPT_ADMIN 部门群组 +
+                       ② NC 端手动创建的未被追踪的 Group Folder（自动注册为 CUSTOM 类型，无需手动对账）。
+        部门管理员只返回自身部门及子部门对应的 DEPT_ADMIN 群组（不含 CUSTOM）。
 
         Returns:
             list[dict]: [{id, code, name, deptName}]，按部门排序顺序排列。
@@ -93,6 +95,51 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             }
             for g in qs
         ]
+
+        # 公司管理员：自动扫描 NC 端手动创建的 Group Folder
+        # 凡是 folder_id 未被任何 NcGroup 追踪的 NC folder，自动注册为 CUSTOM 类型 NcGroup，
+        # 加入返回列表后即可在界面中直接管理，无需手动执行对账命令。
+        if allowed is None:
+            try:
+                _client = NcApiClient.from_settings()
+                _nc_folders = _client.list_group_folders()
+            except RuntimeError as exc:
+                logger.warning(
+                    "[NcFolderTreeViewSet][group_list] 获取 NC folder 列表失败，跳过自动发现: %s", exc
+                )
+                _nc_folders = {}
+
+            if _nc_folders:
+                # 已被任意 NcGroup 追踪的 folder_id 集合（DEPT / DEPT_ADMIN / CUSTOM 均算）
+                _tracked_fids: set[int] = set(
+                    NcGroup.objects.filter(folder_id__isnull=False)
+                    .values_list("folder_id", flat=True)
+                )
+                for _fid, _finfo in _nc_folders.items():
+                    if _fid in _tracked_fids:
+                        continue
+                    _mp = (_finfo.get("mount_point") or "").strip("/")
+                    if not _mp:
+                        continue
+                    # 以 _folder_{fid} 作为合成 code，保证唯一且不与真实 NC group_id 冲突
+                    _ng, _created = NcGroup.objects.get_or_create(
+                        code=f"_folder_{_fid}",
+                        defaults={
+                            "name": _mp,
+                            "group_type": NcGroupType.CUSTOM,
+                            "folder_id": _fid,
+                        },
+                    )
+                    if not _created and _ng.folder_id != _fid:
+                        _ng.folder_id = _fid
+                        _ng.save(update_fields=["folder_id"])
+                    result.append({
+                        "id": _ng.id,
+                        "code": _ng.code,
+                        "name": _ng.name,
+                        "deptName": "",
+                    })
+
         return drf_ok(result)
 
     # ------------------------------------------------------------------ #
@@ -549,7 +596,7 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
 def _resolve_dept_admin_group(
     group_id_str: str | None,
 ) -> tuple[NcGroup | None, str | None]:
-    """解析 groupId 参数，确保其为 DEPT_ADMIN 类型群组。
+    """解析 groupId 参数，确保其为 DEPT_ADMIN 或 CUSTOM 类型群组。
 
     Args:
         group_id_str (str | None): 字符串形式的 NcGroup 主键。
@@ -560,39 +607,51 @@ def _resolve_dept_admin_group(
     try:
         nc_group = NcGroup.objects.select_related("dept").get(
             pk=int(group_id_str),  # type: ignore[arg-type]
-            group_type=NcGroupType.DEPT_ADMIN,
+            group_type__in=[NcGroupType.DEPT_ADMIN, NcGroupType.CUSTOM],
         )
         return nc_group, None
     except (NcGroup.DoesNotExist, ValueError, TypeError):
-        return None, "群组不存在或不是 DEPT_ADMIN 类型"
+        return None, "群组不存在或类型不支持"
 
 
 def _get_mount_point(
     nc_group: NcGroup,
 ) -> tuple[NcApiClient | None, str, str | None]:
-    """根据 DEPT_ADMIN 群组获取对应 Group Folder 的挂载点名称。
+    """根据 NcGroup 获取对应 Group Folder 的挂载点名称。
 
-    先找同部门的 DEPT 群组取 folder_id，再向 NC 查询挂载点。
+    - CUSTOM 类型：folder_id 直接存储在本记录上，直接查询 NC 挂载点。
+    - DEPT_ADMIN 类型：先找同部门的 DEPT 群组取 folder_id，再向 NC 查询挂载点。
 
     Args:
-        nc_group (NcGroup): 目标 DEPT_ADMIN 群组实例。
+        nc_group (NcGroup): 目标群组实例（DEPT_ADMIN 或 CUSTOM）。
 
     Returns:
         tuple: (NcApiClient 实例, mount_point 字符串, 错误信息)；
                成功时错误信息为 None，失败时前两项为 None/"" 。
     """
+    try:
+        client = NcApiClient.from_settings()
+        folders = client.list_group_folders()
+    except RuntimeError as exc:
+        return None, "", f"获取 NC Group Folder 列表失败: {exc}"
+
+    # CUSTOM 类型：folder_id 直接存储在当前 NcGroup 记录上，无需查 DEPT 配对
+    if nc_group.group_type == NcGroupType.CUSTOM:
+        if not nc_group.folder_id:
+            return None, "", "自定义群组缺少 folder_id，请检查配置"
+        folder_info = folders.get(nc_group.folder_id)
+        if not folder_info:
+            return None, "", "NC 中未找到对应 Group Folder，可能已被删除"
+        mount_point = folder_info.get("mount_point", "").strip("/")
+        return client, mount_point, None
+
+    # DEPT_ADMIN 类型：通过同部门 DEPT 群组定位 folder_id
     dept_ng = NcGroup.objects.filter(
         dept_id=nc_group.dept_id,
         group_type=NcGroupType.DEPT,
     ).first()
     if not dept_ng or not dept_ng.folder_id:
         return None, "", "对应 DEPT 群组缺少 folder_id，请先运行对账任务"
-
-    try:
-        client = NcApiClient.from_settings()
-        folders = client.list_group_folders()
-    except RuntimeError as exc:
-        return None, "", f"获取 NC Group Folder 列表失败: {exc}"
 
     folder_info = folders.get(dept_ng.folder_id)
     if not folder_info:
@@ -657,20 +716,25 @@ def _enqueue_acl_for_rule(rule: NcFileAccessRule, nc_group: NcGroup) -> None:
         rule (NcFileAccessRule): 已保存的规则实例。
         nc_group (NcGroup): 请求上下文中的 DEPT_ADMIN 群组（用于定位同部门的 DEPT 群组）。
     """
-    dept_ng = NcGroup.objects.filter(
-        group_type=NcGroupType.DEPT,
-        dept_id=nc_group.dept_id,
-    ).first()
-
     from api_v1.models.nc.nc_sync_task import NcSyncTask  # noqa: PLC0415 避免循环导入
     last_task_id = NcSyncTask.objects.order_by("-id").values_list("id", flat=True).first() or 0
 
-    if dept_ng:
-        if dept_ng.folder_id:
-            # 开启 ACL 模式（幂等），必须在 set_path_acl 之前执行
-            NcSyncService.enqueue_enable_folder_acl(dept_ng.folder_id)
-        # 确保用户加入 DEPT 群组 —— 文件夹可见性的前提条件（幂等）
-        NcSyncService.enqueue_add_to_group(rule.user.username, dept_ng.code)
+    if nc_group.group_type == NcGroupType.CUSTOM:
+        # 自定义文件夹：folder_id 存储在 nc_group 自身，无部门群组配对
+        # 不执行 ADD_TO_GROUP（成员关系由 NC 端手动维护，系统不干预）
+        if nc_group.folder_id:
+            NcSyncService.enqueue_enable_folder_acl(nc_group.folder_id)
+    else:
+        dept_ng = NcGroup.objects.filter(
+            group_type=NcGroupType.DEPT,
+            dept_id=nc_group.dept_id,
+        ).first()
+        if dept_ng:
+            if dept_ng.folder_id:
+                # 开启 ACL 模式（幂等），必须在 set_path_acl 之前执行
+                NcSyncService.enqueue_enable_folder_acl(dept_ng.folder_id)
+            # 确保用户加入 DEPT 群组 —— 文件夹可见性的前提条件（幂等）
+            NcSyncService.enqueue_add_to_group(rule.user.username, dept_ng.code)
 
     NcSyncService.enqueue_set_path_acl(rule)
     # 立即通过后台线程执行，不依赖 Celery Beat 每 30 秒轮询
