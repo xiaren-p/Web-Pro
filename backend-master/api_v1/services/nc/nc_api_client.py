@@ -459,8 +459,20 @@ class NcApiClient:
             folder_id, group_id, permissions,
         )
         # 先确保群组已加入该 Folder
-        self._post_app(f"/apps/groupfolders/folders/{folder_id}/groups", {"group": group_id})
-        # 再设置权限
+        # NC 返回 MySQL 错误码 1062（duplicate entry）时表示群组已是成员，
+        # requests 会因无效 HTTP 状态行抛出 ConnectionError → 此处视为幂等成功继续执行
+        try:
+            self._post_app(f"/apps/groupfolders/folders/{folder_id}/groups", {"group": group_id})
+        except RuntimeError as exc:
+            if "1062" in str(exc):
+                logger.info(
+                    "[NcApiClient][grant_group_folder] 群组已在 Folder 中（NC 1062），跳过添加: "
+                    "folder_id=%s group=%s",
+                    folder_id, group_id,
+                )
+            else:
+                raise
+        # 再设置权限（无论是刚加入还是已存在，均需同步权限值）
         self._post_app(
             f"/apps/groupfolders/folders/{folder_id}/groups/{group_id}",
             {"permissions": permissions},
