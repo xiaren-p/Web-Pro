@@ -419,32 +419,50 @@ class Command(BaseCommand):
         # ------------------------------------------------------------ #
         # Step 5: 对账 NcFileAccessRule 子目录 ACL 规则
         # 遇到生效规则（status=True）→ 确保对应文件夹已开 ACL 模式 → 入队 SET_PATH_ACL
+        # NcFileAccessRule 无 nc_group 字段，通过 nc_path 首段得到 mount_point，
+        # 再经 NC API list_group_folders() 定位 folder_id（避免 dept.name 重命名失配）。
         # ------------------------------------------------------------ #
         if not target_username:
+            # 预取 NC 所有 Group Folder：mount_point（去除首尾斜杠）→ folder_id
+            try:
+                _nc_folders = client.list_group_folders()
+                nc_mount_to_folder_id: dict[str, int] = {
+                    info.get("mount_point", "").strip("/"): fid
+                    for fid, info in _nc_folders.items()
+                }
+            except RuntimeError:
+                logger.warning("[reconcile_nc] 无法获取 NC Group Folder 列表，跳过 Step 5 ACL 对账")
+                nc_mount_to_folder_id = {}
+
             active_rules = NcFileAccessRule.objects.filter(
                 status=True,
-            ).select_related("nc_group__dept")
+            ).select_related("user")
             acl_enqueued = 0
             for rule in active_rules:
-                folder_id_for_acl: int | None = None
-                # 优先从 DEPT 群组取 folder_id
-                if rule.nc_group.dept_id:
-                    dept_ng = NcGroup.objects.filter(
-                        dept_id=rule.nc_group.dept_id, group_type=NcGroupType.DEPT,
-                    ).first()
-                    if dept_ng:
-                        folder_id_for_acl = dept_ng.folder_id
+                # nc_path 格式：<mount_point>[/<子路径>]，首尾无斜杠
+                mount_point = rule.nc_path.split("/")[0]
+                folder_id_for_acl: int | None = nc_mount_to_folder_id.get(mount_point)
                 if not folder_id_for_acl:
                     logger.warning(
-                        "[reconcile_nc] ACL 规则 rule_id=%s 无法确定 folder_id，跳过",
-                        rule.id,
+                        "[reconcile_nc] ACL 规则 rule_id=%s mount_point=%s 无法定位 folder_id，跳过",
+                        rule.id, mount_point,
                     )
                     continue
+                # 通过 folder_id 找到对应的 DEPT 群组（用于 add_to_group）
+                dept_ng_for_rule = NcGroup.objects.filter(
+                    group_type=NcGroupType.DEPT,
+                    folder_id=folder_id_for_acl,
+                ).first()
                 self.stdout.write(
-                    f"  → ACL 规则对账: [{rule.nc_group.code}] {rule.nc_path} perms={rule.permission_bits}"
+                    f"  → ACL 规则对账: [{mount_point}] {rule.nc_path}"
+                    f" user={rule.user.username} perms={rule.permission_bits}"
                 )
                 if not dry_run:
                     NcSyncService.enqueue_enable_folder_acl(folder_id_for_acl)
+                    if dept_ng_for_rule:
+                        NcSyncService.enqueue_add_to_group(
+                            rule.user.username, dept_ng_for_rule.code
+                        )
                     NcSyncService.enqueue_set_path_acl(rule)
                     acl_enqueued += 1
             if acl_enqueued:
