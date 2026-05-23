@@ -18,6 +18,7 @@ class NcFileAccessRule(TimeStampedModel):
     PERM_CREATE: int = 4
     PERM_DELETE: int = 8
     PERM_SHARE: int = 16
+    PERM_FULL: int = 31  # READ + WRITE + CREATE + DELETE + SHARE
 
     nc_group = models.ForeignKey(
         "NcGroup",
@@ -28,8 +29,8 @@ class NcFileAccessRule(TimeStampedModel):
 
     nc_path = models.CharField(
         max_length=500,
-        verbose_name="NC 文件夹路径",
-        help_text="如 /部门文档/技术部/",
+        verbose_name="NC 子路径",
+        help_text="从 Group Folder 挂载点开始的子路径，如 '技术部/机密文档' 或 '技术部'；首尾斜杠自动忽略",
     )
 
     permission_bits = models.IntegerField(

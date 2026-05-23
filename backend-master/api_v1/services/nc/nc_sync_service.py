@@ -22,12 +22,17 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
+from api_v1.models.nc.nc_file_access_rule import NcFileAccessRule
 from api_v1.models.nc.nc_group import NcGroup, NcGroupType
 from api_v1.models.nc.nc_sync_task import NcSyncTask, SyncOperation, SyncStatus
 from api_v1.models.system.user_profile import AdminLevel
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+# NC Group Folder 权限位常量（单一来源，供整个服务层引用）
+_PERM_READ_ONLY: int = NcFileAccessRule.PERM_READ   # 1 —— 普通成员：仅读
+_PERM_FULL: int = NcFileAccessRule.PERM_FULL        # 31 —— 管理员：全权限
 
 
 class NcSyncService:
@@ -222,13 +227,13 @@ class NcSyncService:
         )
 
     @staticmethod
-    def enqueue_grant_group_folder(folder_id: int, group_code: str, permissions: int = 31) -> NcSyncTask:
+    def enqueue_grant_group_folder(folder_id: int, group_code: str, permissions: int) -> NcSyncTask:
         """入队：为 Group Folder 授权指定群组。
 
         Args:
             folder_id (int): NC Group Folder ID。
             group_code (str): NcGroup.code（即 NC group_id）。
-            permissions (int): 权限位（READ=1 WRITE=2 CREATE=4 DELETE=8 SHARE=16，默认 31=全部）。
+            permissions (int): 权限位（普通成员传 _PERM_READ_ONLY=1；管理员传 _PERM_FULL=31）。
 
         Returns:
             NcSyncTask: 已创建的任务记录。
@@ -236,6 +241,70 @@ class NcSyncService:
         return NcSyncTask.objects.create(
             operation=SyncOperation.GRANT_GROUP_FOLDER,
             payload={"folder_id": folder_id, "group": group_code, "permissions": permissions},
+        )
+
+    @staticmethod
+    def enqueue_enable_folder_acl(folder_id: int) -> NcSyncTask:
+        """入队：开启 Group Folder 的 ACL 高级权限模式。
+
+        ACL 模式开启后才能对子路径下发细粒度 ACL 规则。幺等，可重复入队。
+
+        Args:
+            folder_id (int): NC Group Folder ID。
+
+        Returns:
+            NcSyncTask: 已创建的任务记录。
+        """
+        return NcSyncTask.objects.create(
+            operation=SyncOperation.ENABLE_FOLDER_ACL,
+            payload={"folder_id": folder_id},
+        )
+
+    @staticmethod
+    def enqueue_set_path_acl(rule: "NcFileAccessRule") -> NcSyncTask:
+        """入队：为 Group Folder 内子路径设置群组 ACL 规则。
+
+        将当前规则的所有属性写入 payload，以免后续执行时再次查询 DB。
+
+        Args:
+            rule (NcFileAccessRule): 就绪的 NcFileAccessRule 实例（已关联加载 nc_group）。
+
+        Returns:
+            NcSyncTask: 已创建的任务记录。
+        """
+        return NcSyncTask.objects.create(
+            operation=SyncOperation.SET_PATH_ACL,
+            payload={
+                "rule_id": rule.id,
+                "nc_path": rule.nc_path.strip("/"),
+                "group_id": rule.nc_group.code,
+                "permissions": rule.permission_bits,
+            },
+        )
+
+    @staticmethod
+    def enqueue_revoke_path_acl(nc_path: str, group_id: str) -> NcSyncTask:
+        """入队：撤销 Group Folder 内子路径对指定群组的 ACL 规则（mask=0 展透）。
+
+        通过将 acl-mask 设为 0 使该群组的 ACL 条目失效，
+        路径权限回退为 Group Folder GRANT 基线。
+
+        Args:
+            nc_path (str): 子路径（首尾斜杠将被忽略）。
+            group_id (str): NC 群组 ID。
+
+        Returns:
+            NcSyncTask: 已创建的任务记录。
+        """
+        return NcSyncTask.objects.create(
+            operation=SyncOperation.SET_PATH_ACL,
+            payload={
+                "rule_id": None,
+                "nc_path": nc_path.strip("/"),
+                "group_id": group_id,
+                "permissions": 0,
+                "mask": 0,  # mask=0 展透，移除 ACL 限制
+            },
         )
 
     # ------------------------------------------------------------------ #
@@ -261,6 +330,7 @@ class NcSyncService:
         if profile.admin_level == AdminLevel.COMPANY_ADMIN:
             cls.enqueue_set_admin(user.username)
         cls._enqueue_dept_group(user.username, profile)
+        cls._enqueue_dept_admin_group(user.username, profile)  # 仅 DEPT_ADMIN 级别触发
         cls._enqueue_extra_groups(user.username, profile)
         logger.info("[NcSyncService][on_user_created] username=%s 同步任务已入队", user.username)
 
@@ -298,20 +368,45 @@ class NcSyncService:
                 email=new_email,
             )
         if old_admin_level is not None and old_admin_level != profile.admin_level:
-            if profile.admin_level == AdminLevel.COMPANY_ADMIN:
+            new_level = profile.admin_level
+            old_level = old_admin_level
+
+            if new_level == AdminLevel.COMPANY_ADMIN:
                 cls.enqueue_set_admin(user.username)
-            elif old_admin_level == AdminLevel.COMPANY_ADMIN:
+                # 公司管理员通过 NC admin 权限控制，无需活跃在部门管理员群组
+                if old_level == AdminLevel.DEPT_ADMIN and profile.dept_id:
+                    admin_ng = NcGroup.objects.filter(
+                        dept_id=profile.dept_id, group_type=NcGroupType.DEPT_ADMIN,
+                    ).first()
+                    if admin_ng:
+                        cls.enqueue_remove_from_group(user.username, admin_ng.code)
+            elif old_level == AdminLevel.COMPANY_ADMIN:
                 cls.enqueue_revoke_admin(user.username)
-        # 部门变更：退出旧部门群组，加入新部门群组
-        # 注意：old_dept_id 可能为 None（用户原本无部门），此时条件仅判断是否与新値不同
+                # 从公司管理员降为部门管理员时，需加入部门管理员群组
+                if new_level == AdminLevel.DEPT_ADMIN and profile.dept_id:
+                    cls._enqueue_dept_admin_group(user.username, profile)
+            elif new_level == AdminLevel.DEPT_ADMIN and old_level == AdminLevel.MEMBER:
+                # 普通成员 → 部门管理员：加入部门管理员群组
+                cls._enqueue_dept_admin_group(user.username, profile)
+            elif new_level == AdminLevel.MEMBER and old_level == AdminLevel.DEPT_ADMIN:
+                # 部门管理员 → 普通成员：移出部门管理员群组
+                if profile.dept_id:
+                    admin_ng = NcGroup.objects.filter(
+                        dept_id=profile.dept_id, group_type=NcGroupType.DEPT_ADMIN,
+                    ).first()
+                    if admin_ng:
+                        cls.enqueue_remove_from_group(user.username, admin_ng.code)
+
+        # 部门变更：退出旧部门的 DEPT + DEPT_ADMIN 群组，加入新部门群组
         if old_dept_id != profile.dept_id:
             if old_dept_id:
-                old_nc_group = NcGroup.objects.filter(
-                    dept_id=old_dept_id, group_type=NcGroupType.DEPT,
-                ).first()
-                if old_nc_group:
-                    cls.enqueue_remove_from_group(user.username, old_nc_group.code)
+                for old_ng in NcGroup.objects.filter(
+                    dept_id=old_dept_id,
+                    group_type__in=[NcGroupType.DEPT, NcGroupType.DEPT_ADMIN],
+                ):
+                    cls.enqueue_remove_from_group(user.username, old_ng.code)
             cls._enqueue_dept_group(user.username, profile)
+            cls._enqueue_dept_admin_group(user.username, profile)
         # 额外群组变更：仅当调用方显式传入 old_extra_group_codes 时对比差集
         if old_extra_group_codes is not None:
             try:
@@ -358,33 +453,39 @@ class NcSyncService:
 
     @classmethod
     def on_dept_created(cls, dept) -> NcGroup:
-        """部门新建后调用：自动创建 NcGroup 镜像并入队 CREATE_GROUP 任务。
+        """部门新建后调用：同时创建 DEPT + DEPT_ADMIN 双群组并入队同步任务。
 
-        NC group_id（即 NcGroup.code）优先取 dept.code，若为空则回退为 dept_{dept.id}。
-        该方法在同一事务内完成 NcGroup 写入，CREATE_GROUP 任务入队后由 Celery 异步执行。
+        双群组设计：
+          DEPT 群组（{code}）           → 普通成员只读（permissions=1）
+          DEPT_ADMIN 群组（{code}_admin）→ 管理员全权限（permissions=31）
 
         Args:
             dept: Department 实例（已 save，id 已赋值）。
 
         Returns:
-            NcGroup: 刚创建的 NcGroup 记录。
+            NcGroup: 刚创建的 DEPT 类型 NcGroup 记录。
         """
-        code = (dept.code or "").strip() or f"dept_{dept.id}"
+        base_code = (dept.code or "").strip() or f"dept_{dept.id}"
+        admin_code = f"{base_code}_admin"
         with transaction.atomic():
             nc_group, created = NcGroup.objects.get_or_create(
                 dept=dept,
-                defaults={
-                    "code": code,
-                    "name": dept.name,
-                    "group_type": NcGroupType.DEPT,
-                },
+                group_type=NcGroupType.DEPT,
+                defaults={"code": base_code, "name": dept.name},
             )
             if created:
+                admin_nc_group, _ = NcGroup.objects.get_or_create(
+                    dept=dept,
+                    group_type=NcGroupType.DEPT_ADMIN,
+                    defaults={"code": admin_code, "name": f"{dept.name}（管理员）"},
+                )
                 cls.enqueue_create_group(nc_group.code, nc_group.name)
+                cls.enqueue_create_group(admin_nc_group.code, admin_nc_group.name)
                 cls.enqueue_create_group_folder(nc_group.code, dept.name)
                 logger.info(
-                    "[NcSyncService][on_dept_created] dept_id=%s code=%s 入队 CREATE_GROUP + CREATE_GROUP_FOLDER",
-                    dept.id, nc_group.code,
+                    "[NcSyncService][on_dept_created] dept_id=%s code=%s admin_code=%s "
+                    "入队 CREATE_GROUP×2 + CREATE_GROUP_FOLDER",
+                    dept.id, nc_group.code, admin_nc_group.code,
                 )
             else:
                 logger.info(
@@ -394,34 +495,38 @@ class NcSyncService:
 
     @classmethod
     def on_dept_deleted(cls, dept_id: int) -> None:
-        """部门删除前/后调用：入队 NC 群组删除任务并清理本地 NcGroup 镜像。
+        """部门删除前/后调用：入队删除 DEPT + DEPT_ADMIN 群组并清理本地镜像。
+
+        NC 群组删除后成员会挂起无群组，文件夹访问权限随群组删除而失效。
 
         Args:
-            dept_id (int): 被删除部门的 ID（部门记录可能已被 delete，传 id 即可）。
+            dept_id (int): 被删除部门的 ID。
         """
-        nc_groups = list(NcGroup.objects.filter(dept_id=dept_id, group_type=NcGroupType.DEPT))
+        nc_groups = list(NcGroup.objects.filter(dept_id=dept_id))
         for nc_group in nc_groups:
             cls.enqueue_delete_group(nc_group.code)
             logger.info(
-                "[NcSyncService][on_dept_deleted] dept_id=%s code=%s 入队 DELETE_GROUP",
-                dept_id, nc_group.code,
+                "[NcSyncService][on_dept_deleted] dept_id=%s code=%s type=%s 入队 DELETE_GROUP",
+                dept_id, nc_group.code, nc_group.group_type,
             )
-        # 本地镜像随即清理，避免后续 reconcile 重复处理
         NcGroup.objects.filter(id__in=[g.id for g in nc_groups]).delete()
 
     @classmethod
     def on_dept_updated(cls, dept) -> None:
-        """部门名称变更后调用：同步更新 NcGroup 的显示名称（本地镜像）。
+        """部门名称变更后调用：同步更新 DEPT + DEPT_ADMIN 群组的本地显示名。
 
-        注：NC OCS API 暂不支持直接修改 group displayname，仅更新本地镜像记录。
+        注：NC OCS API 暫不支持直接修改 group displayname，仅更新本地镜像。
 
         Args:
             dept: 已保存的 Department 实例。
         """
-        updated = NcGroup.objects.filter(dept=dept, group_type=NcGroupType.DEPT).update(
-            name=dept.name,
-        )
-        if updated:
+        dept_updated = NcGroup.objects.filter(
+            dept=dept, group_type=NcGroupType.DEPT,
+        ).update(name=dept.name)
+        admin_updated = NcGroup.objects.filter(
+            dept=dept, group_type=NcGroupType.DEPT_ADMIN,
+        ).update(name=f"{dept.name}（管理员）")
+        if dept_updated or admin_updated:
             logger.info(
                 "[NcSyncService][on_dept_updated] dept_id=%s name=%s 本地镜像已更新",
                 dept.id, dept.name,
@@ -524,7 +629,7 @@ class NcSyncService:
             else:
                 logger.info("[NcSyncService][_dispatch] group=%s 不存在，跳过 DELETE_GROUP", p["group"])
         elif op == SyncOperation.CREATE_GROUP_FOLDER:
-            # 幂等：若本地 NcGroup 已记录 folder_id，说明此前已创建过，跳过避免 NC 侧重复 folder
+            # 幂等：若本地 NcGroup 已记录 folder_id，说明此前已创建，跳过避免 NC 侧重复 folder
             group_code = p.get("group_code", "")
             existing = NcGroup.objects.filter(code=group_code).first() if group_code else None
             if existing and existing.folder_id:
@@ -536,30 +641,62 @@ class NcSyncService:
                 folder_id = client.create_group_folder(p["mount_point"])
                 if group_code:
                     NcGroup.objects.filter(code=group_code).update(folder_id=folder_id)
-                    NcSyncService.enqueue_grant_group_folder(folder_id, group_code)
-                    logger.info(
-                        "[NcSyncService][_dispatch] CREATE_GROUP_FOLDER group=%s folder_id=%s 已入队授权",
-                        group_code, folder_id,
+                    # DEPT 群组：只读（permissions=1）
+                    NcSyncService.enqueue_grant_group_folder(
+                        folder_id, group_code, permissions=_PERM_READ_ONLY,
                     )
-                    # 同时为所有上级部门的 NC 群组入队授权，使上级部门成员可访问下级文件夹
+                    # DEPT_ADMIN 群组：全权限（permissions=31）
                     try:
-                        nc_group_obj = NcGroup.objects.select_related("dept__parent").get(code=group_code)
+                        nc_group_obj = NcGroup.objects.select_related("dept__parent").get(
+                            code=group_code,
+                        )
+                        if nc_group_obj.dept_id:
+                            dept_admin_ng = NcGroup.objects.filter(
+                                dept_id=nc_group_obj.dept_id,
+                                group_type=NcGroupType.DEPT_ADMIN,
+                            ).first()
+                            if dept_admin_ng:
+                                NcSyncService.enqueue_grant_group_folder(
+                                    folder_id, dept_admin_ng.code, permissions=_PERM_FULL,
+                                )
+                        # 上级部门授权：DEPT 只读，DEPT_ADMIN 全权限
                         parent_dept = nc_group_obj.dept.parent if nc_group_obj.dept else None
                         while parent_dept:
-                            parent_nc_group = NcGroup.objects.filter(dept=parent_dept).first()
-                            if parent_nc_group:
-                                NcSyncService.enqueue_grant_group_folder(folder_id, parent_nc_group.code)
-                                logger.info(
-                                    "[NcSyncService][_dispatch] CREATE_GROUP_FOLDER 入队上级授权 folder_id=%s ancestor=%s",
-                                    folder_id, parent_nc_group.code,
+                            parent_dept_ng = NcGroup.objects.filter(
+                                dept=parent_dept, group_type=NcGroupType.DEPT,
+                            ).first()
+                            if parent_dept_ng:
+                                NcSyncService.enqueue_grant_group_folder(
+                                    folder_id, parent_dept_ng.code, permissions=_PERM_READ_ONLY,
+                                )
+                            parent_admin_ng = NcGroup.objects.filter(
+                                dept=parent_dept, group_type=NcGroupType.DEPT_ADMIN,
+                            ).first()
+                            if parent_admin_ng:
+                                NcSyncService.enqueue_grant_group_folder(
+                                    folder_id, parent_admin_ng.code, permissions=_PERM_FULL,
                                 )
                             parent_dept = parent_dept.parent
                     except NcGroup.DoesNotExist:
                         pass
+                    logger.info(
+                        "[NcSyncService][_dispatch] CREATE_GROUP_FOLDER group=%s folder_id=%s 已入队授权",
+                        group_code, folder_id,
+                    )
         elif op == SyncOperation.GRANT_GROUP_FOLDER:
             client.grant_group_folder(
                 folder_id=int(p["folder_id"]),
                 group_id=p["group"],
+                permissions=int(p["permissions"]),
+            )
+        elif op == SyncOperation.ENABLE_FOLDER_ACL:
+            client.enable_folder_acl(int(p["folder_id"]))
+        elif op == SyncOperation.SET_PATH_ACL:
+            mask = int(p.get("mask", 31))
+            client.set_path_acl(
+                nc_path=p["nc_path"],
+                group_id=p["group_id"],
+                mask=mask,
                 permissions=int(p["permissions"]),
             )
         else:
@@ -571,7 +708,7 @@ class NcSyncService:
 
     @classmethod
     def _enqueue_dept_group(cls, username: str, profile) -> None:
-        """根据用户部门入队 add_to_group（部门对应的 NcGroup）。
+        """根据用户部门入队 add_to_group（部门 DEPT 群组）。
 
         Args:
             username (str): 目标用户名。
@@ -588,6 +725,34 @@ class NcSyncService:
                 cls.enqueue_add_to_group(username, nc_group.code)
         except Exception as exc:
             logger.warning("[NcSyncService][_enqueue_dept_group] username=%s 获取部门群组失败: %s", username, exc)
+
+    @classmethod
+    def _enqueue_dept_admin_group(cls, username: str, profile) -> None:
+        """仅当用户 admin_level == DEPT_ADMIN 时，入队加入部门管理员 NC 群组。
+
+        COMPANY_ADMIN 通过 NC admin 权限控制，无需加入 DEPT_ADMIN 群组；
+        MEMBER 无管理员权限，不加入。
+
+        Args:
+            username (str): 目标用户名。
+            profile: UserProfile 实例。
+        """
+        if not profile.dept_id:
+            return
+        if profile.admin_level != AdminLevel.DEPT_ADMIN:
+            return
+        try:
+            admin_ng = NcGroup.objects.filter(
+                dept_id=profile.dept_id,
+                group_type=NcGroupType.DEPT_ADMIN,
+            ).first()
+            if admin_ng:
+                cls.enqueue_add_to_group(username, admin_ng.code)
+        except Exception as exc:
+            logger.warning(
+                "[NcSyncService][_enqueue_dept_admin_group] username=%s 获取部门管理员群组失败: %s",
+                username, exc,
+            )
 
     @classmethod
     def _enqueue_extra_groups(cls, username: str, profile) -> None:

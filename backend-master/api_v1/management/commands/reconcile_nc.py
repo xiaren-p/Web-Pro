@@ -16,6 +16,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import IntegrityError
 
 from api_v1.models import Department
+from api_v1.models.nc.nc_file_access_rule import NcFileAccessRule
 from api_v1.models.nc.nc_group import NcGroup, NcGroupType
 from api_v1.models.nc.nc_sync_task import NcSyncTask, SyncOperation, SyncStatus
 from api_v1.models.system.user_profile import AdminLevel, UserProfile
@@ -24,6 +25,10 @@ from api_v1.services.nc.nc_sync_service import NcSyncService
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+# NC Group Folder 权限位常量（与 nc_sync_service.py 中保持一致）
+_PERM_READ_ONLY: int = NcFileAccessRule.PERM_READ  # 1 —— 普通成员只读
+_PERM_FULL: int = NcFileAccessRule.PERM_FULL       # 31 —— 管理员全权限
 
 
 class Command(BaseCommand):
@@ -137,23 +142,38 @@ class Command(BaseCommand):
         # 适用场景：部门在 NC 同步功能上线前就已存在，on_dept_created 未被调用
         # ------------------------------------------------------------ #
         if not target_username:
-            depts_without_group = Department.objects.filter(nc_group__isnull=True)
+            # 查找尚无 DEPT 群组的部门
+            depts_without_group = Department.objects.exclude(
+                nc_groups__group_type=NcGroupType.DEPT
+            )
             for dept in depts_without_group:
                 base_code = (dept.code or "").strip() or f"dept_{dept.id}"
-                code = base_code
+                admin_code = f"{base_code}_admin"
                 # 唯一性兜底：若 code 冲突，回退至 dept_{id}，仍冲突则附时间戳
-                if NcGroup.objects.filter(code=code).exists():
+                code = base_code
+                if NcGroup.objects.filter(code=code).exclude(dept=dept).exists():
                     fallback = f"dept_{dept.id}"
                     if not NcGroup.objects.filter(code=fallback).exists():
                         code = fallback
                     else:
                         code = f"dept_{dept.id}_{int(time.time())}"
+                admin_code_resolved = admin_code
+                if NcGroup.objects.filter(code=admin_code_resolved).exclude(dept=dept).exists():
+                    admin_code_resolved = f"dept_{dept.id}_admin_{int(time.time())}"
                 try:
                     nc_group = NcGroup.objects.create(
                         dept=dept,
                         code=code,
                         name=dept.name,
                         group_type=NcGroupType.DEPT,
+                    )
+                    NcGroup.objects.get_or_create(
+                        dept=dept,
+                        group_type=NcGroupType.DEPT_ADMIN,
+                        defaults={
+                            "code": admin_code_resolved,
+                            "name": f"{dept.name}（管理员）",
+                        },
                     )
                 except IntegrityError as exc:
                     logger.warning(
@@ -162,15 +182,23 @@ class Command(BaseCommand):
                     )
                     skipped += 1
                     continue
-                self.stdout.write(f"  → 补建 NcGroup 本地记录: [{dept.name}] → code={nc_group.code}")
+                self.stdout.write(
+                    f"  → 补建 NcGroup: [{dept.name}] DEPT={nc_group.code} ADMIN={admin_code_resolved}"
+                )
                 logger.info(
-                    "[reconcile_nc] 补建 NcGroup dept_id=%s code=%s", dept.id, nc_group.code,
+                    "[reconcile_nc] 补建 NcGroup dept_id=%s code=%s admin_code=%s",
+                    dept.id, code, admin_code_resolved,
                 )
                 # 立即入队 NC 群组与 Group Folder 创建，避免依赖 Step 1 才发现
                 if not dry_run:
                     NcSyncService.enqueue_create_group(nc_group.code, nc_group.name)
+                    admin_ng = NcGroup.objects.filter(
+                        dept=dept, group_type=NcGroupType.DEPT_ADMIN
+                    ).first()
+                    if admin_ng:
+                        NcSyncService.enqueue_create_group(admin_ng.code, admin_ng.name)
                     NcSyncService.enqueue_create_group_folder(nc_group.code, dept.name)
-                    enqueued += 2
+                    enqueued += 3
 
         # ------------------------------------------------------------ #
         # Step 1: 对账 NC 群组是否存在（本地 NcGroup 记录 vs NC 实际状态）
@@ -183,7 +211,7 @@ class Command(BaseCommand):
                     logger.warning("[reconcile_nc] 查询 NC 群组 %s 失败，跳过: %s", nc_group.code, exc)
                     continue
                 if not nc_group_exists:
-                    self.stdout.write(f"  → NC 群组不存在，需创建: {nc_group.code}")
+                    self.stdout.write(f"  → NC 群组不存在，需创建: {nc_group.code} ({nc_group.get_group_type_display()})")
                     if not dry_run:
                         NcSyncService.enqueue_create_group(nc_group.code, nc_group.name)
                         enqueued += 1
@@ -215,6 +243,7 @@ class Command(BaseCommand):
                         NcSyncService.enqueue_set_admin(username)
                     # 入队部门群组
                     NcSyncService._enqueue_dept_group(username, profile)
+                    NcSyncService._enqueue_dept_admin_group(username, profile)
                     NcSyncService._enqueue_extra_groups(username, profile)
                     enqueued += 1
 
@@ -245,6 +274,14 @@ class Command(BaseCommand):
                     ).first()
                     if dept_nc_group:
                         expected_groups.add(dept_nc_group.code)
+                    # DEPT_ADMIN 级别的用户需同时在部门管理员群组
+                    if profile.admin_level == AdminLevel.DEPT_ADMIN:
+                        admin_nc_group = NcGroup.objects.filter(
+                            dept_id=profile.dept_id,
+                            group_type=NcGroupType.DEPT_ADMIN,
+                        ).first()
+                        if admin_nc_group:
+                            expected_groups.add(admin_nc_group.code)
                 for extra_g in profile.extra_nc_groups.all():
                     expected_groups.add(extra_g.code)
                 if profile.admin_level == AdminLevel.COMPANY_ADMIN:
@@ -288,7 +325,9 @@ class Command(BaseCommand):
                     enqueued += 1
 
         # 对账上级部门对下级文件夹的授权
-        # 确保父部门 NC 群组已被加入所有子部门的 Group Folder（使上级成员可访问下级文件夹）
+        # DEPT 群组的上级授权应为只读（permissions=1）。
+        # DEPT_ADMIN 群组的上级授权应为全权限（permissions=31）。
+        # 对存量权限不符（如旧的 31）的直接重新授权覆盖（备忘: 用户确认直接降权）。
         if not target_username:
             dept_groups_with_folder = NcGroup.objects.filter(
                 group_type=NcGroupType.DEPT,
@@ -305,21 +344,111 @@ class Command(BaseCommand):
                     folder_info = nc_folders.get(nc_group.folder_id)
                     if not folder_info:
                         continue
-                    current_groups: set[str] = set(folder_info.get("groups", {}).keys())
-                    parent_dept = nc_group.dept.parent
-                    while parent_dept:
-                        parent_nc_group = NcGroup.objects.filter(dept=parent_dept).first()
-                        if parent_nc_group and parent_nc_group.code not in current_groups:
+                    folder_groups: dict = folder_info.get("groups", {})
+
+                    # 检查自身 DEPT 群组权限是否正确（存量降权）
+                    own_perms = folder_groups.get(nc_group.code, {}).get("permissions", -1)
+                    if nc_group.code in folder_groups and own_perms != _PERM_READ_ONLY:
+                        self.stdout.write(
+                            f"  → DEPT 群组权限不符，重新授权: {nc_group.code} "
+                            f"当前={own_perms} 应为={_PERM_READ_ONLY}"
+                        )
+                        if not dry_run:
+                            NcSyncService.enqueue_grant_group_folder(
+                                nc_group.folder_id, nc_group.code, permissions=_PERM_READ_ONLY,
+                            )
+                            enqueued += 1
+
+                    # 检查 DEPT_ADMIN 群组权限
+                    dept_admin_ng = NcGroup.objects.filter(
+                        dept_id=nc_group.dept_id, group_type=NcGroupType.DEPT_ADMIN,
+                    ).first()
+                    if dept_admin_ng:
+                        admin_perms = folder_groups.get(dept_admin_ng.code, {}).get("permissions", -1)
+                        if admin_perms != _PERM_FULL:
                             self.stdout.write(
-                                f"  → 上级授权缺失: folder_id={nc_group.folder_id} "
-                                f"({nc_group.code}) ← ancestor={parent_nc_group.code}"
+                                f"  → DEPT_ADMIN 群组权限不符，重新授权: {dept_admin_ng.code} "
+                                f"当前={admin_perms} 应为={_PERM_FULL}"
                             )
                             if not dry_run:
                                 NcSyncService.enqueue_grant_group_folder(
-                                    nc_group.folder_id, parent_nc_group.code
+                                    nc_group.folder_id, dept_admin_ng.code, permissions=_PERM_FULL,
                                 )
                                 enqueued += 1
+
+                    # 上级部门授权对账
+                    parent_dept = nc_group.dept.parent
+                    while parent_dept:
+                        parent_dept_ng = NcGroup.objects.filter(
+                            dept=parent_dept, group_type=NcGroupType.DEPT,
+                        ).first()
+                        if parent_dept_ng:
+                            p_perms = folder_groups.get(parent_dept_ng.code, {}).get("permissions", -1)
+                            if p_perms != _PERM_READ_ONLY:
+                                self.stdout.write(
+                                    f"  → 上级 DEPT 授权不符: folder_id={nc_group.folder_id} "
+                                    f"{nc_group.code} ← ancestor={parent_dept_ng.code}"
+                                )
+                                if not dry_run:
+                                    NcSyncService.enqueue_grant_group_folder(
+                                        nc_group.folder_id,
+                                        parent_dept_ng.code,
+                                        permissions=_PERM_READ_ONLY,
+                                    )
+                                    enqueued += 1
+                        parent_admin_ng = NcGroup.objects.filter(
+                            dept=parent_dept, group_type=NcGroupType.DEPT_ADMIN,
+                        ).first()
+                        if parent_admin_ng:
+                            pa_perms = folder_groups.get(parent_admin_ng.code, {}).get("permissions", -1)
+                            if pa_perms != _PERM_FULL:
+                                self.stdout.write(
+                                    f"  → 上级 DEPT_ADMIN 授权不符: folder_id={nc_group.folder_id} "
+                                    f"← ancestor_admin={parent_admin_ng.code}"
+                                )
+                                if not dry_run:
+                                    NcSyncService.enqueue_grant_group_folder(
+                                        nc_group.folder_id,
+                                        parent_admin_ng.code,
+                                        permissions=_PERM_FULL,
+                                    )
+                                    enqueued += 1
                         parent_dept = parent_dept.parent
+
+        # ------------------------------------------------------------ #
+        # Step 5: 对账 NcFileAccessRule 子目录 ACL 规则
+        # 遇到生效规则（status=True）→ 确保对应文件夹已开 ACL 模式 → 入队 SET_PATH_ACL
+        # ------------------------------------------------------------ #
+        if not target_username:
+            active_rules = NcFileAccessRule.objects.filter(
+                status=True,
+            ).select_related("nc_group__dept")
+            acl_enqueued = 0
+            for rule in active_rules:
+                folder_id_for_acl: int | None = None
+                # 优先从 DEPT 群组取 folder_id
+                if rule.nc_group.dept_id:
+                    dept_ng = NcGroup.objects.filter(
+                        dept_id=rule.nc_group.dept_id, group_type=NcGroupType.DEPT,
+                    ).first()
+                    if dept_ng:
+                        folder_id_for_acl = dept_ng.folder_id
+                if not folder_id_for_acl:
+                    logger.warning(
+                        "[reconcile_nc] ACL 规则 rule_id=%s 无法确定 folder_id，跳过",
+                        rule.id,
+                    )
+                    continue
+                self.stdout.write(
+                    f"  → ACL 规则对账: [{rule.nc_group.code}] {rule.nc_path} perms={rule.permission_bits}"
+                )
+                if not dry_run:
+                    NcSyncService.enqueue_enable_folder_acl(folder_id_for_acl)
+                    NcSyncService.enqueue_set_path_acl(rule)
+                    acl_enqueued += 1
+            if acl_enqueued:
+                self.stdout.write(f"  → ACL 规则入队共 {acl_enqueued} 条（每条包含 ENABLE_FOLDER_ACL + SET_PATH_ACL）")
+                enqueued += acl_enqueued * 2
 
         # 重置失败任务
         failed_qs = NcSyncTask.objects.filter(

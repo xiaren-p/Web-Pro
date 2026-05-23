@@ -47,6 +47,7 @@ class NcApiClient:
     def __init__(self, server_url: str, admin_user: str, admin_password: str) -> None:
         """初始化客户端，构建 Session 并设置通用头。"""
         self._base = server_url.rstrip("/")
+        self._admin_user = admin_user
         self._session = requests.Session()
         self._session.auth = (admin_user, admin_password)
         self._session.headers.update({
@@ -464,3 +465,98 @@ class NcApiClient:
             f"/apps/groupfolders/folders/{folder_id}/groups/{group_id}",
             {"permissions": permissions},
         )
+
+    # ------------------------------------------------------------------ #
+    #  Group Folders ACL 操作                                           #
+    # ------------------------------------------------------------------ #
+
+    def _proppatch(self, dav_path: str, xml_body: str) -> None:
+        """**内部**发送 WebDAV PROPPATCH 请求（用于设置 ACL 属性）。
+
+        PROPPATCH 使用 DAV XML 格式，不走 OCS 路由，成功响应为 207 Multi-Status。
+
+        Args:
+            dav_path (str): WebDAV 路径（相对于 server_url），
+                            如 /remote.php/dav/files/{user}/{mount}/{sub_path}。
+            xml_body (str): 完整的 DAV XML 请求体字符串。
+
+        Raises:
+            RuntimeError: HTTP 请求失败或状态码非 207/200 时抛出。
+        """
+        url = f"{self._base}{dav_path}"
+        try:
+            resp = self._session.request(
+                "PROPPATCH",
+                url,
+                data=xml_body.encode("utf-8"),
+                headers={"Content-Type": "application/xml; charset=utf-8"},
+                verify=self._verify,
+                timeout=30,
+            )
+            logger.debug(
+                "[NcApiClient][_proppatch] %s -> HTTP %s",
+                dav_path, resp.status_code,
+            )
+            if resp.status_code not in (200, 207):
+                raise RuntimeError(
+                    f"[NcApiClient] PROPPATCH {dav_path} 返回非预期状态码 "
+                    f"{resp.status_code}: {resp.text[:300]}"
+                )
+        except requests.RequestException as exc:
+            raise RuntimeError(f"[NcApiClient] PROPPATCH {dav_path} 网络错误: {exc}") from exc
+
+    def enable_folder_acl(self, folder_id: int) -> None:
+        """为 Group Folder 开启 ACL 高级权限模式（幂等，可重复调用）。
+
+        开启后才能使用 WebDAV PROPPATCH 为各子路径设置细粒度 ACL 规则。
+
+        Args:
+            folder_id (int): NC Group Folder ID。
+
+        Raises:
+            RuntimeError: NC 响应异常时抛出。
+        """
+        logger.info("[NcApiClient][enable_folder_acl] folder_id=%s", folder_id)
+        self._put(f"/apps/groupfolders/folders/{folder_id}/acl", {"acl": 1})
+
+    def set_path_acl(
+        self,
+        nc_path: str,
+        group_id: str,
+        mask: int,
+        permissions: int,
+    ) -> None:
+        """**为 Group Folder 内子目录设置群组 ACL 规则**（WebDAV PROPPATCH）。
+
+        ACL 规则视该路径的 Group Folder GRANT 基线权限，实现子目录级别的细粒度控制。
+
+        Args:
+            nc_path (str): 从 Group Folder 挂载点开始的完整子路径，
+                           如 "技术部/机密文档" 或 "技术部"；首尾斜杠自动忽略。
+            group_id (str): NC 群组 ID（NcGroup.code）。
+            mask (int): ACL 掩码（全位生效传 31；传 0 表示展透/移除该条规则的效果）。
+            permissions (int): 实际授予的权限位（READ=1 WRITE=2 CREATE=4 DELETE=8 SHARE=16）。
+
+        Raises:
+            RuntimeError: 网络错误或 PROPPATCH 失败时抛出。
+        """
+        clean_path = nc_path.strip("/")
+        dav_path = f"/remote.php/dav/files/{self._admin_user}/{clean_path}"
+        xml_body = (
+            '<?xml version="1.0"?>'
+            '<d:propertyupdate xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">'
+            "<d:set><d:prop><oc:acl-list>"
+            "<oc:acl>"
+            "<oc:acl-mapping-type>group</oc:acl-mapping-type>"
+            f"<oc:acl-mapping-id>{group_id}</oc:acl-mapping-id>"
+            f"<oc:acl-mask>{mask}</oc:acl-mask>"
+            f"<oc:acl-permissions>{permissions}</oc:acl-permissions>"
+            "</oc:acl>"
+            "</oc:acl-list></d:prop></d:set>"
+            "</d:propertyupdate>"
+        )
+        logger.info(
+            "[NcApiClient][set_path_acl] path=%s group=%s mask=%s perms=%s",
+            dav_path, group_id, mask, permissions,
+        )
+        self._proppatch(dav_path, xml_body)

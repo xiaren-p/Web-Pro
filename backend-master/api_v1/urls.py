@@ -87,6 +87,12 @@ urlpatterns = [
     path('notices', views.NoticeViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='notices-list-create'),
     path('notices/<str:ids>', views.NoticeViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='notice-update-delete'),
 
+    # NC 文件访问规则（子路径 ACL 管控）
+    path('nc/rules/page', views.NcFileRuleViewSet.as_view({'get': 'page'}), name='nc-rules-page'),
+    path('nc/rules/group-options', views.NcFileRuleViewSet.as_view({'get': 'group_options'}), name='nc-rules-group-options'),
+    path('nc/rules/create', views.NcFileRuleViewSet.as_view({'post': 'create_rule'}), name='nc-rules-create'),
+    re_path(r'^nc/rules/(?P<pk>\d+)$', views.NcFileRuleViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='nc-rules-update-delete'),
+
     # 菜单与动态路由
     path('menus/routes', views.MenuViewSet.as_view({'get': 'routes'}), name='menus-routes'),
     path('menus/tree', views.MenuViewSet.as_view({'get': 'tree'}), name='menus-tree'),

@@ -19,6 +19,8 @@ class SyncOperation(models.TextChoices):
     REVOKE_ADMIN = "revoke_admin", "撤销 NC 管理员"
     CREATE_GROUP_FOLDER = "create_group_folder", "创建 Group Folder"
     GRANT_GROUP_FOLDER = "grant_group_folder", "Group Folder 授权群组"
+    ENABLE_FOLDER_ACL = "enable_folder_acl", "开启文件夹 ACL 模式"
+    SET_PATH_ACL = "set_path_acl", "设置子目录 ACL 规则"
 
 
 class SyncStatus(models.TextChoices):
