@@ -311,49 +311,7 @@ class Command(BaseCommand):
                     NcSyncService.enqueue_disable_user(username)
                     enqueued += 1
 
-        # 反向扫描：从 NC 已有的 Group Folder 中认领系统已知部门群组
-        # 场景：管理员在 NC 端手动将部门群组加入某 Group Folder，
-        # 此时 DB 里的 NcGroup.folder_id 仍为 NULL，reconcile 会误判为"需新建"。
-        # 本步先扫描 NC folder 成员列表，将 folder_id 回写到 DB，
-        # 避免后续步骤重复创建同名 Group Folder。
-        if not target_username:
-            try:
-                _nc_folders_for_import = client.list_group_folders()
-            except RuntimeError as exc:
-                logger.warning("[reconcile_nc] 无法获取 NC Group Folder 列表，跳过反向扫描: %s", exc)
-                _nc_folders_for_import = {}
-
-            if _nc_folders_for_import:
-                # 构建 group_code → folder_id 反向映射（取 NC 数据中第一次出现的对应关系）
-                _code_to_folder: dict[str, int] = {}
-                for _fid, _finfo in _nc_folders_for_import.items():
-                    for _gc in (_finfo.get("groups") or {}):
-                        if _gc not in _code_to_folder:
-                            _code_to_folder[_gc] = _fid
-
-                # 仅对 folder_id 为空的 DEPT 群组做回写
-                _dept_no_folder = NcGroup.objects.filter(
-                    group_type=NcGroupType.DEPT,
-                    folder_id__isnull=True,
-                    dept__isnull=False,
-                )
-                for _ng in _dept_no_folder:
-                    _discovered_fid = _code_to_folder.get(_ng.code)
-                    if _discovered_fid is not None:
-                        self.stdout.write(
-                            f"  → 反向发现 Group Folder：群组 {_ng.code} "
-                            f"已在 NC folder_id={_discovered_fid} 中，回写 DB"
-                        )
-                        logger.info(
-                            "[reconcile_nc] 反向发现 folder_id：group=%s folder_id=%s",
-                            _ng.code, _discovered_fid,
-                        )
-                        if not dry_run:
-                            _ng.folder_id = _discovered_fid
-                            _ng.save(update_fields=["folder_id"])
-
         # 对账部门 Group Folder：有 NcGroup 但 folder_id 为空的部门
-        # （经上方反向扫描后，已认领的部门群组不会再触发此分支）
         if not target_username:
             dept_missing_folder = NcGroup.objects.filter(
                 group_type=NcGroupType.DEPT,
