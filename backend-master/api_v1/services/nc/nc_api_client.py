@@ -530,6 +530,31 @@ class NcApiClient:
         """
         logger.info("[NcApiClient][enable_folder_acl] folder_id=%s", folder_id)
         self._post_app(f"/apps/groupfolders/folders/{folder_id}/acl", {"acl": 1})
+        # ACL 模式开启后，admin 用户本身的 WebDAV 写入权限也受 ACL 规则约束。
+        # 若 admin 没有显式 ACL 规则，MKCOL / PROPPATCH 均会收到 403。
+        # 因此，在开启 ACL 后立即为 admin 补一条全权限 ACL（mask=31, perms=31）。
+        try:
+            folders = self.list_group_folders()
+            mount_point = folders.get(folder_id, {}).get("mount_point", "").strip("/")
+            if mount_point:
+                self.set_path_acl(
+                    nc_path=mount_point,
+                    username=self._admin_user,
+                    mask=31,
+                    permissions=31,
+                )
+                logger.info(
+                    "[NcApiClient][enable_folder_acl] 已为 admin 补全权限 ACL: "
+                    "folder_id=%s mount_point=%s",
+                    folder_id, mount_point,
+                )
+        except Exception as exc:  # pylint: disable=broad-except
+            # TODO(鲁棒性): 设置 admin ACL 失败不应阻断主流程，但需运维介入排查
+            logger.warning(
+                "[NcApiClient][enable_folder_acl] 设置 admin ACL 失败（不影响主流程）: "
+                "folder_id=%s exc=%s",
+                folder_id, exc,
+            )
 
     def set_path_acl(
         self,
