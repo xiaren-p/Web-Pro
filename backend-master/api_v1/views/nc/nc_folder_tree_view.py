@@ -71,7 +71,7 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
         groups = (
             NcGroup.objects.filter(group_type=NcGroupType.DEPT_ADMIN)
             .select_related("dept")
-            .order_by("dept__sort", "name")
+            .order_by("dept__order_num", "name")
         )
         result = [
             {
@@ -322,7 +322,7 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             NcFileAccessRule.objects
             .filter(nc_path=nc_path)
             .select_related("nc_group", "nc_group__dept")
-            .order_by("nc_group__dept__sort", "nc_group__name")
+            .order_by("nc_group__dept__order_num", "nc_group__name")
         )
         return drf_ok(NcFileRuleReadSerializer(rules, many=True).data)
 
@@ -340,7 +340,7 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
         groups = (
             NcGroup.objects
             .select_related("dept")
-            .order_by("dept__sort", "group_type", "name")
+            .order_by("dept__order_num", "group_type", "name")
         )
         result = [
             {
