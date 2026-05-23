@@ -222,17 +222,21 @@ const treeProps = { label: "name" };
 // TODO(类型): el-tree LoadFunction 的 node 参数类型与自定义 data 不兼容，使用 any 过渡
 async function loadNode(node: any, resolve: (data: FolderTreeNode[]) => void): Promise<void> {
   if (node.level === 0) {
-    const groups = await fetchNcGroupList();
-    resolve(
-      groups.map((g) => ({
-        key: `root-${g.id}`,
-        name: g.deptName,
-        ncPath: "",
-        groupId: g.id,
-        isRoot: true,
-        hasRule: false,
-      }))
-    );
+    try {
+      const groups = await fetchNcGroupList();
+      resolve(
+        groups.map((g) => ({
+          key: `root-${g.id}`,
+          name: g.deptName,
+          ncPath: "",
+          groupId: g.id,
+          isRoot: true,
+          hasRule: false,
+        }))
+      );
+    } catch {
+      resolve([]);
+    }
     return;
   }
 

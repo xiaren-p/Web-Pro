@@ -401,8 +401,8 @@ def _get_mount_point(
     if not dept_ng or not dept_ng.folder_id:
         return None, "", "对应 DEPT 群组缺少 folder_id，请先运行对账任务"
 
-    client = NcApiClient.from_settings()
     try:
+        client = NcApiClient.from_settings()
         folders = client.list_group_folders()
     except RuntimeError as exc:
         return None, "", f"获取 NC Group Folder 列表失败: {exc}"
