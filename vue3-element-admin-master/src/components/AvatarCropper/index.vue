@@ -31,7 +31,7 @@
 <script setup lang="ts">
 /**
  * 头像裁剪弹窗组件。
- * 基于 cropperjs 实现 1:1 圆形预览裁剪，确认后以 Blob 形式 emit 给父组件。
+ * 基于 cropperjs v2 实现 1:1 裁剪，确认后以 Blob 形式 emit 给父组件。
  * 所属板块：通用组件。
  */
 import type Cropper from 'cropperjs'
@@ -39,8 +39,6 @@ import type Cropper from 'cropperjs'
 import { nextTick, ref, watch } from 'vue'
 import { RefreshLeft, RefreshRight, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
 import CropperJS from 'cropperjs'
-
-import 'cropperjs/dist/cropper.css'
 
 const emit = defineEmits<{
   /** v-model 更新 */
@@ -77,23 +75,37 @@ watch(visible, (val) => {
 })
 
 /**
- * 初始化 Cropper.js 实例，固定 1:1 纵横比并显示圆形预览。
+ * 初始化 Cropper.js v2 实例。
+ * v2 不再支持 v1 的 options（viewMode/dragMode/aspectRatio 等已移除），
+ * 改用 template 字符串声明 web components 布局，
+ * 并在初始化后直接设置 selection.aspectRatio。
  */
 function initCropper(): void {
   if (!imgRef.value) return
   destroyCropper()
   cropperInstance = new CropperJS(imgRef.value, {
-    aspectRatio: 1,
-    viewMode: 1,
-    dragMode: 'move',
-    autoCropArea: 0.85,
-    restore: false,
-    guides: false,
-    highlight: false,
-    cropBoxMovable: false,
-    cropBoxResizable: false,
-    toggleDragModeOnDblclick: false,
-    preview: [],
+    template: `<cropper-canvas background>
+      <cropper-image></cropper-image>
+      <cropper-shade></cropper-shade>
+      <cropper-selection initial-coverage="0.85" movable resizable>
+        <cropper-grid bordered covered></cropper-grid>
+        <cropper-crosshair></cropper-crosshair>
+        <cropper-handle action="move"></cropper-handle>
+        <cropper-handle action="n-resize"></cropper-handle>
+        <cropper-handle action="e-resize"></cropper-handle>
+        <cropper-handle action="s-resize"></cropper-handle>
+        <cropper-handle action="w-resize"></cropper-handle>
+        <cropper-handle action="ne-resize"></cropper-handle>
+        <cropper-handle action="nw-resize"></cropper-handle>
+        <cropper-handle action="se-resize"></cropper-handle>
+        <cropper-handle action="sw-resize"></cropper-handle>
+      </cropper-selection>
+    </cropper-canvas>`,
+  })
+  // v2 中 aspectRatio 是 selection 元素的属性，必须在初始化完成后设置
+  nextTick(() => {
+    const sel = cropperInstance?.getCropperSelection()
+    if (sel) sel.aspectRatio = 1
   })
 }
 
@@ -115,16 +127,21 @@ function handleDialogClosed(): void {
 }
 
 /**
- * 用户确认裁剪：导出 canvas 转为 Blob，emit 给父组件。
+ * 用户确认裁剪：用 getCropperSelection().$toCanvas() 导出选区图像。
+ * getCropperSelection 是 v2 专用 API，仅输出选中区域内容。
  */
 async function handleConfirm(): Promise<void> {
   if (!cropperInstance) return
   confirming.value = true
   try {
-    const canvas = cropperInstance.getCroppedCanvas({ width: 512, height: 512 })
+    const canvas = await cropperInstance.getCropperSelection()?.$toCanvas({
+      width: 512,
+      height: 512,
+    })
+    if (!canvas) throw new Error('裁剪区域无效，请确认已选择图片')
     await new Promise<void>((resolve, reject) => {
       canvas.toBlob(
-        (blob) => {
+        (blob: Blob | null) => {
           if (!blob) {
             reject(new Error('导出 Blob 失败'))
             return
@@ -149,19 +166,19 @@ function handleCancel(): void {
 }
 
 function handleZoomIn(): void {
-  cropperInstance?.zoom(0.1)
+  cropperInstance?.getCropperImage()?.$zoom(0.1)
 }
 
 function handleZoomOut(): void {
-  cropperInstance?.zoom(-0.1)
+  cropperInstance?.getCropperImage()?.$zoom(-0.1)
 }
 
 function handleRotate(): void {
-  cropperInstance?.rotate(90)
+  cropperInstance?.getCropperImage()?.$rotate('90deg')
 }
 
 function handleRotateBack(): void {
-  cropperInstance?.rotate(-90)
+  cropperInstance?.getCropperImage()?.$rotate('-90deg')
 }
 </script>
 

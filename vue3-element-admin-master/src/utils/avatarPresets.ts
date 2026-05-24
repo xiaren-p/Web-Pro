@@ -6,7 +6,7 @@
  * 前端渲染：将标识符转为 SVG data URI，直接绑定到 <img :src="..."> 或 <el-avatar>
  */
 import { createAvatar } from '@dicebear/core'
-import { thumbs } from '@dicebear/thumbs'
+import * as thumbs from '@dicebear/thumbs'
 
 /** 系统预设头像数量（与后端 PRESET_COUNT 保持一致） */
 export const PRESET_COUNT = 12

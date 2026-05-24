@@ -17,7 +17,7 @@
         <el-card class="user-card">
           <div class="user-info">
             <div class="avatar-wrapper">
-              <el-avatar :src="resolveAvatarSrc(userStore.userInfo.avatar)" :size="100" />
+              <el-avatar :src="resolveAvatarSrc(userStore.userInfo.avatar ?? '')" :size="100" />
               <el-button
                 type="info"
                 class="avatar-edit-btn upload-btn"
