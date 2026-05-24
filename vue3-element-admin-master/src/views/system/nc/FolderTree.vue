@@ -82,10 +82,10 @@
           class="perm-table"
           :header-cell-style="{ background: '#f5f7fa', color: '#606266', fontWeight: '600', fontSize: '13px' }"
         >
-          <el-table-column label="用户" min-width="220">
+          <el-table-column label="用户" min-width="160">
             <template #default="{ row }: { row: FolderRuleVO }">
               <div class="user-cell">
-                <div class="user-avatar" :style="{ background: avatarColor(row.username) }">
+                <div class="user-avatar">
                   {{ row.username.charAt(0).toUpperCase() }}
                 </div>
                 <div class="user-info">
@@ -103,7 +103,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="权限" min-width="240">
+          <el-table-column label="权限" min-width="160">
             <template #default="{ row }: { row: FolderRuleVO }">
               <div class="perm-badges">
                 <span
@@ -116,7 +116,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="状态" width="90" align="center">
+          <el-table-column label="状态" width="80" align="center">
             <template #default="{ row }: { row: FolderRuleVO }">
               <div class="status-wrap">
                 <span class="status-dot" :class="row.status ? 'status-dot--on' : 'status-dot--off'" />
@@ -726,16 +726,14 @@ async function submitDeleteFolder(): Promise<void> {
         (result.deletedRules > 0 ? `，同步清除 ${result.deletedRules} 条权限规则` : ""),
     );
 
-    // 刷新父节点：找到父节点并强制重新懒加载
-    const parentPath = targetNode.ncPath.includes("/")
-      ? targetNode.ncPath.substring(0, targetNode.ncPath.lastIndexOf("/"))
-      : targetNode.ncPath;
-    const parentNode = treeRef.value?.getNode(parentPath);
-    if (parentNode) {
-      parentNode.loaded = false;
-      parentNode.expanded = false;
+    // 通过 el-tree 节点 parent 链找到父节点并强制重新懒加载
+    const currentElNode = treeRef.value?.getNode(targetNode);
+    const parentElNode = currentElNode?.parent;
+    if (parentElNode && parentElNode.level > 0) {
+      parentElNode.loaded = false;
+      parentElNode.expanded = false;
       await nextTick();
-      parentNode.expand();
+      parentElNode.expand();
     }
 
     // 清空右侧面板
@@ -768,8 +766,8 @@ async function submitMkdir(): Promise<void> {
     await createFolder({ groupId: node.groupId, parentPath, folderName: mkdirForm.name.trim() });
     mkdirDialog.visible = false;
     ElMessage.success("文件夹已创建");
-    // 自动刷新：强制重载当前树节点的子目录列表
-    const treeNode = treeRef.value?.getNode(node.key);
+    // 自动刷新：通过 data 对象直接定位节点（key 可能在 loadNode 中被修改，不能用 key 查找）
+    const treeNode = treeRef.value?.getNode(node);
     if (treeNode) {
       treeNode.loaded = false;
       treeNode.expanded = false;
@@ -792,20 +790,20 @@ async function submitMkdir(): Promise<void> {
   height: calc(100vh - 120px);
   background: #fff;
   border-radius: 8px;
-  border: 1px solid var(--el-border-color-lighter);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
 // ─── 左侧侧边栏 ────────────────────────────────────────────────────────────────
 
 .nc-sidebar {
-  width: 240px;
+  width: 220px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--el-border-color-lighter);
-  background: #fafbfc;
+  border-right: 1px solid #e0e0e0;
+  background: #f3f3f3;
   overflow: hidden;
 }
 
@@ -813,21 +811,21 @@ async function submitMkdir(): Promise<void> {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 16px 18px;
-  background: #fff;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  padding: 14px 16px;
+  background: #f3f3f3;
+  border-bottom: 1px solid #e0e0e0;
   flex-shrink: 0;
 }
 
 .sidebar-icon {
   color: var(--el-color-primary);
-  font-size: 17px;
+  font-size: 16px;
 }
 
 .sidebar-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--el-text-color-primary);
+  color: #1a1a1a;
 }
 
 .sidebar-scroll {
@@ -841,22 +839,22 @@ async function submitMkdir(): Promise<void> {
 // 文件夹树样式
 .nc-tree {
   background: transparent;
-  padding: 6px 0;
+  padding: 4px 0;
 
   :deep(.el-tree-node__content) {
-    height: 38px;
-    border-radius: 6px;
-    margin: 1px 8px;
-    padding-right: 8px;
+    height: 34px;
+    border-radius: 4px;
+    margin: 1px 6px;
+    padding-right: 6px;
 
     &:hover {
-      background: rgba(64, 158, 255, 0.08);
+      background: rgba(0, 0, 0, 0.05);
     }
   }
 
   :deep(.el-tree-node.is-current > .el-tree-node__content) {
-    background: rgba(64, 158, 255, 0.12);
-    color: var(--el-color-primary);
+    background: #cce4f7;
+    color: #003d6b;
     font-weight: 500;
   }
 }
@@ -869,7 +867,7 @@ async function submitMkdir(): Promise<void> {
   min-width: 0;
 
   .node-folder-icon {
-    color: #faad14;
+    color: #e0a020;
     font-size: 15px;
     flex-shrink: 0;
   }
@@ -882,10 +880,9 @@ async function submitMkdir(): Promise<void> {
   }
 
   .node-lock-icon {
-    color: var(--el-color-primary);
+    color: #999;
     font-size: 12px;
     flex-shrink: 0;
-    opacity: 0.7;
   }
 }
 
@@ -911,24 +908,25 @@ async function submitMkdir(): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 24px 16px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid #e0e0e0;
   flex-shrink: 0;
-  gap: 16px;
+  gap: 12px;
+  background: #fff;
 }
 
 .path-info {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
   min-width: 0;
 }
 
 .path-label {
   font-size: 11px;
-  color: var(--el-text-color-placeholder);
+  color: #999;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.5px;
   font-weight: 500;
 }
 
@@ -940,25 +938,24 @@ async function submitMkdir(): Promise<void> {
 }
 
 .crumb-item {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--el-text-color-secondary);
+  font-size: 14px;
+  font-weight: 400;
+  color: #888;
 
   &.crumb-last {
-    color: var(--el-text-color-primary);
+    color: #1a1a1a;
     font-weight: 600;
   }
 }
 
 .crumb-sep {
-  margin: 0 4px;
-  color: var(--el-text-color-placeholder);
-  font-weight: 400;
+  margin: 0 3px;
+  color: #ccc;
 }
 
 .header-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   flex-shrink: 0;
 }
@@ -967,15 +964,15 @@ async function submitMkdir(): Promise<void> {
 
 .perm-table {
   flex: 1;
-  padding: 0 24px 16px;
+  padding: 0 20px 16px;
   overflow: auto;
 
   :deep(.el-table__row:hover > td) {
-    background: #f5f9ff !important;
+    background: #f7f7f7 !important;
   }
 
   :deep(.el-table__inner-wrapper::before) {
-    display: none; // 去掉底部分隔线
+    display: none;
   }
 }
 
@@ -987,23 +984,23 @@ async function submitMkdir(): Promise<void> {
 }
 
 .user-avatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
+  background: #e1e1e1;
+  color: #484848;
+  font-size: 12px;
+  font-weight: 600;
   flex-shrink: 0;
-  letter-spacing: 0;
 }
 
 .user-info {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -1016,67 +1013,43 @@ async function submitMkdir(): Promise<void> {
 .user-name {
   font-size: 13px;
   font-weight: 500;
-  color: var(--el-text-color-primary);
+  color: #1a1a1a;
 }
 
 .user-nick {
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: #888;
 }
 
 .dept-chip {
   display: inline-block;
-  padding: 0 6px;
-  height: 18px;
-  line-height: 18px;
+  padding: 1px 6px;
   font-size: 11px;
   border-radius: 3px;
-  background: #f0f5ff;
-  border: 1px solid #adc6ff;
-  color: #2f54eb;
+  background: #f0f0f0;
+  border: 1px solid #e0e0e0;
+  color: #666;
   white-space: nowrap;
 }
 
-// 权限徽章
+// 权限徽章 - Win11 极简风格：统一浅灰底 + 轻着色文字
 .perm-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
 }
 
 .perm-badge {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 2px 7px;
+  border-radius: 3px;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
   white-space: nowrap;
-
-  &--read {
-    background: #e6f4ff;
-    color: #1677ff;
-  }
-
-  &--write {
-    background: #fff7e6;
-    color: #d46b08;
-  }
-
-  &--create {
-    background: #f6ffed;
-    color: #389e0d;
-  }
-
-  &--delete {
-    background: #fff1f0;
-    color: #cf1322;
-  }
-
-  &--share {
-    background: #f9f0ff;
-    color: #531dab;
-  }
+  background: #f4f4f4;
+  color: #555;
+  border: 1px solid #e2e2e2;
 }
 
 // 状态指示
@@ -1088,24 +1061,23 @@ async function submitMkdir(): Promise<void> {
 }
 
 .status-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
 
   &--on {
-    background: #52c41a;
-    box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.2);
+    background: #38a169;
   }
 
   &--off {
-    background: #bfbfbf;
+    background: #bbb;
   }
 }
 
 .status-text {
   font-size: 12px;
-  color: var(--el-text-color-regular);
+  color: #666;
 }
 
 // 无规则提示
@@ -1113,16 +1085,16 @@ async function submitMkdir(): Promise<void> {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin: 0 24px 16px;
-  padding: 14px 18px;
+  margin: 0 20px 16px;
+  padding: 12px 16px;
   background: #fafafa;
-  border-radius: 6px;
-  border: 1px dashed var(--el-border-color);
+  border-radius: 4px;
+  border: 1px dashed #ddd;
   font-size: 13px;
-  color: var(--el-text-color-secondary);
+  color: #888;
 
   .el-icon {
-    color: var(--el-text-color-placeholder);
+    color: #bbb;
     flex-shrink: 0;
   }
 }
@@ -1140,18 +1112,19 @@ async function submitMkdir(): Promise<void> {
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: var(--el-text-color-secondary);
+  color: #666;
   padding: 6px 10px;
-  background: var(--el-fill-color-lighter);
+  background: #f4f4f4;
   border-radius: 4px;
+  border: 1px solid #e5e5e5;
   width: 100%;
   word-break: break-all;
 }
 
 // 规则弹窗 - 用户树
 .user-tree-wrap {
-  border: 1px solid var(--el-border-color);
-  border-radius: 6px;
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
   padding: 4px 0;
   max-height: 240px;
   overflow-y: auto;
@@ -1169,7 +1142,7 @@ async function submitMkdir(): Promise<void> {
   gap: 4px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--el-text-color-secondary);
+  color: #666;
   cursor: default;
 }
 
@@ -1190,7 +1163,7 @@ async function submitMkdir(): Promise<void> {
 
 .tree-user-un {
   font-size: 11px;
-  color: var(--el-text-color-placeholder);
+  color: #aaa;
 }
 
 .tree-loading,
@@ -1198,13 +1171,13 @@ async function submitMkdir(): Promise<void> {
   text-align: center;
   padding: 16px;
   font-size: 12px;
-  color: var(--el-text-color-placeholder);
+  color: #aaa;
 }
 
 .selected-user-tip {
   margin-top: 6px;
   font-size: 12px;
-  color: var(--el-text-color-placeholder);
+  color: #aaa;
 
   &.active {
     color: var(--el-color-primary);
@@ -1214,7 +1187,7 @@ async function submitMkdir(): Promise<void> {
 
 .readonly-user {
   font-size: 13px;
-  color: var(--el-text-color-regular);
+  color: #666;
 }
 
 // ─── 删除目录弹窗 ──────────────────────────────────────────────────────────────
@@ -1222,26 +1195,26 @@ async function submitMkdir(): Promise<void> {
 .rmdir-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .rmdir-danger-banner {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 12px 14px;
-  background: #fff2f0;
-  border: 1px solid #ffccc7;
-  border-radius: 6px;
+  padding: 10px 14px;
+  background: #fff5f5;
+  border: 1px solid #fecdcd;
+  border-radius: 4px;
   font-size: 13px;
-  color: #cf1322;
+  color: #c0392b;
   line-height: 1.6;
 
   .rmdir-danger-icon {
-    font-size: 18px;
+    font-size: 16px;
     flex-shrink: 0;
-    margin-top: 1px;
-    color: #cf1322;
+    margin-top: 2px;
+    color: #c0392b;
   }
 }
 
@@ -1254,19 +1227,20 @@ async function submitMkdir(): Promise<void> {
 
 .rmdir-label {
   min-width: 56px;
-  color: var(--el-text-color-secondary);
+  color: #888;
   font-size: 12px;
   font-weight: 500;
   flex-shrink: 0;
 }
 
 .rmdir-path {
-  font-family: monospace;
-  font-size: 13px;
-  color: var(--el-text-color-primary);
-  background: var(--el-fill-color-lighter);
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  color: #1a1a1a;
+  background: #f4f4f4;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: 3px;
+  border: 1px solid #e5e5e5;
   word-break: break-all;
 }
 
@@ -1275,23 +1249,23 @@ async function submitMkdir(): Promise<void> {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--el-text-color-placeholder);
+  color: #aaa;
 }
 
 .rmdir-preview-content {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .rmdir-no-rules {
-  color: var(--el-text-color-placeholder);
+  color: #aaa;
   font-size: 12px;
 }
 
 .rmdir-rule-count {
   font-size: 13px;
-  color: var(--el-text-color-regular);
+  color: #555;
 
   strong {
     color: #d46b08;
@@ -1302,31 +1276,31 @@ async function submitMkdir(): Promise<void> {
 .rmdir-user-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
 .rmdir-confirm-row {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding-top: 4px;
-  border-top: 1px dashed var(--el-border-color-lighter);
+  padding-top: 12px;
+  border-top: 1px solid #efefef;
 }
 
 .rmdir-confirm-input-wrap {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .rmdir-confirm-hint {
   font-size: 11px;
-  color: var(--el-text-color-placeholder);
+  color: #aaa;
 
   strong {
-    color: var(--el-text-color-primary);
-    font-family: monospace;
+    color: #333;
+    font-family: 'Consolas', 'Courier New', monospace;
   }
 }
 </style>
