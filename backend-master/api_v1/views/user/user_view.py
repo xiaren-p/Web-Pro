@@ -570,9 +570,7 @@ class UserViewSet(viewsets.ViewSet):
         now = datetime.utcnow()
         rel_path = f"uploads/avatars/{now.year:04d}/{now.month:02d}/{uuid.uuid4().hex}.jpg"
         saved_path = default_storage.save(rel_path, resized_buf)
-        # 使用 /api/v1/media/ 前缀构造 URL：该路径由 nginx 反代到 Django，
-        # 无需为 /media/ 单独配置 nginx location 规则即可在生产环境访问。
-        media_rel = '/api/v1/media/' + saved_path.lstrip('/')
+        media_rel = settings.MEDIA_URL.rstrip('/') + '/' + saved_path.lstrip('/')
         new_url = request.build_absolute_uri(media_rel)
 
         # ④ 原子写 DB：更新 profile.avatar + 清理旧文件
@@ -647,7 +645,7 @@ class UserViewSet(viewsets.ViewSet):
         ext = os.path.splitext(file.name)[1] or ''
         rel_path = f"uploads/images/{now.year:04d}/{now.month:02d}/{uuid.uuid4().hex}{ext}"
         saved_path = default_storage.save(rel_path, file)
-        media_rel = '/api/v1/media/' + saved_path.lstrip('/')
+        media_rel = settings.MEDIA_URL.rstrip('/') + '/' + saved_path.lstrip('/')
         base_url = request.build_absolute_uri(media_rel)
         # 读取尺寸
         try:
@@ -684,7 +682,7 @@ class UserViewSet(viewsets.ViewSet):
                         thumb.save(buf, format=save_fmt if save_fmt != 'JPG' else 'JPEG')
                         buf.seek(0)
                         default_storage.save(t_rel, buf)
-                        t_rel_url = '/api/v1/media/' + t_rel.lstrip('/')
+                        t_rel_url = settings.MEDIA_URL.rstrip('/') + '/' + t_rel.lstrip('/')
                         thumbs[str(s)] = request.build_absolute_uri(t_rel_url)
                     except Exception:
                         continue
