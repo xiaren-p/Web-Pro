@@ -82,7 +82,7 @@
           class="perm-table"
           :header-cell-style="{ background: '#f5f7fa', color: '#606266', fontWeight: '600', fontSize: '13px' }"
         >
-          <el-table-column label="用户" min-width="220">
+          <el-table-column label="用户" width="200">
             <template #default="{ row }: { row: FolderRuleVO }">
               <div class="user-cell">
                 <div class="user-avatar">
@@ -125,7 +125,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="120" align="center" fixed="right">
+          <el-table-column label="操作" width="120" align="center">
             <template #default="{ row }: { row: FolderRuleVO }">
               <el-button v-hasPerm="['nc:folder:setperm']" link type="primary" size="small" @click="openEditRule(row)">
                 编辑
