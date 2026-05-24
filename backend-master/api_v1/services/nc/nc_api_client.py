@@ -692,6 +692,9 @@ class NcApiClient:
     def create_dav_folder(self, dav_path: str) -> None:
         """通过 WebDAV MKCOL 创建目录（幂等：已存在返回 405 时静默通过）。
 
+        若收到 403，说明该 Group Folder 已开启 ACL 模式且 admin 尚无显式权限规则；
+        此时自动补写 admin 全权限 ACL 后重试一次（自愈逻辑）。
+
         Args:
             dav_path (str): 相对于 NC server 根的新目录 WebDAV 路径，
                             如 /remote.php/dav/files/admin/技术部/新文件夹 。
@@ -709,6 +712,37 @@ class NcApiClient:
             raise RuntimeError(
                 f"[NcApiClient] MKCOL {dav_path} 网络错误: {exc}"
             ) from exc
+
+        # 403：ACL 模式下 admin 缺少显式规则 —— 自愈后重试
+        if resp.status_code == 403:
+            mount_point = self._extract_mount_point(dav_path)
+            if mount_point:
+                logger.warning(
+                    "[NcApiClient][create_dav_folder] MKCOL 403，尝试为 admin 补 ACL 后重试: "
+                    "mount_point=%s dav_path=%s",
+                    mount_point, dav_path,
+                )
+                try:
+                    self.set_path_acl(
+                        nc_path=mount_point,
+                        username=self._admin_user,
+                        mask=31,
+                        permissions=31,
+                    )
+                    resp = self._session.request(
+                        "MKCOL", url, verify=self._verify, timeout=15
+                    )
+                except requests.RequestException as exc:
+                    raise RuntimeError(
+                        f"[NcApiClient] MKCOL {dav_path} 网络错误（重试）: {exc}"
+                    ) from exc
+                except RuntimeError:
+                    # set_path_acl 失败时直接透传原 403 错误
+                    raise RuntimeError(
+                        f"[NcApiClient] MKCOL {dav_path} 返回状态码 "
+                        f"403: {resp.text[:200]}"
+                    )
+
         if resp.status_code == 405:
             logger.info(
                 "[NcApiClient][create_dav_folder] 目录已存在，幂等跳过: %s",
@@ -720,3 +754,20 @@ class NcApiClient:
                 f"[NcApiClient] MKCOL {dav_path} 返回状态码 "
                 f"{resp.status_code}: {resp.text[:200]}"
             )
+
+    def _extract_mount_point(self, dav_path: str) -> str:
+        """从 WebDAV 路径中提取 Group Folder 挂载点名称。
+
+        例：/remote.php/dav/files/admin/公共/子目录 → 公共
+
+        Args:
+            dav_path (str): WebDAV 完整路径。
+
+        Returns:
+            str: 挂载点名称；无法解析时返回空字符串。
+        """
+        prefix = f"/remote.php/dav/files/{self._admin_user}/"
+        if dav_path.startswith(prefix):
+            rest = dav_path[len(prefix):]
+            return rest.split("/")[0]
+        return ""

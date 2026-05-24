@@ -471,6 +471,20 @@ class Command(BaseCommand):
                 logger.warning("[reconcile_nc] 无法获取 NC Group Folder 列表，跳过 Step 5 ACL 对账")
                 nc_mount_to_folder_id = {}
 
+            # 预加载所有 DEPT / DEPT_ADMIN 群组映射，避免循环内 N+1 查询
+            _dept_ng_by_folder: dict[int, NcGroup] = {
+                ng.folder_id: ng
+                for ng in NcGroup.objects.filter(
+                    group_type=NcGroupType.DEPT,
+                ).exclude(folder_id=None)
+            }
+            _dept_admin_ng_by_dept: dict[int, NcGroup] = {
+                ng.dept_id: ng
+                for ng in NcGroup.objects.filter(
+                    group_type=NcGroupType.DEPT_ADMIN,
+                ).exclude(dept_id=None)
+            }
+
             active_rules = NcFileAccessRule.objects.filter(
                 status=True,
             ).select_related("user")
@@ -485,11 +499,7 @@ class Command(BaseCommand):
                         rule.id, mount_point,
                     )
                     continue
-                # 通过 folder_id 找到对应的 DEPT 群组（用于 add_to_group）
-                dept_ng_for_rule = NcGroup.objects.filter(
-                    group_type=NcGroupType.DEPT,
-                    folder_id=folder_id_for_acl,
-                ).first()
+                dept_ng_for_rule = _dept_ng_by_folder.get(folder_id_for_acl)
                 self.stdout.write(
                     f"  → ACL 规则对账: [{mount_point}] {rule.nc_path}"
                     f" user={rule.user.username} perms={rule.permission_bits}"
@@ -497,14 +507,23 @@ class Command(BaseCommand):
                 if not dry_run:
                     NcSyncService.enqueue_enable_folder_acl(folder_id_for_acl)
                     if dept_ng_for_rule:
+                        # NC ACL 只能向下限制，无法超越群组上限：
+                        # 写权限用户必须加入 DEPT_ADMIN（上限31）才能使 ACL 生效
+                        if rule.permission_bits & NcFileAccessRule.PERM_WRITE:
+                            _group_for_rule = (
+                                _dept_admin_ng_by_dept.get(dept_ng_for_rule.dept_id)
+                                or dept_ng_for_rule
+                            )
+                        else:
+                            _group_for_rule = dept_ng_for_rule
                         NcSyncService.enqueue_add_to_group(
-                            rule.user.username, dept_ng_for_rule.code
+                            rule.user.username, _group_for_rule.code
                         )
                     NcSyncService.enqueue_set_path_acl(rule)
                     acl_enqueued += 1
             if acl_enqueued:
-                self.stdout.write(f"  → ACL 规则入队共 {acl_enqueued} 条（每条包含 ENABLE_FOLDER_ACL + SET_PATH_ACL）")
-                enqueued += acl_enqueued * 2
+                self.stdout.write(f"  → ACL 规则入队共 {acl_enqueued} 条（每条包含 ENABLE_FOLDER_ACL + ADD_TO_GROUP + SET_PATH_ACL）")
+                enqueued += acl_enqueued * 3
 
         # 重置失败任务
         failed_qs = NcSyncTask.objects.filter(

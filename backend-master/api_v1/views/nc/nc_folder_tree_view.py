@@ -403,9 +403,18 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             dict: 空 dict。
         """
         try:
-            rule = NcFileAccessRule.objects.select_related("user").get(pk=pk)
+            rule = NcFileAccessRule.objects.select_related(
+                "user", "user__profile"
+            ).get(pk=pk)
         except NcFileAccessRule.DoesNotExist:
             return drf_error("规则不存在", code=404)
+
+        # 安全校验：DEPT_ADMIN 只能删除其可管辖部门内用户的规则
+        allowed_depts = _get_caller_dept_ids(request.user)
+        if allowed_depts is not None:
+            _rule_user_dept_id = getattr(getattr(rule.user, "profile", None), "dept_id", None)
+            if _rule_user_dept_id not in allowed_depts:
+                return drf_error("无权限删除该规则", code=403)
 
         nc_path = rule.nc_path
         username = rule.user.username
@@ -443,6 +452,23 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
                     ).first()
                     if dept_ng:
                         NcSyncService.enqueue_remove_from_group(username, dept_ng.code)
+                        # 同步移出 DEPT_ADMIN 群组（写权限用户被加入了 DEPT_ADMIN）
+                        # 但不移出该部门的自然 DEPT_ADMIN，避免影响其本职管理权限
+                        dept_admin_ng = NcGroup.objects.filter(
+                            group_type=NcGroupType.DEPT_ADMIN,
+                            dept_id=dept_ng.dept_id,
+                        ).first()
+                        if dept_admin_ng:
+                            _profile = getattr(target_user, "profile", None)
+                            _is_natural_admin = (
+                                _profile is not None
+                                and getattr(_profile, "admin_level", None) == AdminLevel.DEPT_ADMIN
+                                and getattr(_profile, "dept_id", None) == dept_ng.dept_id
+                            )
+                            if not _is_natural_admin:
+                                NcSyncService.enqueue_remove_from_group(
+                                    username, dept_admin_ng.code
+                                )
             except RuntimeError:
                 logger.warning(
                     "[NcFolderTreeViewSet][delete_rule] 查询 NC Group Folder 列表失败，跳过 remove_from_group"
@@ -662,15 +688,25 @@ def _enqueue_acl_for_rule(rule: NcFileAccessRule, nc_group: NcGroup) -> None:
         dept_id=nc_group.dept_id,
     ).first()
 
-    from api_v1.models.nc.nc_sync_task import NcSyncTask  # noqa: PLC0415 避免循环导入
     last_task_id = NcSyncTask.objects.order_by("-id").values_list("id", flat=True).first() or 0
 
     if dept_ng:
         if dept_ng.folder_id:
             # 开启 ACL 模式（幂等），必须在 set_path_acl 之前执行
             NcSyncService.enqueue_enable_folder_acl(dept_ng.folder_id)
-        # 确保用户加入 DEPT 群组 —— 文件夹可见性的前提条件（幂等）
-        NcSyncService.enqueue_add_to_group(rule.user.username, dept_ng.code)
+        # NC Group Folder ACL 只能「向下限制」权限，无法超越群组授权上限：
+        #   DEPT 群组上限 = READ(1)  → ACL perms 无论设多高，实际仍为只读
+        #   DEPT_ADMIN 群组上限 = FULL(31) → ACL perms 才能真正生效
+        # 因此：有写需求（permission_bits 含 WRITE bit）的用户必须加入 DEPT_ADMIN 群组。
+        if rule.permission_bits & NcFileAccessRule.PERM_WRITE:
+            dept_admin_ng = NcGroup.objects.filter(
+                group_type=NcGroupType.DEPT_ADMIN,
+                dept_id=nc_group.dept_id,
+            ).first()
+            group_to_join = dept_admin_ng or dept_ng  # 无 DEPT_ADMIN 记录时降级到 DEPT
+        else:
+            group_to_join = dept_ng
+        NcSyncService.enqueue_add_to_group(rule.user.username, group_to_join.code)
 
     NcSyncService.enqueue_set_path_acl(rule)
     # 立即通过后台线程执行，不依赖 Celery Beat 每 30 秒轮询
