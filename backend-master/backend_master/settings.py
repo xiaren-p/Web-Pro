@@ -36,8 +36,8 @@ env = environ.Env(
     ONLINE_STALE_SECONDS=(int, 180),
     # 是否允许 Django 在非 DEBUG 模式下通过视图直接提供媒体文件（仅在你确知需要 nginx 反代到 Django 时开启）
     DJANGO_SERVE_MEDIA=(bool, True),
-    # 默认头像
-    DEFAULT_AVATAR_URL=(str, 'https://foruda.gitee.com/images/1723603502796844527/03cdca2a_716974.gif'),
+    # 默认头像（空字符串表示不使用远端兜底，前端使用本地占位图）
+    DEFAULT_AVATAR_URL=(str, ''),
     # 图片同步服务地址
     IMAGE_SYNC_URL=(str, 'https://cloud.hanlis.cn:9898'),
     # 高德天气 API 配置

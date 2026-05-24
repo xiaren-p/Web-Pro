@@ -43,11 +43,13 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 else:
-    # 当你希望在生产通过 nginx 反向代理到 Django 提供媒体时，可以开启环境变量
-    # `DJANGO_SERVE_MEDIA=true`，Django 会在运行时提供 /media/ 和 /prod-api/media/ 路径下的文件。
-    if getattr(settings, "DJANGO_SERVE_MEDIA", False):
-        # 支持两种路径：/media/... 与 /prod-api/media/... （前者为直接路径，后者用于前端使用 /prod-api 前缀的场景）
+    if getattr(settings, "DJANGO_SERVE_MEDIA", True):
         urlpatterns += [
-            re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+            # nginx 通常只反代 /api/ 和 /prod-api/ 到 Django，不反代 /media/。
+            # 因此头像等媒体文件统一走 /api/v1/media/ 路径，与业务接口共用同一反代规则，
+            # 无需额外修改 nginx 配置即可在生产环境访问。
+            re_path(r'^api/v1/media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
             re_path(r'^prod-api/media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+            # 保留原始 /media/ 路径兼容旧数据库记录（如 nginx 已有 location /media/ 则由 nginx 直接服务）
+            re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
         ]
