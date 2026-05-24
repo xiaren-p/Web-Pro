@@ -34,10 +34,10 @@ def _get_nc_base_url() -> str:
     """
     from api_v1.models.system.config import Config
 
-    conf = Config.objects.filter(config_key="NC_BASE_URL").first()
-    if not conf or not conf.config_value:
+    conf = Config.objects.filter(key="NC_BASE_URL").first()
+    if not conf or not conf.value:
         raise RuntimeError("[oidc_logout_service] Config 表中缺少 NC_BASE_URL 配置")
-    return conf.config_value.strip().rstrip("/")
+    return conf.value.strip().rstrip("/")
 
 
 def _get_nc_client_id() -> str:
