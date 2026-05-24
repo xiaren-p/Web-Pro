@@ -91,7 +91,42 @@ class UserProfile(TimeStampedModel):
         help_text="除部门群组外额外加入的 NC 群组（如项目组、公司共享等）",
     )
 
+    nc_app_password = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        verbose_name="NC 应用密码（加密）",
+        help_text="Fernet 密文存储，仅用于用户级 NC API 调用（如头像同步），不对外暴露",
+    )
+
     class Meta:
         verbose_name = "用户扩展"
         verbose_name_plural = "用户扩展"
+
+    def __str__(self) -> str:
+        return f"UserProfile<{self.user_id}:{self.user.username}>"
+
+    # ------------------------------------------------------------------ #
+    #  NC 密码加解密辅助（Fernet AES-128-CBC + HMAC-SHA256）               #
+    # ------------------------------------------------------------------ #
+
+    def get_nc_password(self) -> str:
+        """解密并返回 NC 应用密码明文。
+
+        Returns:
+            str: NC 密码明文；未设置或解密失败时返回空字符串。
+        """
+        if not self.nc_app_password:
+            return ""
+        from api_v1.utils.fernet_crypto import decrypt_value
+        return decrypt_value(self.nc_app_password)
+
+    def set_nc_password(self, plaintext: str) -> None:
+        """加密存储 NC 应用密码（不自动 save，需调用方显式调用 .save()）。
+
+        Args:
+            plaintext (str): NC 密码明文；传空字符串表示清除密码。
+        """
+        from api_v1.utils.fernet_crypto import encrypt_value
+        self.nc_app_password = encrypt_value(plaintext) if plaintext else ""
 

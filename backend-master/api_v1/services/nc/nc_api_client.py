@@ -69,6 +69,23 @@ class NcApiClient:
         admin_password = cls._read_config_plaintext("NC_ADMIN_APP_PWD")
         return cls(server_url, admin_user, admin_password)
 
+    @classmethod
+    def for_user(cls, username: str, password: str) -> "NcApiClient":
+        """创建以普通用户身份认证的 NC 客户端实例。
+
+        与 from_settings() 使用管理员凭据不同，此工厂方法适用于必须以
+        用户本人身份执行的操作（如上传自己的头像）。服务器 URL 仍从 Config 表读取。
+
+        Args:
+            username (str): NC 用户名（与 Django username 一致）。
+            password (str): 该用户的 NC 应用密码明文。
+
+        Returns:
+            NcApiClient: 以用户凭据初始化的客户端实例。
+        """
+        server_url = cls._read_config("NC_BASE_URL")
+        return cls(server_url, username, password)
+
     @staticmethod
     def _read_config(key: str) -> str:
         """从 Config 表读取文本型配置值。
@@ -275,6 +292,19 @@ class NcApiClient:
         logger.info("[NcApiClient][update_user_display_name] username=%s", username)
         self._put(f"/ocs/v1.php/cloud/users/{username}", {"key": "displayname", "value": display_name})
 
+    def update_user_password(self, username: str, new_password: str) -> None:
+        """通过管理员 API 重置 NC 用户密码（仅限管理员客户端调用）。
+
+        使用场景：生产端存量用户补录 nc_app_password 时，先用此方法重置 NC 密码，
+        再将新密码加密保存至 UserProfile，使后续用户级头像同步可正常工作。
+
+        Args:
+            username (str): 目标用户名。
+            new_password (str): 新密码明文。
+        """
+        logger.info("[NcApiClient][update_user_password] username=%s", username)
+        self._put(f"/ocs/v1.php/cloud/users/{username}", {"key": "password", "value": new_password})
+
     def update_user_avatar(
         self,
         username: str,
@@ -318,6 +348,76 @@ class NcApiClient:
                 f"[NcApiClient][update_user_avatar] username={username} 同步失败: {exc}"
             ) from exc
         logger.info("[NcApiClient][update_user_avatar] username=%s 头像同步成功", username)
+
+    def upload_own_avatar(self, image_bytes: bytes, mime_type: str = "image/jpeg") -> None:
+        """以当前认证用户身份上传头像（用户级端点，不需要管理员权限）。
+
+        NC 标准两步协议：
+          1. POST /index.php/avatar    上传图片至临时缓冲区，NC 返回图片尺寸。
+          2. POST /index.php/avatar/cropped    以全图坐标完成裁剪（方形图片无需裁剪）。
+
+        前置条件：self._session 必须以用户本人凭据（Basic Auth）认证（见 for_user()）。
+        OCS-APIRequest: true 头已由 __init__ 统一注入，可绕过 CSRF 校验。
+
+        Args:
+            image_bytes (bytes): 头像图片二进制（建议正方形 JPEG，已完成压缩）。
+            mime_type (str): 图片 MIME 类型，默认 image/jpeg。
+
+        Raises:
+            RuntimeError: 步骤1上传或步骤2裁剪失败时抛出，含用户名与原始异常信息。
+        """
+        import io as _io
+
+        _ext_map = {
+            "image/jpeg": "avatar.jpg",
+            "image/png": "avatar.png",
+            "image/webp": "avatar.webp",
+        }
+        filename = _ext_map.get(mime_type, "avatar.jpg")
+
+        # 步骤1：上传图片至 NC 临时缓冲区
+        url_upload = f"{self._base}/index.php/avatar"
+        try:
+            resp1 = self._session.post(
+                url_upload,
+                files={"files[0]": (filename, _io.BytesIO(image_bytes), mime_type)},
+                verify=self._verify,
+                timeout=30,
+            )
+            resp1.raise_for_status()
+            body1 = resp1.json() if resp1.content else {}
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"[NcApiClient][upload_own_avatar] step1-upload 失败: user={self._admin_user} err={exc}"
+            ) from exc
+
+        # NC 返回 {"status": "success", "data": {"dimension": N}}，取尺寸用于裁剪坐标
+        dimension = 512
+        try:
+            dimension = int((body1.get("data") or {}).get("dimension") or 512)
+        except (TypeError, ValueError):
+            pass
+
+        # 步骤2：提交全图裁剪坐标（x=0, y=0, w=dimension, h=dimension 等价于无裁剪）
+        url_crop = f"{self._base}/index.php/avatar/cropped"
+        try:
+            resp2 = self._session.post(
+                url_crop,
+                data={"x": 0, "y": 0, "w": dimension, "h": dimension},
+                verify=self._verify,
+                timeout=30,
+            )
+            resp2.raise_for_status()
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"[NcApiClient][upload_own_avatar] step2-crop 失败: user={self._admin_user} err={exc}"
+            ) from exc
+
+        logger.info(
+            "[NcApiClient][upload_own_avatar] user=%s 头像上传成功 dimension=%s",
+            self._admin_user,
+            dimension,
+        )
 
     def disable_user(self, username: str) -> None:
         """禁用 NC 用户（账号保留，仅禁止登录）。

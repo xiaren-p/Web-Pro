@@ -773,6 +773,31 @@ class NcSyncService:
                 display_name=p.get("display_name", ""),
                 email=p.get("email", ""),
             )
+            # 将 NC 密码加密后保存到 UserProfile，供后续用户级 NC 操作（如头像同步）使用
+            try:
+                from api_v1.models.system.user_profile import UserProfile  # noqa: PLC0415
+                from api_v1.utils.fernet_crypto import encrypt_value  # noqa: PLC0415
+                updated = (
+                    UserProfile.objects
+                    .filter(user__username=p["username"])
+                    .update(nc_app_password=encrypt_value(nc_password))
+                )
+                if updated:
+                    logger.info(
+                        "[NcSyncService][_dispatch_task] NC 密码已加密保存: user=%s",
+                        p["username"],
+                    )
+                else:
+                    logger.warning(
+                        "[NcSyncService][_dispatch_task] NC 密码未保存（UserProfile 不存在）: user=%s",
+                        p["username"],
+                    )
+            except Exception as _exc:
+                logger.warning(
+                    "[NcSyncService][_dispatch_task] NC 密码保存失败（不阻断）: user=%s err=%s",
+                    p["username"],
+                    _exc,
+                )
         elif op == SyncOperation.UPDATE_USER:
             if p.get("display_name"):
                 client.update_user_display_name(p["username"], p["display_name"])

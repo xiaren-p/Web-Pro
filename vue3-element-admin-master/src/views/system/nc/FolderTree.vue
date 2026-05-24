@@ -57,6 +57,7 @@
             </div>
           </div>
           <div class="header-actions">
+            <el-button :icon="Refresh" @click="handleRefresh">刷新</el-button>
             <el-button v-hasPerm="['nc:folder:mkdir']" :icon="FolderAdd" @click="openMkdir">
               新建子目录
             </el-button>
@@ -85,7 +86,7 @@
           <el-table-column label="用户" min-width="200">
             <template #default="{ row }: { row: FolderRuleVO }">
               <div class="user-cell">
-                <div class="user-avatar">
+                <div class="user-avatar" :style="{ background: avatarColor(row.username) }">
                   {{ row.username.charAt(0).toUpperCase() }}
                 </div>
                 <div class="user-info">
@@ -357,9 +358,9 @@
  */
 import type { FolderDeletePreview, FolderRuleVO, UserTreeDept, UserTreeUser } from "@/api/nc/folderTree";
 
-import { computed, nextTick, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, shallowRef, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Folder, FolderAdd, FolderOpened, InfoFilled, Lock, OfficeBuilding, Plus, User, Delete } from "@element-plus/icons-vue";
+import { Delete, Folder, FolderAdd, FolderOpened, InfoFilled, Lock, OfficeBuilding, Plus, Refresh, User } from "@element-plus/icons-vue";
 
 import {
   batchSetFolderRules,
@@ -429,7 +430,10 @@ async function loadNode(node: any, resolve: (data: FolderTreeNode[]) => void): P
         nextTick(() => {
           activeNode.value = roots[0];
           treeRef.value?.setCurrentKey(roots[0].key);
-          treeRef.value?.getNode(roots[0].key)?.expand();
+          // 同步存储 elNode，确保自动选中的根节点也能触发 mkdir/rmdir 后的刷新
+          const rootElNode = treeRef.value?.getNode(roots[0].key);
+          activeElNode.value = rootElNode ?? null;
+          rootElNode?.expand();
         });
       }
     } catch {
@@ -475,8 +479,11 @@ async function loadNode(node: any, resolve: (data: FolderTreeNode[]) => void): P
 // ─── 节点选择 ─────────────────────────────────────────────────────────────────
 
 const activeNode = ref<FolderTreeNode | null>(null);
-/** 当前激活的 el-tree Node 对象，用于直接操作节点（不经 key 查找）。 */
-const activeElNode = ref<any>(null);
+/**
+ * 当前激活的 el-tree Node 对象，用于直接操作节点（不经 key 查找）。
+ * 使用 shallowRef 避免 Vue 深代理包装 el-tree 内部 Node，防止 expand/loadData 行为异常。
+ */
+const activeElNode = shallowRef<any>(null);
 
 function handleNodeClick(data: FolderTreeNode, elNode: any): void {
   activeNode.value = data;
@@ -502,6 +509,26 @@ async function loadRules(ncPath: string): Promise<void> {
     rules.value = await fetchPathRules(ncPath);
   } finally {
     rulesLoading.value = false;
+  }
+}
+
+/**
+ * 刷新当前选中节点：强制重载其子节点并重新拉取权限规则。
+ */
+async function handleRefresh(): Promise<void> {
+  const node = activeNode.value;
+  if (!node) return;
+  // 刷新规则表格
+  if (node.ncPath) {
+    loadRules(node.ncPath);
+  }
+  // 刷新树节点子列表
+  const treeNode = activeElNode.value;
+  if (treeNode) {
+    treeNode.loaded = false;
+    treeNode.expanded = false;
+    await nextTick();
+    treeNode.expand();
   }
 }
 
@@ -1002,8 +1029,8 @@ async function submitMkdir(): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #e1e1e1;
-  color: #484848;
+  background: #e1e1e1; // 由 :style 动态覆盖为 avatarColor
+  color: #fff;
   font-size: 12px;
   font-weight: 600;
   flex-shrink: 0;

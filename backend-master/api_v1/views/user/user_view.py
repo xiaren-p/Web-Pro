@@ -31,6 +31,29 @@ from api_v1.services.nc.nc_api_client import NcApiClient
 
 logger = logging.getLogger(__name__)
 
+
+def _dept_subtree(root_id: int) -> set[int]:
+    """返回指定部门及其所有子部门的 ID 集合（广度优先遍历）。
+
+    用于部门管理员写权限校验：该管理员可对根部门与子部门内的用户执行写操作。
+
+    Args:
+        root_id (int): 根部门 ID。
+
+    Returns:
+        set[int]: 包含 root_id 本身及所有层级子部门的 ID 集合。
+    """
+    result: set[int] = {root_id}
+    queue = [root_id]
+    while queue:
+        pid = queue.pop()
+        for cid in Department.objects.filter(parent_id=pid).values_list("id", flat=True):
+            if cid not in result:
+                result.add(cid)
+                queue.append(cid)
+    return result
+
+
 class UserViewSet(viewsets.ViewSet):
     """用户相关接口
 
@@ -165,18 +188,8 @@ class UserViewSet(viewsets.ViewSet):
             level = _profile.admin_level if _profile else AdminLevel.MEMBER
             if level == AdminLevel.COMPANY_ADMIN:
                 pass
-            elif level == AdminLevel.DEPT_ADMIN and _profile and _profile.dept_id:
-                _dept_ids: set[int] = set()
-
-                def _collect_dept(did: int) -> None:
-                    if did in _dept_ids:
-                        return
-                    _dept_ids.add(did)
-                    for cid in Department.objects.filter(parent_id=did).values_list("id", flat=True):
-                        _collect_dept(cid)
-
-                _collect_dept(_profile.dept_id)
-                qs = qs.filter(profile__dept_id__in=list(_dept_ids))
+            elif level == AdminLevel.DEPT_ADMIN:
+                pass  # 部门管理员可查看全部用户列表（写操作仍限制在本部门，见 _dept_subtree）
             else:
                 qs = qs.filter(pk=req_user.id)
         total, items, _, _ = paginate_queryset(request, qs)
@@ -212,6 +225,16 @@ class UserViewSet(viewsets.ViewSet):
             return drf_error("用户名已存在", status=400)
         if User.objects.filter(email=email).exists():
             return drf_error("邮箱已被使用", status=400)
+        # 写权限检查：部门管理员只能在本部门（含子部门）内创建用户
+        if not request.user.is_superuser and dept_id is not None:
+            _req_p = getattr(request.user, "profile", None)
+            _req_level = _req_p.admin_level if _req_p else AdminLevel.MEMBER
+            if _req_level == AdminLevel.DEPT_ADMIN and _req_p and _req_p.dept_id:
+                try:
+                    if int(dept_id) not in _dept_subtree(_req_p.dept_id):
+                        return drf_error("部门管理员只能在本部门内创建用户", status=403)
+                except (ValueError, TypeError):
+                    pass
         user = User.objects.create(username=username, email=email, is_active=bool(int(status_num)))
         user.set_password(password)
         user.save()
@@ -275,6 +298,15 @@ class UserViewSet(viewsets.ViewSet):
             user = User.objects.get(pk=id)
         except User.DoesNotExist:
             return drf_error("未找到用户", status=404)
+        # 写权限检查：部门管理员只能编辑本部门（含子部门）的用户
+        if not request.user.is_superuser:
+            _req_p = getattr(request.user, "profile", None)
+            _req_level = _req_p.admin_level if _req_p else AdminLevel.MEMBER
+            if _req_level == AdminLevel.DEPT_ADMIN and _req_p and _req_p.dept_id:
+                _target_p = getattr(user, "profile", None)
+                _target_dept = getattr(_target_p, "dept_id", None)
+                if _target_dept is None or _target_dept not in _dept_subtree(_req_p.dept_id):
+                    return drf_error("无权编辑其他部门的用户", status=403)
         payload = request.data.copy()
         # 在任何字段被覆写前捕获旧值，以供 NC 同步差量判定
         _old_email = user.email
@@ -373,7 +405,14 @@ class UserViewSet(viewsets.ViewSet):
             users_qs = User.objects.filter(id__in=ids)
             if not users_qs.exists():
                 return drf_error("未找到用户", status=404)
-
+            # 写权限检查：部门管理员只能删除本部门（含子部门）的用户
+            if not request.user.is_superuser:
+                _req_p = getattr(request.user, "profile", None)
+                _req_level = _req_p.admin_level if _req_p else AdminLevel.MEMBER
+                if _req_level == AdminLevel.DEPT_ADMIN and _req_p and _req_p.dept_id:
+                    _allowed = _dept_subtree(_req_p.dept_id)
+                    if users_qs.exclude(profile__dept_id__in=list(_allowed)).exists():
+                        return drf_error("无权删除其他部门的用户", status=403)
             count = users_qs.count()
             usernames_del = list(users_qs.values_list("username", flat=True))
             # 先入队 NC disable，再删除 Django 用户（保证 username 在入队时仍有效）
@@ -523,10 +562,17 @@ class UserViewSet(viewsets.ViewSet):
             profile.avatar = new_url
             profile.save(update_fields=["avatar"])
 
-        # ⑤ NC 实时头像同步（失败仅记录 WARNING，不阻断响应）
+        # ⑤ NC 实时头像同步（用户级凭据，失败仅记录 WARNING 不阻断响应）
         try:
-            nc_client = NcApiClient.from_settings()
-            nc_client.update_user_avatar(user.username, resized_bytes, "image/jpeg")
+            nc_password = profile.get_nc_password() if profile else ""
+            if nc_password:
+                user_nc_client = NcApiClient.for_user(user.username, nc_password)
+                user_nc_client.upload_own_avatar(resized_bytes, "image/jpeg")
+            else:
+                logger.info(
+                    "[UserViewSet][upload_avatar] 用户无 NC 应用密码，跳过 NC 头像同步: user=%s",
+                    user.username,
+                )
         except Exception as exc:
             logger.warning(
                 "[UserViewSet][upload_avatar] NC 头像同步失败（不阻断）: user=%s err=%s",

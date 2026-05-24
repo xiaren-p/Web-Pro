@@ -58,3 +58,67 @@ def is_local_upload(avatar: str) -> bool:
         return "/media/uploads/avatars/" in avatar
     # 相对路径格式（如 uploads/avatars/...）
     return avatar.startswith("uploads/avatars/")
+
+
+# 与前端 avatarPresets.ts backgroundColor 数组一一对应（12 色）
+PRESET_COLORS: dict[str, str] = {
+    "preset:01": "5c6bc0",
+    "preset:02": "42a5f5",
+    "preset:03": "26c6da",
+    "preset:04": "66bb6a",
+    "preset:05": "ffa726",
+    "preset:06": "ef5350",
+    "preset:07": "ab47bc",
+    "preset:08": "26a69a",
+    "preset:09": "8d6e63",
+    "preset:10": "78909c",
+    "preset:11": "ec407a",
+    "preset:12": "7e57c2",
+}
+
+
+def make_preset_png(username: str, preset_id: str) -> bytes:
+    """用 Pillow 生成与前端预设色匹配的头像，返回 PNG bytes。
+
+    正方形背景使用与前端 @dicebear/thumbs 相同的 12 色调色板，
+    圆心绘制用户名首字母（大写白色）。生成 256×256 PNG。
+
+    Args:
+        username (str): Django 用户名，取首字母作为头像文字。
+        preset_id (str): 预设标识符，如 'preset:06'，用于查调色板。
+
+    Returns:
+        bytes: PNG 二进制，可直接传给 NcApiClient.upload_own_avatar()。
+    """
+    import io
+    from PIL import Image, ImageDraw, ImageFont  # type: ignore[import]
+
+    size = 256
+    hex_color = PRESET_COLORS.get(preset_id, "5c6bc0")
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+
+    # 正方形画布（NC 会自动裁圆）
+    img = Image.new("RGB", (size, size), (r, g, b))
+    draw = ImageDraw.Draw(img)
+
+    # 首字母居中
+    letter = (username[0] if username else "U").upper()
+    font_size = 110
+    try:
+        # Pillow >= 10.0 支持 load_default(size=)
+        font = ImageFont.load_default(size=font_size)  # type: ignore[call-arg]
+    except TypeError:
+        font = ImageFont.load_default()
+
+    bbox = draw.textbbox((0, 0), letter, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    x = (size - text_w) // 2 - bbox[0]
+    y = (size - text_h) // 2 - bbox[1]
+    draw.text((x, y), letter, fill=(255, 255, 255), font=font)
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
