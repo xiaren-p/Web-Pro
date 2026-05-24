@@ -18,7 +18,7 @@ from api_v1.models.nc.nc_file_access_rule import NcFileAccessRule
 from api_v1.models.nc.nc_group import NcGroup, NcGroupType
 from api_v1.models.nc.nc_sync_task import NcSyncTask
 from api_v1.models.system.department import Department
-from api_v1.models.system.user_profile import AdminLevel
+from api_v1.models.system.user_profile import AdminLevel, UserProfile
 from api_v1.permissions import MenuPermRequired
 from api_v1.serializers.nc.nc_file_rule_serializer import NcFileRuleReadSerializer
 from api_v1.services.nc.nc_api_client import NcApiClient
@@ -226,6 +226,31 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             "[NcFolderTreeViewSet][mkdir] 创建文件夹 ncPath=%s",
             new_nc_path,
         )
+        # 为此挂载点下所有「受限写权限用户」（因其他子目录写规则被加入 DEPT_ADMIN）
+        # 在新建目录上入队 READ-only 屏蔽。
+        # NC ACL 不级联：新建目录无显式 ACL 时，DEPT_ADMIN 用户将默认回退到 grant=31（全权）。
+        _nc_mount_point = new_nc_path.split("/")[0]
+        _write_rules = [
+            _r
+            for _r in NcFileAccessRule.objects.filter(
+                nc_path__startswith=_nc_mount_point + "/",
+                status=True,
+            ).select_related("user")
+            if _r.permission_bits & NcFileAccessRule.PERM_WRITE
+        ]
+        if _write_rules:
+            _last_id = (
+                NcSyncTask.objects.order_by("-id").values_list("id", flat=True).first() or 0
+            )
+            for _write_rule in _write_rules:
+                # 若该用户的写规则路径是新建目录的祖先（含等于），无需屏蔽
+                if (
+                    new_nc_path.startswith(_write_rule.nc_path + "/")
+                    or new_nc_path == _write_rule.nc_path
+                ):
+                    continue
+                NcSyncService.enqueue_restrict_folder_root(new_nc_path, _write_rule.user.username)
+            NcSyncService._flush_tasks_after(_last_id)
         return drf_ok({"message": f"文件夹 '{folder_name}' 创建成功", "ncPath": new_nc_path})
 
     # ------------------------------------------------------------------ #
@@ -527,7 +552,6 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
                 }
             ]
         """
-        from api_v1.models.system.user_profile import UserProfile
 
         # 取有权管理的活跃用户（部门管理员只能看自身部门及子部门的用户）
         allowed = _get_caller_dept_ids(request.user)
@@ -699,16 +723,16 @@ def _enqueue_acl_for_rule(rule: NcFileAccessRule, nc_group: NcGroup) -> None:
         #   DEPT_ADMIN 群组上限 = FULL(31) → ACL perms 才能真正生效
         # 因此：有写需求（permission_bits 含 WRITE bit）的用户必须加入 DEPT_ADMIN 群组。
         if rule.permission_bits & NcFileAccessRule.PERM_WRITE:
-            dept_admin_ng = NcGroup.objects.filter(
-                group_type=NcGroupType.DEPT_ADMIN,
-                dept_id=nc_group.dept_id,
-            ).first()
-            group_to_join = dept_admin_ng or dept_ng  # 无 DEPT_ADMIN 记录时降级到 DEPT
-            # DEPT_ADMIN 群组授权覆盖整个文件夹树（grant=31）。
-            # 若规则不是根目录本身，必须在根目录设置 READ-only 限制基线，
-            # 防止其他没有显式 ACL 的子目录被防透全权。
+            # nc_group 本身就是该部门的 DEPT_ADMIN 群组（已由 _resolve_dept_admin_group 的 group_type 过滤保证）
+            group_to_join = nc_group
             mount_point = rule.nc_path.split("/")[0]
             if mount_point != rule.nc_path:
+                # NC Group Folder Advanced Permissions 规则不级联（not cascading）：
+                # 对某路径设置的 ACL 仅对该路径本身生效，不会自动继承到子目录。
+                # 必须对每个同级兄弟目录显式入队 READ-only 屏蔽，
+                # 防止 DEPT_ADMIN grant=31 通过未显式设置 ACL 的路径渗透到未授权区域。
+                NcSyncService.enqueue_sibling_read_blocks(rule, mount_point)
+                # 同时对挂载点根目录本身设置 READ-only（防止用户在根目录直接创建文件/文件夹）
                 NcSyncService.enqueue_restrict_folder_root(mount_point, rule.user.username)
         else:
             group_to_join = dept_ng

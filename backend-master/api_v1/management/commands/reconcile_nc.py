@@ -514,9 +514,11 @@ class Command(BaseCommand):
                                 _dept_admin_ng_by_dept.get(dept_ng_for_rule.dept_id)
                                 or dept_ng_for_rule
                             )
-                            # 在根目录设置 READ-only 限制基线，防止 DEPT_ADMIN 全权滲透到整个文件夹树
-                            # 仅当规则不是根目录本身时（根目录规则就是授权依据，无需额外限制）
+                            # NC Group Folder ACL 不级联：必须对每个同级兄弟目录显式入队
+                            # READ-only 屏蔽，防止 DEPT_ADMIN grant=31 渗透到未授权路径。
+                            # 同时对挂载点根目录本身设置 READ-only 基线。
                             if mount_point != rule.nc_path:
+                                NcSyncService.enqueue_sibling_read_blocks(rule, mount_point)
                                 NcSyncService.enqueue_restrict_folder_root(
                                     mount_point, rule.user.username
                                 )

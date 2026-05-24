@@ -311,15 +311,15 @@ class NcSyncService:
 
     @staticmethod
     def enqueue_restrict_folder_root(mount_point: str, username: str) -> NcSyncTask:
-        """(入队：在 Group Folder 根目录为指定用户设置 READ-only 限制。
+        """入队：对指定 NC 路径为用户设置 READ-only ACL 屏蔽（mask=31, perms=READ）。
 
-        NC Group Folder ACL 只能「向下限制」权限。当用户被加入 DEPT_ADMIN 群组
-        （grant=31）以便在某子路径获得写权限时，若不射击根目录的限制 ACL，
-        群组授权会淹透到整个文件夹树。此方法在根目录设置 mask=31, permissions=READ，
-        使其他没有显式 ACL 的子路径继承只读基线；子路径上的显式 ACL 规则会覆盖此继承值。
+        注意：NC Group Folder Advanced Permissions 规则不级联（not cascading）——
+        在某路径设置的 ACL 规则仅对该路径本身生效，不会自动继承到子目录。
+        此方法主要用于对挂载点根目录设置 READ-only 基线（防止在根目录直接创建文件），
+        对兄弟目录的批量屏蔽请使用 enqueue_sibling_read_blocks。
 
         Args:
-            mount_point (str): Group Folder 挂载点名称（不含首尾斜杠）。
+            mount_point (str): 目标路径（通常为 Group Folder 挂载点，不含首尾斜杠）。
             username (str): NC 用户名（Django User.username）。
 
         Returns:
@@ -336,6 +336,81 @@ class NcSyncService:
                 "mask": 31,
             },
         )
+
+    @classmethod
+    def enqueue_sibling_read_blocks(cls, rule: "NcFileAccessRule", mount_point: str) -> int:
+        """为写权限规则在各祖先层级的兄弟目录逐一入队 READ-only 屏蔽任务。
+
+        NC Group Folder Advanced Permissions (ACL) 不级联：对某路径设置的 ACL 规则
+        仅对该路径本身生效，不会自动继承到任何子目录。因此将用户加入 DEPT_ADMIN
+        （grant=31）后，所有未显式设置 ACL 的兄弟/同级目录均会回退到群组 grant=31
+        （全权），造成权限泄漏。此方法的修复逻辑如下：
+
+            从挂载点根到 rule.nc_path 的直接父目录，逐层 PROPFIND 获取子目录列表；
+            对每层中所有「不在规则路径方向上」的兄弟目录，入队
+            SET_PATH_ACL（mask=31, perms=READ），显式将该兄弟目录限制为只读。
+
+        示例（rule.nc_path = "技术部/项目X"）：
+            PROPFIND "技术部/" → 子目录 [项目X, 报表, 共享]
+            入队 READ 屏蔽：技术部/报表、技术部/共享
+
+        Args:
+            rule (NcFileAccessRule): 当前写权限规则（rule.nc_path 为授权目标路径）。
+            mount_point (str): Group Folder 挂载点名称（不含首尾斜杠）。
+
+        Returns:
+            int: 成功入队的屏蔽任务数量（PROPFIND 失败时对应层级跳过，不计入）。
+        """
+        from api_v1.services.nc.nc_api_client import NcApiClient  # noqa: PLC0415
+        try:
+            client = NcApiClient.from_settings()
+        except Exception as exc:
+            logger.warning(
+                "[NcSyncService][enqueue_sibling_read_blocks] NC 客户端初始化失败，跳过兄弟目录屏蔽: %s",
+                exc,
+            )
+            return 0
+
+        path_parts = rule.nc_path.strip("/").split("/")
+        username = rule.user.username
+        count = 0
+
+        for depth in range(len(path_parts) - 1):
+            parent_nc_path = "/".join(path_parts[: depth + 1])
+            next_step = path_parts[depth + 1]
+            dav_path = f"/remote.php/dav/files/{client._admin_user}/{parent_nc_path}/"
+            try:
+                children = client.list_dav_folder(dav_path)
+            except RuntimeError as exc:
+                logger.warning(
+                    "[NcSyncService][enqueue_sibling_read_blocks] PROPFIND 失败 path=%s: %s，跳过此层级",
+                    parent_nc_path,
+                    exc,
+                )
+                continue
+
+            for child in children:
+                if child["name"] == next_step:
+                    continue
+                sibling_nc_path = f"{parent_nc_path}/{child['name']}"
+                NcSyncTask.objects.create(
+                    operation=SyncOperation.SET_PATH_ACL,
+                    payload={
+                        "rule_id": None,
+                        "nc_path": sibling_nc_path,
+                        "username": username,
+                        "permissions": NcFileAccessRule.PERM_READ,
+                        "mask": 31,
+                    },
+                )
+                count += 1
+                logger.debug(
+                    "[NcSyncService][enqueue_sibling_read_blocks] 入队 READ 屏蔽 path=%s user=%s",
+                    sibling_nc_path,
+                    username,
+                )
+
+        return count
 
     # ------------------------------------------------------------------ #
     #  高级语义方法：用户状态变更入队（供 view 层调用）                     #
