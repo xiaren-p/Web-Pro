@@ -1,12 +1,12 @@
 ﻿<template>
-  <el-container class="nc-folder-perm">
+  <div class="nc-perm-page">
     <!-- ===== 左侧：文件夹树 ===== -->
-    <el-aside width="300px" class="folder-aside">
-      <div class="aside-title">
-        <el-icon><FolderOpened /></el-icon>
-        文件夹目录
+    <div class="nc-sidebar">
+      <div class="sidebar-header">
+        <el-icon class="sidebar-icon"><FolderOpened /></el-icon>
+        <span class="sidebar-title">文件夹目录</span>
       </div>
-      <el-scrollbar class="aside-scroll">
+      <el-scrollbar class="sidebar-scroll">
         <el-tree
           ref="treeRef"
           :props="treeProps"
@@ -15,75 +15,107 @@
           lazy
           highlight-current
           :expand-on-click-node="false"
+          class="nc-tree"
           @node-click="handleNodeClick"
         >
           <template #default="{ data }">
-            <span class="node-label">
-              <el-icon><Folder /></el-icon>
-              {{ data.name }}
-              <el-icon v-if="data.hasRule" class="lock-icon"><Lock /></el-icon>
+            <span class="tree-node-label">
+              <el-icon class="node-folder-icon"><Folder /></el-icon>
+              <span class="node-name">{{ data.name }}</span>
+              <el-icon v-if="data.hasRule" class="node-lock-icon"><Lock /></el-icon>
             </span>
           </template>
         </el-tree>
       </el-scrollbar>
-    </el-aside>
+    </div>
 
     <!-- ===== 右侧：权限面板 ===== -->
-    <el-main class="perm-panel">
-      <!-- 未选中状态 -->
-      <div v-if="!activeNode" class="empty-hint">
+    <div class="nc-main">
+      <!-- 未选中 -->
+      <div v-if="!activeNode" class="main-empty">
         <el-empty description="点击左侧文件夹查看权限配置" :image-size="80" />
       </div>
 
-      <!-- 根节点正在加载 ncPath -->
-      <div v-else-if="!activeNode.ncPath" class="empty-hint">
-        <el-empty description="正在加载目录信息…" :image-size="80" />
+      <!-- 根节点加载中 -->
+      <div v-else-if="!activeNode.ncPath" class="main-empty">
+        <el-empty description="正在加载目录信息…" :image-size="60" />
       </div>
 
       <!-- 已选中具体路径 -->
       <template v-else>
-        <!-- 路径面包屑 + 操作按钮 -->
-        <div class="perm-header">
-          <el-breadcrumb separator="/" class="path-breadcrumb">
-            <el-breadcrumb-item v-for="(seg, i) in pathSegments" :key="i">
-              {{ seg }}
-            </el-breadcrumb-item>
-          </el-breadcrumb>
-          <div class="header-btns">
-            <el-button v-hasPerm="['nc:folder:mkdir']" size="small" @click="openMkdir">新建子目录</el-button>
-            <el-button v-hasPerm="['nc:folder:setperm']" size="small" type="primary" @click="openAddRule">+ 添加规则</el-button>
+        <!-- 顶部 header -->
+        <div class="main-header">
+          <div class="path-info">
+            <div class="path-label">当前路径</div>
+            <div class="path-crumbs">
+              <template v-for="(seg, i) in pathSegments" :key="i">
+                <span v-if="i > 0" class="crumb-sep">/</span>
+                <span class="crumb-item" :class="{ 'crumb-last': i === pathSegments.length - 1 }">
+                  {{ seg }}
+                </span>
+              </template>
+            </div>
+          </div>
+          <div class="header-actions">
+            <el-button v-hasPerm="['nc:folder:mkdir']" :icon="FolderAdd" @click="openMkdir">
+              新建子目录
+            </el-button>
+            <el-button v-hasPerm="['nc:folder:setperm']" type="primary" :icon="Plus" @click="openAddRule">
+              添加规则
+            </el-button>
           </div>
         </div>
 
         <!-- 规则表格 -->
-        <el-table v-loading="rulesLoading" :data="rules" border size="small">
-          <el-table-column label="用户" min-width="200">
+        <el-table
+          v-loading="rulesLoading"
+          :data="rules"
+          class="perm-table"
+          :header-cell-style="{ background: '#f5f7fa', color: '#606266', fontWeight: '600', fontSize: '13px' }"
+        >
+          <el-table-column label="用户" min-width="220">
             <template #default="{ row }: { row: FolderRuleVO }">
-              <span class="user-cell">
-                <span class="user-name">{{ row.username }}</span>
-                <span v-if="row.userNickname !== row.username" class="user-nick">
-                  {{ row.userNickname }}
-                </span>
-                <el-tag v-if="row.deptName" type="info" size="small" class="dept-tag">
-                  {{ row.deptName }}
-                </el-tag>
-              </span>
+              <div class="user-cell">
+                <div class="user-avatar" :style="{ background: avatarColor(row.username) }">
+                  {{ row.username.charAt(0).toUpperCase() }}
+                </div>
+                <div class="user-info">
+                  <div class="user-main">
+                    <span class="user-name">{{ row.username }}</span>
+                    <span v-if="row.userNickname !== row.username" class="user-nick">
+                      {{ row.userNickname }}
+                    </span>
+                  </div>
+                  <div v-if="row.deptName" class="dept-chip">
+                    {{ row.deptName }}
+                  </div>
+                </div>
+              </div>
             </template>
           </el-table-column>
-          <el-table-column label="权限" min-width="160">
+
+          <el-table-column label="权限" min-width="240">
             <template #default="{ row }: { row: FolderRuleVO }">
-              <el-tag v-for="lbl in row.permLabels" :key="lbl" size="small" class="mr-1">
-                {{ lbl }}
-              </el-tag>
+              <div class="perm-badges">
+                <span
+                  v-for="lbl in row.permLabels"
+                  :key="lbl"
+                  class="perm-badge"
+                  :class="`perm-badge--${lbl.toLowerCase()}`"
+                >{{ lbl }}</span>
+              </div>
             </template>
           </el-table-column>
-          <el-table-column label="状态" width="80" align="center">
+
+          <el-table-column label="状态" width="90" align="center">
             <template #default="{ row }: { row: FolderRuleVO }">
-              <el-tag :type="row.status ? 'success' : 'info'" size="small">
-                {{ row.status ? "生效" : "停用" }}
-              </el-tag>
+              <div class="status-wrap">
+                <span class="status-dot" :class="row.status ? 'status-dot--on' : 'status-dot--off'" />
+                <span class="status-text">{{ row.status ? "生效" : "停用" }}</span>
+              </div>
             </template>
           </el-table-column>
+
           <el-table-column label="操作" width="120" align="center" fixed="right">
             <template #default="{ row }: { row: FolderRuleVO }">
               <el-button v-hasPerm="['nc:folder:setperm']" link type="primary" size="small" @click="openEditRule(row)">
@@ -96,38 +128,35 @@
           </el-table-column>
         </el-table>
 
-        <div v-if="!rulesLoading && rules.length === 0" class="no-rules">
-          该目录暂无 ACL 规则，点击「添加规则」配置访问权限
+        <div v-if="!rulesLoading && rules.length === 0" class="no-rules-hint">
+          <el-icon><InfoFilled /></el-icon>
+          该目录暂无 ACL 规则，点击「添加规则」开始配置访问权限
         </div>
       </template>
-    </el-main>
+    </div>
 
     <!-- ===== 规则编辑弹窗 ===== -->
     <el-dialog
       v-model="ruleDialog.visible"
       :title="ruleDialog.ruleId ? '编辑权限规则' : '添加权限规则'"
-      width="500px"
+      width="520px"
       :close-on-click-modal="false"
     >
-      <el-form :model="ruleForm" label-width="80px">
+      <el-form :model="ruleForm" label-width="80px" class="rule-form">
         <!-- 用户选择器（仅新增时可选；编辑时展示只读信息） -->
         <el-form-item label="目标用户">
           <template v-if="ruleDialog.ruleId">
-            <span class="readonly-user">
-              {{ ruleForm.selectedUserLabel || "—" }}
-            </span>
+            <span class="readonly-user">{{ ruleForm.selectedUserLabel || "—" }}</span>
           </template>
           <template v-else>
-            <!-- 搜索输入 -->
             <el-input
               v-model="userSearchQuery"
-              placeholder="搜索用户名/昵称"
+              placeholder="搜索用户名 / 昵称"
               clearable
               prefix-icon="Search"
               size="small"
-              style="margin-bottom: 6px"
+              style="margin-bottom: 8px"
             />
-            <!-- 部门-用户树 -->
             <div class="user-tree-wrap">
               <el-tree
                 ref="userTreeRef"
@@ -202,12 +231,15 @@
     <el-dialog
       v-model="mkdirDialog.visible"
       title="新建子目录"
-      width="420px"
+      width="440px"
       :close-on-click-modal="false"
     >
-      <el-form label-width="80px">
+      <el-form label-width="80px" class="rule-form">
         <el-form-item label="父目录">
-          <span class="text-sm text-gray-500">{{ activeNode?.ncPath || "/" }}</span>
+          <div class="mkdir-parent-path">
+            <el-icon><Folder /></el-icon>
+            {{ activeNode?.ncPath || "/" }}
+          </div>
         </el-form-item>
         <el-form-item label="文件夹名">
           <el-input
@@ -229,7 +261,7 @@
         </el-button>
       </template>
     </el-dialog>
-  </el-container>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -241,7 +273,7 @@ import type { FolderRuleVO, UserTreeDept, UserTreeUser } from "@/api/nc/folderTr
 
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Folder, FolderOpened, Lock, OfficeBuilding, User } from "@element-plus/icons-vue";
+import { Folder, FolderAdd, FolderOpened, InfoFilled, Lock, OfficeBuilding, Plus, User } from "@element-plus/icons-vue";
 
 import {
   batchSetFolderRules,
@@ -269,6 +301,21 @@ interface FolderTreeNode {
 type UserTreeNode =
   | (UserTreeDept & { nodeKey: string; children: UserTreeNode[] })
   | (UserTreeUser & { nodeKey: string });
+
+// ─── 头像颜色（根据用户名 hash 稳定取色）────────────────────────────────────────
+
+/**
+ * 根据用户名哈希值返回固定的头像背景颜色。
+ *
+ * @param {string} name - 用户名
+ * @returns {string} CSS 颜色字符串
+ */
+function avatarColor(name: string): string {
+  const palette = ['#1677ff', '#52c41a', '#fa8c16', '#722ed1', '#13c2c2', '#eb2f96', '#2f54eb'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return palette[Math.abs(hash) % palette.length];
+}
 
 // ─── 文件夹树 ─────────────────────────────────────────────────────────────────
 
@@ -558,7 +605,15 @@ async function submitMkdir(): Promise<void> {
   try {
     await createFolder({ groupId: node.groupId, parentPath, folderName: mkdirForm.name.trim() });
     mkdirDialog.visible = false;
-    ElMessage.success("文件夹已创建，请重新展开父目录查看");
+    ElMessage.success("文件夹已创建");
+    // 自动刷新：强制重载当前树节点的子目录列表
+    const treeNode = treeRef.value?.getNode(node.key);
+    if (treeNode) {
+      treeNode.loaded = false;
+      treeNode.expanded = false;
+      await nextTick();
+      treeNode.expand();
+    }
   } catch {
     ElMessage.error("创建失败");
   } finally {
@@ -568,107 +623,238 @@ async function submitMkdir(): Promise<void> {
 </script>
 
 <style scoped lang="scss">
-.nc-folder-perm {
+// ─── 整体布局 ──────────────────────────────────────────────────────────────────
+
+.nc-perm-page {
+  display: flex;
   height: calc(100vh - 120px);
-  border: 1px solid var(--el-border-color);
-  border-radius: 4px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-lighter);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
-.folder-aside {
+// ─── 左侧侧边栏 ────────────────────────────────────────────────────────────────
+
+.nc-sidebar {
+  width: 240px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--el-border-color);
+  border-right: 1px solid var(--el-border-color-lighter);
+  background: #fafbfc;
   overflow: hidden;
 }
 
-.aside-title {
+.sidebar-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 12px 16px;
-  font-weight: 600;
-  font-size: 14px;
-  border-bottom: 1px solid var(--el-border-color);
-  background: var(--el-fill-color-light);
+  gap: 8px;
+  padding: 16px 18px;
+  background: #fff;
+  border-bottom: 1px solid var(--el-border-color-lighter);
   flex-shrink: 0;
 }
 
-.aside-scroll {
+.sidebar-icon {
+  color: var(--el-color-primary);
+  font-size: 17px;
+}
+
+.sidebar-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.sidebar-scroll {
   flex: 1;
 
   :deep(.el-scrollbar__wrap) {
     overflow-x: hidden;
   }
+}
 
-  :deep(.el-tree) {
-    padding: 8px 0;
+// 文件夹树样式
+.nc-tree {
+  background: transparent;
+  padding: 6px 0;
+
+  :deep(.el-tree-node__content) {
+    height: 38px;
+    border-radius: 6px;
+    margin: 1px 8px;
+    padding-right: 8px;
+
+    &:hover {
+      background: rgba(64, 158, 255, 0.08);
+    }
+  }
+
+  :deep(.el-tree-node.is-current > .el-tree-node__content) {
+    background: rgba(64, 158, 255, 0.12);
+    color: var(--el-color-primary);
+    font-weight: 500;
   }
 }
 
-.node-label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-}
-
-.lock-icon {
-  color: var(--el-color-warning);
-  font-size: 12px;
-}
-
-.perm-panel {
-  padding: 16px;
-  overflow-y: auto;
-}
-
-.empty-hint {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-}
-
-.perm-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-}
-
-.path-breadcrumb {
-  font-size: 14px;
-}
-
-.header-btns {
-  display: flex;
-  gap: 8px;
-}
-
-.no-rules {
-  margin-top: 12px;
-  padding: 16px;
-  text-align: center;
-  color: var(--el-text-color-placeholder);
-  font-size: 13px;
-  background: var(--el-fill-color-lighter);
-  border-radius: 4px;
-}
-
-// 规则表格 - 用户列
-.user-cell {
+.tree-node-label {
   display: flex;
   align-items: center;
   gap: 6px;
+  font-size: 13px;
+  min-width: 0;
+
+  .node-folder-icon {
+    color: #faad14;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .node-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .node-lock-icon {
+    color: var(--el-color-primary);
+    font-size: 12px;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+}
+
+// ─── 右侧主面板 ────────────────────────────────────────────────────────────────
+
+.nc-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.main-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// 顶部 header
+.main-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.path-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.path-label {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 500;
+}
+
+.path-crumbs {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
+  gap: 2px;
+}
+
+.crumb-item {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--el-text-color-secondary);
+
+  &.crumb-last {
+    color: var(--el-text-color-primary);
+    font-weight: 600;
+  }
+}
+
+.crumb-sep {
+  margin: 0 4px;
+  color: var(--el-text-color-placeholder);
+  font-weight: 400;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+// ─── 表格 ──────────────────────────────────────────────────────────────────────
+
+.perm-table {
+  flex: 1;
+  padding: 0 24px 16px;
+  overflow: auto;
+
+  :deep(.el-table__row:hover > td) {
+    background: #f5f9ff !important;
+  }
+
+  :deep(.el-table__inner-wrapper::before) {
+    display: none; // 去掉底部分隔线
+  }
+}
+
+// 用户单元格
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  letter-spacing: 0;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.user-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .user-name {
-  font-weight: 500;
   font-size: 13px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
 }
 
 .user-nick {
@@ -676,18 +862,139 @@ async function submitMkdir(): Promise<void> {
   color: var(--el-text-color-secondary);
 }
 
-.dept-tag {
+.dept-chip {
+  display: inline-block;
+  padding: 0 6px;
+  height: 18px;
+  line-height: 18px;
   font-size: 11px;
+  border-radius: 3px;
+  background: #f0f5ff;
+  border: 1px solid #adc6ff;
+  color: #2f54eb;
+  white-space: nowrap;
+}
+
+// 权限徽章
+.perm-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.perm-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+
+  &--read {
+    background: #e6f4ff;
+    color: #1677ff;
+  }
+
+  &--write {
+    background: #fff7e6;
+    color: #d46b08;
+  }
+
+  &--create {
+    background: #f6ffed;
+    color: #389e0d;
+  }
+
+  &--delete {
+    background: #fff1f0;
+    color: #cf1322;
+  }
+
+  &--share {
+    background: #f9f0ff;
+    color: #531dab;
+  }
+}
+
+// 状态指示
+.status-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  &--on {
+    background: #52c41a;
+    box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.2);
+  }
+
+  &--off {
+    background: #bfbfbf;
+  }
+}
+
+.status-text {
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+}
+
+// 无规则提示
+.no-rules-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 24px 16px;
+  padding: 14px 18px;
+  background: #fafafa;
+  border-radius: 6px;
+  border: 1px dashed var(--el-border-color);
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+
+  .el-icon {
+    color: var(--el-text-color-placeholder);
+    flex-shrink: 0;
+  }
+}
+
+// ─── 弹窗表单 ──────────────────────────────────────────────────────────────────
+
+.rule-form {
+  :deep(.el-form-item__label) {
+    font-size: 13px;
+  }
+}
+
+.mkdir-parent-path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  padding: 6px 10px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 4px;
+  width: 100%;
+  word-break: break-all;
 }
 
 // 规则弹窗 - 用户树
 .user-tree-wrap {
   border: 1px solid var(--el-border-color);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 4px 0;
   max-height: 240px;
   overflow-y: auto;
   width: 100%;
+  background: #fafafa;
 
   :deep(.el-tree-node__content) {
     height: 30px;
