@@ -9,7 +9,7 @@ import os
 import uuid
 from datetime import datetime, timedelta
 
-from django.db.models import Q
+from django.db.models import Q, Case, When, IntegerField, Value
 from django.contrib.auth.models import User
 from django.conf import settings
 from django.core.files.storage import default_storage
@@ -189,7 +189,16 @@ class UserViewSet(viewsets.ViewSet):
             if level == AdminLevel.COMPANY_ADMIN:
                 pass
             elif level == AdminLevel.DEPT_ADMIN:
-                pass  # 部门管理员可查看全部用户列表（写操作仍限制在本部门，见 _dept_subtree）
+                # 本部门用户优先展示（可编辑），其余按部门+用户名排列
+                _own_dept = _profile.dept_id if _profile else None
+                if _own_dept:
+                    qs = qs.annotate(
+                        _dept_priority=Case(
+                            When(profile__dept_id=_own_dept, then=Value(0)),
+                            default=Value(1),
+                            output_field=IntegerField(),
+                        )
+                    ).order_by("_dept_priority", "profile__dept__name", "username")
             else:
                 qs = qs.filter(pk=req_user.id)
         total, items, _, _ = paginate_queryset(request, qs)
@@ -562,17 +571,10 @@ class UserViewSet(viewsets.ViewSet):
             profile.avatar = new_url
             profile.save(update_fields=["avatar"])
 
-        # ⑤ NC 实时头像同步（用户级凭据，失败仅记录 WARNING 不阻断响应）
+        # ⑥ NC 头像同步（管理员级 OCS API，不依赖 nc_app_password，失败仅记录 WARNING 不阻断响应）
         try:
-            nc_password = profile.get_nc_password() if profile else ""
-            if nc_password:
-                user_nc_client = NcApiClient.for_user(user.username, nc_password)
-                user_nc_client.upload_own_avatar(resized_bytes, "image/jpeg")
-            else:
-                logger.info(
-                    "[UserViewSet][upload_avatar] 用户无 NC 应用密码，跳过 NC 头像同步: user=%s",
-                    user.username,
-                )
+            nc_admin = NcApiClient.from_settings()
+            nc_admin.update_user_avatar(user.username, resized_bytes, "image/jpeg")
         except Exception as exc:
             logger.warning(
                 "[UserViewSet][upload_avatar] NC 头像同步失败（不阻断）: user=%s err=%s",

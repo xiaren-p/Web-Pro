@@ -174,8 +174,8 @@ export function setFolderRule(data: SetRuleForm): Promise<FolderRuleVO> {
  * @param {number} id NcFileAccessRule 主键
  * @returns {Promise<void>}
  */
-export function deleteFolderRule(id: number): Promise<void> {
-  return request.delete(`/nc/folder-tree/rule/${id}`);
+export function deleteFolderRule(id: number, groupId: number): Promise<void> {
+  return request.delete(`/nc/folder-tree/rule/${id}`, { params: { groupId } });
 }
 
 /**

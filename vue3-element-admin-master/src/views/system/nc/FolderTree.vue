@@ -715,7 +715,7 @@ async function handleDeleteRule(row: FolderRuleVO): Promise<void> {
     { type: "warning" }
   );
   try {
-    await deleteFolderRule(row.id);
+    await deleteFolderRule(row.id, activeNode.value!.groupId);
     await loadRules(activeNode.value!.ncPath);
     ElMessage.success("规则已删除");
   } catch {

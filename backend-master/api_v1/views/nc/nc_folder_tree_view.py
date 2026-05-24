@@ -575,12 +575,16 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
         except NcFileAccessRule.DoesNotExist:
             return drf_error("规则不存在", code=404)
 
-        # 安全校验：DEPT_ADMIN 只能删除其可管辖部门内用户的规则
-        allowed_depts = _get_caller_dept_ids(request.user)
-        if allowed_depts is not None:
-            _rule_user_dept_id = getattr(getattr(rule.user, "profile", None), "dept_id", None)
-            if _rule_user_dept_id not in allowed_depts:
-                return drf_error("无权限删除该规则", code=403)
+        # 作用域校验：通过前端传入的 groupId 确认调用方对此路径有管理权限（与 set_rule 逻辑一致）
+        group_id_str = request.query_params.get("groupId", "")
+        if not group_id_str:
+            return drf_error("缺少 groupId 参数", code=400)
+        nc_group, grp_error = _resolve_dept_admin_group(group_id_str)
+        if grp_error:
+            return drf_error(grp_error, code=400)
+        scope_error = _check_group_scope(request.user, nc_group)
+        if scope_error:
+            return drf_error(scope_error, code=403)
 
         nc_path = rule.nc_path
         username = rule.user.username
