@@ -82,10 +82,13 @@ class UserViewSet(viewsets.ViewSet):
         perms = sorted(perms_set)
 
         def abs_avatar(v: str) -> str:
-            """将相对头像路径补齐为绝对 URL。"""
+            """将相对头像路径补齐为绝对 URL。预设头像标识符原样透传，不补 URL。"""
             try:
                 if not v:
                     return getattr(settings, "DEFAULT_AVATAR_URL", "") or ""
+                # 预设头像标识符（如 preset:06）是前端离线 SVG，不需要补绝对路径
+                if str(v).startswith("preset:"):
+                    return v
                 if str(v).startswith(("http://", "https://")):
                     return v
                 base = settings.MEDIA_URL.rstrip("/")
