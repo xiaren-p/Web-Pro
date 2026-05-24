@@ -17,20 +17,32 @@
         <el-card class="user-card">
           <div class="user-info">
             <div class="avatar-wrapper">
-              <el-avatar :src="userStore.userInfo.avatar" :size="100" />
+              <el-avatar :src="resolveAvatarSrc(userStore.userInfo.avatar)" :size="100" />
               <el-button
                 type="info"
-                class="avatar-edit-btn"
+                class="avatar-edit-btn upload-btn"
                 circle
                 :icon="Camera"
                 size="small"
+                :disabled="uploading"
+                title="上传自定义头像"
                 @click="triggerFileUpload"
+              />
+              <el-button
+                type="info"
+                class="avatar-edit-btn preset-btn"
+                circle
+                :icon="Picture"
+                size="small"
+                :disabled="uploading"
+                title="选择预设头像"
+                @click="presetDialogVisible = true"
               />
               <input
                 ref="fileInput"
                 type="file"
                 style="display: none"
-                accept="image/*"
+                accept=".jpg,.jpeg,.png,.webp"
                 @change="handleFileChange"
               />
             </div>
@@ -231,15 +243,44 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 头像裁剪弹窗 -->
+    <avatar-cropper
+      v-model="cropperVisible"
+      :src-url="cropperSrcUrl"
+      @confirm="handleCropConfirm"
+      @cancel="handleCropCancel"
+    />
+
+    <!-- 预设头像选择弹窗 -->
+    <el-dialog v-model="presetDialogVisible" title="选择预设头像" :width="480">
+      <div class="preset-grid">
+        <div
+          v-for="preset in allPresets"
+          :key="preset.id"
+          class="preset-item"
+          :class="{ active: userProfile.avatar === preset.id, selecting: selectingPreset }"
+          @click="handleSelectPreset(preset.id)"
+        >
+          <el-avatar :src="preset.dataUri" :size="72" />
+          <span v-if="userProfile.avatar === preset.id" class="preset-check">✓</span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="presetDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { UserAPI } from "@/api/user";
 import { useUserStoreHook } from "@/store";
-import { Camera, Edit, Male, Female } from "@element-plus/icons-vue";
+import { Camera, Edit, Male, Female, Picture } from "@element-plus/icons-vue";
 import { ref, reactive, onMounted } from "vue";
 import { ElLoading, ElMessage } from "element-plus";
+import AvatarCropper from "@/components/AvatarCropper/index.vue";
+import { resolveAvatarSrc, getAllPresets } from "@/utils/avatarPresets";
 
 // 本地类型定义
 interface UserProfileVO {
@@ -487,47 +528,109 @@ const handleCancel = () => {
 const fileInput = ref<HTMLInputElement | null>(null);
 const uploading = ref(false);
 
+// 裁剪弹窗状态
+const cropperVisible = ref(false);
+const cropperSrcUrl = ref("");
+let cropperObjectUrl = ""; // createObjectURL 引用，需主动释放
+
+// 预设头像选择
+const presetDialogVisible = ref(false);
+const allPresets = getAllPresets();
+const selectingPreset = ref(false);
+
 const triggerFileUpload = () => {
   if (uploading.value) return;
   fileInput.value?.click();
 };
 
-const handleFileChange = async (e: Event) => {
+/**
+ * 选择文件后打开裁剪弹窗（不直接上传原图）。
+ * 前端白名单校验：仅允许 JPG / PNG / WEBP，最大 5MB。
+ *
+ * @param {Event} e - input[type=file] change 事件。
+ */
+const handleFileChange = (e: Event) => {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
-  if (!file.type.startsWith("image/")) {
-    ElMessage.error("请选择图片文件");
+
+  const allowed = ["image/jpeg", "image/png", "image/webp"];
+  if (!allowed.includes(file.type)) {
+    ElMessage.error("仅支持 JPG、PNG、WEBP 格式图片");
     input.value = "";
     return;
   }
-  if (file.size > 2 * 1024 * 1024) {
-    ElMessage.error("图片大小不能超过 2MB");
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.error("图片大小不能超过 5MB");
     input.value = "";
     return;
   }
-  let loadingSvc: any = null;
+
+  // 创建 Object URL 传入裁剪弹窗（弹窗关闭后统一释放）
+  if (cropperObjectUrl) URL.revokeObjectURL(cropperObjectUrl);
+  cropperObjectUrl = URL.createObjectURL(file);
+  cropperSrcUrl.value = cropperObjectUrl;
+  cropperVisible.value = true;
+  input.value = "";
+};
+
+/**
+ * 裁剪确认回调：将裁剪后 Blob 上传至服务端。
+ * 服务端 upload_avatar 已原子化写 DB，此处无需再调 updateProfile。
+ *
+ * @param {{ blob: Blob; dataUrl: string }} payload - 裁剪结果。
+ */
+const handleCropConfirm = async (payload: { blob: Blob; dataUrl: string }) => {
+  let loadingSvc: { close(): void } | null = null;
   try {
     uploading.value = true;
     loadingSvc = ElLoading.service({ text: "上传中...", background: "rgba(0,0,0,0.3)" });
-    const res: any = await UserAPI.uploadAvatar(file);
-    const url = res?.url || (res && (res as any).data && (res as any).data.url) || "";
-    if (url) userStore.userInfo.avatar = url;
-    await UserAPI.updateProfile({ avatar: url });
-    userProfile.value.avatar = url;
-    ElMessage.success("头像已更新");
-  } catch (err: any) {
-    ElMessage.error(err?.message || "上传失败");
+    const croppedFile = new File([payload.blob], "avatar.jpg", { type: "image/jpeg" });
+    const res = await UserAPI.uploadAvatar(croppedFile);
+    const url = res?.url ?? "";
+    if (url) {
+      userStore.userInfo.avatar = url;
+      userProfile.value.avatar = url;
+      ElMessage.success("头像已更新");
+    }
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : "上传失败");
   } finally {
     uploading.value = false;
-    input.value = "";
-    if (loadingSvc) {
-      try {
-        loadingSvc.close();
-      } catch {
-        // ignore
-      }
+    loadingSvc?.close();
+    if (cropperObjectUrl) {
+      URL.revokeObjectURL(cropperObjectUrl);
+      cropperObjectUrl = "";
     }
+  }
+};
+
+/** 裁剪取消：释放 Object URL。 */
+const handleCropCancel = () => {
+  if (cropperObjectUrl) {
+    URL.revokeObjectURL(cropperObjectUrl);
+    cropperObjectUrl = "";
+  }
+};
+
+/**
+ * 选择预设头像：直接调 updateProfile，更新 DB 和本地 store。
+ *
+ * @param {string} presetId - 预设标识符，如 'preset:03'。
+ */
+const handleSelectPreset = async (presetId: string) => {
+  if (selectingPreset.value) return;
+  selectingPreset.value = true;
+  try {
+    await UserAPI.updateProfile({ avatar: presetId });
+    userProfile.value.avatar = presetId;
+    userStore.userInfo.avatar = presetId;
+    presetDialogVisible.value = false;
+    ElMessage.success("头像已更新");
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : "更新失败");
+  } finally {
+    selectingPreset.value = false;
   }
 };
 
@@ -594,7 +697,6 @@ onMounted(async () => {
 
       .avatar-edit-btn {
         position: absolute;
-        right: 0;
         bottom: 0;
         background: rgba(0, 0, 0, 0.5);
         border: none;
@@ -602,6 +704,14 @@ onMounted(async () => {
 
         &:hover {
           background: rgba(0, 0, 0, 0.7);
+        }
+
+        &.upload-btn {
+          right: 0;
+        }
+
+        &.preset-btn {
+          left: 0;
         }
       }
     }
@@ -726,6 +836,51 @@ onMounted(async () => {
   .el-dialog__footer {
     padding: 20px;
     border-top: 1px solid var(--el-border-color-light);
+  }
+}
+
+.preset-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: flex-start;
+  padding: 8px 0;
+
+  .preset-item {
+    position: relative;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.08);
+    }
+
+    &.active {
+      outline: 3px solid var(--el-color-primary);
+      outline-offset: 2px;
+    }
+
+    &.selecting {
+      cursor: wait;
+      pointer-events: none;
+    }
+
+    .preset-check {
+      position: absolute;
+      right: -2px;
+      bottom: -2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--el-color-primary);
+      border-radius: 50%;
+    }
   }
 }
 

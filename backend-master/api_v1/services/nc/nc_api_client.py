@@ -275,6 +275,50 @@ class NcApiClient:
         logger.info("[NcApiClient][update_user_display_name] username=%s", username)
         self._put(f"/ocs/v1.php/cloud/users/{username}", {"key": "displayname", "value": display_name})
 
+    def update_user_avatar(
+        self,
+        username: str,
+        image_bytes: bytes,
+        mime_type: str = "image/jpeg",
+    ) -> None:
+        """为 NC 用户上传/更新头像图片。
+
+        使用 NC OCS Provisioning API 的头像端点（NC 25+ admin 可为任意用户设置头像）。
+        若 NC 版本不支持或权限不足，此方法会抛出 RuntimeError，调用方应捕获并以
+        WARNING 级别记录，不阻断主业务流程。
+
+        NC 头像 API 说明：
+          POST /ocs/v1.php/cloud/users/{userId}/avatar
+          Content-Type: multipart/form-data，字段名 'data'
+
+        Args:
+            username (str): NC 用户名（与 Django username 一致）。
+            image_bytes (bytes): 头像图片二进制（建议 512×512 JPEG，已完成压缩）。
+            mime_type (str): 图片 MIME 类型，默认 image/jpeg。
+
+        Raises:
+            RuntimeError: NC 返回 HTTP 错误或连接超时时抛出。
+        """
+        import io as _io
+
+        _ext_map = {
+            "image/jpeg": "avatar.jpg",
+            "image/png": "avatar.png",
+            "image/webp": "avatar.webp",
+        }
+        filename = _ext_map.get(mime_type, "avatar.jpg")
+        path = f"/ocs/v1.php/cloud/users/{username}/avatar"
+        url = f"{self._base}{path}"
+        files = {"data": (filename, _io.BytesIO(image_bytes), mime_type)}
+        try:
+            resp = self._session.post(url, files=files, verify=self._verify, timeout=20)
+            resp.raise_for_status()
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"[NcApiClient][update_user_avatar] username={username} 同步失败: {exc}"
+            ) from exc
+        logger.info("[NcApiClient][update_user_avatar] username=%s 头像同步成功", username)
+
     def disable_user(self, username: str) -> None:
         """禁用 NC 用户（账号保留，仅禁止登录）。
 

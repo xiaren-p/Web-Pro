@@ -24,7 +24,10 @@ from api_v1.models.system.user_profile import AdminLevel
 from api_v1.serializers import UserSerializer
 from api_v1.utils.responses import drf_ok, drf_error
 from api_v1.utils.pagination import paginate_queryset
+from api_v1.utils.image_validator import validate_image_file, resize_image_to_square
+from api_v1.utils.avatar_presets import get_random_preset, is_local_upload
 from api_v1.services.nc.nc_sync_service import NcSyncService
+from api_v1.services.nc.nc_api_client import NcApiClient
 
 logger = logging.getLogger(__name__)
 
@@ -193,8 +196,8 @@ class UserViewSet(viewsets.ViewSet):
         email = payload.get("email") or ""
         nickname = payload.get("nickname") or ""
         mobile = payload.get("mobile") or ""
-        # 若未显式传入 avatar，使用 settings.DEFAULT_AVATAR_URL
-        avatar = payload.get("avatar") or getattr(settings, 'DEFAULT_AVATAR_URL', '') or ""
+        # 若未显式传入 avatar，随机分配系统预设头像（格式 'preset:01'~'preset:12'）
+        avatar = payload.get("avatar") or get_random_preset()
         dept_id = payload.get("deptId")
         status_num = payload.get("status", 1)
         gender = payload.get("gender")
@@ -458,45 +461,78 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="avatar")
     def upload_avatar(self, request):
-        """上传头像，仅用于用户头像，不恢复通用文件上传模块。
+        """上传头像：三重校验 + 服务端压缩 + 原子写 DB + 旧文件清理 + NC 实时同步。
 
-        请求：multipart/form-data，字段名 file
-        响应：{ url, name, suggestCrop }
+        请求：multipart/form-data，字段名 file（JPEG / PNG / WEBP，≤5MB）
+        响应：{ url }  ——  前端拿到 url 后直接更新本地 store，无需再调 updateProfile。
         """
         user = request.user
         if not getattr(user, 'is_authenticated', False):
             return drf_error("未登录", status=401)
+
         file = request.FILES.get('file')
         if not file:
             return drf_error("未选择文件", status=400)
-        # 基本校验：仅允许图片，限制大小 2MB
-        content_type = getattr(file, 'content_type', '') or ''
-        if not content_type.startswith('image/'):
-            return drf_error("仅支持图片文件", status=400)
-        max_mb = 2
-        if getattr(file, 'size', 0) > max_mb * 1024 * 1024:
-            return drf_error(f"图片过大，不能超过 {max_mb}MB", status=400)
 
-        # 保存到本地存储
-        from datetime import datetime
+        # ① Magic Number 三重校验（替代原 content_type 单一校验）
+        try:
+            ext, _mime = validate_image_file(file, max_mb=5)
+        except ValueError as exc:
+            return drf_error(str(exc), status=400)
+
+        # ② 服务端居中裁剪 + 压缩至 512×512 JPEG
+        try:
+            resized_buf = resize_image_to_square(file, size=512)
+        except Exception as exc:
+            logger.error("[UserViewSet][upload_avatar] 图片处理失败: %s", exc, exc_info=True)
+            return drf_error("图片处理失败，请重新选择", status=400)
+
+        resized_bytes = resized_buf.read()
+        resized_buf.seek(0)
+
+        # ③ 保存压缩后的头像文件（统一存为 .jpg）
         now = datetime.utcnow()
-        ext = os.path.splitext(file.name)[1] or ''
-        if not ext:
-            ext = {
-                'image/png': '.png',
-                'image/jpeg': '.jpg',
-                'image/gif': '.gif',
-                'image/webp': '.webp',
-            }.get(content_type, '')
-        rel_path = f"uploads/avatars/{now.year:04d}/{now.month:02d}/{uuid.uuid4().hex}{ext}"
-        saved_path = default_storage.save(rel_path, file)
+        rel_path = f"uploads/avatars/{now.year:04d}/{now.month:02d}/{uuid.uuid4().hex}.jpg"
+        saved_path = default_storage.save(rel_path, resized_buf)
         media_rel = settings.MEDIA_URL.rstrip('/') + '/' + saved_path.lstrip('/')
-        url = request.build_absolute_uri(media_rel)
-        # write_log removed: 上传头像
+        new_url = request.build_absolute_uri(media_rel)
 
-        # 建议裁剪信息 & 预置缩略图（头像常用 256/128/64）
-        suggest = {"aspect": "1:1", "recommended": [256, 128, 64]}
-        return drf_ok({"url": url, "name": os.path.basename(saved_path), "suggestCrop": suggest})
+        # ④ 原子写 DB：更新 profile.avatar + 清理旧文件
+        profile = getattr(user, 'profile', None)
+        old_avatar = profile.avatar if profile else ""
+        if profile:
+            # 清理旧本地上传文件（预设/外部 URL 跳过，防止误删）
+            if is_local_upload(old_avatar):
+                try:
+                    old_rel = old_avatar
+                    # 兼容绝对 URL 格式：提取 /media/ 之后的相对路径
+                    if "/media/uploads/" in old_avatar:
+                        old_rel = old_avatar.split("/media/")[1]
+                    if default_storage.exists(old_rel):
+                        default_storage.delete(old_rel)
+                        logger.info(
+                            "[UserViewSet][upload_avatar] 已清理旧头像文件: %s", old_rel
+                        )
+                except Exception as exc:
+                    logger.warning(
+                        "[UserViewSet][upload_avatar] 旧头像清理失败（不阻断）: %s", exc
+                    )
+            profile.avatar = new_url
+            profile.save(update_fields=["avatar"])
+
+        # ⑤ NC 实时头像同步（失败仅记录 WARNING，不阻断响应）
+        try:
+            nc_client = NcApiClient.from_settings()
+            nc_client.update_user_avatar(user.username, resized_bytes, "image/jpeg")
+        except Exception as exc:
+            logger.warning(
+                "[UserViewSet][upload_avatar] NC 头像同步失败（不阻断）: user=%s err=%s",
+                user.username,
+                exc,
+            )
+
+        logger.info("[UserViewSet][upload_avatar] user=%s 头像更新成功", user.username)
+        return drf_ok({"url": new_url})
 
     # 通用精简图片上传（非头像），供富文本/普通图片组件复用
     @action(detail=False, methods=["post"], url_path="upload-image")

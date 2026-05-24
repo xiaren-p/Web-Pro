@@ -113,7 +113,7 @@ export const UserAPI = {
   uploadAvatar(file: File) {
     const form = new FormData();
     form.append("file", file);
-    return request<any, { url: string; name: string }>({
+    return request<unknown, { url: string }>({
       url: `${USER_BASE_URL}/avatar`,
       method: "post",
       data: form,
