@@ -11,7 +11,7 @@
       <!-- 阅读模式 -->
       <div class="detail-header">
         <div class="user-info">
-          <el-avatar :size="40" :src="currentDetail.avatar">
+          <el-avatar :size="40" :src="resolveAvatarSrc(currentDetail.avatar ?? '')">
             {{ (currentDetail.nickname || currentDetail.username || "我")?.charAt(0) }}
           </el-avatar>
           <div class="ml-3">
@@ -106,6 +106,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from "vue";
+import { resolveAvatarSrc } from "@/utils/avatarPresets";
 import { ElMessage } from "element-plus";
 import dayjs from "dayjs";
 

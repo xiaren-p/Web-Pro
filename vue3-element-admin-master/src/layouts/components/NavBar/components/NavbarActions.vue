@@ -27,7 +27,7 @@
     <div class="navbar-actions__item">
       <el-dropdown trigger="click">
         <div class="user-profile">
-          <img class="user-profile__avatar" :src="userStore.userInfo.avatar || defaultAvatarUrl" />
+          <img class="user-profile__avatar" :src="resolveAvatarSrc(userStore.userInfo.avatar ?? '') || defaultAvatarUrl" />
           <span class="user-profile__name">{{ userStore.userInfo.username }}</span>
         </div>
         <template #dropdown>
@@ -69,6 +69,7 @@ import Fullscreen from "@/components/Fullscreen/index.vue";
 import SizeSelect from "@/components/SizeSelect/index.vue";
 import Notification from "@/components/Notification/index.vue";
 import defaultAvatarUrl from "@/assets/images/default-avatar.svg";
+import { resolveAvatarSrc } from "@/utils/avatarPresets";
 
 const { t } = useI18n();
 const appStore = useAppStore();

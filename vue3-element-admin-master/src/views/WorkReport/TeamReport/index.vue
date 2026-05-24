@@ -108,7 +108,7 @@
         <el-table-column label="提交人" width="180">
           <template #default="{ row }">
             <div class="flex items-center">
-              <el-avatar :size="32" :src="row.avatar" class="mr-2 bg-blue-500">
+              <el-avatar :size="32" :src="resolveAvatarSrc(row.avatar ?? '')" class="mr-2 bg-blue-500">
                 {{ (row.nickname || row.username || "?").charAt(0) }}
               </el-avatar>
               <div>
@@ -177,7 +177,7 @@
         <el-table-column label="姓名" width="180" align="center">
           <template #default="{ row }">
             <div class="flex items-center justify-center">
-              <el-avatar :size="30" :src="row.avatar" class="mr-2 bg-blue-500">
+              <el-avatar :size="30" :src="resolveAvatarSrc(row.avatar ?? '')" class="mr-2 bg-blue-500">
                 {{ (row.nickname || row.username || "?").charAt(0) }}
               </el-avatar>
               <span>{{ row.nickname || row.username }}</span>
@@ -192,6 +192,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from "vue";
+import { resolveAvatarSrc } from "@/utils/avatarPresets";
 import { User, Check, Warning, Search, Refresh, View } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
 import ReportDrawer from "@/views/WorkReport/components/ReportDrawer.vue";

@@ -5,7 +5,7 @@
       <div class="flex-1 flex items-start">
         <img
           class="w80px h80px rounded-full"
-          :src="userStore.userInfo.avatar + '?imageView2/1/w/80/h/80'"
+          :src="resolveAvatarSrc(userStore.userInfo.avatar ?? '')"
         />
         <div class="ml-5">
           <p>{{ greetings }}</p>
@@ -89,6 +89,7 @@
 
 <script setup lang="ts">
 import { useUserStore } from "@/store/modules/user-store";
+import { resolveAvatarSrc } from "@/utils/avatarPresets";
 import { WeatherAPI } from "@/api/weather";
 import { Folder, Document, VideoCamera } from "@element-plus/icons-vue";
 

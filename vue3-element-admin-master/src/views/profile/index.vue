@@ -16,28 +16,17 @@
       <el-col :span="8">
         <el-card class="user-card">
           <div class="user-info">
-            <div class="avatar-wrapper">
+            <div class="avatar-wrapper" :class="{ 'is-uploading': uploading }">
               <el-avatar :src="resolveAvatarSrc(userStore.userInfo.avatar ?? '')" :size="100" />
-              <el-button
-                type="info"
-                class="avatar-edit-btn upload-btn"
-                circle
-                :icon="Camera"
-                size="small"
-                :disabled="uploading"
-                title="上传自定义头像"
-                @click="triggerFileUpload"
-              />
-              <el-button
-                type="info"
-                class="avatar-edit-btn preset-btn"
-                circle
-                :icon="Picture"
-                size="small"
-                :disabled="uploading"
-                title="选择预设头像"
-                @click="presetDialogVisible = true"
-              />
+              <div class="avatar-overlay">
+                <el-tooltip content="上传图片" placement="top" :show-after="400">
+                  <el-icon class="overlay-icon" @click="triggerFileUpload"><Camera /></el-icon>
+                </el-tooltip>
+                <div class="overlay-divider" />
+                <el-tooltip content="选择预设" placement="top" :show-after="400">
+                  <el-icon class="overlay-icon" @click="presetDialogVisible = true"><Picture /></el-icon>
+                </el-tooltip>
+              </div>
               <input
                 ref="fileInput"
                 type="file"
@@ -693,26 +682,54 @@ onMounted(async () => {
     .avatar-wrapper {
       position: relative;
       display: inline-block;
+      width: 100px;
+      height: 100px;
       margin-bottom: 16px;
+      overflow: hidden;
+      cursor: pointer;
+      border-radius: 50%;
 
-      .avatar-edit-btn {
+      &.is-uploading {
+        pointer-events: none;
+        opacity: 0.65;
+      }
+
+      .avatar-overlay {
         position: absolute;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        border: none;
-        transition: all 0.3s ease;
+        left: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 38px;
+        background: rgba(0, 0, 0, 0.58);
+        opacity: 0;
+        transition: opacity 0.22s ease;
 
-        &:hover {
-          background: rgba(0, 0, 0, 0.7);
+        .overlay-icon {
+          flex: 1;
+          display: flex;
+          justify-content: center;
+          font-size: 17px;
+          color: rgba(255, 255, 255, 0.88);
+          cursor: pointer;
+          transition: color 0.18s;
+
+          &:hover {
+            color: #fff;
+          }
         }
 
-        &.upload-btn {
-          right: 0;
+        .overlay-divider {
+          width: 1px;
+          height: 16px;
+          background: rgba(255, 255, 255, 0.28);
         }
+      }
 
-        &.preset-btn {
-          left: 0;
-        }
+      &:hover .avatar-overlay {
+        opacity: 1;
       }
     }
 

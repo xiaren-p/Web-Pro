@@ -2,7 +2,7 @@
   <el-dialog
     v-model="visible"
     title="裁剪头像"
-    :width="520"
+    :width="580"
     :close-on-click-modal="false"
     destroy-on-close
     @closed="handleDialogClosed"
@@ -184,10 +184,10 @@ function handleRotateBack(): void {
 
 <style scoped lang="scss">
 .cropper-wrapper {
-  display: flex;
-  justify-content: center;
-  max-height: 380px;
+  height: 400px;
   overflow: hidden;
+  background: #161616;
+  border-radius: 6px;
 
   .cropper-source {
     display: block;
@@ -199,10 +199,11 @@ function handleRotateBack(): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 0 4px;
 
   .zoom-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
   }
 
   .confirm-actions {
