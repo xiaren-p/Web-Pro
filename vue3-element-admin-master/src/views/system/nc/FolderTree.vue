@@ -125,7 +125,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="120" align="center" fixed="right">
+          <el-table-column label="操作" width="120" align="center">
             <template #default="{ row }: { row: FolderRuleVO }">
               <el-button v-hasPerm="['nc:folder:setperm']" link type="primary" size="small" @click="openEditRule(row)">
                 编辑
@@ -475,15 +475,18 @@ async function loadNode(node: any, resolve: (data: FolderTreeNode[]) => void): P
 // ─── 节点选择 ─────────────────────────────────────────────────────────────────
 
 const activeNode = ref<FolderTreeNode | null>(null);
+/** 当前激活的 el-tree Node 对象，用于直接操作节点（不经 key 查找）。 */
+const activeElNode = ref<any>(null);
 
-function handleNodeClick(data: FolderTreeNode): void {
+function handleNodeClick(data: FolderTreeNode, elNode: any): void {
   activeNode.value = data;
+  activeElNode.value = elNode;
   rules.value = [];
   if (data.ncPath) {
     loadRules(data.ncPath);
   } else if (data.isRoot) {
-    // 根节点尚未展开：自动触发展开，loadNode 完成后会回调 loadRules
-    treeRef.value?.getNode(data.key)?.expand();
+    // 根节点尚未展开：直接用已捕获的 elNode 展开，避免通过 key 查找（key 会被 loadNode 修改）
+    elNode?.expand();
   }
 }
 
@@ -726,8 +729,8 @@ async function submitDeleteFolder(): Promise<void> {
         (result.deletedRules > 0 ? `，同步清除 ${result.deletedRules} 条权限规则` : ""),
     );
 
-    // 通过 el-tree 节点 parent 链找到父节点并强制重新懒加载
-    const currentElNode = treeRef.value?.getNode(targetNode);
+    // 通过已存储的 el-tree Node 的 parent 属性找父节点，无需 key 查找
+    const currentElNode = activeElNode.value;
     const parentElNode = currentElNode?.parent;
     if (parentElNode && parentElNode.level > 0) {
       parentElNode.loaded = false;
@@ -766,8 +769,8 @@ async function submitMkdir(): Promise<void> {
     await createFolder({ groupId: node.groupId, parentPath, folderName: mkdirForm.name.trim() });
     mkdirDialog.visible = false;
     ElMessage.success("文件夹已创建");
-    // 自动刷新：通过 data 对象直接定位节点（key 可能在 loadNode 中被修改，不能用 key 查找）
-    const treeNode = treeRef.value?.getNode(node);
+    // 直接使用已存储的 el-tree Node 对象（不经过 key 查找，避免根节点 key 被修改导致查不到）
+    const treeNode = activeElNode.value;
     if (treeNode) {
       treeNode.loaded = false;
       treeNode.expanded = false;
@@ -966,6 +969,10 @@ async function submitMkdir(): Promise<void> {
   flex: 1;
   padding: 0 20px 16px;
   overflow: auto;
+
+  :deep(.el-table__cell) {
+    padding: 6px 0; // 压缩行高
+  }
 
   :deep(.el-table__row:hover > td) {
     background: #f7f7f7 !important;
