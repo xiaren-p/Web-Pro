@@ -92,7 +92,7 @@
                 >
                   <img
                     v-if="isRealAvatarUrl(row.avatarUrl)"
-                    :src="row.avatarUrl"
+                    :src="resolveRuleAvatar(row.avatarUrl)"
                     class="user-avatar-img"
                     alt=""
                   />
@@ -368,6 +368,7 @@
 import type { FolderDeletePreview, FolderRuleVO, UserTreeDept, UserTreeUser } from "@/api/nc/folderTree";
 
 import { computed, nextTick, reactive, ref, shallowRef, watch } from "vue";
+import { resolveAvatarSrc } from "@/utils/avatarPresets";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Delete, Folder, FolderAdd, FolderOpened, InfoFilled, Lock, OfficeBuilding, Plus, Refresh, User } from "@element-plus/icons-vue";
 
@@ -415,7 +416,18 @@ type UserTreeNode =
  * @returns {boolean} 是否可直接用 img src 展示。
  */
 function isRealAvatarUrl(url: string | undefined): boolean {
-  return !!url && (url.startsWith('http://') || url.startsWith('https://'));
+  if (!url) return false;
+  return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('preset:');
+}
+
+/**
+ * 解析规则头像：preset 转为 SVG data URI，普通 URL 原样返回。
+ *
+ * @param {string | undefined} url - 后端返回的 avatarUrl 字段。
+ * @returns {string} 可直接用于 img src 的地址。
+ */
+function resolveRuleAvatar(url: string | undefined): string {
+  return resolveAvatarSrc(url ?? '');
 }
 
 function avatarColor(name: string): string {

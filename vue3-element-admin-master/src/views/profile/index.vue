@@ -192,15 +192,6 @@
         <el-form-item label="手机号码" prop="mobile">
           <el-input v-model="mobileUpdateForm.mobile" style="width: 250px" />
         </el-form-item>
-        <el-form-item label="验证码" prop="code">
-          <el-input v-model="mobileUpdateForm.code" style="width: 250px">
-            <template #append>
-              <el-button :disabled="mobileCountdown > 0" @click="handleSendMobileCode">
-                {{ mobileCountdown > 0 ? `${mobileCountdown}s后重新发送` : "发送验证码" }}
-              </el-button>
-            </template>
-          </el-input>
-        </el-form-item>
       </el-form>
 
       <!-- 绑定邮箱 -->
@@ -213,15 +204,6 @@
       >
         <el-form-item label="邮箱" prop="email">
           <el-input v-model="emailUpdateForm.email" style="width: 250px" />
-        </el-form-item>
-        <el-form-item label="验证码" prop="code">
-          <el-input v-model="emailUpdateForm.code" style="width: 250px">
-            <template #append>
-              <el-button :disabled="emailCountdown > 0" @click="handleSendEmailCode">
-                {{ emailCountdown > 0 ? `${emailCountdown}s后重新发送` : "发送验证码" }}
-              </el-button>
-            </template>
-          </el-input>
         </el-form-item>
       </el-form>
 
@@ -291,11 +273,9 @@ interface PasswordChangeForm {
 }
 interface MobileUpdateForm {
   mobile?: string;
-  code?: string;
 }
 interface EmailUpdateForm {
   email?: string;
-  code?: string;
 }
 interface UserProfileForm {
   id?: string;
@@ -332,11 +312,7 @@ const passwordChangeForm = reactive<PasswordChangeForm>({});
 const mobileUpdateForm = reactive<MobileUpdateForm>({});
 const emailUpdateForm = reactive<EmailUpdateForm>({});
 
-const mobileCountdown = ref(0);
-const mobileTimer = ref();
 
-const emailCountdown = ref(0);
-const emailTimer = ref();
 
 // 修改密码校验规则
 const passwordChangeRules = {
@@ -355,7 +331,6 @@ const mobileBindingRules = {
       trigger: "blur",
     },
   ],
-  code: [{ required: true, message: "请输入验证码", trigger: "blur" }],
 };
 
 // 邮箱校验规则
@@ -368,7 +343,6 @@ const emailBindingRules = {
       trigger: "blur",
     },
   ],
-  code: [{ required: true, message: "请输入验证码", trigger: "blur" }],
 };
 
 /**
@@ -399,66 +373,6 @@ const handleOpenDialog = (type: DialogType) => {
 };
 
 /**
- * 发送手机验证码
- */
-function handleSendMobileCode() {
-  if (!mobileUpdateForm.mobile) {
-    ElMessage.error("请输入手机号");
-    return;
-  }
-  // 验证手机号格式
-  const reg = /^1[3-9]\d{9}$/;
-  if (!reg.test(mobileUpdateForm.mobile)) {
-    ElMessage.error("手机号格式不正确");
-    return;
-  }
-  // 发送短信验证码
-  UserAPI.sendMobileCode(mobileUpdateForm.mobile).then(() => {
-    ElMessage.success("验证码发送成功");
-
-    // 倒计时 60s 重新发送
-    mobileCountdown.value = 60;
-    mobileTimer.value = setInterval(() => {
-      if (mobileCountdown.value > 0) {
-        mobileCountdown.value -= 1;
-      } else {
-        clearInterval(mobileTimer.value!);
-      }
-    }, 1000);
-  });
-}
-
-/**
- * 发送邮箱验证码
- */
-function handleSendEmailCode() {
-  if (!emailUpdateForm.email) {
-    ElMessage.error("请输入邮箱");
-    return;
-  }
-  // 验证邮箱格式
-  const reg = /\w[-\w.+]*@([A-Za-z0-9][-A-Za-z0-9]+\.)+[A-Za-z]{2,14}/;
-  if (!reg.test(emailUpdateForm.email)) {
-    ElMessage.error("邮箱格式不正确");
-    return;
-  }
-
-  // 发送邮箱验证码
-  UserAPI.sendEmailCode(emailUpdateForm.email).then(() => {
-    ElMessage.success("验证码发送成功");
-    // 倒计时 60s 重新发送
-    emailCountdown.value = 60;
-    emailTimer.value = setInterval(() => {
-      if (emailCountdown.value > 0) {
-        emailCountdown.value -= 1;
-      } else {
-        clearInterval(emailTimer.value!);
-      }
-    }, 1000);
-  });
-}
-
-/**
  * 提交表单
  */
 const handleSubmit = async () => {
@@ -484,17 +398,23 @@ const handleSubmit = async () => {
       ElMessage.error(err?.message || "修改密码失败");
     }
   } else if (dialog.type === DialogType.MOBILE) {
-    UserAPI.bindOrChangeMobile(mobileUpdateForm).then(() => {
-      ElMessage.success("手机号绑定成功");
+    try {
+      await UserAPI.updateProfile({ mobile: mobileUpdateForm.mobile });
+      ElMessage.success("手机号修改成功");
       dialog.visible = false;
       loadUserProfile();
-    });
+    } catch (err: any) {
+      ElMessage.error(err?.message || "修改失败");
+    }
   } else if (dialog.type === DialogType.EMAIL) {
-    UserAPI.bindOrChangeEmail(emailUpdateForm).then(() => {
-      ElMessage.success("邮箱绑定成功");
+    try {
+      await UserAPI.updateProfile({ email: emailUpdateForm.email });
+      ElMessage.success("邮箱修改成功");
       dialog.visible = false;
       loadUserProfile();
-    });
+    } catch (err: any) {
+      ElMessage.error(err?.message || "修改失败");
+    }
   }
 };
 
@@ -655,12 +575,6 @@ const loadUserProfile = async () => {
 };
 
 onMounted(async () => {
-  if (mobileTimer.value) {
-    clearInterval(mobileTimer.value);
-  }
-  if (emailTimer.value) {
-    clearInterval(emailTimer.value);
-  }
   // 预填用户基本信息，随后拉取完整资料
   preloadFromStore();
   await loadUserProfile();

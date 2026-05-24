@@ -17,7 +17,7 @@ def _build_avatar_url(avatar: str) -> str:
     if not avatar:
         return ""
     if avatar.startswith("preset:"):
-        # preset 类型由前端用 avatarColor 渲染，无需 URL
+        # preset 类型：原样返回，前端通过 resolveAvatarSrc 转为 SVG data URI 渲染
         return avatar
     if avatar.startswith(("http://", "https://")):
         return avatar

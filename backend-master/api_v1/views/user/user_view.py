@@ -485,12 +485,17 @@ class UserViewSet(viewsets.ViewSet):
             return drf_error("未登录", status=401)
         payload = request.data.copy()
         profile = getattr(user, "profile", None)
+        # 保存前记录旧值，用于 NC 同步对比
+        _old_display_name = (profile.nickname if profile and profile.nickname else user.username)
+        _old_email = user.email or ""
         if profile:
             _old_avatar = profile.avatar or ""
             profile.nickname = payload.get("nickname", profile.nickname)
             profile.mobile = payload.get("mobile", profile.mobile)
             profile.avatar = payload.get("avatar", profile.avatar)
             profile.dept_id = payload.get("deptId", profile.dept_id)
+            if payload.get("gender") is not None:
+                profile.gender = int(payload.get("gender"))
             profile.save()
             # 切换了预设头像时，将 Pillow 生成的 PNG 同步至 NC
             _new_avatar = profile.avatar or ""
@@ -518,6 +523,20 @@ class UserViewSet(viewsets.ViewSet):
                     )
         user.email = payload.get("email", user.email)
         user.save()
+        # NC 同步：昵称或邮箱有变更时入队（不阻断主流程）
+        if profile:
+            try:
+                NcSyncService.on_user_updated(
+                    profile,
+                    old_display_name=_old_display_name,
+                    old_email=_old_email,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[UserViewSet][profile_put] NC 同步入队失败（不阻断）: user=%s err=%s",
+                    user.username,
+                    exc,
+                )
         return drf_ok(UserSerializer(user).data)
 
     @action(detail=False, methods=["put"], url_path="password")
