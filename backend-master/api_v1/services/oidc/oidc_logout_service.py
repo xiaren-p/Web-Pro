@@ -63,27 +63,38 @@ def _get_nc_client_id() -> str:
     return app.client_id
 
 
-def _get_issuer() -> str:
-    """从 OAUTH2_PROVIDER 设置读取 OIDC 颁发者 URL。
+def _derive_issuer(request=None) -> str:
+    """推导 OIDC 颁发者 URL。
+
+    优先使用 OAUTH2_PROVIDER['OIDC_ISS_ENDPOINT']（固定配置），
+    其次从 request.build_absolute_uri('/') 动态推导（与 DOT 生成 id_token 时完全一致）。
+
+    Args:
+        request: Django HttpRequest 实例（可选）。
 
     Returns:
-        str: OIDC 颁发者 URL（iss 声明值）。
+        str: issuer 字符串。
 
     Raises:
-        RuntimeError: OIDC_ISS_ENDPOINT 未配置。
+        RuntimeError: 两种来源均不可用时抛出。
     """
+    # 优先固定配置
     oauth2_cfg: dict = getattr(settings, "OAUTH2_PROVIDER", {})
     issuer: str = (oauth2_cfg.get("OIDC_ISS_ENDPOINT") or "").strip()
-    if not issuer:
-        raise RuntimeError(
-            "[oidc_logout_service] OAUTH2_PROVIDER['OIDC_ISS_ENDPOINT'] 未配置，"
-            "无法构建 Logout Token 的 iss 声明。"
-            "请在 .env 中设置 DJANGO_OIDC_ISSUER=https://<你的Django域名>。"
-        )
-    return issuer
+    if issuer:
+        return issuer
+
+    # 从 request 动态推导（与 DOT ConnectDiscoveryInfoView 逻辑一致）
+    if request is not None:
+        return request.build_absolute_uri("/").rstrip("/")
+
+    raise RuntimeError(
+        "[oidc_logout_service] 无法推导 OIDC issuer：既未配置 OIDC_ISS_ENDPOINT，"
+        "也未传入 request 对象。"
+    )
 
 
-def push_backchannel_logout(user) -> None:
+def push_backchannel_logout(user, request=None) -> None:
     """向 Nextcloud 推送 OIDC Back-Channel Logout Token，同步注销 NC 端会话。
 
     构建并以 RSA 私钥签名符合 OIDC BCL 1.0 规范的 Logout Token，POST 至
@@ -92,6 +103,7 @@ def push_backchannel_logout(user) -> None:
 
     Args:
         user: 已认证的 Django User 实例，用于提取 sub（user.pk）声明。
+        request: Django HttpRequest 实例，用于动态推导 issuer（与 id_token 保持一致）。
 
     Returns:
         None
@@ -117,7 +129,7 @@ def push_backchannel_logout(user) -> None:
             )
             return
 
-        issuer = _get_issuer()
+        issuer = _derive_issuer(request)
         nc_base_url = _get_nc_base_url()
         client_id = _get_nc_client_id()
         verify_ssl: bool = getattr(settings, "NC_VERIFY_SSL", True)

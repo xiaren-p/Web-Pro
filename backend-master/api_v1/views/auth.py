@@ -176,7 +176,7 @@ class AuthViewSet(viewsets.ViewSet):
         # OIDC Back-Channel Logout：向 NC 推送注销令牌，实现无感同步退出
         if logout_user is not None:
             from api_v1.services.oidc.oidc_logout_service import push_backchannel_logout
-            push_backchannel_logout(logout_user)
+            push_backchannel_logout(logout_user, request=request)
 
         return drf_ok(status=204)
 
