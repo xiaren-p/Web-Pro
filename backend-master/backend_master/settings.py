@@ -12,6 +12,7 @@ from pathlib import Path
 import os
 import environ
 import json
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -99,6 +100,12 @@ CELERY_BEAT_SCHEDULE = {
     'nc-retry-failed': {
         'task': 'api_v1.tasks.nc_sync_tasks.retry_failed_nc_tasks',
         'schedule': 300.0,
+    },
+    # 运维维护：每天凌晨 03:00 (Asia/Shanghai) 清理孤儿上传文件
+    'cleanup-orphan-uploads': {
+        'task': 'api_v1.tasks.maintenance_tasks.cleanup_orphan_uploads',
+        'schedule': crontab(hour=3, minute=0),
+        'kwargs': {'days': 30},
     },
 }
 
