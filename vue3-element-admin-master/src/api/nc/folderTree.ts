@@ -224,3 +224,54 @@ export function batchSetFolderRules(data: BatchSetRuleForm): Promise<BatchSetRul
   return request.post("/nc/folder-tree/set-rules-batch", data);
 }
 
+/** 文件夹删除预检响应（用于安全确认弹窗展示影响范围） */
+export interface FolderDeletePreview {
+  /** 待删除的完整 NC 路径 */
+  ncPath: string;
+  /** 受影响的权限规则总条数（含子目录规则） */
+  ruleCount: number;
+  /** 受影响的用户名列表（去重、已排序） */
+  affectedUsers: string[];
+}
+
+/** 删除子文件夹请求体 */
+export interface DeleteFolderForm {
+  /** NcGroup ID（DEPT_ADMIN 类型） */
+  groupId: number;
+  /** 待删除的完整 NC 路径（含挂载点，不能是挂载点根） */
+  ncPath: string;
+}
+
+/** 删除子文件夹响应 */
+export interface DeleteFolderResult {
+  /** 被清理的权限规则条数 */
+  deletedRules: number;
+}
+
+/**
+ * 文件夹删除预检：获取待删文件夹受影响的规则数量与用户列表。
+ * 调用后用于前端安全确认弹窗展示，不修改任何数据。
+ *
+ * @param {number} groupId NcGroup ID
+ * @param {string} ncPath 待删除的完整 NC 路径
+ * @returns {Promise<FolderDeletePreview>} 预检信息
+ */
+export function fetchFolderDeletePreview(
+  groupId: number,
+  ncPath: string,
+): Promise<FolderDeletePreview> {
+  return request.get("/nc/folder-tree/folder-delete-preview", {
+    params: { groupId, ncPath },
+  });
+}
+
+/**
+ * 删除指定子文件夹：清理全部 ACL 规则并将文件夹移入 NC 回收站（兼作备份）。
+ *
+ * @param {DeleteFolderForm} data 删除请求体
+ * @returns {Promise<DeleteFolderResult>} 删除结果
+ */
+export function deleteFolder(data: DeleteFolderForm): Promise<DeleteFolderResult> {
+  return request.delete("/nc/folder-tree/folder", { data });
+}
+

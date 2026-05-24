@@ -60,6 +60,10 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             required = ["nc:folder:setperm"]
         elif action_name == "delete_rule" and method == "DELETE":
             required = ["nc:folder:delete"]
+        elif action_name == "folder_delete_preview" and method == "GET":
+            required = ["nc:folder:rmdir"]
+        elif action_name == "delete_folder" and method == "DELETE":
+            required = ["nc:folder:rmdir"]
         setattr(self, "required_perms", required)
         return super().get_permissions()
 
@@ -252,6 +256,142 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
                 NcSyncService.enqueue_restrict_folder_root(new_nc_path, _write_rule.user.username)
             NcSyncService._flush_tasks_after(_last_id)
         return drf_ok({"message": f"文件夹 '{folder_name}' 创建成功", "ncPath": new_nc_path})
+
+    # ------------------------------------------------------------------ #
+    #  删除子文件夹 — 预检（返回受影响规则统计，用于安全确认弹窗）          #
+    # ------------------------------------------------------------------ #
+
+    @action(detail=False, methods=["get"], url_path="folder-delete-preview")
+    def folder_delete_preview(self, request: Request):
+        """文件夹删除预检：统计该目录及所有子目录下受影响的规则数量与用户列表。
+
+        用于前端删除确认弹窗展示安全提示，帮助操作者知悉影响范围后再做决策。
+        本接口只读，不修改任何数据。
+
+        Query Params:
+            groupId (int): NcGroup ID（DEPT_ADMIN 类型）。
+            ncPath (str): 待删除的完整路径（含挂载点），必须包含 '/'（不能是挂载点根）。
+
+        Returns:
+            dict: {
+                ncPath: str,
+                ruleCount: int,           # 受影响的规则总数
+                affectedUsers: [str],     # 受影响的用户名列表
+            }
+        """
+        group_id_str = request.query_params.get("groupId")
+        nc_path = (request.query_params.get("ncPath") or "").strip("/")
+
+        if not nc_path:
+            return drf_error("ncPath 不能为空")
+        if "/" not in nc_path:
+            return drf_error("不能删除群组文件夹根目录，只允许删除子文件夹")
+
+        nc_group, error = _resolve_dept_admin_group(group_id_str)
+        if error:
+            return drf_error(error)
+        scope_error = _check_group_scope(request.user, nc_group)
+        if scope_error:
+            return drf_error(scope_error, code=403)
+
+        affected_rules = NcFileAccessRule.objects.filter(
+            Q(nc_path=nc_path) | Q(nc_path__startswith=nc_path + "/")
+        ).select_related("user")
+
+        affected_user_names = sorted({r.user.username for r in affected_rules})
+
+        return drf_ok({
+            "ncPath": nc_path,
+            "ruleCount": affected_rules.count(),
+            "affectedUsers": affected_user_names,
+        })
+
+    # ------------------------------------------------------------------ #
+    #  删除子文件夹 — 执行（清理 DB 规则 + WebDAV DELETE 移入回收站）       #
+    # ------------------------------------------------------------------ #
+
+    @action(detail=False, methods=["delete"], url_path="folder")
+    def delete_folder(self, request: Request):
+        """删除指定子文件夹：清理全部关联 ACL 规则，并通过 WebDAV DELETE 将文件夹移入 NC 回收站。
+
+        NC 回收站（Files Trashbin）默认保留被删文件夹 30 天，
+        管理员可通过 NC 后台恢复或永久清空，兼作数据备份手段。
+
+        安全约束：
+          - ncPath 必须包含至少一个 '/'（不允许删除挂载点根目录）。
+          - 仅允许操作调用方有权管辖的部门对应群组。
+          - ncPath 的挂载点必须与 groupId 对应群组的 Group Folder 一致。
+
+        Body:
+            groupId (int): NcGroup ID（DEPT_ADMIN 类型）。
+            ncPath (str): 待删除的完整路径（含挂载点），如 "技术部/旧文件夹"。
+
+        Returns:
+            dict: { deletedRules: int }  # 被清理的规则条数
+        """
+        group_id_str = str(request.data.get("groupId", ""))
+        nc_path = (request.data.get("ncPath") or "").strip("/")
+
+        if not nc_path:
+            return drf_error("ncPath 不能为空")
+        if "/" not in nc_path:
+            return drf_error("不能删除群组文件夹根目录，只允许删除子文件夹")
+
+        nc_group, error = _resolve_dept_admin_group(group_id_str)
+        if error:
+            return drf_error(error)
+        scope_error = _check_group_scope(request.user, nc_group)
+        if scope_error:
+            return drf_error(scope_error, code=403)
+
+        client, mount_point, fetch_error = _get_mount_point(nc_group)
+        if fetch_error:
+            return drf_error(fetch_error)
+
+        # 校验 ncPath 挂载点与群组 Group Folder 一致
+        if nc_path.split("/")[0] != mount_point:
+            return drf_error("ncPath 的挂载点与群组不匹配，请核对后重试")
+
+        # 快照所有受影响规则及其用户（删除前采集，确保后续群组清理完整）
+        affected_rules = list(
+            NcFileAccessRule.objects.filter(
+                Q(nc_path=nc_path) | Q(nc_path__startswith=nc_path + "/")
+            ).select_related("user", "user__profile")
+        )
+        affected_users = {r.user for r in affected_rules}
+
+        # ① 从 DB 中批量删除规则
+        with transaction.atomic():
+            deleted_count, _ = NcFileAccessRule.objects.filter(
+                Q(nc_path=nc_path) | Q(nc_path__startswith=nc_path + "/")
+            ).delete()
+
+        # ② 处理群组成员资格（无剩余规则则移出 DEPT / DEPT_ADMIN 群组）
+        _handle_group_membership_after_folder_delete(
+            affected_users, mount_point, nc_group
+        )
+
+        # ③ WebDAV DELETE：将目录移入 NC 回收站（回收站保留 30 天，兼作备份）
+        sub_path = nc_path[len(mount_point) + 1:]
+        dav_path = (
+            f"/remote.php/dav/files/{client._admin_user}"
+            f"/{mount_point}/{sub_path}"
+        )
+        try:
+            client.delete_dav_folder(dav_path)
+        except RuntimeError as exc:
+            logger.error(
+                "[NcFolderTreeViewSet][delete_folder] WebDAV DELETE 失败，"
+                "规则已从 DB 清除但 NC 端删除未完成: ncPath=%s err=%s",
+                nc_path, exc,
+            )
+            return drf_error(f"权限规则已清理，但 NC 端文件夹删除失败: {exc}")
+
+        logger.info(
+            "[NcFolderTreeViewSet][delete_folder] 删除成功 ncPath=%s deletedRules=%d",
+            nc_path, deleted_count,
+        )
+        return drf_ok({"deletedRules": deleted_count})
 
     # ------------------------------------------------------------------ #
     #  设置/更新权限规则（upsert）                                          #
@@ -794,3 +934,56 @@ def _check_group_scope(user, nc_group: NcGroup) -> str | None:
     if nc_group.dept_id not in allowed:
         return "无权限操作该部门的群组文件夹"
     return None
+
+
+def _handle_group_membership_after_folder_delete(
+    affected_users: set,
+    mount_point: str,
+    nc_group: NcGroup,
+) -> None:
+    """文件夹删除后，检查受影响用户是否仍有挂载点下的剩余规则。
+
+    对每个受影响用户：若在此挂载点下已无任何剩余规则，则入队移出对应
+    DEPT 群组（消除文件夹可见性）及 DEPT_ADMIN 群组（收回写权限通道），
+    自然管理员（本部门 DEPT_ADMIN）不移出自身 DEPT_ADMIN 群组。
+
+    Args:
+        affected_users (set): 受影响的 Django User 对象集合（快照，含 profile）。
+        mount_point (str): Group Folder 挂载点名称（不含斜杠）。
+        nc_group (NcGroup): 操作上下文中的 DEPT_ADMIN 群组。
+    """
+    if not affected_users:
+        return
+
+    dept_ng = NcGroup.objects.filter(
+        group_type=NcGroupType.DEPT,
+        dept_id=nc_group.dept_id,
+    ).first()
+
+    last_id = NcSyncTask.objects.order_by("-id").values_list("id", flat=True).first() or 0
+
+    for user in affected_users:
+        # 若该用户在此挂载点下仍有其他规则，跳过群组移除
+        has_remaining = NcFileAccessRule.objects.filter(
+            user=user,
+        ).filter(
+            Q(nc_path=mount_point) | Q(nc_path__startswith=mount_point + "/")
+        ).exists()
+        if has_remaining:
+            continue
+
+        # 无剩余规则：入队移出 DEPT 群组，消除文件夹可见性
+        if dept_ng:
+            NcSyncService.enqueue_remove_from_group(user.username, dept_ng.code)
+
+        # 若该用户并非此部门的自然管理员，同时移出 DEPT_ADMIN 群组
+        _profile = getattr(user, "profile", None)
+        _is_natural_admin = (
+            _profile is not None
+            and getattr(_profile, "admin_level", None) == AdminLevel.DEPT_ADMIN
+            and getattr(_profile, "dept_id", None) == nc_group.dept_id
+        )
+        if not _is_natural_admin:
+            NcSyncService.enqueue_remove_from_group(user.username, nc_group.code)
+
+    NcSyncService._flush_tasks_after(last_id)

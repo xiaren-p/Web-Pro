@@ -60,6 +60,15 @@
             <el-button v-hasPerm="['nc:folder:mkdir']" :icon="FolderAdd" @click="openMkdir">
               新建子目录
             </el-button>
+            <el-button
+              v-if="activeNode && !activeNode.isRoot"
+              v-hasPerm="['nc:folder:rmdir']"
+              type="danger"
+              :icon="Delete"
+              @click="handleDeleteFolder"
+            >
+              删除此目录
+            </el-button>
             <el-button v-hasPerm="['nc:folder:setperm']" type="primary" :icon="Plus" @click="openAddRule">
               添加规则
             </el-button>
@@ -261,6 +270,83 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- ===== 删除子目录确认弹窗 ===== -->
+    <el-dialog
+      v-model="rmdirDialog.visible"
+      title="删除子目录"
+      width="480px"
+      :close-on-click-modal="false"
+    >
+      <div class="rmdir-body">
+        <!-- 危险提示横幅 -->
+        <div class="rmdir-danger-banner">
+          <el-icon class="rmdir-danger-icon"><Delete /></el-icon>
+          <span>此操作将把文件夹移入 NC 回收站，30 天内可通过 NC 管理后台恢复</span>
+        </div>
+
+        <!-- 目标路径 -->
+        <div class="rmdir-info-row">
+          <span class="rmdir-label">目标路径</span>
+          <span class="rmdir-path">{{ activeNode?.ncPath }}</span>
+        </div>
+
+        <!-- 受影响规则（预检加载中时显示 skeleton） -->
+        <div class="rmdir-info-row" style="align-items: flex-start;">
+          <span class="rmdir-label">影响规则</span>
+          <div v-if="rmdirDialog.previewLoading" class="rmdir-preview-loading">
+            <el-icon class="is-loading"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M512 64a32 32 0 0 1 32 32v192a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32zm0 640a32 32 0 0 1 32 32v192a32 32 0 0 1-64 0V736a32 32 0 0 1 32-32zm448-192a32 32 0 0 1-32 32H736a32 32 0 1 1 0-64h192a32 32 0 0 1 32 32zM288 512a32 32 0 0 1-32 32H64a32 32 0 1 1 0-64h192a32 32 0 0 1 32 32zm411.44-235.26a32 32 0 0 1 0 45.26L563.18 458.26a32 32 0 1 1-45.26-45.26l136.26-136.26a32 32 0 0 1 45.26 0zm-355.62 355.62a32 32 0 0 1 0 45.26L207.56 813.88a32 32 0 1 1-45.26-45.26l136.26-136.26a32 32 0 0 1 45.26 0zm355.62 0a32 32 0 0 1 45.26 0l136.26 136.26a32 32 0 1 1-45.26 45.26L699.44 677.62a32 32 0 0 1 0-45.26zm-355.62-355.62a32 32 0 0 1 45.26 0L525.44 412.74a32 32 0 1 1-45.26 45.26L343.92 321.74a32 32 0 0 1 0-45.26z"/></svg></el-icon>
+            正在检查影响范围…
+          </div>
+          <div v-else-if="rmdirDialog.preview" class="rmdir-preview-content">
+            <span v-if="rmdirDialog.preview.ruleCount === 0" class="rmdir-no-rules">
+              无关联权限规则
+            </span>
+            <template v-else>
+              <span class="rmdir-rule-count">
+                共 <strong>{{ rmdirDialog.preview.ruleCount }}</strong> 条规则将被清除，影响用户：
+              </span>
+              <div class="rmdir-user-tags">
+                <el-tag
+                  v-for="u in rmdirDialog.preview.affectedUsers"
+                  :key="u"
+                  size="small"
+                  type="warning"
+                  effect="light"
+                >{{ u }}</el-tag>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 二次确认输入 -->
+        <div class="rmdir-confirm-row">
+          <span class="rmdir-label">确认操作</span>
+          <div class="rmdir-confirm-input-wrap">
+            <el-input
+              v-model="rmdirDialog.confirmText"
+              placeholder="请输入目录名称以确认删除"
+              size="small"
+            />
+            <div class="rmdir-confirm-hint">
+              请输入 <strong>{{ activeNode?.name }}</strong> 以启用删除按钮
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="rmdirDialog.visible = false">取消</el-button>
+        <el-button
+          type="danger"
+          :loading="rmdirDialog.loading"
+          :disabled="rmdirDialog.previewLoading || rmdirDialog.confirmText !== activeNode?.name"
+          @click="submitDeleteFolder"
+        >
+          确认删除
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -269,16 +355,18 @@
  * NC 文件夹权限配置页面：左侧文件夹树 + 右侧 ACL 规则管理面板。
  * 所属板块：nc / 文件权限管理。
  */
-import type { FolderRuleVO, UserTreeDept, UserTreeUser } from "@/api/nc/folderTree";
+import type { FolderDeletePreview, FolderRuleVO, UserTreeDept, UserTreeUser } from "@/api/nc/folderTree";
 
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Folder, FolderAdd, FolderOpened, InfoFilled, Lock, OfficeBuilding, Plus, User } from "@element-plus/icons-vue";
+import { Folder, FolderAdd, FolderOpened, InfoFilled, Lock, OfficeBuilding, Plus, User, Delete } from "@element-plus/icons-vue";
 
 import {
   batchSetFolderRules,
   createFolder,
+  deleteFolder,
   deleteFolderRule,
+  fetchFolderDeletePreview,
   fetchFolderList,
   fetchNcGroupList,
   fetchPathRules,
@@ -583,6 +671,80 @@ async function handleDeleteRule(row: FolderRuleVO): Promise<void> {
     ElMessage.success("规则已删除");
   } catch {
     ElMessage.error("删除失败");
+  }
+}
+
+// ─── 删除文件夹弹窗 ───────────────────────────────────────────────────────────
+
+const rmdirDialog = reactive({
+  visible: false,
+  loading: false,
+  previewLoading: false,
+  confirmText: "",
+  preview: null as FolderDeletePreview | null,
+});
+
+/**
+ * 点击「删除此目录」：打开确认弹窗并预检受影响范围。
+ */
+async function handleDeleteFolder(): Promise<void> {
+  if (!activeNode.value || activeNode.value.isRoot) return;
+  rmdirDialog.confirmText = "";
+  rmdirDialog.preview = null;
+  rmdirDialog.visible = true;
+  rmdirDialog.previewLoading = true;
+  try {
+    rmdirDialog.preview = await fetchFolderDeletePreview(
+      activeNode.value.groupId,
+      activeNode.value.ncPath,
+    );
+  } catch {
+    ElMessage.error("预检失败，请稍后重试");
+    rmdirDialog.visible = false;
+  } finally {
+    rmdirDialog.previewLoading = false;
+  }
+}
+
+/**
+ * 确认删除：清理 DB 规则并将文件夹移入 NC 回收站，完成后刷新父节点。
+ */
+async function submitDeleteFolder(): Promise<void> {
+  if (!activeNode.value || rmdirDialog.loading) return;
+  if (rmdirDialog.confirmText !== activeNode.value.name) return;
+
+  const targetNode = activeNode.value;
+  rmdirDialog.loading = true;
+  try {
+    const result = await deleteFolder({
+      groupId: targetNode.groupId,
+      ncPath: targetNode.ncPath,
+    });
+    rmdirDialog.visible = false;
+    ElMessage.success(
+      `目录「${targetNode.name}」已移入 NC 回收站` +
+        (result.deletedRules > 0 ? `，同步清除 ${result.deletedRules} 条权限规则` : ""),
+    );
+
+    // 刷新父节点：找到父节点并强制重新懒加载
+    const parentPath = targetNode.ncPath.includes("/")
+      ? targetNode.ncPath.substring(0, targetNode.ncPath.lastIndexOf("/"))
+      : targetNode.ncPath;
+    const parentNode = treeRef.value?.getNode(parentPath);
+    if (parentNode) {
+      parentNode.loaded = false;
+      parentNode.expanded = false;
+      await nextTick();
+      parentNode.expand();
+    }
+
+    // 清空右侧面板
+    activeNode.value = null;
+    rules.value = [];
+  } catch {
+    ElMessage.error("删除失败，请重试");
+  } finally {
+    rmdirDialog.loading = false;
   }
 }
 
@@ -1053,5 +1215,118 @@ async function submitMkdir(): Promise<void> {
 .readonly-user {
   font-size: 13px;
   color: var(--el-text-color-regular);
+}
+
+// ─── 删除目录弹窗 ──────────────────────────────────────────────────────────────
+
+.rmdir-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rmdir-danger-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #cf1322;
+  line-height: 1.6;
+
+  .rmdir-danger-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: #cf1322;
+  }
+}
+
+.rmdir-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.rmdir-label {
+  min-width: 56px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.rmdir-path {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+  background: var(--el-fill-color-lighter);
+  padding: 3px 8px;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.rmdir-preview-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+}
+
+.rmdir-preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rmdir-no-rules {
+  color: var(--el-text-color-placeholder);
+  font-size: 12px;
+}
+
+.rmdir-rule-count {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+
+  strong {
+    color: #d46b08;
+    font-weight: 600;
+  }
+}
+
+.rmdir-user-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rmdir-confirm-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--el-border-color-lighter);
+}
+
+.rmdir-confirm-input-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rmdir-confirm-hint {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
+
+  strong {
+    color: var(--el-text-color-primary);
+    font-family: monospace;
+  }
 }
 </style>

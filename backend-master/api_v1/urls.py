@@ -87,10 +87,12 @@ urlpatterns = [
     path('notices', views.NoticeViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='notices-list-create'),
     path('notices/<str:ids>', views.NoticeViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='notice-update-delete'),
 
-    # NC 文件夹树管理（文件夹浏览、新建、权限分配）
+    # NC 文件夹树管理（文件夹浏览、新建、删除、权限分配）
     path('nc/folder-tree/groups', views.NcFolderTreeViewSet.as_view({'get': 'group_list'}), name='nc-folder-tree-groups'),
     path('nc/folder-tree/list', views.NcFolderTreeViewSet.as_view({'get': 'list_folder'}), name='nc-folder-tree-list'),
     path('nc/folder-tree/mkdir', views.NcFolderTreeViewSet.as_view({'post': 'mkdir'}), name='nc-folder-tree-mkdir'),
+    path('nc/folder-tree/folder-delete-preview', views.NcFolderTreeViewSet.as_view({'get': 'folder_delete_preview'}), name='nc-folder-tree-folder-delete-preview'),
+    path('nc/folder-tree/folder', views.NcFolderTreeViewSet.as_view({'delete': 'delete_folder'}), name='nc-folder-tree-delete-folder'),
     path('nc/folder-tree/set-rule', views.NcFolderTreeViewSet.as_view({'post': 'set_rule'}), name='nc-folder-tree-set-rule'),
     path('nc/folder-tree/set-rules-batch', views.NcFolderTreeViewSet.as_view({'post': 'set_rules_batch'}), name='nc-folder-tree-set-rules-batch'),
     re_path(r'^nc/folder-tree/rule/(?P<pk>\d+)$', views.NcFolderTreeViewSet.as_view({'delete': 'delete_rule'}), name='nc-folder-tree-delete-rule'),

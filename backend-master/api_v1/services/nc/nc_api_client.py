@@ -859,6 +859,44 @@ class NcApiClient:
                 f"{resp.status_code}: {resp.text[:200]}"
             )
 
+    def delete_dav_folder(self, dav_path: str) -> None:
+        """通过 WebDAV DELETE 删除目录（文件夹移入 NC 回收站，非永久删除）。
+
+        NC 启用了 Files Trashbin 应用时，DELETE 请求将文件夹及其全部内容移入
+        回收站（用户 Trash），管理员可在 NC 管理界面或通过 OCS 清空回收站实现
+        永久删除。
+
+        Args:
+            dav_path (str): 相对于 NC server 根的目录 WebDAV 路径，
+                            如 /remote.php/dav/files/admin/技术部/旧文件夹 。
+
+        Raises:
+            RuntimeError: 网络错误或服务器返回非预期状态码时抛出。
+        """
+        url = f"{self._base}{dav_path}"
+        logger.info("[NcApiClient][delete_dav_folder] DELETE %s", dav_path)
+        try:
+            resp = self._session.delete(url, verify=self._verify, timeout=30)
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"[NcApiClient] DELETE {dav_path} 网络错误: {exc}"
+            ) from exc
+
+        # 404：目录已不存在，幂等跳过
+        if resp.status_code == 404:
+            logger.warning(
+                "[NcApiClient][delete_dav_folder] 目录不存在（404），已跳过: %s",
+                dav_path,
+            )
+            return
+
+        # WebDAV DELETE 成功时返回 204 No Content；部分 NC 版本返回 200
+        if resp.status_code not in (200, 204):
+            raise RuntimeError(
+                f"[NcApiClient] DELETE {dav_path} 返回状态码 "
+                f"{resp.status_code}: {resp.text[:200]}"
+            )
+
     def _extract_mount_point(self, dav_path: str) -> str:
         """从 WebDAV 路径中提取 Group Folder 挂载点名称。
 
