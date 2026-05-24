@@ -556,6 +556,83 @@ class NcApiClient:
                 folder_id, exc,
             )
 
+    def get_path_acl(self, nc_path: str) -> list[dict]:
+        """获取 Group Folder 子路径当前所有 ACL 规则（WebDAV PROPFIND）。
+
+        通过 PROPFIND 读取路径上已存在的 ACL 条目，供 set_path_acl 合并使用，
+        避免 PROPPATCH 全量替换时误删其他用户/群组的规则。
+
+        Args:
+            nc_path (str): 子路径（首尾斜杠自动忽略）。
+
+        Returns:
+            list[dict]: 现有 ACL 规则列表，每项含:
+                - mapping_type (str): "user" 或 "group"
+                - mapping_id (str): 用户名或群组 ID
+                - mask (int): ACL 掩码
+                - permissions (int): 权限位
+
+        Raises:
+            RuntimeError: 网络错误或非 207 响应时抛出。
+        """
+        import xml.etree.ElementTree as ET  # noqa: PLC0415
+
+        _NC = "http://nextcloud.org/ns"
+        clean_path = nc_path.strip("/")
+        dav_path = f"/remote.php/dav/files/{self._admin_user}/{clean_path}"
+        url = f"{self._base}{dav_path}"
+
+        xml_body = (
+            '<?xml version="1.0"?>'
+            '<d:propfind xmlns:d="DAV:" xmlns:nc="http://nextcloud.org/ns">'
+            "<d:prop><nc:acl-list/></d:prop>"
+            "</d:propfind>"
+        )
+
+        try:
+            resp = self._session.request(
+                "PROPFIND",
+                url,
+                data=xml_body.encode("utf-8"),
+                headers={
+                    "Content-Type": "application/xml; charset=utf-8",
+                    "Depth": "0",
+                },
+                verify=self._verify,
+                timeout=30,
+            )
+            if resp.status_code not in (200, 207):
+                raise RuntimeError(
+                    f"[NcApiClient] PROPFIND {dav_path} 返回非预期状态码 "
+                    f"{resp.status_code}: {resp.text[:300]}"
+                )
+        except requests.RequestException as exc:
+            raise RuntimeError(f"[NcApiClient] PROPFIND {dav_path} 网络错误: {exc}") from exc
+
+        rules: list[dict] = []
+        try:
+            root = ET.fromstring(resp.text)
+            for acl_elem in root.iter(f"{{{_NC}}}acl"):
+                mapping_type = acl_elem.findtext(f"{{{_NC}}}acl-mapping-type") or ""
+                mapping_id = acl_elem.findtext(f"{{{_NC}}}acl-mapping-id") or ""
+                mask_text = acl_elem.findtext(f"{{{_NC}}}acl-mask") or "0"
+                perms_text = acl_elem.findtext(f"{{{_NC}}}acl-permissions") or "0"
+                if mapping_type and mapping_id:
+                    rules.append({
+                        "mapping_type": mapping_type,
+                        "mapping_id": mapping_id,
+                        "mask": int(mask_text),
+                        "permissions": int(perms_text),
+                    })
+        except ET.ParseError as exc:
+            logger.warning("[NcApiClient][get_path_acl] XML 解析失败，返回空列表: %s", exc)
+
+        logger.debug(
+            "[NcApiClient][get_path_acl] path=%s found %d rules",
+            dav_path, len(rules),
+        )
+        return rules
+
     def set_path_acl(
         self,
         nc_path: str,
@@ -563,38 +640,65 @@ class NcApiClient:
         mask: int,
         permissions: int,
     ) -> None:
-        """**为 Group Folder 内子目录设置用户 ACL 规则**（WebDAV PROPPATCH）。
+        """**为 Group Folder 内子目录设置用户 ACL 规则**（读取现有规则后合并写入）。
 
-        ACL 规则视该路径的 Group Folder GRANT 基线权限，实现子目录级别的细粒度控制。
+        先通过 PROPFIND 读取该路径的全量 ACL 条目，更新目标用户的规则后，
+        再通过 PROPPATCH 写回完整列表——避免全量替换时误删其他用户/群组的规则。
+
+        mask=0 时视为撤销：将目标用户从 ACL 列表中移除（效果等同于无 ACL 约束）。
 
         Args:
             nc_path (str): 从 Group Folder 挂载点开始的完整子路径，
                            如 "技术部/机密文档" 或 "技术部"；首尾斜杠自动忽略。
             username (str): NC 用户名（Django User.username）。
-            mask (int): ACL 掩码（全位生效传 31；传 0 表示展透/移除该条规则的效果）。
+            mask (int): ACL 掩码（全位生效传 31；传 0 表示撤销/移除该用户的 ACL 条目）。
             permissions (int): 实际授予的权限位（READ=1 WRITE=2 CREATE=4 DELETE=8 SHARE=16）。
 
         Raises:
             RuntimeError: 网络错误或 PROPPATCH 失败时抛出。
         """
+        from xml.sax.saxutils import escape as xml_escape  # noqa: PLC0415
+
         clean_path = nc_path.strip("/")
         dav_path = f"/remote.php/dav/files/{self._admin_user}/{clean_path}"
+
+        # 先读取现有规则，避免 PROPPATCH 全量替换时误删其他用户/群组的 ACL 条目
+        existing = self.get_path_acl(nc_path)
+
+        # 移除当前用户的旧条目，按需重新插入（mask=0 表示撤销，不回插）
+        merged = [
+            r for r in existing
+            if not (r["mapping_type"] == "user" and r["mapping_id"] == username)
+        ]
+        if mask != 0:
+            merged.append({
+                "mapping_type": "user",
+                "mapping_id": username,
+                "mask": mask,
+                "permissions": permissions,
+            })
+
+        # 构建 PROPPATCH XML，命名空间必须使用 http://nextcloud.org/ns（非 owncloud）
+        acl_entries = "".join(
+            "<nc:acl>"
+            f"<nc:acl-mapping-type>{xml_escape(r['mapping_type'])}</nc:acl-mapping-type>"
+            f"<nc:acl-mapping-id>{xml_escape(r['mapping_id'])}</nc:acl-mapping-id>"
+            f"<nc:acl-mask>{r['mask']}</nc:acl-mask>"
+            f"<nc:acl-permissions>{r['permissions']}</nc:acl-permissions>"
+            "</nc:acl>"
+            for r in merged
+        )
         xml_body = (
             '<?xml version="1.0"?>'
-            '<d:propertyupdate xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">'
-            "<d:set><d:prop><oc:acl-list>"
-            "<oc:acl>"
-            "<oc:acl-mapping-type>user</oc:acl-mapping-type>"
-            f"<oc:acl-mapping-id>{username}</oc:acl-mapping-id>"
-            f"<oc:acl-mask>{mask}</oc:acl-mask>"
-            f"<oc:acl-permissions>{permissions}</oc:acl-permissions>"
-            "</oc:acl>"
-            "</oc:acl-list></d:prop></d:set>"
+            '<d:propertyupdate xmlns:d="DAV:" xmlns:nc="http://nextcloud.org/ns">'
+            "<d:set><d:prop><nc:acl-list>"
+            + acl_entries
+            + "</nc:acl-list></d:prop></d:set>"
             "</d:propertyupdate>"
         )
         logger.info(
-            "[NcApiClient][set_path_acl] path=%s user=%s mask=%s perms=%s",
-            dav_path, username, mask, permissions,
+            "[NcApiClient][set_path_acl] path=%s user=%s mask=%s perms=%s total_rules=%d",
+            dav_path, username, mask, permissions, len(merged),
         )
         self._proppatch(dav_path, xml_body)
 
