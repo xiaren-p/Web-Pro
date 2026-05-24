@@ -101,11 +101,10 @@
 
 <script setup lang="ts">
 import * as ElementPlusIconsVue from "@element-plus/icons-vue";
-// 电商 ERP 场景 Tabler 图标精选，按业务分类组织
+// 电商 ERP 场景 Tabler 图标精选（已逐一核验图标名称真实存在），按业务分类组织
 const TABLER_ECOMMERCE_ICONS = [
   // ── 商品 / 目录 ───────────────────────────────────────────────────────────
   "box",
-  "boxes",
   "package",
   "packages",
   "package-export",
@@ -117,7 +116,6 @@ const TABLER_ECOMMERCE_ICONS = [
   "tags",
   "tag-off",
   "photo",
-  "photos",
   "list-details",
   "layout-grid",
   "layout-list",
@@ -166,21 +164,20 @@ const TABLER_ECOMMERCE_ICONS = [
   "cash",
   "coin",
   "coins",
-  "bank",
+  "building-bank",
   "moneybag",
   "currency-dollar",
   "currency-yuan",
   "currency-euro",
   "report-money",
-  "percent",
+  "percentage",
 
   // ── 营销 / 广告 ───────────────────────────────────────────────────────────
   "ad",
   "ad-2",
   "speakerphone",
   "discount",
-  "discount-2",
-  "discount-check",
+  "discount-filled",
   "gift",
   "gift-card",
   "star",
@@ -212,7 +209,6 @@ const TABLER_ECOMMERCE_ICONS = [
   "building-store",
   "building-community",
   "building",
-  "handshake",
   "briefcase",
   "file-text",
   "user-dollar",
