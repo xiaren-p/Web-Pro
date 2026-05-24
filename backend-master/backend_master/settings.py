@@ -61,9 +61,6 @@ env = environ.Env(
     FERNET_SECRET_KEY=(str, ''),
     # Celery Broker（复用 REDIS_URL；也可单独指定 CELERY_BROKER_URL）
     CELERY_BROKER_URL=(str, ''),
-    # OIDC 颁发者 URL（与 id_token iss 声明完全一致，用于 Back-Channel Logout 推送）
-    # 示例：https://api.hanlis.cn  或  http://192.168.0.251:8000
-    DJANGO_OIDC_ISSUER=(str, ''),
 )
 
 env_file = BASE_DIR / '.env'
@@ -391,8 +388,4 @@ OAUTH2_PROVIDER = {
     # NC user_oidc 不必须 PKCE，内网环境可以不强制
     'PKCE_REQUIRED': False,
 }
-# OIDC 颁发者 URL：非空时注入到 OAUTH2_PROVIDER，用于 Back-Channel Logout Logout Token 的 iss 声明
-_oidc_issuer = env('DJANGO_OIDC_ISSUER')
-if _oidc_issuer:
-    OAUTH2_PROVIDER['OIDC_ISS_ENDPOINT'] = _oidc_issuer
 
