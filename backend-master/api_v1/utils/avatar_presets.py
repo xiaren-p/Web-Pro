@@ -78,18 +78,42 @@ PRESET_COLORS: dict[str, str] = {
 
 
 def make_preset_png(username: str, preset_id: str) -> bytes:
-    """用 Pillow 生成与前端预设色匹配的头像，返回 PNG bytes。
+    """返回与前端 @dicebear/thumbs 完全一致的预设头像 PNG bytes。
 
-    正方形背景使用与前端 @dicebear/thumbs 相同的 12 色调色板，
-    圆心绘制用户名首字母（大写白色）。生成 256×256 PNG。
+    静态文件存放于 api_v1/static/api_v1/preset_avatars/preset_XX.png，
+    由 dicebear 公开 API 按相同 seed 与 backgroundColor 离线预生成，
+    视觉上与前端渲染完全一致。读取优先级：
+      1. Django staticfiles.finders.find()  → 开发环境直接命中 app 静态目录
+      2. settings.STATIC_ROOT               → 生产环境 collectstatic 后的汇总目录
+      3. 降级：Pillow 生成彩色首字母方块    → 上述均不可用时兜底
 
     Args:
-        username (str): Django 用户名，取首字母作为头像文字。
-        preset_id (str): 预设标识符，如 'preset:06'，用于查调色板。
+        username (str): Django 用户名（降级时用于取首字母）。
+        preset_id (str): 预设标识符，如 'preset:06'。
 
     Returns:
         bytes: PNG 二进制，可直接传给 NcApiClient.upload_own_avatar()。
     """
+    import os
+    from django.conf import settings
+    from django.contrib.staticfiles import finders
+
+    num = preset_id.replace(PRESET_PREFIX, "")  # '01' ~ '12'
+    rel_path = f"preset_avatars/preset_{num}.png"
+
+    # 优先通过 Django staticfiles finders 查找（开发环境命中 app static 目录）
+    found = finders.find(rel_path)
+    if found and os.path.isfile(found):
+        with open(found, "rb") as f:
+            return f.read()
+
+    # 生产环境：collectstatic 后文件在 STATIC_ROOT
+    static_root_path = os.path.join(getattr(settings, "STATIC_ROOT", ""), rel_path)
+    if os.path.isfile(static_root_path):
+        with open(static_root_path, "rb") as f:
+            return f.read()
+
+    # 降级：预生成文件不可用时，用 Pillow 生成彩色首字母方块
     import io
     from PIL import Image, ImageDraw, ImageFont  # type: ignore[import]
 
@@ -99,15 +123,12 @@ def make_preset_png(username: str, preset_id: str) -> bytes:
     g = int(hex_color[2:4], 16)
     b = int(hex_color[4:6], 16)
 
-    # 正方形画布（NC 会自动裁圆）
     img = Image.new("RGB", (size, size), (r, g, b))
     draw = ImageDraw.Draw(img)
 
-    # 首字母居中
     letter = (username[0] if username else "U").upper()
     font_size = 110
     try:
-        # Pillow >= 10.0 支持 load_default(size=)
         font = ImageFont.load_default(size=font_size)  # type: ignore[call-arg]
     except TypeError:
         font = ImageFont.load_default()
