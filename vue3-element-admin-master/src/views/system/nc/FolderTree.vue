@@ -967,8 +967,8 @@ async function submitMkdir(): Promise<void> {
 
 .perm-table {
   flex: 1;
-  padding: 0 20px 16px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 
   :deep(.el-table__cell) {
     padding: 6px 0; // 压缩行高
@@ -980,6 +980,11 @@ async function submitMkdir(): Promise<void> {
 
   :deep(.el-table__inner-wrapper::before) {
     display: none;
+  }
+
+  // 无数据时撑高空块，使"暂无数据"居中显示
+  :deep(.el-table__empty-block) {
+    min-height: 300px;
   }
 }
 
