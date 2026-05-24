@@ -514,6 +514,12 @@ class Command(BaseCommand):
                                 _dept_admin_ng_by_dept.get(dept_ng_for_rule.dept_id)
                                 or dept_ng_for_rule
                             )
+                            # 在根目录设置 READ-only 限制基线，防止 DEPT_ADMIN 全权滲透到整个文件夹树
+                            # 仅当规则不是根目录本身时（根目录规则就是授权依据，无需额外限制）
+                            if mount_point != rule.nc_path:
+                                NcSyncService.enqueue_restrict_folder_root(
+                                    mount_point, rule.user.username
+                                )
                         else:
                             _group_for_rule = dept_ng_for_rule
                         NcSyncService.enqueue_add_to_group(

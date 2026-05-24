@@ -309,6 +309,34 @@ class NcSyncService:
             },
         )
 
+    @staticmethod
+    def enqueue_restrict_folder_root(mount_point: str, username: str) -> NcSyncTask:
+        """(入队：在 Group Folder 根目录为指定用户设置 READ-only 限制。
+
+        NC Group Folder ACL 只能「向下限制」权限。当用户被加入 DEPT_ADMIN 群组
+        （grant=31）以便在某子路径获得写权限时，若不射击根目录的限制 ACL，
+        群组授权会淹透到整个文件夹树。此方法在根目录设置 mask=31, permissions=READ，
+        使其他没有显式 ACL 的子路径继承只读基线；子路径上的显式 ACL 规则会覆盖此继承值。
+
+        Args:
+            mount_point (str): Group Folder 挂载点名称（不含首尾斜杠）。
+            username (str): NC 用户名（Django User.username）。
+
+        Returns:
+            NcSyncTask: 已创建的任务记录。
+        """
+        from api_v1.models.nc.nc_file_access_rule import NcFileAccessRule  # noqa: PLC0415
+        return NcSyncTask.objects.create(
+            operation=SyncOperation.SET_PATH_ACL,
+            payload={
+                "rule_id": None,
+                "nc_path": mount_point.strip("/"),
+                "username": username,
+                "permissions": NcFileAccessRule.PERM_READ,
+                "mask": 31,
+            },
+        )
+
     # ------------------------------------------------------------------ #
     #  高级语义方法：用户状态变更入队（供 view 层调用）                     #
     # ------------------------------------------------------------------ #

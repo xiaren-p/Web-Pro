@@ -704,6 +704,12 @@ def _enqueue_acl_for_rule(rule: NcFileAccessRule, nc_group: NcGroup) -> None:
                 dept_id=nc_group.dept_id,
             ).first()
             group_to_join = dept_admin_ng or dept_ng  # 无 DEPT_ADMIN 记录时降级到 DEPT
+            # DEPT_ADMIN 群组授权覆盖整个文件夹树（grant=31）。
+            # 若规则不是根目录本身，必须在根目录设置 READ-only 限制基线，
+            # 防止其他没有显式 ACL 的子目录被防透全权。
+            mount_point = rule.nc_path.split("/")[0]
+            if mount_point != rule.nc_path:
+                NcSyncService.enqueue_restrict_folder_root(mount_point, rule.user.username)
         else:
             group_to_join = dept_ng
         NcSyncService.enqueue_add_to_group(rule.user.username, group_to_join.code)
