@@ -154,6 +154,9 @@ class AuthViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["delete", "get", "post"], url_path="logout")
     def logout(self, request):  # pragma: no cover
+        # 提前缓存用户引用：django_logout() 会清空 request.user，之后无法取到
+        logout_user = request.user if request.user and request.user.is_authenticated else None
+
         # 撤销 JWT access token
         try:
             from rest_framework.authentication import get_authorization_header
@@ -164,11 +167,17 @@ class AuthViewSet(viewsets.ViewSet):
         except Exception:
             pass
         # 同时清除 Django Session，防止 ssoSession 建立的 Session Cookie
-        # 尋达退出后残留并导致下次登录被 SessionAuthentication 强制校验 CSRF。
+        # 退出后残留并导致下次登录被 SessionAuthentication 强制校验 CSRF。
         try:
             django_logout(request)
         except Exception:
             pass
+
+        # OIDC Back-Channel Logout：向 NC 推送注销令牌，实现无感同步退出
+        if logout_user is not None:
+            from api_v1.services.oidc.oidc_logout_service import push_backchannel_logout
+            push_backchannel_logout(logout_user)
+
         return drf_ok(status=204)
 
     @action(detail=False, methods=["get"], url_path="captcha")
