@@ -243,8 +243,7 @@ DEFAULT_AVATAR_URL = env('DEFAULT_AVATAR_URL')
 # 对外可访问的后端 URL（例如内部开发机对局域网可见的 IP）
 BACKEND_EXTERNAL_URL = env('BACKEND_EXTERNAL_URL')
 ONLINE_STALE_SECONDS = env('ONLINE_STALE_SECONDS')
-# 是否允许 Django 在非 DEBUG 模式下通过视图直接提供媒体文件（仅在你确知需要 nginx 反代到 Django 时开启）
-# 该变量在 urls.py 中通过 getattr(settings, 'DJANGO_SERVE_MEDIA', False) 读取
+# 是否允许 Django 在非 DEBUG 模式下通过视图直接提供媒体文件（默认开启，整域名反代到 Django 时无需关闭）
 DJANGO_SERVE_MEDIA = env('DJANGO_SERVE_MEDIA')
 
 # CORS
