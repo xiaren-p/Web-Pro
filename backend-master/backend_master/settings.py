@@ -332,6 +332,8 @@ SESSION_COOKIE_SAMESITE = 'None'
 SECURE_HSTS_SECONDS = env('SECURE_HSTS_SECONDS')
 # 反向代理 HTTPS 透传：告知 Django 外层已是 HTTPS，修复 Admin CSRF 403
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# 让 request.get_host() 优先使用 X-Forwarded-Host，修复反代后 build_absolute_uri 丢失 Host 的问题
+USE_X_FORWARDED_HOST = True
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_BROWSER_XSS_FILTER = True
