@@ -1,7 +1,37 @@
 """NC 文件访问规则序列化器（nc_file_access_rule）。"""
+from django.conf import settings
 from rest_framework import serializers
 
 from api_v1.models.nc.nc_file_access_rule import NcFileAccessRule
+
+
+def _build_avatar_url(avatar: str) -> str:
+    """将 UserProfile.avatar 字段转换为前端可直接使用的完整 URL。
+
+    Args:
+        avatar (str): UserProfile.avatar 原始值，可能是 preset:XX、上传路径或空串。
+
+    Returns:
+        str: 完整 URL（含 BACKEND_EXTERNAL_URL 前缀），或原始 preset 字符串，或空串。
+    """
+    if not avatar:
+        return ""
+    if avatar.startswith("preset:"):
+        # preset 类型由前端用 avatarColor 渲染，无需 URL
+        return avatar
+    if avatar.startswith(("http://", "https://")):
+        return avatar
+    base = settings.MEDIA_URL.rstrip("/")
+    if avatar.startswith("/media/"):
+        rel = avatar
+    elif avatar.startswith("media/"):
+        rel = "/" + avatar
+    elif avatar.startswith("uploads/"):
+        rel = base + "/" + avatar
+    else:
+        rel = avatar if avatar.startswith("/") else "/" + avatar
+    external = (getattr(settings, "BACKEND_EXTERNAL_URL", "") or "").rstrip("/")
+    return external + rel if external else rel
 
 
 class NcFileRuleReadSerializer(serializers.ModelSerializer):
@@ -48,6 +78,8 @@ class NcFileRuleReadSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    avatarUrl = serializers.SerializerMethodField()
+
     class Meta:
         model = NcFileAccessRule
         fields = [
@@ -56,6 +88,7 @@ class NcFileRuleReadSerializer(serializers.ModelSerializer):
             "username",
             "userNickname",
             "deptName",
+            "avatarUrl",
             "ncPath",
             "permissionBits",
             "permLabels",
@@ -83,6 +116,15 @@ class NcFileRuleReadSerializer(serializers.ModelSerializer):
         if profile and profile.dept:
             return profile.dept.name
         return ""
+
+    def get_avatarUrl(self, obj: NcFileAccessRule) -> str:
+        """从关联 UserProfile.avatar 构建完整头像 URL，无头像时返回空串。
+
+        Returns:
+            str: 完整 URL 或 preset:XX 字符串（前端按后者使用 avatarColor 回退）。
+        """
+        profile = getattr(obj.user, "profile", None)
+        return _build_avatar_url(profile.avatar if profile and profile.avatar else "")
 
     def get_permLabels(self, obj: NcFileAccessRule) -> list[str]:
         """将 permission_bits 位图解析为可读权限标签列表。

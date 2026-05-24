@@ -109,6 +109,7 @@
               <template #default="scope">
                 <el-button
                   v-hasPerm="'sys:user:reset-password'"
+                  v-show="canWriteUser(scope.row)"
                   type="primary"
                   icon="RefreshLeft"
                   size="small"
@@ -119,6 +120,7 @@
                 </el-button>
                 <el-button
                   v-hasPerm="'sys:user:edit'"
+                  v-show="canWriteUser(scope.row)"
                   type="primary"
                   icon="edit"
                   link
@@ -129,6 +131,7 @@
                 </el-button>
                 <el-button
                   v-hasPerm="'sys:user:delete'"
+                  v-show="canWriteUser(scope.row)"
                   type="danger"
                   icon="delete"
                   link
@@ -165,6 +168,25 @@ import DeptTree from "./components/DeptTree.vue";
 import UserFormDrawer from "./components/UserFormDrawer.vue";
 
 const userStore = useUserStore();
+
+/**
+ * 判断当前登录用户是否有权限对目标用户执行写操作（编辑、删除、重置密码）。
+ * - COMPANY_ADMIN（1）或未知级别：全权访问。
+ * - DEPT_ADMIN（2）：仅允许操作与自身 deptId 相同的用户；后端负责子部门授权。
+ * - MEMBER（3）：无写权。
+ *
+ * @param {UserPageVO} row - 目标用户行数据。
+ * @returns {boolean} 是否允许对该用户执行写操作。
+ */
+function canWriteUser(row: UserPageVO): boolean {
+  const { adminLevel, deptId } = userStore.userInfo;
+  // COMPANY_ADMIN 或超管：全权
+  if (!adminLevel || adminLevel === 1) return true;
+  // MEMBER：无写权
+  if (adminLevel === 3) return false;
+  // DEPT_ADMIN：仅允许操作本部门用户，后端负责子部门授权检查
+  return !!deptId && row.deptId === deptId;
+}
 defineOptions({
   name: "User",
   inheritAttrs: false,

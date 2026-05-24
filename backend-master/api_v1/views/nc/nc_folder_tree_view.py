@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
@@ -693,16 +694,14 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
             ]
         """
 
-        # 取有权管理的活跃用户（部门管理员只能看自身部门及子部门的用户）
-        allowed = _get_caller_dept_ids(request.user)
-        user_qs = UserProfile.objects.filter(user__is_active=True)
-        if allowed is not None:
-            user_qs = user_qs.filter(dept_id__in=list(allowed))
-        profiles = (
-            user_qs
+        # 取全部活跃用户（不再按调用方部门过滤，权限分配允许跨部门选择用户）
+        user_qs = (
+            UserProfile.objects.filter(user__is_active=True)
             .select_related("user", "dept")
             .order_by("dept__order_num", "dept_id", "user__username")
         )
+
+        profiles = user_qs
 
         # 按部门分组构建树结构
         dept_map: dict[int | None, dict] = {}
@@ -726,6 +725,7 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
                 "id": profile.user_id,
                 "username": profile.user.username,
                 "nickname": profile.nickname or profile.user.username,
+                "avatar": _build_user_avatar_url(profile.avatar),
                 "type": "user",
             })
 
@@ -735,6 +735,36 @@ class NcFolderTreeViewSet(viewsets.ViewSet):
 # ------------------------------------------------------------------ #
 #  私有工具函数                                                         #
 # ------------------------------------------------------------------ #
+
+def _build_user_avatar_url(avatar: str | None) -> str:
+    """将 UserProfile.avatar 转换为前端可直接使用的完整 URL。
+
+    Args:
+        avatar (str | None): UserProfile.avatar 原始值，可能是 preset:XX、
+                             上传路径（uploads/...）或空值。
+
+    Returns:
+        str: 完整 URL（含 BACKEND_EXTERNAL_URL 前缀），preset 字符串原样返回，
+             无头像时返回空串。
+    """
+    if not avatar:
+        return ""
+    if avatar.startswith("preset:"):
+        return avatar
+    if avatar.startswith(("http://", "https://")):
+        return avatar
+    base = settings.MEDIA_URL.rstrip("/")
+    if avatar.startswith("/media/"):
+        rel = avatar
+    elif avatar.startswith("media/"):
+        rel = "/" + avatar
+    elif avatar.startswith("uploads/"):
+        rel = base + "/" + avatar
+    else:
+        rel = avatar if avatar.startswith("/") else "/" + avatar
+    external = (getattr(settings, "BACKEND_EXTERNAL_URL", "") or "").rstrip("/")
+    return external + rel if external else rel
+
 
 def _resolve_dept_admin_group(
     group_id_str: str | None,

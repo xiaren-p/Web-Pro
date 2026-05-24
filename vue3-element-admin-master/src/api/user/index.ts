@@ -19,6 +19,7 @@ export interface UserPageVO {
   email?: string;
   mobile?: string;
   gender?: number;
+  deptId?: number | null;
   deptName?: string;
   positionName?: string;
   adminLevelLabel?: string;

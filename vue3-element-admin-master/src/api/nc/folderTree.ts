@@ -28,6 +28,8 @@ export interface FolderRuleVO {
   userNickname: string;
   /** 所属部门名称 */
   deptName: string;
+  /** 用户头像 URL，上传图片则为完整 http URL，preset 则为 preset:XX */
+  avatarUrl?: string;
   ncPath: string;
   permissionBits: number;
   /** 权限标签列表，如 ["READ", "WRITE"] */
@@ -111,6 +113,8 @@ export interface UserTreeUser {
   username: string;
   /** 用户显示昵称 */
   nickname: string;
+  /** 用户头像 URL，上传图片则为完整 http URL，preset 则为 preset:XX */
+  avatar?: string;
   type: "user";
 }
 

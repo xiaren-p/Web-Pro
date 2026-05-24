@@ -86,8 +86,17 @@
           <el-table-column label="用户" min-width="200">
             <template #default="{ row }: { row: FolderRuleVO }">
               <div class="user-cell">
-                <div class="user-avatar" :style="{ background: avatarColor(row.username) }">
-                  {{ row.username.charAt(0).toUpperCase() }}
+                <div
+                  class="user-avatar"
+                  :style="!isRealAvatarUrl(row.avatarUrl) ? { background: avatarColor(row.username) } : {}"
+                >
+                  <img
+                    v-if="isRealAvatarUrl(row.avatarUrl)"
+                    :src="row.avatarUrl"
+                    class="user-avatar-img"
+                    alt=""
+                  />
+                  <span v-else>{{ row.username.charAt(0).toUpperCase() }}</span>
                 </div>
                 <div class="user-info">
                   <div class="user-main">
@@ -399,6 +408,16 @@ type UserTreeNode =
  * @param {string} name - 用户名
  * @returns {string} CSS 颜色字符串
  */
+/**
+ * 判断 avatarUrl 是否为真实可展示的图片地址（非 preset 占位符）。
+ *
+ * @param {string | undefined} url - 后端返回的 avatarUrl 字段。
+ * @returns {boolean} 是否可直接用 img src 展示。
+ */
+function isRealAvatarUrl(url: string | undefined): boolean {
+  return !!url && (url.startsWith('http://') || url.startsWith('https://'));
+}
+
 function avatarColor(name: string): string {
   const palette = ['#1677ff', '#52c41a', '#fa8c16', '#722ed1', '#13c2c2', '#eb2f96', '#2f54eb'];
   let hash = 0;
@@ -1034,6 +1053,14 @@ async function submitMkdir(): Promise<void> {
   font-size: 12px;
   font-weight: 600;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.user-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .user-info {
