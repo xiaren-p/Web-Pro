@@ -376,11 +376,12 @@ class NcApiClient:
         filename = _ext_map.get(mime_type, "avatar.jpg")
 
         # 步骤1：上传图片至 NC 临时缓冲区
+        # 字段名使用 "files" 而非 "files[0]"，兼容 NC 各版本的 getUploadedFile('files') 解析逻辑
         url_upload = f"{self._base}/index.php/avatar"
         try:
             resp1 = self._session.post(
                 url_upload,
-                files={"files[0]": (filename, _io.BytesIO(image_bytes), mime_type)},
+                files={"files": (filename, _io.BytesIO(image_bytes), mime_type)},
                 verify=self._verify,
                 timeout=30,
             )
@@ -391,14 +392,26 @@ class NcApiClient:
                 f"[NcApiClient][upload_own_avatar] step1-upload 失败: user={self._admin_user} err={exc}"
             ) from exc
 
-        # NC 返回 {"status": "success", "data": {"dimension": N}}，取尺寸用于裁剪坐标
+        # NC 返回 {"data": {"dimension": N}}，取尺寸用于裁剪坐标；若无 dimension 则用默认值 512
         dimension = 512
         try:
-            dimension = int((body1.get("data") or {}).get("dimension") or 512)
+            _d = int((body1.get("data") or {}).get("dimension") or 0)
+            if _d > 0:
+                dimension = _d
         except (TypeError, ValueError):
             pass
 
+        # 检查步骤1是否有效：成功响应应包含 dimension，若包含 message 则说明上传被拒绝
+        _err_msg = (body1.get("data") or {}).get("message") or ""
+        if _err_msg:
+            raise RuntimeError(
+                f"[NcApiClient][upload_own_avatar] step1-upload NC 拒绝文件: "
+                f"user={self._admin_user} msg={_err_msg}"
+            )
+
         # 步骤2：提交全图裁剪坐标（x=0, y=0, w=dimension, h=dimension 等价于无裁剪）
+        # 部分 NC 版本（如 NC 30+）step1 已直接落盘，/avatar/cropped 路由不存在会返回 404；
+        # 此时 404 视为"步骤1已完成落盘"，按正常成功处理，不抛出异常。
         url_crop = f"{self._base}/index.php/avatar/cropped"
         try:
             resp2 = self._session.post(
@@ -407,7 +420,15 @@ class NcApiClient:
                 verify=self._verify,
                 timeout=30,
             )
-            resp2.raise_for_status()
+            if resp2.status_code == 404:
+                # 此 NC 版本步骤1已直接落盘，/avatar/cropped 路由不存在属正常现象
+                logger.info(
+                    "[NcApiClient][upload_own_avatar] user=%s step2-crop 端点不存在 (404)，"
+                    "步骤1 已直接落盘，跳过裁剪",
+                    self._admin_user,
+                )
+            else:
+                resp2.raise_for_status()
         except requests.RequestException as exc:
             raise RuntimeError(
                 f"[NcApiClient][upload_own_avatar] step2-crop 失败: user={self._admin_user} err={exc}"
