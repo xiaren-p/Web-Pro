@@ -49,7 +49,7 @@ class Command(BaseCommand):
             "--nc-sync",
             action="store_true",
             default=False,
-            help="重置完成后将预设头像同步到 Nextcloud（需 NC 配置正常）",
+            help="保留参数（预设头像为前端 data URI，无需 NC 同步；此参数对 reset 命令无实际效果）",
         )
 
     def handle(self, *args, **options):
@@ -114,17 +114,16 @@ class Command(BaseCommand):
             processed += 1
             self.stdout.write(f"  已更新 {username}: {new_preset!r}")
 
-            # NC 同步：预设头像无二进制数据，向 NC 发送删除请求，让 NC 回退到首字母默认头像
+            # 预设头像在前端通过 DiceBear 实时渲染为 data URI，不存在真实图片文件，
+            # 也无需写入 NC（NC 的 OCS API 不支持管理员删除其他用户头像）。
+            # --nc-sync 仅对"自定义上传头像"有意义，此处跳过。
             if nc_client:
-                try:
-                    nc_client._delete(f"/ocs/v1.php/cloud/users/{username}/avatar")
-                    nc_ok += 1
-                    logger.info("[reset_user_avatars] NC 头像已重置为默认: user=%s", username)
-                except Exception as exc:
-                    nc_fail += 1
-                    logger.warning(
-                        "[reset_user_avatars] NC 同步失败（不阻断）: user=%s err=%s", username, exc
-                    )
+                nc_ok += 1
+                logger.info(
+                    "[reset_user_avatars] 预设头像无需 NC 同步，已跳过: user=%s preset=%s",
+                    username,
+                    new_preset,
+                )
 
         # 结果摘要
         self.stdout.write(self.style.SUCCESS(
