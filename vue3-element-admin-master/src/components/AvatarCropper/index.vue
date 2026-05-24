@@ -189,9 +189,19 @@ function handleRotateBack(): void {
   background: #161616;
   border-radius: 6px;
 
+  // 原始 img 节点：Cropper.js v2 初始化后会隐藏它，此样式仅在初始化前短暂生效
   .cropper-source {
     display: block;
     max-width: 100%;
+  }
+
+  // Cropper.js v2 以 Web Component 形式渲染，<cropper-canvas> 不会自动撑满父容器，
+  // 必须显式设置 width/height 才能填满 400px 包裹层，否则画布仅与图片原始尺寸等高，
+  // 剩余空间显示背景色（黑色），造成截图中所示的"只有顶部有图、下方全黑"的错误效果。
+  :deep(cropper-canvas) {
+    display: block;
+    width: 100%;
+    height: 100%;
   }
 }
 

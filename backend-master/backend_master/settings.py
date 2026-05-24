@@ -35,7 +35,7 @@ env = environ.Env(
     # 在线用户心跳过期秒数（超过该秒数未 ping 视为离线）
     ONLINE_STALE_SECONDS=(int, 180),
     # 是否允许 Django 在非 DEBUG 模式下通过视图直接提供媒体文件（仅在你确知需要 nginx 反代到 Django 时开启）
-    DJANGO_SERVE_MEDIA=(bool, False),
+    DJANGO_SERVE_MEDIA=(bool, True),
     # 默认头像
     DEFAULT_AVATAR_URL=(str, 'https://foruda.gitee.com/images/1723603502796844527/03cdca2a_716974.gif'),
     # 图片同步服务地址
