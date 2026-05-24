@@ -139,9 +139,10 @@ class Command(BaseCommand):
                 skip += 1
                 continue
 
-            # ④ 用管理员凭据上传头像到 NC（admin 级 OCS API，更可靠）
+            # ④ 用用户级凭据上传头像到 NC（密码刚被重置，保证可用）
             try:
-                admin_client.update_user_avatar(username, avatar_bytes, mime_type)  # type: ignore[union-attr]
+                user_nc = NcApiClient.for_user(username, nc_password)
+                user_nc.upload_own_avatar(avatar_bytes, mime_type)
                 logger.info("[sync_nc_avatars] NC 头像已同步: user=%s", username)
                 self.stdout.write(self.style.SUCCESS(f"  [OK] {username}"))
                 ok += 1

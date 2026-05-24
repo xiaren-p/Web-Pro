@@ -17,11 +17,15 @@
     python manage.py reset_user_avatars --force --nc-sync
 """
 import logging
+import secrets
+import string
 
 from django.core.management.base import BaseCommand
 
 from api_v1.models.system.user_profile import UserProfile
+from api_v1.services.nc.nc_api_client import NcApiClient
 from api_v1.utils.avatar_presets import get_random_preset, is_local_upload, is_preset, make_preset_png
+from api_v1.utils.fernet_crypto import encrypt_value
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +53,8 @@ class Command(BaseCommand):
             action="store_true",
             default=False,
             help=(
-                "尝试将预设头像同步到 Nextcloud（POST 上传 PNG）。"
-                "若 NC 实例不支持管理员为其他用户设置头像（返回 405），"
-                "则自动降级为跳过（nc_skip），NC 仍显示自动生成的默认彩色头像。"
+                "尝试将预设头像同步到 Nextcloud（使用用户级凭据 POST /index.php/avatar）。"
+                "如未设置 NC 应用密码，则先通过管理员 API 自动重置。"
             ),
         )
 
@@ -69,13 +72,11 @@ class Command(BaseCommand):
         skipped = 0
         nc_ok = 0
         nc_fail = 0
-        nc_skip = 0  # NC 端点不支持（405）时的降级计数
 
         # 仅在需要 NC 同步时才初始化客户端
         nc_client = None
         if nc_sync and not dry_run:
             try:
-                from api_v1.services.nc.nc_api_client import NcApiClient
                 nc_client = NcApiClient.from_settings()
             except Exception as exc:
                 self.stderr.write(f"[reset_user_avatars] NC 客户端初始化失败，将跳过同步: {exc}")
@@ -118,13 +119,20 @@ class Command(BaseCommand):
             processed += 1
             self.stdout.write(f"  已更新 {username}: {new_preset!r}")
 
-            # NC 同步：用 Pillow 生成与前端同色调的 PNG，通过 POST 上传。
-            # NC OCS API 支持 POST 上传头像（/ocs/v1.php/cloud/users/{user}/avatar），
-            # 但不支持管理员 DELETE 其他用户头像（返回 405），故只做上传不做删除。
+            # NC 同步：确保用户有有效 NC 凭据，再用用户级客户端上传预设 PNG
             if nc_client:
                 try:
+                    nc_pwd = (profile.get_nc_password() if hasattr(profile, "get_nc_password") else "") or ""
+                    if not nc_pwd:
+                        # nc_app_password 为空：先重置一个随机 NC 密码并存入库
+                        _chars = string.ascii_letters + string.digits + "!@#$"
+                        nc_pwd = "".join(secrets.choice(_chars) for _ in range(20))
+                        nc_client.update_user_password(username, nc_pwd)
+                        profile.nc_app_password = encrypt_value(nc_pwd)
+                        profile.save(update_fields=["nc_app_password"])
+
                     png_bytes = make_preset_png(username, new_preset)
-                    nc_client.update_user_avatar(username, png_bytes, mime_type="image/png")
+                    NcApiClient.for_user(username, nc_pwd).upload_own_avatar(png_bytes, "image/png")
                     nc_ok += 1
                     logger.info(
                         "[reset_user_avatars] NC 头像已上传: user=%s preset=%s",
@@ -132,28 +140,18 @@ class Command(BaseCommand):
                         new_preset,
                     )
                 except Exception as exc:
-                    # 405 = NC 不允许管理员设置其他用户头像（API 设计限制，非配置错误）
-                    # NC 会自动为该用户显示默认彩色首字母头像，业务上可接受，降级为跳过
-                    if "405" in str(exc):
-                        nc_skip += 1
-                        logger.info(
-                            "[reset_user_avatars] NC 头像同步不支持 (405)，已降级跳过: user=%s"
-                            "  → NC 将自动显示默认头像",
-                            username,
-                        )
-                    else:
-                        nc_fail += 1
-                        logger.warning(
-                            "[reset_user_avatars] NC 同步失败: user=%s reason=%s",
-                            username,
-                            exc,
-                        )
-                        self.stderr.write(f"  NC 同步失败 {username}: {exc}")
+                    nc_fail += 1
+                    logger.warning(
+                        "[reset_user_avatars] NC 同步失败: user=%s reason=%s",
+                        username,
+                        exc,
+                    )
+                    self.stderr.write(f"  NC 同步失败 {username}: {exc}")
 
         # 结果摘要
         nc_summary = ""
         if nc_sync:
-            nc_summary = f"，NC成功={nc_ok}，NC跳过(405)={nc_skip}，NC失败={nc_fail}"
+            nc_summary = f"，NC成功={nc_ok}，NC失败={nc_fail}"
         self.stdout.write(self.style.SUCCESS(
             f"\n[reset_user_avatars] 完成。"
             f"处理={processed}，跳过={skipped}"

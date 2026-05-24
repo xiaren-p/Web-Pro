@@ -25,7 +25,7 @@ from api_v1.serializers import UserSerializer
 from api_v1.utils.responses import drf_ok, drf_error
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.image_validator import validate_image_file, resize_image_to_square
-from api_v1.utils.avatar_presets import get_random_preset, is_local_upload
+from api_v1.utils.avatar_presets import get_random_preset, is_local_upload, is_preset, make_preset_png
 from api_v1.services.nc.nc_sync_service import NcSyncService
 from api_v1.services.nc.nc_api_client import NcApiClient
 
@@ -486,11 +486,36 @@ class UserViewSet(viewsets.ViewSet):
         payload = request.data.copy()
         profile = getattr(user, "profile", None)
         if profile:
+            _old_avatar = profile.avatar or ""
             profile.nickname = payload.get("nickname", profile.nickname)
             profile.mobile = payload.get("mobile", profile.mobile)
             profile.avatar = payload.get("avatar", profile.avatar)
             profile.dept_id = payload.get("deptId", profile.dept_id)
             profile.save()
+            # 切换了预设头像时，将 Pillow 生成的 PNG 同步至 NC
+            _new_avatar = profile.avatar or ""
+            if _new_avatar != _old_avatar and is_preset(_new_avatar):
+                try:
+                    import secrets as _secrets
+                    import string as _string
+                    from api_v1.utils.fernet_crypto import encrypt_value as _encrypt
+
+                    _nc_pwd = profile.get_nc_password() or ""
+                    if not _nc_pwd:
+                        _chars = _string.ascii_letters + _string.digits + "!@#$"
+                        _nc_pwd = "".join(_secrets.choice(_chars) for _ in range(20))
+                        NcApiClient.from_settings().update_user_password(user.username, _nc_pwd)
+                        profile.nc_app_password = _encrypt(_nc_pwd)
+                        profile.save(update_fields=["nc_app_password"])
+
+                    _png = make_preset_png(user.username, _new_avatar)
+                    NcApiClient.for_user(user.username, _nc_pwd).upload_own_avatar(_png, "image/png")
+                except Exception as exc:
+                    logger.warning(
+                        "[UserViewSet][profile_put] NC 头像同步失败（不阻断）: user=%s err=%s",
+                        user.username,
+                        exc,
+                    )
         user.email = payload.get("email", user.email)
         user.save()
         return drf_ok(UserSerializer(user).data)
@@ -571,10 +596,23 @@ class UserViewSet(viewsets.ViewSet):
             profile.avatar = new_url
             profile.save(update_fields=["avatar"])
 
-        # ⑥ NC 头像同步（管理员级 OCS API，不依赖 nc_app_password，失败仅记录 WARNING 不阻断响应）
+        # ⑥ NC 头像同步（用户凭据，必要时通过管理员 API 先重置密码，失败仅记录 WARNING 不阻断响应）
         try:
-            nc_admin = NcApiClient.from_settings()
-            nc_admin.update_user_avatar(user.username, resized_bytes, "image/jpeg")
+            import secrets as _secrets
+            import string as _string
+            from api_v1.utils.fernet_crypto import encrypt_value as _encrypt
+
+            _nc_pwd = (profile.get_nc_password() if profile else "") or ""
+            if not _nc_pwd:
+                # nc_app_password 未设置：通过管理员 API 重置一个随机密码并存入库
+                _chars = _string.ascii_letters + _string.digits + "!@#$"
+                _nc_pwd = "".join(_secrets.choice(_chars) for _ in range(20))
+                NcApiClient.from_settings().update_user_password(user.username, _nc_pwd)
+                if profile:
+                    profile.nc_app_password = _encrypt(_nc_pwd)
+                    profile.save(update_fields=["nc_app_password"])
+
+            NcApiClient.for_user(user.username, _nc_pwd).upload_own_avatar(resized_bytes, "image/jpeg")
         except Exception as exc:
             logger.warning(
                 "[UserViewSet][upload_avatar] NC 头像同步失败（不阻断）: user=%s err=%s",
