@@ -82,7 +82,7 @@
           class="perm-table"
           :header-cell-style="{ background: '#f5f7fa', color: '#606266', fontWeight: '600', fontSize: '13px' }"
         >
-          <el-table-column label="用户" width="200">
+          <el-table-column label="用户" min-width="200">
             <template #default="{ row }: { row: FolderRuleVO }">
               <div class="user-cell">
                 <div class="user-avatar">
@@ -103,7 +103,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="权限" width="220">
+          <el-table-column label="权限" width="400">
             <template #default="{ row }: { row: FolderRuleVO }">
               <div class="perm-badges">
                 <span
@@ -116,7 +116,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="状态" width="88" align="center">
+          <el-table-column label="状态" width="120" align="center">
             <template #default="{ row }: { row: FolderRuleVO }">
               <div class="status-wrap">
                 <span class="status-dot" :class="row.status ? 'status-dot--on' : 'status-dot--off'" />
@@ -125,7 +125,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="120" align="center">
+          <el-table-column label="操作" width="180" align="center">
             <template #default="{ row }: { row: FolderRuleVO }">
               <el-button v-hasPerm="['nc:folder:setperm']" link type="primary" size="small" @click="openEditRule(row)">
                 编辑

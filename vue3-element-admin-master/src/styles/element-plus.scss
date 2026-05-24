@@ -2,6 +2,9 @@ $border: 1px solid var(--el-border-color-light);
 
 /* el-dialog */
 .el-dialog {
+  border-radius: 10px;
+  overflow: hidden;
+
   .el-dialog__header {
     padding: 15px 20px;
     margin: 0;
@@ -20,6 +23,8 @@ $border: 1px solid var(--el-border-color-light);
 
 /** el-drawer */
 .el-drawer {
+  border-radius: 10px 0 0 10px;
+
   .el-drawer__header {
     padding: 15px 20px;
     margin: 0;
@@ -42,4 +47,104 @@ $border: 1px solid var(--el-border-color-light);
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+// ─── El Card 全局精化 ────────────────────────────────────────────────────────
+
+.el-card {
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-lighter);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+  .el-card__header {
+    padding: 14px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+
+  .el-card__body {
+    padding: 20px;
+  }
+}
+
+// ─── El Table 全局精化 ───────────────────────────────────────────────────────
+
+.el-table {
+  font-size: 13px;
+
+  // 表头单元格：深背景 + 加重字体
+  th.el-table__cell {
+    background-color: #f5f7fa;
+    color: #606273;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  td.el-table__cell {
+    font-size: 13px;
+    color: var(--el-text-color-primary);
+  }
+}
+
+// ─── El Button 全局精化 ──────────────────────────────────────────────────────
+
+.el-button {
+  font-weight: 500;
+  border-radius: 6px;
+}
+
+// ─── El Input / Select 全局精化 ─────────────────────────────────────────────
+
+.el-input .el-input__wrapper {
+  border-radius: 6px;
+}
+
+.el-textarea .el-textarea__inner {
+  border-radius: 6px;
+}
+
+.el-select .el-input .el-input__wrapper {
+  border-radius: 6px;
+}
+
+// ─── El Form 全局精化 ────────────────────────────────────────────────────────
+
+.el-form-item__label {
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+}
+
+// ─── El Tag 全局精化 ─────────────────────────────────────────────────────────
+
+.el-tag {
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+// ─── El Pagination 全局精化 ──────────────────────────────────────────────────
+
+.el-pagination {
+  .el-pager li {
+    border-radius: 4px;
+  }
+
+  button {
+    border-radius: 4px;
+  }
+}
+
+// ─── El Popover 圆角 ─────────────────────────────────────────────────────────
+
+.el-popover.el-popper {
+  border-radius: 8px;
+}
+
+// ─── El Descriptions 全局精化 ────────────────────────────────────────────────
+
+.el-descriptions {
+  .el-descriptions__label {
+    font-weight: 500;
+    color: var(--el-text-color-regular);
+  }
 }
