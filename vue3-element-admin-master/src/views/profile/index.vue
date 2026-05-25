@@ -24,7 +24,9 @@
                 </el-tooltip>
                 <div class="overlay-divider" />
                 <el-tooltip content="选择预设" placement="top" :show-after="400">
-                  <el-icon class="overlay-icon" @click="presetDialogVisible = true"><Picture /></el-icon>
+                  <el-icon class="overlay-icon" @click="presetDialogVisible = true">
+                    <Picture />
+                  </el-icon>
                 </el-tooltip>
               </div>
               <input
@@ -216,7 +218,7 @@
     </el-dialog>
 
     <!-- 头像裁剪弹窗 -->
-    <avatar-cropper
+    <AvatarCropper
       v-model="cropperVisible"
       :src-url="cropperSrcUrl"
       @confirm="handleCropConfirm"
@@ -312,8 +314,6 @@ const passwordChangeForm = reactive<PasswordChangeForm>({});
 const mobileUpdateForm = reactive<MobileUpdateForm>({});
 const emailUpdateForm = reactive<EmailUpdateForm>({});
 
-
-
 // 修改密码校验规则
 const passwordChangeRules = {
   oldPassword: [{ required: true, message: "请输入原密码", trigger: "blur" }],
@@ -378,7 +378,7 @@ const handleOpenDialog = (type: DialogType) => {
 const handleSubmit = async () => {
   if (dialog.type === DialogType.ACCOUNT) {
     try {
-    await UserAPI.updateProfile({ ...userProfileForm });
+      await UserAPI.updateProfile({ ...userProfileForm });
       ElMessage.success("账号资料修改成功");
       dialog.visible = false;
       loadUserProfile();
@@ -610,9 +610,9 @@ onMounted(async () => {
 
       .avatar-overlay {
         position: absolute;
+        right: 0;
         bottom: 0;
         left: 0;
-        right: 0;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -622,8 +622,8 @@ onMounted(async () => {
         transition: opacity 0.22s ease;
 
         .overlay-icon {
-          flex: 1;
           display: flex;
+          flex: 1;
           justify-content: center;
           font-size: 17px;
           color: rgba(255, 255, 255, 0.88);
@@ -793,8 +793,8 @@ onMounted(async () => {
     }
 
     &.selecting {
-      cursor: wait;
       pointer-events: none;
+      cursor: wait;
     }
 
     .preset-check {

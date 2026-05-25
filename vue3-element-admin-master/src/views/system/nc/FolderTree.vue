@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="nc-perm-page">
     <!-- ===== 左侧：文件夹树 ===== -->
-    <div class="nc-sidebar">
+    <div class="nc-sidebar" :style="{ width: sidebarWidth + 'px' }">
       <div class="sidebar-header">
         <el-icon class="sidebar-icon"><FolderOpened /></el-icon>
         <span class="sidebar-title">文件夹目录</span>
@@ -28,6 +28,9 @@
         </el-tree>
       </el-scrollbar>
     </div>
+
+    <!-- ===== 拖拽分隔条 ===== -->
+    <div class="nc-resize-handle" @mousedown="handleResizeStart" />
 
     <!-- ===== 右侧：权限面板 ===== -->
     <div class="nc-main">
@@ -70,7 +73,12 @@
             >
               删除此目录
             </el-button>
-            <el-button v-hasPerm="['nc:folder:setperm']" type="primary" :icon="Plus" @click="openAddRule">
+            <el-button
+              v-hasPerm="['nc:folder:setperm']"
+              type="primary"
+              :icon="Plus"
+              @click="openAddRule"
+            >
               添加规则
             </el-button>
           </div>
@@ -81,14 +89,21 @@
           v-loading="rulesLoading"
           :data="rules"
           class="perm-table"
-          :header-cell-style="{ background: '#f5f7fa', color: '#606266', fontWeight: '600', fontSize: '13px' }"
+          :header-cell-style="{
+            background: '#f5f7fa',
+            color: '#606266',
+            fontWeight: '600',
+            fontSize: '13px',
+          }"
         >
           <el-table-column label="用户" min-width="200">
             <template #default="{ row }: { row: FolderRuleVO }">
               <div class="user-cell">
                 <div
                   class="user-avatar"
-                  :style="!isRealAvatarUrl(row.avatarUrl) ? { background: avatarColor(row.username) } : {}"
+                  :style="
+                    !isRealAvatarUrl(row.avatarUrl) ? { background: avatarColor(row.username) } : {}
+                  "
                 >
                   <img
                     v-if="isRealAvatarUrl(row.avatarUrl)"
@@ -121,7 +136,9 @@
                   :key="lbl"
                   class="perm-badge"
                   :class="`perm-badge--${lbl.toLowerCase()}`"
-                >{{ lbl }}</span>
+                >
+                  {{ lbl }}
+                </span>
               </div>
             </template>
           </el-table-column>
@@ -129,7 +146,10 @@
           <el-table-column label="状态" width="120" align="center">
             <template #default="{ row }: { row: FolderRuleVO }">
               <div class="status-wrap">
-                <span class="status-dot" :class="row.status ? 'status-dot--on' : 'status-dot--off'" />
+                <span
+                  class="status-dot"
+                  :class="row.status ? 'status-dot--on' : 'status-dot--off'"
+                />
                 <span class="status-text">{{ row.status ? "生效" : "停用" }}</span>
               </div>
             </template>
@@ -137,10 +157,22 @@
 
           <el-table-column label="操作" width="180" align="center">
             <template #default="{ row }: { row: FolderRuleVO }">
-              <el-button v-hasPerm="['nc:folder:setperm']" link type="primary" size="small" @click="openEditRule(row)">
+              <el-button
+                v-hasPerm="['nc:folder:setperm']"
+                link
+                type="primary"
+                size="small"
+                @click="openEditRule(row)"
+              >
                 编辑
               </el-button>
-              <el-button v-hasPerm="['nc:folder:delete']" link type="danger" size="small" @click="handleDeleteRule(row)">
+              <el-button
+                v-hasPerm="['nc:folder:delete']"
+                link
+                type="danger"
+                size="small"
+                @click="handleDeleteRule(row)"
+              >
                 删除
               </el-button>
             </template>
@@ -205,11 +237,11 @@
             </div>
             <div class="selected-user-tip" :class="{ active: ruleForm.userIds.length > 0 }">
               <template v-if="ruleForm.userIds.length">
-                已勾选 <strong>{{ ruleForm.userIds.length }}</strong> 个用户
+                已勾选
+                <strong>{{ ruleForm.userIds.length }}</strong>
+                个用户
               </template>
-              <template v-else>
-                请勾选用户，或勾选部门节点自动选中该部门所有成员
-              </template>
+              <template v-else>请勾选用户，或勾选部门节点自动选中该部门所有成员</template>
             </div>
           </template>
         </el-form-item>
@@ -242,7 +274,9 @@
           :loading="ruleDialog.loading"
           :disabled="!ruleDialog.ruleId && ruleForm.userIds.length === 0"
           @click="submitRule"
-        >确定</el-button>
+        >
+          确定
+        </el-button>
       </template>
     </el-dialog>
 
@@ -302,10 +336,16 @@
         </div>
 
         <!-- 受影响规则（预检加载中时显示 skeleton） -->
-        <div class="rmdir-info-row" style="align-items: flex-start;">
+        <div class="rmdir-info-row" style="align-items: flex-start">
           <span class="rmdir-label">影响规则</span>
           <div v-if="rmdirDialog.previewLoading" class="rmdir-preview-loading">
-            <el-icon class="is-loading"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M512 64a32 32 0 0 1 32 32v192a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32zm0 640a32 32 0 0 1 32 32v192a32 32 0 0 1-64 0V736a32 32 0 0 1 32-32zm448-192a32 32 0 0 1-32 32H736a32 32 0 1 1 0-64h192a32 32 0 0 1 32 32zM288 512a32 32 0 0 1-32 32H64a32 32 0 1 1 0-64h192a32 32 0 0 1 32 32zm411.44-235.26a32 32 0 0 1 0 45.26L563.18 458.26a32 32 0 1 1-45.26-45.26l136.26-136.26a32 32 0 0 1 45.26 0zm-355.62 355.62a32 32 0 0 1 0 45.26L207.56 813.88a32 32 0 1 1-45.26-45.26l136.26-136.26a32 32 0 0 1 45.26 0zm355.62 0a32 32 0 0 1 45.26 0l136.26 136.26a32 32 0 1 1-45.26 45.26L699.44 677.62a32 32 0 0 1 0-45.26zm-355.62-355.62a32 32 0 0 1 45.26 0L525.44 412.74a32 32 0 1 1-45.26 45.26L343.92 321.74a32 32 0 0 1 0-45.26z"/></svg></el-icon>
+            <el-icon class="is-loading">
+              <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M512 64a32 32 0 0 1 32 32v192a32 32 0 0 1-64 0V96a32 32 0 0 1 32-32zm0 640a32 32 0 0 1 32 32v192a32 32 0 0 1-64 0V736a32 32 0 0 1 32-32zm448-192a32 32 0 0 1-32 32H736a32 32 0 1 1 0-64h192a32 32 0 0 1 32 32zM288 512a32 32 0 0 1-32 32H64a32 32 0 1 1 0-64h192a32 32 0 0 1 32 32zm411.44-235.26a32 32 0 0 1 0 45.26L563.18 458.26a32 32 0 1 1-45.26-45.26l136.26-136.26a32 32 0 0 1 45.26 0zm-355.62 355.62a32 32 0 0 1 0 45.26L207.56 813.88a32 32 0 1 1-45.26-45.26l136.26-136.26a32 32 0 0 1 45.26 0zm355.62 0a32 32 0 0 1 45.26 0l136.26 136.26a32 32 0 1 1-45.26 45.26L699.44 677.62a32 32 0 0 1 0-45.26zm-355.62-355.62a32 32 0 0 1 45.26 0L525.44 412.74a32 32 0 1 1-45.26 45.26L343.92 321.74a32 32 0 0 1 0-45.26z"
+                />
+              </svg>
+            </el-icon>
             正在检查影响范围…
           </div>
           <div v-else-if="rmdirDialog.preview" class="rmdir-preview-content">
@@ -314,7 +354,9 @@
             </span>
             <template v-else>
               <span class="rmdir-rule-count">
-                共 <strong>{{ rmdirDialog.preview.ruleCount }}</strong> 条规则将被清除，影响用户：
+                共
+                <strong>{{ rmdirDialog.preview.ruleCount }}</strong>
+                条规则将被清除，影响用户：
               </span>
               <div class="rmdir-user-tags">
                 <el-tag
@@ -323,7 +365,9 @@
                   size="small"
                   type="warning"
                   effect="light"
-                >{{ u }}</el-tag>
+                >
+                  {{ u }}
+                </el-tag>
               </div>
             </template>
           </div>
@@ -339,7 +383,9 @@
               size="small"
             />
             <div class="rmdir-confirm-hint">
-              请输入 <strong>{{ activeNode?.name }}</strong> 以启用删除按钮
+              请输入
+              <strong>{{ activeNode?.name }}</strong>
+              以启用删除按钮
             </div>
           </div>
         </div>
@@ -365,12 +411,28 @@
  * NC 文件夹权限配置页面：左侧文件夹树 + 右侧 ACL 规则管理面板。
  * 所属板块：nc / 文件权限管理。
  */
-import type { FolderDeletePreview, FolderRuleVO, UserTreeDept, UserTreeUser } from "@/api/nc/folderTree";
+import type {
+  FolderDeletePreview,
+  FolderRuleVO,
+  UserTreeDept,
+  UserTreeUser,
+} from "@/api/nc/folderTree";
 
-import { computed, nextTick, reactive, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef, watch } from "vue";
 import { resolveAvatarSrc } from "@/utils/avatarPresets";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Delete, Folder, FolderAdd, FolderOpened, InfoFilled, Lock, OfficeBuilding, Plus, Refresh, User } from "@element-plus/icons-vue";
+import {
+  Delete,
+  Folder,
+  FolderAdd,
+  FolderOpened,
+  InfoFilled,
+  Lock,
+  OfficeBuilding,
+  Plus,
+  Refresh,
+  User,
+} from "@element-plus/icons-vue";
 
 import {
   batchSetFolderRules,
@@ -417,7 +479,7 @@ type UserTreeNode =
  */
 function isRealAvatarUrl(url: string | undefined): boolean {
   if (!url) return false;
-  return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('preset:');
+  return url.startsWith("http://") || url.startsWith("https://") || url.startsWith("preset:");
 }
 
 /**
@@ -427,15 +489,49 @@ function isRealAvatarUrl(url: string | undefined): boolean {
  * @returns {string} 可直接用于 img src 的地址。
  */
 function resolveRuleAvatar(url: string | undefined): string {
-  return resolveAvatarSrc(url ?? '');
+  return resolveAvatarSrc(url ?? "");
 }
 
 function avatarColor(name: string): string {
-  const palette = ['#1677ff', '#52c41a', '#fa8c16', '#722ed1', '#13c2c2', '#eb2f96', '#2f54eb'];
+  const palette = ["#1677ff", "#52c41a", "#fa8c16", "#722ed1", "#13c2c2", "#eb2f96", "#2f54eb"];
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return palette[Math.abs(hash) % palette.length];
 }
+
+// ─── 左侧宽度拖拽 ────────────────────────────────────────────────────────────────
+
+const SIDEBAR_MIN = 160;
+const SIDEBAR_MAX = 480;
+const sidebarWidth = ref(220);
+
+let _dragStartX = 0;
+let _dragStartWidth = 0;
+
+function handleResizeMove(e: MouseEvent): void {
+  const delta = e.clientX - _dragStartX;
+  sidebarWidth.value = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, _dragStartWidth + delta));
+}
+
+function handleResizeEnd(): void {
+  document.removeEventListener("mousemove", handleResizeMove);
+  document.removeEventListener("mouseup", handleResizeEnd);
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+}
+
+function handleResizeStart(e: MouseEvent): void {
+  _dragStartX = e.clientX;
+  _dragStartWidth = sidebarWidth.value;
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+  document.addEventListener("mousemove", handleResizeMove);
+  document.addEventListener("mouseup", handleResizeEnd);
+}
+
+onBeforeUnmount(() => {
+  handleResizeEnd();
+});
 
 // ─── 文件夹树 ─────────────────────────────────────────────────────────────────
 
@@ -611,11 +707,10 @@ watch(userSearchQuery, (val) => {
 });
 
 // TODO(类型): el-tree @check 的 checkedInfo 参数类型为 CheckedInfo（含 TreeNodeData），使用 any 过渡
-function handleUserTreeCheck(
-  _data: unknown,
-  state: { checkedNodes: unknown[] },
-): void {
-  const users = (state.checkedNodes as UserTreeNode[]).filter((n) => n.type === "user") as (UserTreeUser & {
+function handleUserTreeCheck(_data: unknown, state: { checkedNodes: unknown[] }): void {
+  const users = (state.checkedNodes as UserTreeNode[]).filter(
+    (n) => n.type === "user"
+  ) as (UserTreeUser & {
     nodeKey: string;
   })[];
   ruleForm.userIds = users.map((u) => u.id);
@@ -708,7 +803,7 @@ async function submitRule(): Promise<void> {
         status: ruleForm.status,
       });
       ElMessage.success(
-        `已处理 ${result.created + result.updated} 条规则（新建 ${result.created}，更新 ${result.updated}）`,
+        `已处理 ${result.created + result.updated} 条规则（新建 ${result.created}，更新 ${result.updated}）`
       );
     }
     ruleDialog.visible = false;
@@ -757,7 +852,7 @@ async function handleDeleteFolder(): Promise<void> {
   try {
     rmdirDialog.preview = await fetchFolderDeletePreview(
       activeNode.value.groupId,
-      activeNode.value.ncPath,
+      activeNode.value.ncPath
     );
   } catch {
     ElMessage.error("预检失败，请稍后重试");
@@ -784,7 +879,7 @@ async function submitDeleteFolder(): Promise<void> {
     rmdirDialog.visible = false;
     ElMessage.success(
       `目录「${targetNode.name}」已移入 NC 回收站` +
-        (result.deletedRules > 0 ? `，同步清除 ${result.deletedRules} 条权限规则` : ""),
+        (result.deletedRules > 0 ? `，同步清除 ${result.deletedRules} 条权限规则` : "")
     );
 
     // 通过已存储的 el-tree Node 的 parent 属性找父节点，无需 key 查找
@@ -849,38 +944,57 @@ async function submitMkdir(): Promise<void> {
 .nc-perm-page {
   display: flex;
   height: calc(100vh - 120px);
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   overflow: hidden;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 }
 
 // ─── 左侧侧边栏 ────────────────────────────────────────────────────────────────
 
-.nc-sidebar {
-  width: 220px;
+.nc-resize-handle {
+  position: relative;
+  z-index: 1;
   flex-shrink: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+
+  &::after {
+    position: absolute;
+    inset: 0 -2px;
+    content: "";
+  }
+
+  &:hover {
+    background: var(--el-color-primary-light-5);
+  }
+}
+
+.nc-sidebar {
   display: flex;
+  flex-shrink: 0;
   flex-direction: column;
-  border-right: 1px solid #e0e0e0;
-  background: #f3f3f3;
   overflow: hidden;
+  background: #f3f3f3;
+  border-right: 1px solid #e0e0e0;
 }
 
 .sidebar-header {
   display: flex;
-  align-items: center;
+  flex-shrink: 0;
   gap: 8px;
+  align-items: center;
   padding: 14px 16px;
   background: #f3f3f3;
   border-bottom: 1px solid #e0e0e0;
-  flex-shrink: 0;
 }
 
 .sidebar-icon {
-  color: var(--el-color-primary);
   font-size: 16px;
+  color: var(--el-color-primary);
 }
 
 .sidebar-title {
@@ -899,14 +1013,14 @@ async function submitMkdir(): Promise<void> {
 
 // 文件夹树样式
 .nc-tree {
-  background: transparent;
   padding: 4px 0;
+  background: transparent;
 
   :deep(.el-tree-node__content) {
     height: 34px;
-    border-radius: 4px;
-    margin: 1px 6px;
     padding-right: 6px;
+    margin: 1px 6px;
+    border-radius: 4px;
 
     &:hover {
       background: rgba(0, 0, 0, 0.05);
@@ -914,23 +1028,23 @@ async function submitMkdir(): Promise<void> {
   }
 
   :deep(.el-tree-node.is-current > .el-tree-node__content) {
-    background: #cce4f7;
-    color: #003d6b;
     font-weight: 500;
+    color: #003d6b;
+    background: #cce4f7;
   }
 }
 
 .tree-node-label {
   display: flex;
-  align-items: center;
   gap: 6px;
-  font-size: 13px;
+  align-items: center;
   min-width: 0;
+  font-size: 13px;
 
   .node-folder-icon {
-    color: #e0a020;
-    font-size: 15px;
     flex-shrink: 0;
+    font-size: 15px;
+    color: #e0a020;
   }
 
   .node-name {
@@ -941,25 +1055,25 @@ async function submitMkdir(): Promise<void> {
   }
 
   .node-lock-icon {
-    color: #999;
-    font-size: 12px;
     flex-shrink: 0;
+    font-size: 12px;
+    color: #999;
   }
 }
 
 // ─── 右侧主面板 ────────────────────────────────────────────────────────────────
 
 .nc-main {
-  flex: 1;
   display: flex;
+  flex: 1;
   flex-direction: column;
-  overflow: hidden;
   min-width: 0;
+  overflow: hidden;
 }
 
 .main-empty {
-  flex: 1;
   display: flex;
+  flex: 1;
   align-items: center;
   justify-content: center;
 }
@@ -967,13 +1081,13 @@ async function submitMkdir(): Promise<void> {
 // 顶部 header
 .main-header {
   display: flex;
+  flex-shrink: 0;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px 12px;
-  border-bottom: 1px solid #e0e0e0;
-  flex-shrink: 0;
-  gap: 12px;
   background: #fff;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .path-info {
@@ -985,17 +1099,17 @@ async function submitMkdir(): Promise<void> {
 
 .path-label {
   font-size: 11px;
+  font-weight: 500;
   color: #999;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  font-weight: 500;
 }
 
 .path-crumbs {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
   gap: 2px;
+  align-items: center;
 }
 
 .crumb-item {
@@ -1004,8 +1118,8 @@ async function submitMkdir(): Promise<void> {
   color: #888;
 
   &.crumb-last {
-    color: #1a1a1a;
     font-weight: 600;
+    color: #1a1a1a;
   }
 }
 
@@ -1016,17 +1130,17 @@ async function submitMkdir(): Promise<void> {
 
 .header-actions {
   display: flex;
+  flex-shrink: 0;
   gap: 8px;
   align-items: center;
-  flex-shrink: 0;
 }
 
 // ─── 表格 ──────────────────────────────────────────────────────────────────────
 
 .perm-table {
   flex: 1;
-  overflow-y: auto;
   overflow-x: hidden;
+  overflow-y: auto;
 
   :deep(.el-table__cell) {
     padding: 6px 0; // 压缩行高
@@ -1049,23 +1163,23 @@ async function submitMkdir(): Promise<void> {
 // 用户单元格
 .user-cell {
   display: flex;
-  align-items: center;
   gap: 10px;
+  align-items: center;
 }
 
 .user-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  background: #e1e1e1; // 由 :style 动态覆盖为 avatarColor
-  color: #fff;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
   font-size: 12px;
   font-weight: 600;
-  flex-shrink: 0;
-  overflow: hidden;
+  color: #fff;
+  background: #e1e1e1; // 由 :style 动态覆盖为 avatarColor
+  border-radius: 50%;
 }
 
 .user-avatar-img {
@@ -1084,8 +1198,8 @@ async function submitMkdir(): Promise<void> {
 
 .user-main {
   display: flex;
-  align-items: center;
   gap: 6px;
+  align-items: center;
 }
 
 .user-name {
@@ -1103,11 +1217,11 @@ async function submitMkdir(): Promise<void> {
   display: inline-block;
   padding: 1px 6px;
   font-size: 11px;
-  border-radius: 3px;
-  background: #f0f0f0;
-  border: 1px solid #e0e0e0;
   color: #666;
   white-space: nowrap;
+  background: #f0f0f0;
+  border: 1px solid #e0e0e0;
+  border-radius: 3px;
 }
 
 // 权限徽章 - Win11 极简风格：统一浅灰底 + 轻着色文字
@@ -1120,29 +1234,29 @@ async function submitMkdir(): Promise<void> {
 .perm-badge {
   display: inline-block;
   padding: 2px 7px;
-  border-radius: 3px;
   font-size: 11px;
   font-weight: 500;
+  color: #555;
   letter-spacing: 0.3px;
   white-space: nowrap;
   background: #f4f4f4;
-  color: #555;
   border: 1px solid #e2e2e2;
+  border-radius: 3px;
 }
 
 // 状态指示
 .status-wrap {
   display: flex;
+  gap: 5px;
   align-items: center;
   justify-content: center;
-  gap: 5px;
 }
 
 .status-dot {
+  flex-shrink: 0;
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  flex-shrink: 0;
 
   &--on {
     background: #38a169;
@@ -1161,19 +1275,19 @@ async function submitMkdir(): Promise<void> {
 // 无规则提示
 .no-rules-hint {
   display: flex;
-  align-items: center;
   gap: 7px;
-  margin: 0 20px 16px;
+  align-items: center;
   padding: 12px 16px;
-  background: #fafafa;
-  border-radius: 4px;
-  border: 1px dashed #ddd;
+  margin: 0 20px 16px;
   font-size: 13px;
   color: #888;
+  background: #fafafa;
+  border: 1px dashed #ddd;
+  border-radius: 4px;
 
   .el-icon {
-    color: #bbb;
     flex-shrink: 0;
+    color: #bbb;
   }
 }
 
@@ -1187,27 +1301,27 @@ async function submitMkdir(): Promise<void> {
 
 .mkdir-parent-path {
   display: flex;
-  align-items: center;
   gap: 6px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 10px;
   font-size: 13px;
   color: #666;
-  padding: 6px 10px;
-  background: #f4f4f4;
-  border-radius: 4px;
-  border: 1px solid #e5e5e5;
-  width: 100%;
   word-break: break-all;
+  background: #f4f4f4;
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
 }
 
 // 规则弹窗 - 用户树
 .user-tree-wrap {
+  width: 100%;
+  max-height: 240px;
+  padding: 4px 0;
+  overflow-y: auto;
+  background: #fafafa;
   border: 1px solid #e5e5e5;
   border-radius: 4px;
-  padding: 4px 0;
-  max-height: 240px;
-  overflow-y: auto;
-  width: 100%;
-  background: #fafafa;
 
   :deep(.el-tree-node__content) {
     height: 30px;
@@ -1216,8 +1330,8 @@ async function submitMkdir(): Promise<void> {
 
 .tree-dept-node {
   display: flex;
-  align-items: center;
   gap: 4px;
+  align-items: center;
   font-size: 13px;
   font-weight: 500;
   color: #666;
@@ -1226,16 +1340,16 @@ async function submitMkdir(): Promise<void> {
 
 .tree-user-node {
   display: flex;
-  align-items: center;
   gap: 4px;
+  align-items: center;
+  padding: 0 4px;
   font-size: 13px;
   cursor: pointer;
-  padding: 0 4px;
   border-radius: 3px;
 
   &.selected {
-    color: var(--el-color-primary);
     font-weight: 500;
+    color: var(--el-color-primary);
   }
 }
 
@@ -1246,10 +1360,10 @@ async function submitMkdir(): Promise<void> {
 
 .tree-loading,
 .tree-empty {
-  text-align: center;
   padding: 16px;
   font-size: 12px;
   color: #aaa;
+  text-align: center;
 }
 
 .selected-user-tip {
@@ -1258,8 +1372,8 @@ async function submitMkdir(): Promise<void> {
   color: #aaa;
 
   &.active {
-    color: var(--el-color-primary);
     font-weight: 500;
+    color: var(--el-color-primary);
   }
 }
 
@@ -1278,54 +1392,54 @@ async function submitMkdir(): Promise<void> {
 
 .rmdir-danger-banner {
   display: flex;
-  align-items: flex-start;
   gap: 10px;
+  align-items: flex-start;
   padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #c0392b;
   background: #fff5f5;
   border: 1px solid #fecdcd;
   border-radius: 4px;
-  font-size: 13px;
-  color: #c0392b;
-  line-height: 1.6;
 
   .rmdir-danger-icon {
-    font-size: 16px;
     flex-shrink: 0;
     margin-top: 2px;
+    font-size: 16px;
     color: #c0392b;
   }
 }
 
 .rmdir-info-row {
   display: flex;
-  align-items: center;
   gap: 12px;
+  align-items: center;
   font-size: 13px;
 }
 
 .rmdir-label {
+  flex-shrink: 0;
   min-width: 56px;
-  color: #888;
   font-size: 12px;
   font-weight: 500;
-  flex-shrink: 0;
+  color: #888;
 }
 
 .rmdir-path {
-  font-family: 'Consolas', 'Courier New', monospace;
+  padding: 3px 8px;
+  font-family: "Consolas", "Courier New", monospace;
   font-size: 12px;
   color: #1a1a1a;
-  background: #f4f4f4;
-  padding: 3px 8px;
-  border-radius: 3px;
-  border: 1px solid #e5e5e5;
   word-break: break-all;
+  background: #f4f4f4;
+  border: 1px solid #e5e5e5;
+  border-radius: 3px;
 }
 
 .rmdir-preview-loading {
   display: flex;
-  align-items: center;
   gap: 6px;
+  align-items: center;
   font-size: 12px;
   color: #aaa;
 }
@@ -1337,8 +1451,8 @@ async function submitMkdir(): Promise<void> {
 }
 
 .rmdir-no-rules {
-  color: #aaa;
   font-size: 12px;
+  color: #aaa;
 }
 
 .rmdir-rule-count {
@@ -1346,8 +1460,8 @@ async function submitMkdir(): Promise<void> {
   color: #555;
 
   strong {
-    color: #d46b08;
     font-weight: 600;
+    color: #d46b08;
   }
 }
 
@@ -1359,15 +1473,15 @@ async function submitMkdir(): Promise<void> {
 
 .rmdir-confirm-row {
   display: flex;
-  align-items: flex-start;
   gap: 12px;
+  align-items: flex-start;
   padding-top: 12px;
   border-top: 1px solid #efefef;
 }
 
 .rmdir-confirm-input-wrap {
-  flex: 1;
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 5px;
 }
@@ -1377,8 +1491,8 @@ async function submitMkdir(): Promise<void> {
   color: #aaa;
 
   strong {
+    font-family: "Consolas", "Courier New", monospace;
     color: #333;
-    font-family: 'Consolas', 'Courier New', monospace;
   }
 }
 </style>

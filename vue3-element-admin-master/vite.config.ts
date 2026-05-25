@@ -69,6 +69,11 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
               if (path.startsWith("/dev-api/media")) {
                 return path.replace(/^\/dev-api\/media/, "/media");
               }
+              // 已含版本前缀的路径（api/v2、api/v3...）以及 OAuth2 /o/ 端点
+              // 直接剥去 /dev-api，路径保持原样，不再补 /api/v1
+              if (/^\/dev-api\/(api\/v[2-9]|o)\//.test(path)) {
+                return path.replace(/^\/dev-api/, "");
+              }
               // 其它 API 请求 => 根据是否已在环境中显式声明 /api/v1 决定前缀
               if (hasApiV1) {
                 // 去掉 /dev-api，替换为 /api/v1

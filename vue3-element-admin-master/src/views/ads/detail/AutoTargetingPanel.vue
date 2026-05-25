@@ -151,12 +151,7 @@
               <template v-if="row._isSummary">---</template>
               <div v-else class="bid-cell">
                 <span class="bid-icon">{{ currencyIcon }}</span>
-                <el-input
-                  v-model="row.bid"
-                  size="small"
-                  class="bid-input"
-                  @change="onBidChange(row)"
-                />
+                <el-input v-model="row.bid" size="small" class="bid-input" @change="onBidChange" />
               </div>
             </template>
 
@@ -251,7 +246,7 @@
     </div>
 
     <!-- 通用列配置抽屉 -->
-    <column-manager
+    <ColumnManager
       v-model="columnConfigVisible"
       :columns="activeColumns"
       @save="onColumnConfigSave"
@@ -332,7 +327,14 @@ const activeColumns = ref([
   { prop: "recommended_bid", label: "建议竞价", visible: true, category: "设置" },
   { prop: "bid", label: "竞价", visible: true, category: "设置" },
   { prop: "portfolio_name", label: "广告组合", visible: true, category: "设置" },
-  { prop: "campaign_name", label: "广告活动", visible: true, category: "设置", minWidth: 240, sortable: true },
+  {
+    prop: "campaign_name",
+    label: "广告活动",
+    visible: true,
+    category: "设置",
+    minWidth: 240,
+    sortable: true,
+  },
   { prop: "created_at", label: "创建时间", visible: false, category: "设置" },
   { prop: "tag", label: "标签", visible: false, category: "设置" },
   // 转化
@@ -405,9 +407,12 @@ function onColumnConfigSave(columns: typeof activeColumns.value): void {
 }
 
 // 筛选条件变化时自动持久化（不含日期范围）
-watch(() => filters.value.state, () => {
-  _savedFilters.value = { state: filters.value.state };
-});
+watch(
+  () => filters.value.state,
+  () => {
+    _savedFilters.value = { state: filters.value.state };
+  }
+);
 
 /**
  * 触发搜索，重置到第一页后加载数据。
@@ -481,10 +486,8 @@ function fetchData(): void {
 
 /**
  * 竞价修改占位处理（后端接口待实现）。
- *
- * @param {any} _row - 当前行数据对象
  */
-function onBidChange(_row: any): void {
+function onBidChange(): void {
   // TODO(后端联调): 调用修改自动投放竞价接口，提交 target_id + bid
 }
 

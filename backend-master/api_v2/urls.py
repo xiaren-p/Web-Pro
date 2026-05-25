@@ -1,0 +1,26 @@
+"""api_v2 路由分发。"""
+
+from django.urls import path
+
+from api_v2.views.app_view import (
+    create_app,
+    delete_app,
+    list_apps,
+    rotate_secret,
+)
+from api_v2.views.task_view import cancel_workflow, get_workflow_status, start_workflow
+
+app_name = 'api_v2'
+
+urlpatterns = [
+    # 工作流任务接口
+    path('workflow/', start_workflow, name='workflow_start'),
+    path('workflow/<int:execution_id>/', get_workflow_status, name='workflow_status'),
+    path('workflow/<int:execution_id>/cancel/', cancel_workflow, name='workflow_cancel'),
+
+    # 开发者应用管理接口（仅对登录用户开放）
+    path('developer/apps/', list_apps, name='developer_apps_list'),
+    path('developer/apps/create/', create_app, name='developer_apps_create'),
+    path('developer/apps/<int:app_id>/', delete_app, name='developer_apps_delete'),
+    path('developer/apps/<int:app_id>/rotate-secret/', rotate_secret, name='developer_apps_rotate'),
+]

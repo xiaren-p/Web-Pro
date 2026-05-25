@@ -56,7 +56,9 @@
         <el-table-column key="configKey" label="配置键" prop="configKey" min-width="100" />
         <el-table-column key="configValue" label="配置值" min-width="100">
           <template #default="scope">
-            <span>{{ scope.row.configType === 'PASSWORD' ? '******' : scope.row.configValue }}</span>
+            <span>
+              {{ scope.row.configType === "PASSWORD" ? "******" : scope.row.configValue }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column key="remark" label="描述" prop="remark" min-width="100" />

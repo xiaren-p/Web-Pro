@@ -352,10 +352,10 @@ onMounted(fetchData);
 .negative-keyword-panel {
   .filter-bar {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 0;
     flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 12px 0;
   }
 
   .filter-item {
@@ -370,28 +370,28 @@ onMounted(fetchData);
 
   .keyword-cell {
     display: flex;
-    align-items: center;
-    gap: 6px;
     flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
   }
 
   .match-badge {
     display: inline-block;
     padding: 1px 6px;
-    border-radius: 3px;
     font-size: 11px;
     font-weight: 500;
     white-space: nowrap;
+    border-radius: 3px;
 
     &.match-negativeExact {
-      background: #fef0f0;
       color: #f56c6c;
+      background: #fef0f0;
       border: 1px solid #fbc4c4;
     }
 
     &.match-negativePhrase {
-      background: #fdf6ec;
       color: #e6a23c;
+      background: #fdf6ec;
       border: 1px solid #f5dab1;
     }
   }
@@ -399,20 +399,20 @@ onMounted(fetchData);
   .status-badge {
     display: inline-block;
     padding: 2px 8px;
-    border-radius: 4px;
     font-size: 12px;
+    border-radius: 4px;
   }
 
   .summary-label {
-    color: #606266;
-    font-weight: 600;
     font-size: 13px;
+    font-weight: 600;
+    color: #606266;
   }
 
   .msku-cell {
     display: flex;
-    align-items: center;
     gap: 4px;
+    align-items: center;
   }
 
   .msku-text {
@@ -422,11 +422,11 @@ onMounted(fetchData);
 
   .dot-circle {
     display: inline-block;
+    flex-shrink: 0;
     width: 8px;
     height: 8px;
-    border-radius: 50%;
     background: #67c23a;
-    flex-shrink: 0;
+    border-radius: 50%;
   }
 
   .pagination-bar {
@@ -444,8 +444,8 @@ onMounted(fetchData);
 
     .drawer-left {
       flex: 0 0 260px;
-      border-right: 1px solid #ebeef5;
       padding-right: 16px;
+      border-right: 1px solid #ebeef5;
     }
 
     .drawer-right {
@@ -453,26 +453,26 @@ onMounted(fetchData);
     }
 
     .drawer-section-title {
+      margin-bottom: 12px;
       font-size: 14px;
       font-weight: 600;
       color: #303133;
-      margin-bottom: 12px;
     }
 
     .keyword-info-card {
-      background: #f5f7fa;
-      border-radius: 6px;
-      padding: 14px;
       display: flex;
       flex-direction: column;
       gap: 10px;
+      padding: 14px;
+      background: #f5f7fa;
+      border-radius: 6px;
 
       .keyword-text {
         font-size: 14px;
         font-weight: 500;
+        line-height: 1.5;
         color: #303133;
         word-break: break-all;
-        line-height: 1.5;
       }
 
       .keyword-meta {
@@ -482,19 +482,19 @@ onMounted(fetchData);
       }
 
       .keyword-state {
-        font-size: 12px;
         padding: 1px 6px;
+        font-size: 12px;
         border-radius: 3px;
 
         &.state-tag-enabled {
-          background: #f0f9eb;
           color: #67c23a;
+          background: #f0f9eb;
           border: 1px solid #c2e7b0;
         }
 
         &.state-tag-archived {
-          background: #f4f4f5;
           color: #909399;
+          background: #f4f4f5;
           border: 1px solid #d3d4d6;
         }
       }
@@ -505,9 +505,9 @@ onMounted(fetchData);
         font-size: 13px;
 
         .detail-label {
-          color: #909399;
           flex-shrink: 0;
           width: 60px;
+          color: #909399;
         }
 
         .detail-value {
@@ -522,14 +522,14 @@ onMounted(fetchData);
       gap: 12px;
 
       .metric-card {
+        padding: 14px 16px;
         background: #f5f7fa;
         border-radius: 6px;
-        padding: 14px 16px;
 
         .metric-label {
+          margin-bottom: 6px;
           font-size: 12px;
           color: #909399;
-          margin-bottom: 6px;
         }
 
         .metric-value {

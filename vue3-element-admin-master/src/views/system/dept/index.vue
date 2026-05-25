@@ -30,12 +30,7 @@
     <el-card shadow="hover" class="data-table">
       <div class="data-table__toolbar">
         <div class="data-table__toolbar--actions">
-          <el-button
-            v-if="isCompanyAdmin"
-            type="success"
-            icon="plus"
-            @click="handleOpenDialog()"
-          >
+          <el-button v-if="isCompanyAdmin" type="success" icon="plus" @click="handleOpenDialog()">
             新增
           </el-button>
           <el-button
@@ -74,7 +69,12 @@
         <el-table-column label="操作" fixed="right" align="left" width="200">
           <template #default="scope">
             <el-button
-              v-if="isCompanyAdmin || (isDeptAdmin && (String(scope.row.id) === myDeptIdStr || myDeptDescendantIds.has(String(scope.row.id))))"
+              v-if="
+                isCompanyAdmin ||
+                (isDeptAdmin &&
+                  (String(scope.row.id) === myDeptIdStr ||
+                    myDeptDescendantIds.has(String(scope.row.id))))
+              "
               type="primary"
               link
               size="small"
@@ -84,7 +84,12 @@
               新增
             </el-button>
             <el-button
-              v-if="isCompanyAdmin || (isDeptAdmin && (String(scope.row.id) === myDeptIdStr || myDeptDescendantIds.has(String(scope.row.id))))"
+              v-if="
+                isCompanyAdmin ||
+                (isDeptAdmin &&
+                  (String(scope.row.id) === myDeptIdStr ||
+                    myDeptDescendantIds.has(String(scope.row.id))))
+              "
               type="primary"
               link
               size="small"
@@ -94,7 +99,9 @@
               编辑
             </el-button>
             <el-button
-              v-if="isCompanyAdmin || (isDeptAdmin && myDeptDescendantIds.has(String(scope.row.id)))"
+              v-if="
+                isCompanyAdmin || (isDeptAdmin && myDeptDescendantIds.has(String(scope.row.id)))
+              "
               type="danger"
               link
               size="small"
@@ -113,9 +120,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed } from "vue";
 
-import { useUserStore } from '@/store/modules/user-store';
+import { useUserStore } from "@/store/modules/user-store";
 import { DeptAPI, type DeptVO, type DeptQuery } from "@/api/dept";
 import DeptFormDialog from "./components/DeptFormDialog.vue";
 
@@ -130,17 +137,17 @@ const deptFormDialogRef = ref();
 const userStore = useUserStore();
 
 /** 是否为公司管理员（含超管） */
-const isCompanyAdmin = computed(() => userStore.userInfo.roles?.includes('ROOT') ?? false);
+const isCompanyAdmin = computed(() => userStore.userInfo.roles?.includes("ROOT") ?? false);
 
 /** 是否为部门管理员 */
-const isDeptAdmin = computed(() => userStore.userInfo.roles?.includes('dept_admin') ?? false);
+const isDeptAdmin = computed(() => userStore.userInfo.roles?.includes("dept_admin") ?? false);
 
 /** 当前用户所属部门 ID */
 const myDeptId = computed(() => userStore.userInfo.deptId ?? null);
 
 /** 当前用户所属部门 ID（字符串，与 DeptVO.id 类型对齐） */
 const myDeptIdStr = computed<string | null>(() =>
-  myDeptId.value != null ? String(myDeptId.value) : null,
+  myDeptId.value != null ? String(myDeptId.value) : null
 );
 
 /**
@@ -164,11 +171,7 @@ function addAllDescendants(children: DeptVO[] | undefined, result: Set<string>):
  * @param {Set<string>} result - 收集结果集合。
  * @returns {boolean} 是否已找到目标节点。
  */
-function collectDescendantIds(
-  nodes: DeptVO[],
-  targetId: string,
-  result: Set<string>,
-): boolean {
+function collectDescendantIds(nodes: DeptVO[], targetId: string, result: Set<string>): boolean {
   for (const node of nodes) {
     if (String(node.id) === targetId) {
       addAllDescendants(node.children, result);

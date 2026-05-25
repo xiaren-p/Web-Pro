@@ -195,7 +195,9 @@ export interface AutoNegativeTargetingResponse {
  * @param {AutoNegativeTargetingParams} data - 查询参数，campaign_id 和 profile_id 为必填
  * @returns {Promise<AutoNegativeTargetingResponse>} 否定定向分页列表
  */
-export function getAutoNegativeTargeting(data: AutoNegativeTargetingParams): Promise<AutoNegativeTargetingResponse> {
+export function getAutoNegativeTargeting(
+  data: AutoNegativeTargetingParams
+): Promise<AutoNegativeTargetingResponse> {
   return request({
     url: "/ads/auto-negative-targeting",
     method: "post",

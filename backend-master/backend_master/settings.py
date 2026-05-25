@@ -44,10 +44,6 @@ env = environ.Env(
     AMAP_BASE=(str, 'https://restapi.amap.com'),
     AMAP_KEY=(str, '9ca18a1d97d6a8c31a77e001bfbd2742'),
     AMAP_CITY=(str, '440605'),  # 默认佛山南海区
-    # 是否允许使用万能验证码绕过（仅用于受控开发/测试，生产请勿启用）
-    ALLOW_CAPTCHA_BYPASS=(bool, False),
-    # 全局万能验证码（仅在 ALLOW_CAPTCHA_BYPASS 为 true 时生效），请在生产环境不要设置
-    CAPTCHA_MASTER_CODE=(str, ''),
     # 安全响应头（开发默认全部关闭）
     SECURE_SSL_REDIRECT=(bool, False),
     SESSION_COOKIE_SECURE=(bool, False),
@@ -90,6 +86,9 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Shanghai'
+# Celery 队列定义（Worker 启动时需按队列名分别启动）：
+# single_thread_queue：concurrency=1，用于顺序执行（文件转换、AI 推理）
+# parallel_queue：concurrency=4，用于并行执行（批量数据处理）
 CELERY_BEAT_SCHEDULE = {
     # NC 同步：每 30 秒处理一次 PENDING 队列
     'nc-process-pending': {
@@ -132,6 +131,7 @@ INSTALLED_APPS = [
     'django_celery_beat',     # Celery 定时任务
     'oauth2_provider',        # OIDC Provider（django-oauth-toolkit）
     'api_v1',              # 业务接口 v1
+    'api_v2',              # 任务调度 v2（工作流执行引擎）
 ]
 
 MIDDLEWARE = [
@@ -286,17 +286,29 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'api_v1.utils.responses.custom_exception_handler',
 }
 
+# OAuth2 / OIDC Provider 配置（django-oauth-toolkit）
+# /o/token/ 端点同时支持：
+#   - OIDC Authorization Code Flow（前端 SSO 登录）
+#   - Client Credentials Grant（api_v2 外部应用调用）
+OAUTH2_PROVIDER = {
+    # 全局可用 Scope 字典
+    'SCOPES': {
+        'openid':  'OpenID Connect 身份标识',
+        'profile': '用户个人资料',
+        'email':   '用户邮箱',
+        'api_v2':  '工作流任务接口访问权限（仅限 api_v2）',
+    },
+    'DEFAULT_SCOPES': ['openid'],
+    # Token 有效期
+    'ACCESS_TOKEN_EXPIRE_SECONDS': 3600,
+    'REFRESH_TOKEN_EXPIRE_SECONDS': 86400 * 7,
+    # 启用 OIDC（/.well-known/openid-configuration 等端点）
+    'OIDC_ENABLED': True,
+}
+
 # 认证令牌有效期（秒）
 ACCESS_TOKEN_EXPIRE_SECONDS = env('ACCESS_TOKEN_EXPIRE_SECONDS')
 REFRESH_TOKEN_EXPIRE_SECONDS = env('REFRESH_TOKEN_EXPIRE_SECONDS')
-
-# 图片验证码万能口令配置（仅用于开发/测试）
-ALLOW_CAPTCHA_BYPASS = env('ALLOW_CAPTCHA_BYPASS')
-CAPTCHA_MASTER_CODE = env('CAPTCHA_MASTER_CODE') or None
-# 安全提示：若在非 DEBUG 环境启用了万能口令，发出警告以提醒审计
-if ALLOW_CAPTCHA_BYPASS and not DEBUG:
-    import warnings
-    warnings.warn("ALLOW_CAPTCHA_BYPASS is enabled in non-debug mode; this is insecure and should not be used in production.", RuntimeWarning)
 
 # 文件管理模块已下线；如需恢复请参考历史提交
 

@@ -22,12 +22,7 @@
     <el-card shadow="hover" class="data-table">
       <div class="data-table__toolbar">
         <div class="data-table__toolbar--actions">
-          <el-button
-            v-if="isCompanyAdmin"
-            type="success"
-            icon="plus"
-            @click="handleOpenDialog()"
-          >
+          <el-button v-if="isCompanyAdmin" type="success" icon="plus" @click="handleOpenDialog()">
             新增
           </el-button>
           <el-button
@@ -51,7 +46,12 @@
         class="data-table__content"
         @selection-change="handleSelectionChange"
       >
-        <el-table-column type="selection" width="55" align="center" :selectable="(row: PositionPageVO) => !row.isBuiltin" />
+        <el-table-column
+          type="selection"
+          width="55"
+          align="center"
+          :selectable="(row: PositionPageVO) => !row.isBuiltin"
+        />
         <el-table-column label="岗位名称" prop="name" min-width="120" />
         <el-table-column label="岗位编码" prop="code" width="160" />
         <el-table-column label="所属部门" prop="deptName" width="140" show-overflow-tooltip />
@@ -111,10 +111,10 @@
     </el-card>
 
     <!-- 岗位表单弹窗 -->
-    <position-dialog ref="positionDialogRef" @success="handleResetQuery" />
+    <PositionDialog ref="positionDialogRef" @success="handleResetQuery" />
 
     <!-- 分配权限抽屉 -->
-    <position-perm-drawer ref="positionPermDrawerRef" @success="handleResetQuery" />
+    <PositionPermDrawer ref="positionPermDrawerRef" @success="handleResetQuery" />
   </div>
 </template>
 
@@ -123,9 +123,9 @@
  * 岗位管理列表页：展示所有岗位、支持增删改及菜单权限分配。
  * 所属板块：system。
  */
-import { computed } from 'vue';
+import { computed } from "vue";
 
-import { useUserStore } from '@/store/modules/user-store';
+import { useUserStore } from "@/store/modules/user-store";
 import { PositionAPI, type PositionPageVO, type PositionPageQuery } from "@/api/position";
 import PositionDialog from "./components/PositionDialog.vue";
 import PositionPermDrawer from "./components/PositionPermDrawer.vue";
@@ -151,10 +151,10 @@ const queryParams = reactive<PositionPageQuery>({
 const userStore = useUserStore();
 
 /** 是否为公司管理员（含超管） */
-const isCompanyAdmin = computed(() => userStore.userInfo.roles?.includes('ROOT') ?? false);
+const isCompanyAdmin = computed(() => userStore.userInfo.roles?.includes("ROOT") ?? false);
 
 /** 是否为部门管理员 */
-const isDeptAdmin = computed(() => userStore.userInfo.roles?.includes('dept_admin') ?? false);
+const isDeptAdmin = computed(() => userStore.userInfo.roles?.includes("dept_admin") ?? false);
 
 /** 岗位表格数据 */
 const positionList = ref<PositionPageVO[]>();

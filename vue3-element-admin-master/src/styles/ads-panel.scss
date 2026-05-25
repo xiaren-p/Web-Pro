@@ -88,19 +88,6 @@
     display: none;
   }
 
-  /* 表头列分隔线展示为拖拽手柄，正常状态下级 1px 淡灰，hover 加深 */
-  .el-table__header th.el-table__cell {
-    border-right: 1px solid #e5e7eb !important;
-
-    &:hover {
-      border-right-color: #c0c4cc !important;
-    }
-  }
-
-  .el-table__body td.el-table__cell {
-    border-bottom: 1px solid #f0f2f5 !important;
-  }
-
   .el-table__header-wrapper th.el-table__cell,
   .el-table__header th {
     padding: 9px 0 !important;
@@ -110,6 +97,19 @@
     text-align: center;
     background-color: #f9fafb !important;
     border-bottom: 1px solid #e5e7eb !important;
+  }
+
+  .el-table__body td.el-table__cell {
+    border-bottom: 1px solid #f0f2f5 !important;
+  }
+
+  /* 表头列分隔线展示为拖拽手柄，正常状态下级 1px 淡灰，hover 加深 */
+  .el-table__header th.el-table__cell {
+    border-right: 1px solid #e5e7eb !important;
+
+    &:hover {
+      border-right-color: #c0c4cc !important;
+    }
   }
 
   .el-table .el-table__cell {
@@ -148,6 +148,16 @@
   .el-table .el-switch.is-checked .el-switch__core {
     background-color: #22c55e !important;
     border-color: #22c55e !important;
+  }
+
+  /* 汇总行背景 */
+  .el-table .is-summary-row > td.el-table__cell {
+    padding: 9px 0 !important;
+    font-weight: 600;
+    color: #1a1a2e;
+    background-color: #f0f4ff !important;
+    border-top: 1px solid #d0d8ef !important;
+    border-bottom: 1px solid #d0d8ef !important;
   }
 
   /* 行 hover */
@@ -231,8 +241,8 @@
 
   /* 通用复制图标：默认隐藏，由各容器 hover 触发显示 */
   .copy-icon {
-    flex-shrink: 0;
     display: none;
+    flex-shrink: 0;
     font-size: 13px;
     color: #909399;
     cursor: pointer;
@@ -245,22 +255,22 @@
   /* MSKU / 广告活动 / 广告组名称单元格：flex 布局，最多两行截断，复制图标对齐第一行尾部 */
   .msku-cell {
     display: flex;
-    align-items: flex-start;
     gap: 4px;
+    align-items: flex-start;
     padding: 2px 0;
   }
 
   .msku-text {
+    display: -webkit-box;
     flex: 1;
     overflow: hidden;
-    display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
-    -webkit-box-orient: vertical;
-    word-break: break-all;
     font-size: 12px;
-    color: #409eff;
     line-height: 1.5;
+    color: #409eff;
+    word-break: break-all;
+    -webkit-box-orient: vertical;
   }
 
   .msku-text--dark {
@@ -310,13 +320,4 @@
   }
 }
 
-/* 汇总行背景（is-summary-row 由 el-table row-class-name 注入到 <tr>，
-   需在全局作用域匹配子 <td>，故放在 .ads-detail-panel 外部） */
-.ads-detail-panel .el-table .is-summary-row > td.el-table__cell {
-  padding: 9px 0 !important;
-  font-weight: 600;
-  color: #1a1a2e;
-  background-color: #f0f4ff !important;
-  border-top: 1px solid #d0d8ef !important;
-  border-bottom: 1px solid #d0d8ef !important;
-}
+/* 此处为内联应用后的汇总行样式工作入口，上方 .ads-detail-panel 块内已包含实际定义 */

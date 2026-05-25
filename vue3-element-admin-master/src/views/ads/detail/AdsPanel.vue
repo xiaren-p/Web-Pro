@@ -133,14 +133,14 @@
               :disabled="!productMeta.titleVisible || !isLikelyOverflow(row.title, 258, 1)"
             >
               <template #content>
-                <div style="display: flex; align-items: flex-start; gap: 6px; max-width: 260px">
-                  <span style="word-break: break-word">{{ row.title }}</span>
+                <div style="display: flex; gap: 6px; align-items: flex-start; max-width: 260px">
+                  <span style="overflow-wrap: break-word">{{ row.title }}</span>
                   <el-icon
                     style="
                       flex-shrink: 0;
                       margin-top: 2px;
-                      cursor: pointer;
                       color: rgba(255, 255, 255, 0.8);
+                      cursor: pointer;
                     "
                     @click.stop="copyText(row.title)"
                   >
@@ -565,7 +565,7 @@ function onPageSizeChange(size: number): void {
  * @returns {string} 替换尺寸后的高清图 URL
  */
 function toPreviewUrl(url: string): string {
-  return url.replace(/(_[A-Z]+)\d+_/, '$1400_');
+  return url.replace(/(_[A-Z]+)\d+_/, "$1400_");
 }
 
 /**
@@ -715,24 +715,24 @@ onMounted(() => {
 
 .asin-title-row {
   display: flex;
-  align-items: center;
   gap: 4px;
+  align-items: center;
   overflow: hidden;
 }
 
 .asin-title {
   flex: 1;
   overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 12px;
   color: #303133;
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .asin-row {
   display: flex;
-  align-items: center;
   gap: 6px;
+  align-items: center;
   font-size: 12px;
   white-space: nowrap;
 }

@@ -2,14 +2,14 @@
   <div class="auto-negative-panel">
     <el-tabs v-model="activeSubTab" class="negative-sub-tabs">
       <el-tab-pane label="否定关键词" name="keywords">
-        <negative-keyword-panel
+        <NegativeKeywordPanel
           :campaign-id="campaignId"
           :profile-id="profileId"
           :initial-date-range="initialDateRange"
         />
       </el-tab-pane>
       <el-tab-pane label="否定商品" name="products">
-        <auto-negative-targeting-panel
+        <AutoNegativeTargetingPanel
           :campaign-id="campaignId"
           :profile-id="profileId"
           :initial-date-range="initialDateRange"
@@ -29,7 +29,7 @@ import { ref } from "vue";
 import NegativeKeywordPanel from "@/views/ads/detail/NegativeKeywordPanel.vue";
 import AutoNegativeTargetingPanel from "@/views/ads/detail/AutoNegativeTargetingPanel.vue";
 
-const props = defineProps<{
+defineProps<{
   campaignId: string;
   profileId: string;
   initialDateRange?: string[];

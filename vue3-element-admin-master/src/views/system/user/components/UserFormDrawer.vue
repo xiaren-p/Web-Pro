@@ -48,7 +48,9 @@
         <!-- admin 账号的岗位为内置绑定，不可修改 -->
         <template v-if="formData.username === 'admin'">
           <el-input :value="formData.positionName || '系统管理员'" disabled style="width: 100%" />
-          <div style="font-size: 12px; color: #999; margin-top: 4px">内置管理员账号岗位不可修改</div>
+          <div style="margin-top: 4px; font-size: 12px; color: #999">
+            内置管理员账号岗位不可修改
+          </div>
         </template>
         <el-select v-else v-model="formData.positionId" placeholder="请选择岗位" clearable>
           <el-option
@@ -86,7 +88,6 @@
           :inactive-value="0"
         />
       </el-form-item>
-
     </el-form>
 
     <template #footer>

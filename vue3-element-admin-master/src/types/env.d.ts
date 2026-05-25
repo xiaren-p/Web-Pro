@@ -10,6 +10,8 @@ interface ImportMetaEnv {
   VITE_APP_BASE_API: string;
   /** API 地址 */
   VITE_APP_API_URL: string;
+  /** api_v2 / OAuth2 端点源站（仅含协议+域名，不含路径；开发环境为空字符串） */
+  VITE_APP_API_ORIGIN: string;
   /** 是否开启 Mock 服务 */
   VITE_MOCK_DEV_SERVER: boolean;
 }

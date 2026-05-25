@@ -108,8 +108,8 @@
             <el-table-column label="操作" fixed="right" width="220">
               <template #default="scope">
                 <el-button
-                  v-hasPerm="'sys:user:reset-password'"
                   v-show="canWriteUser(scope.row)"
+                  v-hasPerm="'sys:user:reset-password'"
                   type="primary"
                   icon="RefreshLeft"
                   size="small"
@@ -119,8 +119,8 @@
                   重置密码
                 </el-button>
                 <el-button
-                  v-hasPerm="'sys:user:edit'"
                   v-show="canWriteUser(scope.row)"
+                  v-hasPerm="'sys:user:edit'"
                   type="primary"
                   icon="edit"
                   link
@@ -130,8 +130,8 @@
                   编辑
                 </el-button>
                 <el-button
-                  v-hasPerm="'sys:user:delete'"
                   v-show="canWriteUser(scope.row)"
+                  v-hasPerm="'sys:user:delete'"
                   type="danger"
                   icon="delete"
                   link

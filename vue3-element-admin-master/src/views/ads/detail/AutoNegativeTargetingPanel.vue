@@ -108,9 +108,7 @@
                 <span v-if="row.asin_price !== '-'" class="meta-item meta-price">
                   {{ row.asin_price }}
                 </span>
-                <span v-if="row.asin_stars !== '-'" class="meta-item">
-                  ★ {{ row.asin_stars }}
-                </span>
+                <span v-if="row.asin_stars !== '-'" class="meta-item">★ {{ row.asin_stars }}</span>
                 <span v-if="row.asin_review_count !== '-'" class="meta-item meta-reviews">
                   {{ row.asin_review_count }} 评论
                 </span>
@@ -132,10 +130,7 @@
           <template #default="{ row }">
             <!-- 服务状态徽标 -->
             <template v-if="col.prop === 'service_status'">
-              <span
-                class="status-badge"
-                :class="`status-${row.service_status_type || 'default'}`"
-              >
+              <span class="status-badge" :class="`status-${row.service_status_type || 'default'}`">
                 {{ row.service_status_label || row.service_status || "-" }}
               </span>
             </template>
@@ -143,10 +138,19 @@
             <!-- 广告活动（带状态图标） -->
             <template v-else-if="col.prop === 'campaign_name'">
               <div class="msku-cell">
-                <span class="campaign-state-icon" :class="`state-${row.campaign_state || 'unknown'}`">
-                  <template v-if="row.campaign_state === 'enabled'"><span class="dot-circle" /></template>
-                  <template v-else-if="row.campaign_state === 'paused'"><el-icon><VideoPause /></el-icon></template>
-                  <template v-else-if="row.campaign_state === 'archived'"><el-icon><CircleClose /></el-icon></template>
+                <span
+                  class="campaign-state-icon"
+                  :class="`state-${row.campaign_state || 'unknown'}`"
+                >
+                  <template v-if="row.campaign_state === 'enabled'">
+                    <span class="dot-circle" />
+                  </template>
+                  <template v-else-if="row.campaign_state === 'paused'">
+                    <el-icon><VideoPause /></el-icon>
+                  </template>
+                  <template v-else-if="row.campaign_state === 'archived'">
+                    <el-icon><CircleClose /></el-icon>
+                  </template>
                 </span>
                 <span class="msku-text">{{ row.campaign_name || "-" }}</span>
               </div>
@@ -162,14 +166,7 @@
         <!-- 固定右：分析 -->
         <el-table-column label="分析" width="64" fixed="right" align="center" :resizable="false">
           <template #default="{ row }">
-            <el-button
-              type="primary"
-              link
-              size="small"
-              @click="openDrawer(row)"
-            >
-              分析
-            </el-button>
+            <el-button type="primary" link size="small" @click="openDrawer(row)">分析</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -195,7 +192,7 @@
     <!-- 分析抽屉 -->
     <el-drawer
       v-model="drawerVisible"
-      :title="activeRow ? (activeRow.exp_value || '否定商品详情') : '否定商品详情'"
+      :title="activeRow ? activeRow.exp_value || '否定商品详情' : '否定商品详情'"
       size="680px"
       direction="rtl"
     >
@@ -387,15 +384,19 @@ onMounted(fetchData);
 .auto-negative-targeting-panel {
   .filter-bar {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 0;
     flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 12px 0;
   }
 
   .filter-item {
-    &.w-110 { width: 110px; }
-    &.w-130 { width: 130px; }
+    &.w-110 {
+      width: 110px;
+    }
+    &.w-130 {
+      width: 130px;
+    }
   }
 
   // ASIN 商品卡片单元格
@@ -408,8 +409,8 @@ onMounted(fetchData);
 
   .asin-header {
     display: flex;
-    align-items: center;
     gap: 6px;
+    align-items: center;
   }
 
   .asin-code {
@@ -421,38 +422,38 @@ onMounted(fetchData);
   .exp-type-badge {
     display: inline-block;
     padding: 1px 6px;
-    border-radius: 3px;
     font-size: 11px;
     font-weight: 500;
     white-space: nowrap;
+    border-radius: 3px;
 
     &.exp-asin {
-      background: #ecf5ff;
       color: #409eff;
+      background: #ecf5ff;
       border: 1px solid #b3d8ff;
     }
 
     &.exp-brand {
-      background: #f0f9eb;
       color: #67c23a;
+      background: #f0f9eb;
       border: 1px solid #c2e7b0;
     }
   }
 
   .asin-title {
-    font-size: 12px;
-    color: #606266;
     max-width: 240px;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: 12px;
     line-height: 1.4;
+    color: #606266;
+    white-space: nowrap;
   }
 
   .asin-meta {
     display: flex;
-    gap: 8px;
     flex-wrap: wrap;
+    gap: 8px;
   }
 
   .meta-item {
@@ -460,38 +461,46 @@ onMounted(fetchData);
     color: #909399;
     white-space: nowrap;
 
-    &.meta-price { color: #f56c6c; font-weight: 500; }
-    &.meta-reviews { color: #909399; }
+    &.meta-price {
+      font-weight: 500;
+      color: #f56c6c;
+    }
+    &.meta-reviews {
+      color: #909399;
+    }
   }
 
   .status-badge {
     display: inline-block;
     padding: 2px 8px;
-    border-radius: 4px;
     font-size: 12px;
+    border-radius: 4px;
   }
 
   .summary-label {
-    color: #606266;
-    font-weight: 600;
     font-size: 13px;
+    font-weight: 600;
+    color: #606266;
   }
 
   .msku-cell {
     display: flex;
-    align-items: center;
     gap: 4px;
+    align-items: center;
   }
 
-  .msku-text { font-size: 13px; color: #303133; }
+  .msku-text {
+    font-size: 13px;
+    color: #303133;
+  }
 
   .dot-circle {
     display: inline-block;
+    flex-shrink: 0;
     width: 8px;
     height: 8px;
-    border-radius: 50%;
     background: #67c23a;
-    flex-shrink: 0;
+    border-radius: 50%;
   }
 
   .pagination-bar {
@@ -509,8 +518,8 @@ onMounted(fetchData);
 
     .drawer-left {
       flex: 0 0 260px;
-      border-right: 1px solid #ebeef5;
       padding-right: 16px;
+      border-right: 1px solid #ebeef5;
     }
 
     .drawer-right {
@@ -518,24 +527,24 @@ onMounted(fetchData);
     }
 
     .drawer-section-title {
+      margin-bottom: 12px;
       font-size: 14px;
       font-weight: 600;
       color: #303133;
-      margin-bottom: 12px;
     }
 
     .product-info-card {
-      background: #f5f7fa;
-      border-radius: 6px;
-      padding: 14px;
       display: flex;
       flex-direction: column;
       gap: 10px;
+      padding: 14px;
+      background: #f5f7fa;
+      border-radius: 6px;
 
       .product-asin-row {
         display: flex;
-        align-items: center;
         gap: 8px;
+        align-items: center;
 
         .product-asin {
           font-size: 15px;
@@ -547,15 +556,15 @@ onMounted(fetchData);
 
       .product-title {
         font-size: 13px;
-        color: #606266;
         line-height: 1.5;
+        color: #606266;
         word-break: break-all;
       }
 
       .product-meta {
         display: flex;
-        gap: 10px;
         flex-wrap: wrap;
+        gap: 10px;
       }
 
       .product-detail-row {
@@ -564,9 +573,9 @@ onMounted(fetchData);
         font-size: 13px;
 
         .detail-label {
-          color: #909399;
           flex-shrink: 0;
           width: 60px;
+          color: #909399;
         }
 
         .detail-value {
@@ -581,14 +590,14 @@ onMounted(fetchData);
       gap: 12px;
 
       .metric-card {
+        padding: 14px 16px;
         background: #f5f7fa;
         border-radius: 6px;
-        padding: 14px 16px;
 
         .metric-label {
+          margin-bottom: 6px;
           font-size: 12px;
           color: #909399;
-          margin-bottom: 6px;
         }
 
         .metric-value {

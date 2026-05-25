@@ -262,7 +262,7 @@ export interface DeleteFolderResult {
  */
 export function fetchFolderDeletePreview(
   groupId: number,
-  ncPath: string,
+  ncPath: string
 ): Promise<FolderDeletePreview> {
   return request.get("/nc/folder-tree/folder-delete-preview", {
     params: { groupId, ncPath },
@@ -278,4 +278,3 @@ export function fetchFolderDeletePreview(
 export function deleteFolder(data: DeleteFolderForm): Promise<DeleteFolderResult> {
   return request.delete("/nc/folder-tree/folder", { data });
 }
-

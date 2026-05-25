@@ -16,12 +16,26 @@
         <div class="zoom-actions">
           <el-button :icon="ZoomIn" circle size="small" title="放大" @click="handleZoomIn" />
           <el-button :icon="ZoomOut" circle size="small" title="缩小" @click="handleZoomOut" />
-          <el-button :icon="RefreshRight" circle size="small" title="顺时针旋转" @click="handleRotate" />
-          <el-button :icon="RefreshLeft" circle size="small" title="逆时针旋转" @click="handleRotateBack" />
+          <el-button
+            :icon="RefreshRight"
+            circle
+            size="small"
+            title="顺时针旋转"
+            @click="handleRotate"
+          />
+          <el-button
+            :icon="RefreshLeft"
+            circle
+            size="small"
+            title="逆时针旋转"
+            @click="handleRotateBack"
+          />
         </div>
         <div class="confirm-actions">
           <el-button @click="handleCancel">取消</el-button>
-          <el-button type="primary" :loading="confirming" @click="handleConfirm">确认裁剪</el-button>
+          <el-button type="primary" :loading="confirming" @click="handleConfirm">
+            确认裁剪
+          </el-button>
         </div>
       </div>
     </template>
@@ -34,45 +48,45 @@
  * 基于 cropperjs v2 实现 1:1 裁剪，确认后以 Blob 形式 emit 给父组件。
  * 所属板块：通用组件。
  */
-import type Cropper from 'cropperjs'
+import type Cropper from "cropperjs";
 
-import { nextTick, ref, watch } from 'vue'
-import { RefreshLeft, RefreshRight, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
-import CropperJS from 'cropperjs'
+import { nextTick, ref, watch } from "vue";
+import { RefreshLeft, RefreshRight, ZoomIn, ZoomOut } from "@element-plus/icons-vue";
+import CropperJS from "cropperjs";
 
 const emit = defineEmits<{
   /** v-model 更新 */
-  (e: 'update:modelValue', value: boolean): void
+  (e: "update:modelValue", value: boolean): void;
   /** 用户确认裁剪，携带 Blob 和预览 dataUrl */
-  (e: 'confirm', payload: { blob: Blob; dataUrl: string }): void
+  (e: "confirm", payload: { blob: Blob; dataUrl: string }): void;
   /** 用户取消 */
-  (e: 'cancel'): void
-}>()
+  (e: "cancel"): void;
+}>();
 
 const props = defineProps<{
-  modelValue: boolean
-  srcUrl: string
-}>()
-const visible = ref(props.modelValue)
-const imgRef = ref<HTMLImageElement | null>(null)
-const confirming = ref(false)
-let cropperInstance: Cropper | null = null
+  modelValue: boolean;
+  srcUrl: string;
+}>();
+const visible = ref(props.modelValue);
+const imgRef = ref<HTMLImageElement | null>(null);
+const confirming = ref(false);
+let cropperInstance: Cropper | null = null;
 
 // 同步外部 v-model → 内部 visible
 watch(
   () => props.modelValue,
   (val) => {
-    visible.value = val
+    visible.value = val;
     if (val) {
-      nextTick(() => initCropper())
+      nextTick(() => initCropper());
     }
-  },
-)
+  }
+);
 
 // 同步内部关闭 → 外部 v-model
 watch(visible, (val) => {
-  if (!val) emit('update:modelValue', false)
-})
+  if (!val) emit("update:modelValue", false);
+});
 
 /**
  * 初始化 Cropper.js v2 实例。
@@ -81,8 +95,8 @@ watch(visible, (val) => {
  * 并在初始化后直接设置 selection.aspectRatio。
  */
 function initCropper(): void {
-  if (!imgRef.value) return
-  destroyCropper()
+  if (!imgRef.value) return;
+  destroyCropper();
   cropperInstance = new CropperJS(imgRef.value, {
     template: `<cropper-canvas background>
       <cropper-image></cropper-image>
@@ -101,12 +115,12 @@ function initCropper(): void {
         <cropper-handle action="sw-resize"></cropper-handle>
       </cropper-selection>
     </cropper-canvas>`,
-  })
+  });
   // v2 中 aspectRatio 是 selection 元素的属性，必须在初始化完成后设置
   nextTick(() => {
-    const sel = cropperInstance?.getCropperSelection()
-    if (sel) sel.aspectRatio = 1
-  })
+    const sel = cropperInstance?.getCropperSelection();
+    if (sel) sel.aspectRatio = 1;
+  });
 }
 
 /**
@@ -114,8 +128,8 @@ function initCropper(): void {
  */
 function destroyCropper(): void {
   if (cropperInstance) {
-    cropperInstance.destroy()
-    cropperInstance = null
+    cropperInstance.destroy();
+    cropperInstance = null;
   }
 }
 
@@ -123,7 +137,7 @@ function destroyCropper(): void {
  * 弹窗彻底关闭后的清理（destroy-on-close 配合）。
  */
 function handleDialogClosed(): void {
-  destroyCropper()
+  destroyCropper();
 }
 
 /**
@@ -131,54 +145,54 @@ function handleDialogClosed(): void {
  * getCropperSelection 是 v2 专用 API，仅输出选中区域内容。
  */
 async function handleConfirm(): Promise<void> {
-  if (!cropperInstance) return
-  confirming.value = true
+  if (!cropperInstance) return;
+  confirming.value = true;
   try {
     const canvas = await cropperInstance.getCropperSelection()?.$toCanvas({
       width: 512,
       height: 512,
-    })
-    if (!canvas) throw new Error('裁剪区域无效，请确认已选择图片')
+    });
+    if (!canvas) throw new Error("裁剪区域无效，请确认已选择图片");
     await new Promise<void>((resolve, reject) => {
       canvas.toBlob(
         (blob: Blob | null) => {
           if (!blob) {
-            reject(new Error('导出 Blob 失败'))
-            return
+            reject(new Error("导出 Blob 失败"));
+            return;
           }
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-          emit('confirm', { blob, dataUrl })
-          visible.value = false
-          resolve()
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          emit("confirm", { blob, dataUrl });
+          visible.value = false;
+          resolve();
         },
-        'image/jpeg',
-        0.85,
-      )
-    })
+        "image/jpeg",
+        0.85
+      );
+    });
   } finally {
-    confirming.value = false
+    confirming.value = false;
   }
 }
 
 function handleCancel(): void {
-  visible.value = false
-  emit('cancel')
+  visible.value = false;
+  emit("cancel");
 }
 
 function handleZoomIn(): void {
-  cropperInstance?.getCropperImage()?.$zoom(0.1)
+  cropperInstance?.getCropperImage()?.$zoom(0.1);
 }
 
 function handleZoomOut(): void {
-  cropperInstance?.getCropperImage()?.$zoom(-0.1)
+  cropperInstance?.getCropperImage()?.$zoom(-0.1);
 }
 
 function handleRotate(): void {
-  cropperInstance?.getCropperImage()?.$rotate('90deg')
+  cropperInstance?.getCropperImage()?.$rotate("90deg");
 }
 
 function handleRotateBack(): void {
-  cropperInstance?.getCropperImage()?.$rotate('-90deg')
+  cropperInstance?.getCropperImage()?.$rotate("-90deg");
 }
 </script>
 

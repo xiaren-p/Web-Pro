@@ -2,8 +2,8 @@ $border: 1px solid var(--el-border-color-light);
 
 /* el-dialog */
 .el-dialog {
-  border-radius: 10px;
   overflow: hidden;
+  border-radius: 10px;
 
   .el-dialog__header {
     padding: 15px 20px;
@@ -52,8 +52,8 @@ $border: 1px solid var(--el-border-color-light);
 // ─── El Card 全局精化 ────────────────────────────────────────────────────────
 
 .el-card {
-  border-radius: 8px;
   border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 
   .el-card__header {
@@ -75,10 +75,10 @@ $border: 1px solid var(--el-border-color-light);
 
   // 表头单元格：深背景 + 加重字体
   th.el-table__cell {
-    background-color: #f5f7fa;
-    color: #606273;
-    font-weight: 600;
     font-size: 13px;
+    font-weight: 600;
+    color: #606273;
+    background-color: #f5f7fa;
   }
 
   td.el-table__cell {
