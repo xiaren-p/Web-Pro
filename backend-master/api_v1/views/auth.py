@@ -58,37 +58,45 @@ class AuthViewSet(viewsets.ViewSet):
         try:
             # 首先尝试使用共享 cache 验证
             if not validate_captcha(captcha_key, captcha_code):
-                # cache 验证失败，回退到 session（客户端与服务在同一浏览器时会携带 sessionid）
+                # 若 cache 验证失败，尝试回退到 session（若客户端与服务在同一浏览器，会携带 sessionid）
+                # 开发/测试用途：允许通过配置的万能验证码跳过校验（需在 .env 中设置 ALLOW_CAPTCHA_BYPASS=true 与 CAPTCHA_MASTER_CODE）
                 try:
-                    sess_val = request.session.get(f"captcha:{captcha_key}")
-                    if sess_val and isinstance(sess_val, str) and sess_val.strip():
-                        # reuse captcha normalization from utils.captcha
-                        try:
-                            import unicodedata
-                        except Exception:
-                            unicodedata = None
+                    # 检查是否启用了万能验证码并匹配
+                    bypass_allowed = getattr(settings, 'ALLOW_CAPTCHA_BYPASS', False)
+                    master_code = getattr(settings, 'CAPTCHA_MASTER_CODE', None)
+                    if bypass_allowed and master_code and str(captcha_code) == str(master_code):
+                        # 万能验证码命中，直接通过
+                        pass
+                    else:
+                        sess_val = request.session.get(f"captcha:{captcha_key}")
+                        if sess_val and isinstance(sess_val, str) and sess_val.strip():
+                            # reuse captcha normalization from utils.captcha
+                            try:
+                                import unicodedata
+                            except Exception:
+                                unicodedata = None
 
-                        def _norm(s: str) -> str:
-                            if s is None:
-                                return ''
-                            s2 = str(s)
-                            if unicodedata:
+                            def _norm(s: str) -> str:
+                                if s is None:
+                                    return ''
+                                s2 = str(s)
+                                if unicodedata:
+                                    try:
+                                        s2 = unicodedata.normalize('NFKC', s2)
+                                    except Exception:
+                                        pass
+                                return s2.strip().lower()
+
+                            if _norm(sess_val) == _norm(captcha_code):
+                                # session 验证通过，删除 session 存储并继续
                                 try:
-                                    s2 = unicodedata.normalize('NFKC', s2)
+                                    del request.session[f"captcha:{captcha_key}"]
                                 except Exception:
                                     pass
-                            return s2.strip().lower()
-
-                        if _norm(sess_val) == _norm(captcha_code):
-                            # session 验证通过，删除 session 存储并继续
-                            try:
-                                del request.session[f"captcha:{captcha_key}"]
-                            except Exception:
-                                pass
+                            else:
+                                return drf_error("验证码错误", status=400)
                         else:
                             return drf_error("验证码错误", status=400)
-                    else:
-                        return drf_error("验证码错误", status=400)
                 except Exception:
                     return drf_error("验证码校验失败", status=400)
         except Exception:

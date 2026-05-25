@@ -44,6 +44,10 @@ env = environ.Env(
     AMAP_BASE=(str, 'https://restapi.amap.com'),
     AMAP_KEY=(str, '9ca18a1d97d6a8c31a77e001bfbd2742'),
     AMAP_CITY=(str, '440605'),  # 默认佛山南海区
+    # 是否允许使用万能验证码绕过（仅用于受控开发/测试，生产请勿启用）
+    ALLOW_CAPTCHA_BYPASS=(bool, False),
+    # 全局万能验证码（仅在 ALLOW_CAPTCHA_BYPASS 为 true 时生效），请在生产环境不要设置
+    CAPTCHA_MASTER_CODE=(str, ''),
     # 安全响应头（开发默认全部关闭）
     SECURE_SSL_REDIRECT=(bool, False),
     SESSION_COOKIE_SECURE=(bool, False),
@@ -311,6 +315,14 @@ ACCESS_TOKEN_EXPIRE_SECONDS = env('ACCESS_TOKEN_EXPIRE_SECONDS')
 REFRESH_TOKEN_EXPIRE_SECONDS = env('REFRESH_TOKEN_EXPIRE_SECONDS')
 
 # 文件管理模块已下线；如需恢复请参考历史提交
+
+# 图片验证码万能口令配置（仅用于开发/测试）
+ALLOW_CAPTCHA_BYPASS = env('ALLOW_CAPTCHA_BYPASS')
+CAPTCHA_MASTER_CODE = env('CAPTCHA_MASTER_CODE') or None
+# 安全提示：若在非 DEBUG 环境启用了万能口令，发出警告以提醒审计
+if ALLOW_CAPTCHA_BYPASS and not DEBUG:
+    import warnings
+    warnings.warn("ALLOW_CAPTCHA_BYPASS is enabled in non-debug mode; this is insecure and should not be used in production.", RuntimeWarning)
 
 # Channels 已从项目中移除；保留 REDIS_URL 以备将来需要，但不再配置 CHANNEL_LAYERS
 REDIS_URL = env('REDIS_URL')
