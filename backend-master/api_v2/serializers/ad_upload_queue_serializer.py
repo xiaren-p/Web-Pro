@@ -38,15 +38,21 @@ class AdUploadQueueSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_parse_status_label(self, obj: AdUploadQueue) -> str:
-        """返回解析状态的中文标签（队列中 / 失败）。
+        """返回状态的中文标签。
 
         Args:
             obj (AdUploadQueue): 队列记录实例。
 
         Returns:
-            str: "队列中" 或 "失败"。
+            str: "队列中" / "失败" / "成功"。
         """
-        return "队列中" if obj.parse_status == AdParseStatus.SUCCESS else "失败"
+        from api_v2.models.ad_upload_queue import AdParseStatus
+        label_map = {
+            AdParseStatus.PENDING: "队列中",
+            AdParseStatus.SUCCESS: "成功",
+            AdParseStatus.FAILED: "失败",
+        }
+        return label_map.get(obj.parse_status, "未知")
 
     def get_ad_type_label(self, obj: AdUploadQueue) -> str:
         """返回广告类型的中文标签（手动 / 自动）。

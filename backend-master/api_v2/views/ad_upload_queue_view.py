@@ -78,7 +78,7 @@ def upload_ad_xlsx(request: Request) -> Response:
         )
         return Response({"detail": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
-    success_count = sum(1 for r in created if r.parse_status == AdParseStatus.SUCCESS)
+    success_count = sum(1 for r in created if r.parse_status == AdParseStatus.PENDING)
     failed_count = len(created) - success_count
     data = AdUploadQueueSerializer(created, many=True).data
     return Response(
@@ -102,7 +102,7 @@ def list_ad_queue(request: Request) -> Response:
     Query Params:
         page (int): 页码，默认 1。
         page_size (int): 每页条数，默认 20，最大 100。
-        parse_status (int): 0=失败 1=成功，不传则查全部。
+        parse_status (int): 0=失败 1=队列中 2=成功，不传则查全部。
         shop (str): 按店铺名模糊过滤。
         country (str): 按国家精确过滤（DE/IT/FR/ES/UK）。
 

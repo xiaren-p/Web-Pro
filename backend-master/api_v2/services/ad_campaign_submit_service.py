@@ -19,7 +19,7 @@ from typing import Any
 import requests
 
 from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
-from api_v2.models.ad_upload_queue import AdParseStatus, AdUploadQueue, CampaignSubmitStatus
+from api_v2.models.ad_upload_queue import AdParseStatus, AdUploadQueue
 from api_v2.models.api_request_log import ApiRequestLog, HttpMethod, ParamType
 from api_v2.services.qinglong_env_service import get_cached_env
 
@@ -236,10 +236,9 @@ def _submit_single(queue: AdUploadQueue) -> None:
     """
     profile_id = _find_profile_id(queue.shop, queue.country)
     if profile_id is None:
-        queue.campaign_status = CampaignSubmitStatus.FAILED
+        queue.parse_status = AdParseStatus.FAILED
         queue.msg = f"未找到匹配 profile: {queue.shop}-{queue.country}"
-        queue.campaign_response = {"error": queue.msg}
-        queue.save(update_fields=["campaign_status", "campaign_response", "msg"])
+        queue.save(update_fields=["parse_status", "msg"])
         return
 
     targeting_type = _extract_targeting_type(queue.campaign_name)
@@ -270,10 +269,9 @@ def _submit_single(queue: AdUploadQueue) -> None:
             exc,
             exc_info=True,
         )
-        queue.campaign_status = CampaignSubmitStatus.FAILED
+        queue.parse_status = AdParseStatus.FAILED
         queue.msg = str(exc)
-        queue.campaign_response = {"error": str(exc)}
-        queue.save(update_fields=["campaign_status", "campaign_response", "msg"])
+        queue.save(update_fields=["parse_status", "msg"])
         return
 
     # 领星接口始终返回 HTTP 200，真实失败通过 result 数组非空体现
@@ -284,10 +282,9 @@ def _submit_single(queue: AdUploadQueue) -> None:
             queue.pk,
             queue.campaign_name,
         )
-        queue.campaign_status = CampaignSubmitStatus.SUCCESS
+        queue.parse_status = AdParseStatus.SUCCESS
         queue.msg = "成功"
-        queue.campaign_response = resp_json
-        queue.save(update_fields=["campaign_status", "campaign_response", "msg"])
+        queue.save(update_fields=["parse_status", "msg"])
         _write_request_log(
             url=_API_URL,
             headers=headers,
@@ -302,10 +299,9 @@ def _submit_single(queue: AdUploadQueue) -> None:
             queue.campaign_name,
             error_msg,
         )
-        queue.campaign_status = CampaignSubmitStatus.FAILED
+        queue.parse_status = AdParseStatus.FAILED
         queue.msg = error_msg
-        queue.campaign_response = resp_json
-        queue.save(update_fields=["campaign_status", "campaign_response", "msg"])
+        queue.save(update_fields=["parse_status", "msg"])
 
 
 def process_pending_campaigns() -> dict[str, int]:
@@ -317,8 +313,7 @@ def process_pending_campaigns() -> dict[str, int]:
         dict[str, int]: 含 total / submitted / failed 三个计数字段的结果摘要。
     """
     pending_qs = AdUploadQueue.objects.filter(
-        parse_status=AdParseStatus.SUCCESS,
-        campaign_status=CampaignSubmitStatus.PENDING,
+        parse_status=AdParseStatus.PENDING,
     ).order_by("id")
 
     total = pending_qs.count()
@@ -333,7 +328,7 @@ def process_pending_campaigns() -> dict[str, int]:
     for queue in pending_qs.iterator():
         try:
             _submit_single(queue)
-            if queue.campaign_status == CampaignSubmitStatus.SUCCESS:
+            if queue.parse_status == AdParseStatus.SUCCESS:
                 submitted += 1
             else:
                 failed += 1

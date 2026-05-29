@@ -354,8 +354,8 @@ def _do_parse_and_create(
                             ad_type=ad_type,
                             skus=skus,
                             keywords=keywords,
-                            parse_status=AdParseStatus.SUCCESS,
-                            msg="成功",
+                            parse_status=AdParseStatus.PENDING,
+                            msg="队列中",
                             created_by=user,
                         )
                     )

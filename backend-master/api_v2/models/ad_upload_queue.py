@@ -8,18 +8,11 @@ from django.db import models
 
 
 class AdParseStatus(models.IntegerChoices):
-    """广告队列解析状态枚举。"""
+    """广告队列状态枚举（贯穿解析与提交两个阶段）。"""
 
-    FAILED = 0, "解析失败"
-    SUCCESS = 1, "解析成功"
-
-
-class CampaignSubmitStatus(models.IntegerChoices):
-    """广告活动 API 提交状态枚举。"""
-
-    PENDING = 0, "待提交"
-    SUCCESS = 1, "提交成功"
-    FAILED = 2, "提交失败"
+    FAILED = 0, "失败"
+    PENDING = 1, "队列中"
+    SUCCESS = 2, "成功"
 
 
 class AdUploadQueue(models.Model):
@@ -63,21 +56,9 @@ class AdUploadQueue(models.Model):
 
     parse_status = models.IntegerField(
         choices=AdParseStatus.choices,
-        default=AdParseStatus.SUCCESS,
+        default=AdParseStatus.PENDING,
         db_index=True,
-        verbose_name="解析状态",
-    )
-
-    campaign_status = models.IntegerField(
-        choices=CampaignSubmitStatus.choices,
-        default=CampaignSubmitStatus.PENDING,
-        db_index=True,
-        verbose_name="API 提交状态",
-    )
-
-    campaign_response = models.JSONField(
-        default=dict,
-        verbose_name="API 响应数据",
+        verbose_name="状态",
     )
 
     msg = models.TextField(
