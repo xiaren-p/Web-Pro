@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 @shared_task(
     bind=True,
     name='api_v2.tasks.listing_image_upload_task.upload_listing_images_task',
-    queue='single_thread_queue',
     max_retries=0,
     soft_time_limit=1500,
     time_limit=1800,

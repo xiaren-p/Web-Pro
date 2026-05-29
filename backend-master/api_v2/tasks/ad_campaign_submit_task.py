@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 @shared_task(
     bind=True,
     name='api_v2.tasks.ad_campaign_submit_task.submit_pending_campaigns_task',
-    queue='parallel_queue',
     max_retries=0,
     soft_time_limit=120,
     time_limit=180,

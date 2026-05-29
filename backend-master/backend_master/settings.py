@@ -90,9 +90,60 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Shanghai'
-# Celery 队列定义（Worker 启动时需按队列名分别启动）：
-# single_thread_queue：concurrency=1，用于顺序执行（文件转换、AI 推理）
-# parallel_queue：concurrency=4，用于并行执行（批量数据处理）
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Celery 任务体系配置
+#
+# 架构约定（必须遵守，违反会导致任务静默积压）：
+#   1. 任务装饰器 @shared_task 禁止写 queue= 参数，路由统一在 CELERY_TASK_ROUTES 声明。
+#   2. Worker 启动命令固定为：
+#        celery -A backend_master worker -Q celery,parallel_queue,single_thread_queue
+#      不允许省略 -Q 参数（省略后默认只消费 celery 队列，其余队列的任务永远不执行）。
+#   3. 新增任务时必须完成以下两步，缺一不可：
+#        步骤 A：在下方 CELERY_TASK_ROUTES 追加路由（参考选队列决策树）。
+#        步骤 B：若是定时任务，在 CELERY_BEAT_SCHEDULE 追加调度项。
+#
+# ── 选队列决策树 ──────────────────────────────────────────────────────────────
+#
+#   新任务是否需要与同类任务互斥、必须按顺序一条一条执行？
+#     是 → single_thread_queue（concurrency=1）
+#          适用：文件转换、AI 推理、图片上传等不可并发的 IO 密集任务
+#     否 → 任务是否会占用大量 CPU / 内存，或需要并发加速？
+#           是 → parallel_queue（concurrency=4）
+#                适用：广告提交、批量数据处理、爬虫等可并行的任务
+#           否 → celery（默认队列）
+#                适用：定时同步、轻量 CRUD、运维维护等低频低负载任务
+#
+# ── 任务装饰器标准模板 ────────────────────────────────────────────────────────
+#
+#   @shared_task(
+#       bind=True,
+#       name='<app>.tasks.<module>.<func_name>',   # 与 CELERY_TASK_ROUTES 的 key 必须完全一致
+#       max_retries=0,                              # 按需调整；定时任务建议 0，手动触发任务可设 3
+#       soft_time_limit=<秒>,                       # 任务软超时：触发后抛 SoftTimeLimitExceeded
+#       time_limit=<秒>,                            # 任务硬超时：强制 Kill，建议比 soft 多 60s
+#   )
+#   def my_task(self, ...) -> dict:
+#       ...
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 默认队列：未在 CELERY_TASK_ROUTES 中指定路由的任务均落此队列
+CELERY_TASK_DEFAULT_QUEUE = 'celery'
+
+# 集中路由表：所有任务的队列归属在此声明，不在装饰器里写 queue=
+CELERY_TASK_ROUTES = {
+    # ── celery（默认队列）：轻量 / 定时 / 低频任务 ───────────────────────────
+    'api_v2.tasks.qinglong_env_sync_task.sync_qinglong_env_task': {'queue': 'celery'},
+    'api_v1.tasks.nc_sync_tasks.process_pending_nc_tasks':        {'queue': 'celery'},
+    'api_v1.tasks.nc_sync_tasks.retry_failed_nc_tasks':           {'queue': 'celery'},
+    'api_v1.tasks.maintenance_tasks.cleanup_orphan_uploads':      {'queue': 'celery'},
+    # ── parallel_queue（concurrency=4）：可并行的批量任务 ────────────────────
+    'api_v2.tasks.ad_campaign_submit_task.submit_pending_campaigns_task': {'queue': 'parallel_queue'},
+    # ── single_thread_queue（concurrency=1）：须顺序执行的任务 ───────────────
+    'api_v2.tasks.listing_image_upload_task.upload_listing_images_task':  {'queue': 'single_thread_queue'},
+}
+
 CELERY_BEAT_SCHEDULE = {
     # 青龙环境变量同步：每 10 分钟拉取 LX_ERP_HEADERS / LX_ADS_HEADERS / MIDDLE_API_HEADERS 写入缓存
     'qinglong-env-sync': {

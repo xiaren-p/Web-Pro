@@ -59,7 +59,13 @@ def _build_headers(profile_id: int) -> dict[str, str]:
     """
     raw = get_cached_env("LX_ERP_HEADERS")
     base: dict[str, str] = {}
-    if raw:
+    if not raw:
+        logger.warning(
+            "[AdCampaignSubmitService] [_build_headers] LX_ERP_HEADERS 缓存为空，"
+            "将以无认证头发起请求，预计返回 401。请检查：① 青龙同步任务是否运行 "
+            "② 青龙中 LX_ERP_HEADERS 是否存在且非空。"
+        )
+    else:
         try:
             base = json.loads(raw)
         except json.JSONDecodeError as exc:

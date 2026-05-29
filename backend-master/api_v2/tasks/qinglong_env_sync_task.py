@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 @shared_task(
     bind=True,
     name="api_v2.tasks.qinglong_env_sync_task.sync_qinglong_env_task",
-    queue="parallel_queue",
     max_retries=0,
     soft_time_limit=60,
     time_limit=90,
