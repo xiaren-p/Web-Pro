@@ -94,11 +94,6 @@ CELERY_TIMEZONE = 'Asia/Shanghai'
 # single_thread_queue：concurrency=1，用于顺序执行（文件转换、AI 推理）
 # parallel_queue：concurrency=4，用于并行执行（批量数据处理）
 CELERY_BEAT_SCHEDULE = {
-    # 广告活动队列监控：每 30 秒扫描一次 parse_status=SUCCESS+campaign_status=PENDING 记录并提交
-    'ad-campaign-submit': {
-        'task': 'api_v2.tasks.ad_campaign_submit_task.submit_pending_campaigns_task',
-        'schedule': 30.0,
-    },
     # 青龙环境变量同步：每 10 分钟拉取 LX_ERP_HEADERS / LX_ADS_HEADERS / MIDDLE_API_HEADERS 写入缓存
     'qinglong-env-sync': {
         'task': 'api_v2.tasks.qinglong_env_sync_task.sync_qinglong_env_task',
