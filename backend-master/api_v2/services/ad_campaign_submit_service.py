@@ -132,18 +132,16 @@ def _build_form_data(
     profile_id: int,
     campaign_name: str,
     targeting_type: str,
-    ad_type: str,
 ) -> dict[str, Any]:
     """构造广告活动创建接口的 form-encoded 请求体。
 
     按照真实请求参数模板构造，仅 profile_id / name / targetingType / startDate 动态填充；
-    其余固定参数与模板保持一致，不做任何调整。
+    ad_type 固定为 "sp"（Sponsored Products），其余固定参数与模板保持一致。
 
     Args:
         profile_id (int): 广告 Profile ID。
         campaign_name (str): 广告活动名称（含 AUTO/MANU 后缀）。
         targeting_type (str): Amazon 广告定向类型，"AUTO" 或 "MANUAL"。
-        ad_type (str): 广告类型，如 "sp"。
 
     Returns:
         dict[str, Any]: requests.post 的 data 参数字典。
@@ -168,7 +166,7 @@ def _build_form_data(
         "params[campaigns][0][dynamicBidding][placementBidding][2][percentage]": 0,
         "params[campaigns][0][dynamicBidding][placementBidding][3][placement]": "SITE_AMAZON_BUSINESS",
         "params[campaigns][0][dynamicBidding][placementBidding][3][percentage]": 0,
-        "ad_type": ad_type,
+        "ad_type": "sp",  # 固定为 Sponsored Products，不随 targetingType 变化
         "api_version": "v3",
     }
     return data
@@ -258,7 +256,7 @@ def _submit_single(queue: AdUploadQueue) -> None:
         return
 
     targeting_type = _extract_targeting_type(queue.campaign_name)
-    form_data = _build_form_data(profile_id, queue.campaign_name, targeting_type, queue.ad_type)
+    form_data = _build_form_data(profile_id, queue.campaign_name, targeting_type)
     headers = _build_headers(profile_id)
 
     logger.info(
