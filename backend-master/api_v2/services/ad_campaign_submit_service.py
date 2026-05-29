@@ -3,9 +3,9 @@
 职责：
   1. 查询 parse_status=SUCCESS 且 campaign_status=PENDING 的队列记录。
   2. 通过 LxAdsProfile 按「店铺-国家」匹配 profile_id。
-  3. 从青龙缓存读取 LX_ERP_HEADERS，拼接附加请求头。
+  3. 从青龙缓存读取 LX_ADS_HEADERS（含 Cookie），拼接附加固定请求头。
   4. 向领星广告接口 POST 创建广告活动。
-  5. 根据 API 响应更新队列记录的 campaign_status / campaign_response。
+  5. 根据 API 响应更新队列记录的 parse_status。
   6. 无论成功与否，每次 HTTP 请求均写入 ApiRequestLog 日志表。
 """
 
@@ -28,9 +28,9 @@ logger = logging.getLogger(__name__)
 # 领星广告活动创建接口
 _API_URL = "https://ads.lingxing.com/ad_report/core/api/handle"
 
-# 固定追加的 HTTP 请求头（在 LX_ERP_HEADERS 基础上叠加，严格对齐真实请求头列表）
+# 固定追加的 HTTP 请求头（在 LX_ADS_HEADERS 基础上叠加，严格对齐真实请求头列表）
 _EXTRA_HEADERS: dict[str, str] = {
-    "accept": "*/*",
+    "accept": "application/json, text/javascript, */*; q=0.01",
     "accept-encoding": "gzip, deflate, br, zstd",
     "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
     "connection": "keep-alive",
@@ -49,28 +49,31 @@ _EXTRA_HEADERS: dict[str, str] = {
 
 
 def _build_headers(profile_id: int) -> dict[str, str]:
-    """合并 LX_ERP_HEADERS 缓存值与附加固定请求头。
+    """合并 LX_ADS_HEADERS 缓存值与附加固定请求头。
+
+    ads.lingxing.com 接口使用 Cookie 鉴权，必须使用包含 Cookie 字段的 LX_ADS_HEADERS。
+    LX_ERP_HEADERS 仅含 auth-token，不适用于此接口。
 
     Args:
         profile_id (int): 当前操作的广告 profile ID，用于构造 referer。
 
     Returns:
-        dict[str, str]: 最终请求头字典；LX_ERP_HEADERS 未命中时返回仅含附加头的字典。
+        dict[str, str]: 最终请求头字典；LX_ADS_HEADERS 未命中时返回仅含附加头的字典。
     """
-    raw = get_cached_env("LX_ERP_HEADERS")
+    raw = get_cached_env("LX_ADS_HEADERS")
     base: dict[str, str] = {}
     if not raw:
         logger.warning(
-            "[AdCampaignSubmitService] [_build_headers] LX_ERP_HEADERS 缓存为空，"
+            "[AdCampaignSubmitService] [_build_headers] LX_ADS_HEADERS 缓存为空，"
             "将以无认证头发起请求，预计返回 401。请检查：① 青龙同步任务是否运行 "
-            "② 青龙中 LX_ERP_HEADERS 是否存在且非空。"
+            "② 青龙中 LX_ADS_HEADERS 是否存在且非空。"
         )
     else:
         try:
             base = json.loads(raw)
         except json.JSONDecodeError as exc:
             logger.warning(
-                "[AdCampaignSubmitService] LX_ERP_HEADERS JSON 解析失败: %s", exc
+                "[AdCampaignSubmitService] LX_ADS_HEADERS JSON 解析失败: %s", exc
             )
     headers = {**base, **_EXTRA_HEADERS}
     headers["referer"] = (
