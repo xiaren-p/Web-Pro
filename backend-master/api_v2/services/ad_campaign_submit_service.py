@@ -213,11 +213,11 @@ def _write_request_log(
 def _parse_result_error(resp_json: dict[str, Any]) -> str | None:
     """从领星接口响应中提取业务级错误描述。
 
-    领星广告接口无论成功与否均返回 HTTP 200，result 条目始终包含 "code" 字段。
-    区分成功与失败的依据是 code 值是否以 "Error" 结尾（大小写不敏感）：
-    - code 以 "Error" 结尾（如 "dateError"） → 创建失败，提取 descriptionCn，回退到 description。
-    - code 不以 "Error" 结尾                 → 创建成功，返回 None。
-    - result 为空                             → 创建成功，返回 None。
+    领星广告接口无论成功与否均返回 HTTP 200，需按以下优先级判断失败：
+    1. 顶层 code != 0 → 服务端拒绝请求（如 21408 服务器繁忙），提取 message 作为错误描述。
+    2. result 条目 code 以 "Error" 结尾（如 "dateError"） → 创建失败，提取 descriptionCn，
+       回退到 description。
+    3. 其余情况（code=0 且 result 无错误条目） → 创建成功，返回 None。
 
     Args:
         resp_json (dict[str, Any]): 接口原始响应字典。
@@ -225,6 +225,13 @@ def _parse_result_error(resp_json: dict[str, Any]) -> str | None:
     Returns:
         str | None: 失败时返回错误描述字符串；成功时返回 None。
     """
+    # 优先判断顶层 code，非 0 视为整体失败
+    top_code = resp_json.get("code", 0)
+    if top_code != 0:
+        msg = resp_json.get("message") or f"接口返回错误码 {top_code}"
+        return msg
+
+    # 再检查 result 数组中的逐条错误
     result: list[dict[str, Any]] = resp_json.get("result") or []
     for item in result:
         code = str(item.get("code", ""))
