@@ -21,14 +21,14 @@ from api_v1.models import (
     LxAdPortfolios,
     LxCampaignInfo,
 )
-from api_v1.services.ads_metrics_service import (
+from api_v1.services.lingxing.ads_metrics_service import (
     build_adgroup_metrics_map,
     empty_adgroup_metrics,
 )
 from api_v1.utils.ad_status import resolve_service_status
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_ok
-from api_v1.views.ads._helpers import resolve_currency_icon
+from api_v1.views.lingxing.ads._helpers import resolve_currency_icon
 
 
 class AdGroupViewSet(viewsets.ViewSet):
@@ -145,3 +145,4 @@ class AdGroupViewSet(viewsets.ViewSet):
             "pageNum": p_num,
             "pageSize": p_size,
         })
+

@@ -16,20 +16,20 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from api_v1.models.ads.lx_auto_negative_targeting_info import LxAutoNegativeTargetingInfo
+from api_v1.models.lingxing.ads.lx_auto_negative_targeting_info import LxAutoNegativeTargetingInfo
 from api_v1.models import (
     LxAdGroupInfo,
     LxAdPortfolios,
     LxCampaignInfo,
 )
-from api_v1.services.ads_metrics_service import (
+from api_v1.services.lingxing.ads_metrics_service import (
     build_auto_negative_targeting_metrics_map,
     empty_negative_metrics,
 )
 from api_v1.utils.ad_status import resolve_service_status
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_ok
-from api_v1.views.ads._helpers import resolve_currency_icon
+from api_v1.views.lingxing.ads._helpers import resolve_currency_icon
 
 # 否定类型中文映射
 _EXP_TYPE_LABEL: dict[str, str] = {
@@ -176,3 +176,4 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
             "pageNum": p_num,
             "pageSize": p_size,
         })
+

@@ -1,14 +1,13 @@
-"""自动投放定向条款列表及指标聚合视图（详情页 Tab：投放 - 自动）。
+"""广告投放列表及指标聚合视图（详情页 Tab：投放）。
 
-接受 ``campaign_id`` + ``profile_id`` 为必填参数，
-可选日期范围与状态筛选，返回带指标的自动投放条款列表、汇总行及分页信息。
+接受 ``ad_group_id`` + ``campaign_id`` + ``profile_id`` 为必填参数，
+可选日期范围与筛选条件，返回带指标的广告投放列表、汇总行及分页信息。
 
-自动投放条款即"紧密匹配 / 宽泛匹配 / 同类商品 / 关联商品"四种预设定向组，
-来源于 lx_auto_targeting_info 表，指标来源于 lx_auto_targeting_metrics 表。
+由于 lx_ad_metrics 不含 ad_group_id 字段，视图层须先获取广告组下
+全量 ad_id，再将其传入指标服务完成 IN 子句聚合查询，保证 % 分母完整。
 """
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from rest_framework import viewsets
@@ -16,39 +15,38 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from api_v1.models.ads.lx_auto_targeting_info import LxAutoTargetingInfo
 from api_v1.models import (
     LxAdGroupInfo,
+    LxAdInfo,
     LxAdPortfolios,
     LxCampaignInfo,
 )
-from api_v1.services.ads_metrics_service import (
-    build_auto_targeting_metrics_map,
-    empty_auto_targeting_metrics,
+from api_v1.services.lingxing.ads_metrics_service import (
+    build_ad_metrics_map,
+    empty_adgroup_metrics,
 )
 from api_v1.utils.ad_status import resolve_service_status
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_ok
-from api_v1.views.ads._helpers import resolve_currency_icon
+from api_v1.views.lingxing.ads._helpers import resolve_currency_icon
 
 
-class AutoTargetingViewSet(viewsets.ViewSet):
-    """自动投放定向条款列表及指标聚合视图。"""
+class AdViewSet(viewsets.ViewSet):
+    """广告投放列表及指标聚合视图。"""
 
     @action(detail=False, methods=["post"], url_path="list")
-    def list_auto_targeting(self, request: Request) -> Response:
-        """分页获取自动投放定向条款列表及聚合指标。
+    def list_ads(self, request: Request) -> Response:
+        """分页获取广告投放列表及聚合指标。
 
         Args:
             request (Request): DRF 请求对象，body 字段：
 
             - campaign_id (str): 必填，广告活动 ID。
             - profile_id (str): 必填，店铺 Profile ID。
+            - ad_group_id (str): 可选，广告组 ID；不传则展示整个广告活动下的所有投放。
             - date_start (str): 可选，起始日期 YYYY-MM-DD。
             - date_end (str): 可选，截止日期 YYYY-MM-DD。
-            - state (str): 可选，状态过滤（enabled / paused / archived）。
-            - pageNum (int): 可选，页码，默认 1。
-            - pageSize (int): 可选，每页条数，默认 25。
+            - state (str): 可选，投放状态过滤（enabled / paused / archived）。            - service_status (str): 可选，服务状态过滤（如 AD_STATUS_LIVE / AD_PAUSED 等）。            - keyword (str): 可选，ASIN 或 MSKU 模糊搜索。
 
         Returns:
             Response: 标准分页响应，含 ``total / list / summary / pageNum / pageSize``。
@@ -62,19 +60,33 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             return drf_ok({}, msg="campaign_id 与 profile_id 均为必填参数")
 
         # 基础查询集：按 campaign_id + profile_id 隔离
-        qs = LxAutoTargetingInfo.objects.filter(
+        qs = LxAdInfo.objects.filter(
             campaign_id=campaign_id,
             profile_id=profile_id,
-        ).order_by("id")
+        ).order_by("ad_id")
 
-        # 全量 target_id：必须在状态过滤前提取，保证指标汇总分母始终覆盖完整广告活动
-        # （与 build_adgroup_metrics_map 行为一致：metrics 查询不受状态过滤影响）
-        all_target_ids = list(qs.values_list("target_id", flat=True))
+        # 可选广告组过滤
+        ad_group_id = str(data.get("ad_group_id") or "").strip()
+        if ad_group_id:
+            qs = qs.filter(ad_group_id=ad_group_id)
 
-        # 可选状态过滤（仅影响分页展示，不影响指标聚合分母）
+        # 可选状态过滤
         state = str(data.get("state") or "").strip()
         if state:
             qs = qs.filter(state=state)
+
+        # 可选服务状态过滤
+        service_status = str(data.get("service_status") or "").strip()
+        if service_status:
+            qs = qs.filter(service_status=service_status)
+
+        # 可选关键词过滤（ASIN 或 MSKU）
+        keyword = str(data.get("keyword") or "").strip()
+        if keyword:
+            qs = qs.filter(asin__icontains=keyword) | qs.filter(sku__icontains=keyword)
+
+        # 提前获取全量 ad_id（分页前），保证 % 指标分母覆盖完整广告组
+        all_ad_ids = list(qs.values_list("ad_id", flat=True))
 
         # 分页
         total, items, p_num, p_size = paginate_queryset(request, qs)
@@ -91,15 +103,15 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         campaign_state = ""
         try:
             c_obj = LxCampaignInfo.objects.get(
-                campaign_id=campaign_id,
-                profile_id=profile_id,
+                campaign_id=campaign_id, profile_id=profile_id
             )
             campaign_name = c_obj.name or ""
             campaign_state = c_obj.state or ""
         except LxCampaignInfo.DoesNotExist:
             pass
 
-        # 广告组名称 + 状态批量映射（避免 N+1）
+        # 广告组名称批量映射（用每条 ad 的 ad_group_id + campaign_id + profile_id 查询，
+        # 避免仅按传入 ad_group_id 过滤时其他组的广告显示空名称）
         item_ad_group_ids = list({
             str(item.ad_group_id) for item in items if item.ad_group_id
         })
@@ -115,60 +127,47 @@ class AutoTargetingViewSet(viewsets.ViewSet):
                 adgroup_map[gid] = g["name"] or ""
                 adgroup_state_map[gid] = g["state"] or ""
 
-        # 广告组合名称映射（批量查询）
+        # 广告组合名称映射（批量查询，避免 N+1）
         portfolio_ids = [item.portfolio_id for item in items if item.portfolio_id]
         portfolio_map: dict[str, str] = {}
         if portfolio_ids:
             for p in LxAdPortfolios.objects.filter(portfolio_id__in=portfolio_ids):
                 portfolio_map[str(p.portfolio_id)] = p.name or str(p.portfolio_id)
 
-        # 指标聚合（传入全量 target_id，1 次 SQL GROUP BY target_id + Python 两轮遍历）
-        metrics_map, summary = build_auto_targeting_metrics_map(
-            all_target_ids,
-            campaign_id,
-            profile_id,
-            date_start,
-            date_end,
-            currency_icon,
+        # 指标聚合（传入全量 ad_id，1 次 SQL GROUP BY ad_id + Python 两轮遍历）
+        metrics_map, summary = build_ad_metrics_map(
+            all_ad_ids, campaign_id, profile_id,
+            date_start, date_end, currency_icon,
         )
 
         # 组装响应列表
         res_list: list[dict[str, Any]] = []
         for item in items:
-            # 解析 recommends JSON 取建议竞价字段
-            recommends: dict[str, Any] = {}
-            if item.recommends:
-                try:
-                    recommends = item.recommends if isinstance(item.recommends, dict) else json.loads(item.recommends)
-                except (ValueError, TypeError):
-                    recommends = {}
-
-            gid = str(item.ad_group_id) if item.ad_group_id else ""
-
             row: dict[str, Any] = {
-                "target_id": item.target_id,
-                "targeting_text": item.targeting_text or "-",
+                "ad_id": item.ad_id,
+                "asin": item.asin or "",
+                "msku": item.sku or "",
+                "image_url": item.main_img or "",
+                "title": item.product_name or "",
+                "price": item.listing_price or "",
+                "rating": item.stars or "",
+                "reviews": item.review_count or "",
+                "stock": item.afn_fulfillable_quantity or 0,
                 "state": item.state or "",
                 "service_status": item.service_status or "",
                 **{f"service_status_{k}": v for k, v in resolve_service_status(item.service_status).items()},
-                "bid": item.bid or "-",
-                "bidding_strategy": item.bidding_strategy or "",
-                "recommended_bid": recommends.get("suggested", "-"),
-                "recommend_range_start": recommends.get("rangeStart", "-"),
-                "recommend_range_end": recommends.get("rangeEnd", "-"),
                 "portfolio_name": (
                     portfolio_map.get(str(item.portfolio_id), "")
                     if item.portfolio_id else ""
                 ),
                 "campaign_name": campaign_name,
                 "campaign_state": campaign_state,
-                "adgroup_name": adgroup_map.get(gid, "") if gid else "",
-                "adgroup_state": adgroup_state_map.get(gid, "") if gid else "",
+                "adgroup_name": adgroup_map.get(str(item.ad_group_id), "") if item.ad_group_id else "",
+                "adgroup_state": adgroup_state_map.get(str(item.ad_group_id), "") if item.ad_group_id else "",
                 "created_at": str(item.creation_date) if item.creation_date else "",
-                "tag": "-",
             }
             row.update(
-                metrics_map.get(str(item.target_id), empty_auto_targeting_metrics())
+                metrics_map.get(str(item.ad_id), empty_adgroup_metrics())
             )
             res_list.append(row)
 
@@ -180,3 +179,4 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             "pageNum": p_num,
             "pageSize": p_size,
         })
+

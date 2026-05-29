@@ -17,6 +17,7 @@ class AdUploadQueueSerializer(serializers.ModelSerializer):
     """
 
     parse_status_label = serializers.SerializerMethodField()
+    ad_type_label = serializers.SerializerMethodField()
 
     class Meta:
         model = AdUploadQueue
@@ -26,6 +27,7 @@ class AdUploadQueueSerializer(serializers.ModelSerializer):
             "shop",
             "country",
             "ad_type",
+            "ad_type_label",
             "skus",
             "keywords",
             "parse_status",
@@ -45,6 +47,17 @@ class AdUploadQueueSerializer(serializers.ModelSerializer):
             str: "队列中" 或 "失败"。
         """
         return "队列中" if obj.parse_status == AdParseStatus.SUCCESS else "失败"
+
+    def get_ad_type_label(self, obj: AdUploadQueue) -> str:
+        """返回广告类型的中文标签（手动 / 自动）。
+
+        Args:
+            obj (AdUploadQueue): 队列记录实例。
+
+        Returns:
+            str: "手动" 或 "自动"。
+        """
+        return "手动" if obj.ad_type == "manual" else "自动"
 
 
 class AdBulkDeleteSerializer(serializers.Serializer):

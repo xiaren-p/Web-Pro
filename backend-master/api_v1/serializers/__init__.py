@@ -42,7 +42,7 @@ from api_v1.serializers.finance.monthly_loss_first20_serializer import MonthlyLo
 from api_v1.serializers.work import WorkReportSerializer
 
 # ads 板块
-from api_v1.serializers.ads import LxCampaignInfoSerializer
+from api_v1.serializers.lingxing.ads import LxCampaignInfoSerializer
 
 __all__ = [
     "PositionSerializer", "PositionWriteSerializer", "PositionOptionSerializer",
@@ -58,3 +58,4 @@ __all__ = [
     "WorkReportSerializer",
     "LxCampaignInfoSerializer",
 ]
+

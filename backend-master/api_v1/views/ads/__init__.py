@@ -1,24 +1,2 @@
-"""api_v1.views.ads 板块视图包。
-
-按"一类一文件"拆分广告活动相关 ViewSet，重导出以保证旧的
-``from api_v1.views.ads_views import XxxViewSet`` 调用路径仍然可用。
-"""
-from api_v1.views.ads.shop_profile_view import ShopProfileViewSet
-from api_v1.views.ads.ad_portfolio_view import AdPortfolioViewSet
-from api_v1.views.ads.ad_campaign_view import AdCampaignViewSet
-from api_v1.views.ads.ad_group_view import AdGroupViewSet
-from api_v1.views.ads.ad_view import AdViewSet
-from api_v1.views.ads.auto_targeting_view import AutoTargetingViewSet
-from api_v1.views.ads.auto_negative_targeting_view import AutoNegativeTargetingViewSet
-from api_v1.views.ads.negative_keyword_view import NegativeKeywordViewSet
-
-__all__ = [
-    "ShopProfileViewSet",
-    "AdPortfolioViewSet",
-    "AdCampaignViewSet",
-    "AdGroupViewSet",
-    "AdViewSet",
-    "AutoTargetingViewSet",
-    "AutoNegativeTargetingViewSet",
-    "NegativeKeywordViewSet",
-]
+# 兼容层：实际代码已迁移至 api_v1.views.lingxing.ads
+from api_v1.views.lingxing.ads import *  # noqa: F401, F403

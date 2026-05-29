@@ -1,7 +1,7 @@
 """Listing 业务指标模型（lx_listing_metrics，managed=False）。"""
 from django.db import models
 
-from api_v1.models.listing.lx_listing_info import LxListingInfo
+from api_v1.models.lingxing.sales.listing.lx_listing_info import LxListingInfo
 
 
 class LxListingMetrics(models.Model):
@@ -179,4 +179,5 @@ class LxListingMetrics(models.Model):
         db_table = "lx_listing_metrics"
         verbose_name = "Listing业务指标表"
         verbose_name_plural = "Listing业务指标表"
+
 

@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from api_v1.models import LxCampaignInfo, LxShopProfile
 from api_v1.utils.responses import drf_ok
-from api_v1.views.ads._helpers import COUNTRY_MAP
+from api_v1.views.lingxing.ads._helpers import COUNTRY_MAP
 
 
 class ShopProfileViewSet(viewsets.ViewSet):
@@ -70,3 +70,4 @@ class ShopProfileViewSet(viewsets.ViewSet):
             "profiles": profiles,
             "bidding_types": bidding_types,
         })
+

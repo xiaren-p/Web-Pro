@@ -33,8 +33,8 @@
       <div class="table-controls">
         <div class="left-controls">
           <!-- 新建广告：下拉选择操作类型 -->
-          <el-dropdown :disabled="uploadLoading" @command="handleNewAdCommand">
-            <el-button type="primary" :loading="uploadLoading">
+          <el-dropdown @command="handleNewAdCommand">
+            <el-button type="primary">
               新建广告
               <el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
@@ -49,15 +49,6 @@
           <el-button style="margin-left: 8px" @click="queueDrawerVisible = true">
             查看队列
           </el-button>
-
-          <!-- 隐藏文件输入，仅支持 .xlsx -->
-          <input
-            ref="fileInputRef"
-            type="file"
-            accept=".xlsx"
-            style="display: none"
-            @change="handleFileChange"
-          />
         </div>
 
         <div class="right-controls">
@@ -99,6 +90,8 @@
 
     <!-- 广告上传队列抽屉 -->
     <AdQueueDrawer v-model:visible="queueDrawerVisible" />
+    <!-- 新建广告上传对话框 -->
+    <AdUploadDialog v-model:visible="uploadDialogVisible" @view-queue="queueDrawerVisible = true" />
   </div>
 </template>
 
@@ -109,57 +102,24 @@ import Filters from "./Filters.vue";
 import Indicators from "./Indicators.vue";
 import AdsTable from "./AdsTable.vue";
 import AdQueueDrawer from "./AdQueueDrawer.vue";
+import AdUploadDialog from "./AdUploadDialog.vue";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import { ElMessage } from "element-plus";
-import { getAdCampaigns, getAdOptions, getAdPortfolioOptions, uploadAdXlsx } from "@/api/ads";
+import { getAdCampaigns, getAdOptions, getAdPortfolioOptions } from "@/api/ads";
 
 defineOptions({ name: "AdsText" });
 
 // ── 广告上传队列 ──────────────────────────────────────────────────────────────
 const queueDrawerVisible = ref(false);
-const uploadLoading = ref(false);
-const fileInputRef = ref<HTMLInputElement | null>(null);
-
+const uploadDialogVisible = ref(false);
 /**
- * 处理"新建广告"下拉命令。
+ * 处理"新建广告"下拉命令：打开上传对话框。
  *
  * @param {string} command - 下拉项命令值，当前仅支持 "upload"
  */
 function handleNewAdCommand(command: string): void {
   if (command === "upload") {
-    fileInputRef.value?.click();
-  }
-}
-
-/**
- * 处理隐藏文件输入的 change 事件，触发 xlsx 上传并解析。
- *
- * @param {Event} event - 文件选择 change 事件
- * @returns {Promise<void>}
- */
-async function handleFileChange(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  // 重置 input，允许重复选同一文件
-  input.value = "";
-  if (!file) return;
-
-  if (!file.name.toLowerCase().endsWith(".xlsx")) {
-    ElMessage.error("仅支持 .xlsx 格式文件");
-    return;
-  }
-
-  uploadLoading.value = true;
-  try {
-    const res = await uploadAdXlsx(file);
-    ElMessage.success(`成功创建 ${res.count} 条队列记录`);
-    queueDrawerVisible.value = true;
-  } catch (err: unknown) {
-    // 透传后端返回的实际错误描述（已由拦截器提取并包装到 Error.message 中）
-    const msg = err instanceof Error ? err.message : "文件解析失败，请检查 Excel 格式";
-    ElMessage.error(msg);
-  } finally {
-    uploadLoading.value = false;
+    uploadDialogVisible.value = true;
   }
 }
 

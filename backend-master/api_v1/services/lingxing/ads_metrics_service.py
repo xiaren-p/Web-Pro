@@ -353,7 +353,7 @@ def build_ad_metrics_map(
             - metrics_map: 以 ad_id（str）为键，各行指标字典为值的映射。
             - summary: 全量合计汇总行字典，供前端表格底部汇总行展示。
     """
-    from api_v1.models.ads.lx_ad_metrics import LxAdMetrics
+    from api_v1.models.lingxing.ads.lx_ad_metrics import LxAdMetrics
 
     if not ad_ids:
         return {}, _build_summary_row(0.0, 0.0, 0, 0, 0, 0.0, 0, 0, currency_icon)
@@ -511,7 +511,7 @@ def build_auto_targeting_metrics_map(
             - metrics_map: target_id → 完整指标展示字典（含 IS 字段）。
             - summary: 全量合计汇总行字典（IS 字段固定为 "-"）。
     """
-    from api_v1.models.ads.lx_auto_targeting_metrics import LxAutoTargetingMetrics
+    from api_v1.models.lingxing.ads.lx_auto_targeting_metrics import LxAutoTargetingMetrics
 
     if not target_ids:
         summary = _build_summary_row(0.0, 0.0, 0, 0, 0, 0.0, 0, 0, currency_icon)
@@ -733,7 +733,7 @@ def build_auto_negative_targeting_metrics_map(
             - metrics_map: target_id → 指标展示字典。
             - summary: 全量合计汇总行字典。
     """
-    from api_v1.models.ads.lx_auto_negative_targeting_metrics import (
+    from api_v1.models.lingxing.ads.lx_auto_negative_targeting_metrics import (
         LxAutoNegativeTargetingMetrics,
     )
 
@@ -805,7 +805,7 @@ def build_negative_keyword_metrics_map(
             - metrics_map: keyword_id → 指标展示字典。
             - summary: 全量合计汇总行字典。
     """
-    from api_v1.models.ads.lx_negative_keyword_metrics import LxNegativeKeywordMetrics
+    from api_v1.models.lingxing.ads.lx_negative_keyword_metrics import LxNegativeKeywordMetrics
 
     if not keyword_ids:
         return {}, _build_negative_summary_row(0.0, 0, 0.0, currency_icon)
@@ -849,3 +849,4 @@ def build_negative_keyword_metrics_map(
     }
     summary = _build_negative_summary_row(tot_sales, tot_orders, tot_spends, currency_icon)
     return metrics_map, summary
+

@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visible" title="广告上传队列" size="900px" destroy-on-close>
+  <el-drawer v-model="visible" title="广告新建队列" size="720px" destroy-on-close>
     <div class="queue-drawer">
       <!-- 顶部工具栏 -->
       <div class="queue-toolbar">
@@ -46,6 +46,8 @@
 
         <el-table-column prop="country" label="国家" width="80" align="center" />
 
+        <el-table-column prop="ad_type_label" label="广告类型" width="90" align="center" />
+
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.parse_status === 1 ? 'success' : 'danger'" size="small">
@@ -54,7 +56,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="100" align="center">
+        <el-table-column label="操作" width="140" align="center">
           <template #default="{ row }">
             <el-button
               v-if="row.parse_status === 0"
@@ -65,7 +67,15 @@
             >
               查看原因
             </el-button>
-            <span v-else class="text-muted">—</span>
+            <el-button
+              type="danger"
+              link
+              size="small"
+              :loading="deletingId === row.id"
+              @click="handleSingleDelete(row)"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -87,7 +97,7 @@
   </el-drawer>
 
   <!-- 失败原因弹窗 -->
-  <el-dialog v-model="failDialogVisible" title="失败原因" width="500px">
+  <el-dialog v-model="failDialogVisible" title="失败原因" width="480px">
     <p class="fail-reason-text">{{ currentFailMsg }}</p>
     <template #footer>
       <el-button @click="failDialogVisible = false">关闭</el-button>
@@ -97,8 +107,8 @@
 
 <script setup lang="ts">
 /**
- * 广告上传队列抽屉组件。
- * 展示当前所有广告上传队列记录，支持状态过滤、多选批量删除、失败原因查看。
+ * 广告新建队列抽屉组件。
+ * 展示当前所有广告新建队列记录，支持状态过滤、多选批量删除、单条删除、失败原因查看。
  * 所属板块：ads。
  */
 import type { AdQueueItem, AdQueueQuery } from "@/api/ads/index";
@@ -147,6 +157,9 @@ const filterStatus = ref<number | undefined>(undefined);
 // 失败原因弹窗
 const failDialogVisible = ref(false);
 const currentFailMsg = ref("");
+
+// 单条删除加载态
+const deletingId = ref<number | null>(null);
 
 /**
  * 加载队列记录列表（分页）。
@@ -228,6 +241,34 @@ function handleFilterChange(): void {
 function handlePageSizeChange(): void {
   currentPage.value = 1;
   loadQueue();
+}
+
+/**
+ * 删除单条队列记录。
+ *
+ * @param {AdQueueItem} row - 要删除的队列记录行
+ * @returns {Promise<void>}
+ */
+async function handleSingleDelete(row: AdQueueItem): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      `确认删除该条记录（${row.campaign_name} / ${row.country}）？`,
+      "删除确认",
+      { type: "warning", confirmButtonText: "确认删除", cancelButtonText: "取消" }
+    );
+  } catch {
+    return;
+  }
+  deletingId.value = row.id;
+  try {
+    await bulkDeleteAdQueue([row.id]);
+    ElMessage.success("删除成功");
+    await loadQueue();
+  } catch {
+    ElMessage.error("删除失败，请重试");
+  } finally {
+    deletingId.value = null;
+  }
 }
 
 /**

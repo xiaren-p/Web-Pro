@@ -20,6 +20,7 @@ import pandas as pd
 from django.contrib.auth.models import User
 from django.db import transaction
 
+from api_v1.models.lingxing.basic.lx_shops import LxShops
 from api_v2.models.ad_upload_queue import AdParseStatus, AdUploadQueue
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,11 @@ _REQUIRED_COLS: tuple[str, ...] = (_COL_SHOP, _COL_AD_NAME, _COL_SKU)
 _KEYWORD_HEADER: str = "关键词"
 _START_PREFIX: str = "START "
 _END_TOKEN: str = "END"
-_TARGET_SITES: tuple[str, ...] = ("DE", "IT", "FR", "ES", "UK")
+# 子表名合规性校验：仅接受标准两位大写国家代码（如 DE / UK / US），超出范围的子表直接跳过。
+_SITE_NAME_RE = re.compile(r"^[A-Z]{2}$")
+
+# 广告类型推断：广告活动名末尾 token 决定投放类型（AUTO → 自动投放，MANU → 手动投放）
+_AD_TYPE_MAP: dict[str, str] = {"AUTO": "auto", "MANU": "manual"}
 
 _SHOP_RE = re.compile(r"^[a-zA-Z0-9]+$")
 _AD_NAME_RE = re.compile(
@@ -43,6 +48,21 @@ _SKU_RE = re.compile(r"^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$")
 
 
 # ── 内部解析辅助函数 ────────────────────────────────────────────────────────────
+
+def _infer_ad_type(ad_name: str) -> str:
+    """根据广告活动名称末尾 token 推断广告类型。
+
+    末尾 token 为 "AUTO" 时为自动投放，为 "MANU" 时为手动投放，其他默认 "auto"。
+
+    Args:
+        ad_name (str): 广告活动名称，如 "X-HLS-LQ-SR AUTO" 或 "X-HLS-LQ-SR MANU"。
+
+    Returns:
+        str: "auto" 或 "manual"。
+    """
+    last_token = ad_name.strip().rsplit(" ", 1)[-1].upper()
+    return _AD_TYPE_MAP.get(last_token, "auto")
+
 
 def _find_keyword_col_index(row: pd.Series) -> int:
     """在候选表头行中查找"关键词"列的索引。
@@ -106,7 +126,10 @@ def _parse_site_sheet(df: pd.DataFrame) -> dict[str, list[str]]:
 
 
 def _read_site_keywords(file_path: str) -> dict[str, dict[str, list[str]]]:
-    """读取文件中所有可用站点 sheet 的关键词映射。
+    """读取文件中所有合规子表的关键词映射。
+
+    合规子表：表名匹配 `_SITE_NAME_RE`（两位大写字母）且不为主表 Sheet1。
+    返回 dict 的 key 即为实际发现的有效站点列表，展开时以此为准。
 
     Args:
         file_path (str): xlsx 文件绝对路径。
@@ -124,19 +147,20 @@ def _read_site_keywords(file_path: str) -> dict[str, dict[str, list[str]]]:
         )
         return result
 
-    for site in _TARGET_SITES:
-        if site not in sheet_names:
+    for sheet in sheet_names:
+        # 子表名合规性过滤：必须为两位大写字母（标准国家代码）
+        if not _SITE_NAME_RE.match(sheet):
             continue
         try:
-            site_df = pd.read_excel(file_path, sheet_name=site, header=None, engine="openpyxl")
-            result[site] = _parse_site_sheet(site_df)
+            site_df = pd.read_excel(file_path, sheet_name=sheet, header=None, engine="openpyxl")
+            result[sheet] = _parse_site_sheet(site_df)
             logger.info(
                 "[AdUploadQueueService][_read_site_keywords] 站点 %s 解析完成: ad_count=%s",
-                site, len(result[site]),
+                sheet, len(result[sheet]),
             )
         except Exception as exc:
             logger.warning(
-                "[AdUploadQueueService][_read_site_keywords] 站点 %s 读取失败: %s", site, exc
+                "[AdUploadQueueService][_read_site_keywords] 站点 %s 读取失败: %s", sheet, exc
             )
 
     return result
@@ -176,35 +200,61 @@ def _get_group_error(shop: str, ad_name: str, group: pd.DataFrame) -> str | None
 def _do_parse_and_create(
     tmp_path: str,
     user: User | None,
-) -> tuple[list[AdUploadQueue], str | None]:
+    ad_type_filter: str,
+    country_filter: list[str] | None,
+) -> tuple[list[AdUploadQueue], str | None, list[str]]:
     """执行 xlsx 解析并批量落库。
 
     Args:
         tmp_path (str): 已落盘的 xlsx 临时文件绝对路径。
         user (User | None): 当前操作用户。
+        ad_type_filter (str): 广告类型筛选，取値 "all" / "auto" / "manual"。
+        country_filter (list[str] | None): 手动指定的国家代码列表；None 表示按表需求自动发现。
 
     Returns:
-        tuple[list[AdUploadQueue], str | None]:
+        tuple[list[AdUploadQueue], str | None, list[str]]:
             - 已创建的记录列表（成功时非空）。
             - error_msg：文件级错误时非 None，此时列表为空。
+            - skipped_warnings：手动广告无关键词被跳过的提示信息列表。
     """
     # 1. 读主表
     try:
         df = pd.read_excel(tmp_path, sheet_name=_MAIN_SHEET, engine="openpyxl")
     except ValueError as exc:
         if "Worksheet named" in str(exc):
-            return [], f"文件中未找到 '{_MAIN_SHEET}' 工作表"
-        return [], f"读取主表失败：{exc}"
+            return [], f"文件中未找到 '{_MAIN_SHEET}' 工作表", []
+        return [], f"读取主表失败：{exc}", []
     except Exception as exc:
-        return [], f"读取文件失败：{exc}"
+        return [], f"读取文件失败：{exc}", []
 
     # 2. 校验必需列
     missing = [c for c in _REQUIRED_COLS if c not in df.columns]
     if missing:
-        return [], f"主表缺少必需列：{', '.join(missing)}"
+        return [], f"主表缺少必需列：{', '.join(missing)}", []
 
-    # 3. 读站点关键词
+    # 3. 读站点关键词（同时动态发现合规站点：子表名 = 两位大写国家代码）
     site_keywords = _read_site_keywords(tmp_path)
+    discovered_sites: list[str] = list(site_keywords.keys())
+
+    if not discovered_sites:
+        return [], "文件中未发现合规站点子表（子表名应为两位大写国家代码，如 DE、UK）", []
+
+    # 3c. 根据前端传入的 country_filter 过滤有效站点：
+    #     None = 按表需求，使用文件中全部发现站点；传入列表则求交，文件没有的巻默忽略。
+    if country_filter:
+        effective_sites: list[str] = [s for s in discovered_sites if s in set(country_filter)]
+        if not effective_sites:
+            return [], (
+                f"选中的国家（{', '.join(country_filter)}）在文件中均不存在对应站点子表"
+            ), []
+    else:
+        effective_sites = discovered_sites
+
+    # 3b. 预加载 lx_shops 所有已知店铺名称（用于后续店铺-国家存在性校验）
+    #     格式："{shop_name}-{site}"，例如 "MF-DE"。
+    valid_shop_sites: frozenset[str] = frozenset(
+        LxShops.objects.values_list("name", flat=True)
+    )
 
     # 4. 归一化主表（向下填充店铺名/广告活动名）
     df[_COL_SHOP] = df[_COL_SHOP].ffill()
@@ -215,20 +265,27 @@ def _do_parse_and_create(
     # 5. 按（店铺 × 广告活动 × 国家）三维展开，内联校验并构造队列记录。
     #    格式不合规的分组不阻断整体上传，改为以 FAILED 状态落库并在 msg 中注明原因，
     #    其余合规分组正常以 SUCCESS 状态写入。
+    #    手动广告（MANU）无关键词时直接跳过，不创建任何记录，仅记录 skipped_warnings 供前端提示。
     records_to_create: list[AdUploadQueue] = []
+    skipped_warnings: list[str] = []
     for shop, shop_group in df.groupby(_COL_SHOP, sort=False):
         for ad_name, ad_group in shop_group.groupby(_COL_AD_NAME, sort=False):
+            # 广告类型筛选：不符合前端选择的类型直接跳过该广告活动，不创建任何记录
+            inferred_type: str = _infer_ad_type(str(ad_name))
+            if ad_type_filter != "all" and inferred_type != ad_type_filter:
+                continue
+
             error_msg = _get_group_error(str(shop), str(ad_name), ad_group)
 
             if error_msg:
-                # 校验失败：5 个站点全部以 FAILED 状态落库，SKU/关键词留空
-                for site in _TARGET_SITES:
+                # 校验失败：全部有效站点以 FAILED 状态落库，SKU/关键词留空
+                for site in effective_sites:
                     records_to_create.append(
                         AdUploadQueue(
                             campaign_name=str(ad_name),
                             shop=str(shop),
                             country=site,
-                            ad_type="sp",
+                            ad_type=inferred_type,
                             skus=[],
                             keywords=[],
                             parse_status=AdParseStatus.FAILED,
@@ -237,18 +294,41 @@ def _do_parse_and_create(
                         )
                     )
             else:
-                # 校验通过：正常展开 5 个站点
+                # 校验通过：按有效站点展开，每个站点额外校验 lx_shops 存在性
                 skus: list[str] = ad_group[_COL_SKU].dropna().astype(str).tolist()
                 if not skus:
                     continue
-                for site in _TARGET_SITES:
+                for site in effective_sites:
+                    shop_site_key = f"{shop}-{site}"
+                    if shop_site_key not in valid_shop_sites:
+                        # 店铺-国家组合在 lx_shops 中不存在，以 FAILED 状态落库
+                        records_to_create.append(
+                            AdUploadQueue(
+                                campaign_name=str(ad_name),
+                                shop=str(shop),
+                                country=site,
+                                ad_type=inferred_type,
+                                skus=[],
+                                keywords=[],
+                                parse_status=AdParseStatus.FAILED,
+                                msg=f"店铺不存在（{shop_site_key}）",
+                                created_by=user,
+                            )
+                        )
+                        continue
                     keywords: list[str] = site_keywords.get(site, {}).get(str(ad_name), [])
+                    # 手动广告（MANU）无关键词：直接跳过，不创建任何记录，仅记录提示
+                    if inferred_type == "manual" and not keywords:
+                        skipped_warnings.append(
+                            f"{ad_name}（{site}）没有关键词，不予创建"
+                        )
+                        continue
                     records_to_create.append(
                         AdUploadQueue(
                             campaign_name=str(ad_name),
                             shop=str(shop),
                             country=site,
-                            ad_type="sp",
+                            ad_type=inferred_type,
                             skus=skus,
                             keywords=keywords,
                             parse_status=AdParseStatus.SUCCESS,
@@ -258,17 +338,17 @@ def _do_parse_and_create(
                     )
 
     if not records_to_create:
-        return [], "文件中未解析出有效广告数据，请检查主表内容"
+        return [], "文件中未解析出有效广告数据，请检查主表内容", skipped_warnings
 
     # 7. 批量落库（原子操作）
     with transaction.atomic():
         created = AdUploadQueue.objects.bulk_create(records_to_create)
 
     logger.info(
-        "[AdUploadQueueService][parse_and_create_queue] 队列记录创建完成: count=%s user=%s",
-        len(created), user,
+        "[AdUploadQueueService][parse_and_create_queue] 队列记录创建完成: count=%s skipped=%s user=%s",
+        len(created), len(skipped_warnings), user,
     )
-    return created, None
+    return created, None, skipped_warnings
 
 
 # ── 对外公共入口 ────────────────────────────────────────────────────────────────
@@ -276,7 +356,9 @@ def _do_parse_and_create(
 def parse_and_create_queue(
     file_obj: Any,
     user: User | None,
-) -> tuple[list[AdUploadQueue], str | None]:
+    ad_type_filter: str = "all",
+    country_filter: list[str] | None = None,
+) -> tuple[list[AdUploadQueue], str | None, list[str]]:
     """解析上传的 xlsx 文件并批量创建广告上传队列记录。
 
     整体流程：写临时文件 → 解析主表 → 读站点关键词 → 合规校验 → 批量落库。
@@ -285,11 +367,14 @@ def parse_and_create_queue(
     Args:
         file_obj: Django InMemoryUploadedFile 或实现了 chunks() 方法的类文件对象。
         user (User | None): 当前操作用户，用于记录创建者。
+        ad_type_filter (str): "all"（默认，都创建）/ "auto"（仅自动）/ "manual"（仅手动）。
+        country_filter (list[str] | None): 手动指定国家代码列表；None 表示按表需求。
 
     Returns:
-        tuple[list[AdUploadQueue], str | None]:
+        tuple[list[AdUploadQueue], str | None, list[str]]:
             - 已创建的 AdUploadQueue 记录列表（文件级错误时为空列表）。
             - error_msg：文件级错误时非 None，成功时为 None。
+            - skipped_warnings：被跳过的手动广告提示信息列表。
     """
     try:
         with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
@@ -301,10 +386,10 @@ def parse_and_create_queue(
             "[AdUploadQueueService][parse_and_create_queue] 临时文件写入失败: %s",
             exc, exc_info=True,
         )
-        return [], f"文件读取失败：{exc}"
+        return [], f"文件读取失败：{exc}", []
 
     try:
-        return _do_parse_and_create(tmp_path, user)
+        return _do_parse_and_create(tmp_path, user, ad_type_filter, country_filter)
     finally:
         try:
             os.unlink(tmp_path)

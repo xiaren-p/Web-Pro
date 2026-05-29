@@ -22,7 +22,7 @@ from api_v1.serializers import LxCampaignInfoSerializer
 from api_v1.utils.ad_status import resolve_service_status
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_ok
-from api_v1.views.ads._helpers import (
+from api_v1.views.lingxing.ads._helpers import (
     COUNTRY_MAP,
     build_campaign_profile_key,
     build_campaign_profile_query,
@@ -618,3 +618,4 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 "impressions": t_impressions,
             },
         }
+

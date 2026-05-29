@@ -16,7 +16,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from api_v1.auth.bearer_token_auth import BearerTokenAuthentication
-from api_v2.models.ad_upload_queue import AdUploadQueue
+from api_v2.models.ad_upload_queue import AdParseStatus, AdUploadQueue
 from api_v2.permissions.workflow_permission import IsV2Accessible
 from api_v2.serializers.ad_upload_queue_serializer import (
     AdBulkDeleteSerializer,
@@ -55,7 +55,21 @@ def upload_ad_xlsx(request: Request) -> Response:
         file_obj.name, file_obj.size, request.user,
     )
 
-    created, error_msg = parse_and_create_queue(file_obj, request.user)
+    # 解析广告类型筛选参数（all / auto / manual）
+    ad_type_filter: str = request.data.get("ad_type_filter", "all")
+    if ad_type_filter not in {"all", "auto", "manual"}:
+        ad_type_filter = "all"
+
+    # 解析国家筛选参数（逗号分隔的国家代码字符串，空字符串表示按表需求）
+    country_filter_raw: str = request.data.get("country_filter", "")
+    country_filter: list[str] | None = (
+        [c.strip().upper() for c in country_filter_raw.split(",") if c.strip()]
+        if country_filter_raw else None
+    )
+
+    created, error_msg, skipped_warnings = parse_and_create_queue(
+        file_obj, request.user, ad_type_filter, country_filter
+    )
 
     if error_msg:
         logger.warning(
@@ -64,8 +78,19 @@ def upload_ad_xlsx(request: Request) -> Response:
         )
         return Response({"detail": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
+    success_count = sum(1 for r in created if r.parse_status == AdParseStatus.SUCCESS)
+    failed_count = len(created) - success_count
     data = AdUploadQueueSerializer(created, many=True).data
-    return Response({"count": len(created), "list": data}, status=status.HTTP_201_CREATED)
+    return Response(
+        {
+            "count": len(created),
+            "success_count": success_count,
+            "failed_count": failed_count,
+            "skipped_warnings": skipped_warnings,
+            "list": data,
+        },
+        status=status.HTTP_201_CREATED,
+    )
 
 
 @api_view(["GET"])

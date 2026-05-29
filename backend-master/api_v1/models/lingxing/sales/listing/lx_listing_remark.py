@@ -1,7 +1,7 @@
 """Listing 备注模型（lx_listing_remark）。"""
 from django.db import models
 
-from api_v1.models.listing.lx_listing_info import LxListingInfo
+from api_v1.models.lingxing.sales.listing.lx_listing_info import LxListingInfo
 
 
 class LxListingRemark(models.Model):
@@ -36,4 +36,5 @@ class LxListingRemark(models.Model):
         db_table = "lx_listing_remark"
         verbose_name = "Listing备注"
         verbose_name_plural = "Listing备注"
+
 

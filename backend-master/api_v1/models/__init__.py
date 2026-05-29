@@ -33,21 +33,22 @@ from api_v1.models.finance.monthly_loss_order_first20 import MonthlyLossOrderFir
 from api_v1.models.work import WorkReport
 from api_v1.models.currency.currency_icon import CurrencyIcon
 from api_v1.models.currency.lx_currency_rates import LxCurrencyRates
-from api_v1.models.ads.lx_ad_portfolios import LxAdPortfolios
-from api_v1.models.ads.lx_campaign_info import LxCampaignInfo
-from api_v1.models.ads.lx_campaign_metrics import LxCampaignMetrics
-from api_v1.models.ads.lx_ad_group_info import LxAdGroupInfo
-from api_v1.models.ads.lx_ad_group_metrics import LxAdGroupMetrics
-from api_v1.models.ads.lx_ad_info import LxAdInfo
-from api_v1.models.ads.lx_ad_metrics import LxAdMetrics
+from api_v1.models.lingxing.ads.lx_ad_portfolios import LxAdPortfolios
+from api_v1.models.lingxing.ads.lx_campaign_info import LxCampaignInfo
+from api_v1.models.lingxing.ads.lx_campaign_metrics import LxCampaignMetrics
+from api_v1.models.lingxing.ads.lx_ad_group_info import LxAdGroupInfo
+from api_v1.models.lingxing.ads.lx_ad_group_metrics import LxAdGroupMetrics
+from api_v1.models.lingxing.ads.lx_ad_info import LxAdInfo
+from api_v1.models.lingxing.ads.lx_ad_metrics import LxAdMetrics
 from api_v1.models.shop.lx_shop_profile import LxShopProfile
 from api_v1.models.shop.lx_sellers import LxSellers
 from api_v1.models.shop.lx_user_list import LxUserList
-from api_v1.models.listing.lx_listing_info import LxListingInfo
-from api_v1.models.listing.lx_product_info import LxProductInfo
-from api_v1.models.listing.lx_listing_remark import LxListingRemark
-from api_v1.models.listing.lx_order_profit import LxOrderProfit
-from api_v1.models.listing.lx_listing_metrics import LxListingMetrics
+from api_v1.models.lingxing.basic.lx_shops import HasAdsSetting, LxShops, ShopStatus
+from api_v1.models.lingxing.sales.listing.lx_listing_info import LxListingInfo
+from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
+from api_v1.models.lingxing.sales.listing.lx_listing_remark import LxListingRemark
+from api_v1.models.lingxing.sales.listing.lx_order_profit import LxOrderProfit
+from api_v1.models.lingxing.sales.listing.lx_listing_metrics import LxListingMetrics
 
 __all__ = [
     'TimeStampedModel',
@@ -63,5 +64,6 @@ __all__ = [
     'LxAdPortfolios', 'LxCampaignInfo', 'LxCampaignMetrics',
     'LxAdGroupInfo', 'LxAdGroupMetrics', 'LxAdInfo', 'LxAdMetrics',
     'LxShopProfile', 'LxSellers', 'LxUserList',
+    'LxShops', 'ShopStatus', 'HasAdsSetting',
     'LxListingInfo', 'LxProductInfo', 'LxListingRemark', 'LxOrderProfit', 'LxListingMetrics',
 ]

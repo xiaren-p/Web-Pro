@@ -253,6 +253,7 @@ export interface AdQueueItem {
   shop: string;
   country: string;
   ad_type: string;
+  ad_type_label: string;
   skus: string[];
   keywords: string[];
   parse_status: number;
@@ -278,15 +279,38 @@ export interface AdQueueListResponse {
   list: AdQueueItem[];
 }
 
+/** 广告文件上传解析结果响应结构 */
+export interface AdUploadResponse {
+  count: number;
+  success_count: number;
+  failed_count: number;
+  skipped_warnings: string[];
+  list: AdQueueItem[];
+}
+
+/** 上传请求参数：包含文件、广告类型筛选和国家筛选 */
+export interface AdUploadParams {
+  /** 用户选择的 .xlsx 文件对象 */
+  file: File;
+  /** 广告类型筛选：都创建 / 仅自动 / 仅手动 */
+  adTypeFilter: "all" | "auto" | "manual";
+  /** 手动指定的国家代码列表；空数组表示按表需求自动读取 */
+  countryFilter: string[];
+}
+
 /**
  * 上传 xlsx 文件，解析并批量创建广告上传队列记录。
  *
- * @param {File} file - 用户选择的 .xlsx 文件对象
- * @returns {Promise<{ count: number; list: AdQueueItem[] }>} 创建成功的记录数与列表
+ * @param {AdUploadParams} params - 上传参数（文件、广告类型筛选、国家筛选）
+ * @returns {Promise<AdUploadResponse>} 解析结果（含成功/失败条目统计与列表）
  */
-export function uploadAdXlsx(file: File): Promise<{ count: number; list: AdQueueItem[] }> {
+export function uploadAdXlsx(params: AdUploadParams): Promise<AdUploadResponse> {
   const formData = new FormData();
-  formData.append("file", file);
+  formData.append("file", params.file);
+  formData.append("ad_type_filter", params.adTypeFilter);
+  if (params.countryFilter.length > 0) {
+    formData.append("country_filter", params.countryFilter.join(","));
+  }
   return requestV2({
     url: "/ads/upload/",
     method: "post",

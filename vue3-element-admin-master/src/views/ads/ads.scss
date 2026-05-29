@@ -98,6 +98,28 @@
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1);
 }
 
+.upload-result {
+  &__summary {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  &__warnings {
+    max-height: 200px;
+    padding-left: 20px;
+    margin: 0;
+    overflow-y: auto;
+  }
+
+  &__warning-item {
+    padding: 3px 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #e6a23c;
+  }
+}
+
 @media (max-width: 768px) {
   .ads-text-container {
     padding: 12px;
