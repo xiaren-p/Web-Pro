@@ -1,3 +1,4 @@
+from api_v1.models.lingxing.ads.basic.lx_ads_profile import AdsProfileStatus, AdsProfileType, LxAdsProfile
 from api_v1.models.lingxing.ads.lx_ad_portfolios import LxAdPortfolios
 from api_v1.models.lingxing.ads.lx_campaign_info import LxCampaignInfo
 from api_v1.models.lingxing.ads.lx_campaign_metrics import LxCampaignMetrics
@@ -13,6 +14,7 @@ from api_v1.models.lingxing.ads.lx_negative_keyword_info import LxNegativeKeywor
 from api_v1.models.lingxing.ads.lx_negative_keyword_metrics import LxNegativeKeywordMetrics
 
 __all__ = [
+    'LxAdsProfile', 'AdsProfileStatus', 'AdsProfileType',
     'LxAdPortfolios', 'LxCampaignInfo', 'LxCampaignMetrics',
     'LxAdGroupInfo', 'LxAdGroupMetrics', 'LxAdInfo', 'LxAdMetrics',
     'LxAutoTargetingInfo', 'LxAutoTargetingMetrics',

@@ -33,6 +33,7 @@ from api_v1.models.finance.monthly_loss_order_first20 import MonthlyLossOrderFir
 from api_v1.models.work import WorkReport
 from api_v1.models.currency.currency_icon import CurrencyIcon
 from api_v1.models.currency.lx_currency_rates import LxCurrencyRates
+from api_v1.models.lingxing.ads.basic.lx_ads_profile import AdsProfileStatus, AdsProfileType, LxAdsProfile
 from api_v1.models.lingxing.ads.lx_ad_portfolios import LxAdPortfolios
 from api_v1.models.lingxing.ads.lx_campaign_info import LxCampaignInfo
 from api_v1.models.lingxing.ads.lx_campaign_metrics import LxCampaignMetrics
@@ -61,6 +62,7 @@ __all__ = [
     'CrawlerLog', 'CrawlerConf', 'CrawlerSellerAccount', 'CrawlerCategory',
     'OrderProfitCache', 'MonthlyLossOrder', 'MonthlyLossOrderFirst20',
     'WorkReport', 'CurrencyIcon', 'LxCurrencyRates',
+    'LxAdsProfile', 'AdsProfileStatus', 'AdsProfileType',
     'LxAdPortfolios', 'LxCampaignInfo', 'LxCampaignMetrics',
     'LxAdGroupInfo', 'LxAdGroupMetrics', 'LxAdInfo', 'LxAdMetrics',
     'LxShopProfile', 'LxSellers', 'LxUserList',
