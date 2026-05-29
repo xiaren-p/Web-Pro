@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("api_v2", "0003_alter_workflowexecution_workflow_type"),
-        ("api_v2", "0003_aduploadqueue_campaign_status"),
+        ("api_v2", "0004_apirequestlog"),
     ]
 
     operations = []
