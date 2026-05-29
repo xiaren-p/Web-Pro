@@ -10,6 +10,7 @@
 import logging
 
 from django.core.cache import cache
+from oauth2_provider.contrib.rest_framework import OAuth2Authentication
 from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.request import Request
@@ -21,7 +22,7 @@ from api_v2.services.ad_campaign_submit_service import process_pending_campaigns
 
 logger = logging.getLogger(__name__)
 
-_AUTH = [BearerTokenAuthentication]
+_AUTH = [BearerTokenAuthentication, OAuth2Authentication]
 _PERM = [IsV2Accessible]
 
 # 互斥锁 Cache Key 及最长持有时间（秒）
