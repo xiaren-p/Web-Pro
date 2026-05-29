@@ -30,7 +30,7 @@ _API_URL = "https://ads.lingxing.com/ad_report/core/api/handle"
 
 # 固定追加的 HTTP 请求头（在 LX_ADS_HEADERS 基础上叠加，严格对齐真实请求头列表）
 _EXTRA_HEADERS: dict[str, str] = {
-    "accept": "application/json, text/javascript, */*; q=0.01",
+    "accept": "*/*",
     "accept-encoding": "gzip, deflate, br, zstd",
     "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
     "connection": "keep-alive",
