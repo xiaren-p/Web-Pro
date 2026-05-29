@@ -14,6 +14,14 @@ class AdParseStatus(models.IntegerChoices):
     SUCCESS = 1, "解析成功"
 
 
+class CampaignSubmitStatus(models.IntegerChoices):
+    """广告活动 API 提交状态枚举。"""
+
+    PENDING = 0, "待提交"
+    SUCCESS = 1, "提交成功"
+    FAILED = 2, "提交失败"
+
+
 class AdUploadQueue(models.Model):
     """广告活动上传队列记录。
 
@@ -58,6 +66,18 @@ class AdUploadQueue(models.Model):
         default=AdParseStatus.SUCCESS,
         db_index=True,
         verbose_name="解析状态",
+    )
+
+    campaign_status = models.IntegerField(
+        choices=CampaignSubmitStatus.choices,
+        default=CampaignSubmitStatus.PENDING,
+        db_index=True,
+        verbose_name="API 提交状态",
+    )
+
+    campaign_response = models.JSONField(
+        default=dict,
+        verbose_name="API 响应数据",
     )
 
     msg = models.TextField(
