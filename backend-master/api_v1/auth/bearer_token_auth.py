@@ -25,7 +25,8 @@ class BearerTokenAuthentication(BaseAuthentication):
         try:
             at = AuthToken.objects.select_related("user").get(access_token=token, revoked=False)
         except AuthToken.DoesNotExist:
-            raise AuthenticationFailed("无效或已过期的令牌")
+            # 返回 None 而非抛出异常，使认证链继续尝试下一个认证器（如 OAuth2Authentication）
+            return None
         if not at.is_access_valid():
             raise AuthenticationFailed("令牌已过期")
         return at.user, at
