@@ -116,63 +116,83 @@
       <!-- 竞价设置 -->
       <div class="upload-section">
         <div class="upload-section__title">竞价设置</div>
-        <el-form label-width="140px" size="small" class="bidding-form">
-          <el-form-item label="每日预算（美元）">
+
+        <!-- 第一行：每日预算 + 广告组默认竞价 -->
+        <div class="bidding-grid bidding-grid--top">
+          <div class="bidding-item">
+            <span class="bidding-label">每日预算</span>
             <el-input-number
               v-model="dailyBudget"
               :min="0.01"
               :step="0.5"
               :precision="2"
-              style="width: 160px"
+              controls-position="right"
+              class="bidding-input"
             />
-          </el-form-item>
-          <el-form-item label="广告组默认竞价">
+          </div>
+          <div class="bidding-item">
+            <span class="bidding-label">广告组默认竞价</span>
             <el-input-number
               v-model="defaultBid"
               :min="0.01"
               :step="0.01"
               :precision="2"
-              style="width: 160px"
+              controls-position="right"
+              class="bidding-input"
             />
-          </el-form-item>
-          <el-divider content-position="left" style="margin: 8px 0">自动定向组竞价</el-divider>
-          <el-form-item label="紧密匹配">
+          </div>
+        </div>
+
+        <!-- 自动定向组竞价：四列网格 -->
+        <div class="bidding-sub-title">
+          <span>自动定向组竞价</span>
+        </div>
+        <div class="bidding-grid bidding-grid--auto">
+          <div class="bidding-item">
+            <span class="bidding-label">紧密匹配</span>
             <el-input-number
               v-model="closeMatchBid"
               :min="0.01"
               :step="0.01"
               :precision="2"
-              style="width: 160px"
+              controls-position="right"
+              class="bidding-input"
             />
-          </el-form-item>
-          <el-form-item label="同类匹配">
+          </div>
+          <div class="bidding-item">
+            <span class="bidding-label">同类匹配</span>
             <el-input-number
               v-model="looseMatchBid"
               :min="0.01"
               :step="0.01"
               :precision="2"
-              style="width: 160px"
+              controls-position="right"
+              class="bidding-input"
             />
-          </el-form-item>
-          <el-form-item label="宽泛匹配">
+          </div>
+          <div class="bidding-item">
+            <span class="bidding-label">宽泛匹配</span>
             <el-input-number
               v-model="substitutesBid"
               :min="0.01"
               :step="0.01"
               :precision="2"
-              style="width: 160px"
+              controls-position="right"
+              class="bidding-input"
             />
-          </el-form-item>
-          <el-form-item label="关联匹配">
+          </div>
+          <div class="bidding-item">
+            <span class="bidding-label">关联匹配</span>
             <el-input-number
               v-model="complementsBid"
               :min="0.01"
               :step="0.01"
               :precision="2"
-              style="width: 160px"
+              controls-position="right"
+              class="bidding-input"
             />
-          </el-form-item>
-        </el-form>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -618,6 +638,63 @@ function handleReset(): void {
 
 .country-empty {
   color: #f56c6c;
+}
+
+// ── 竞价设置 ───────────────────────────────────────────────────────────────────
+.bidding-grid {
+  display: grid;
+  gap: 12px 16px;
+
+  &--top {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  &--auto {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.bidding-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bidding-label {
+  font-size: 12px;
+  color: #606266;
+}
+
+.bidding-input {
+  width: 100%;
+
+  :deep(.el-input__wrapper) {
+    padding-right: 32px;
+  }
+}
+
+.bidding-sub-title {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 2px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #909399;
+
+  &::before,
+  &::after {
+    flex: 1;
+    height: 1px;
+    content: "";
+    background: #e4e7ed;
+  }
+
+  span {
+    flex-shrink: 0;
+    padding: 0 8px;
+    white-space: nowrap;
+  }
 }
 
 // ── 过渡动画 ───────────────────────────────────────────────────────────────────
