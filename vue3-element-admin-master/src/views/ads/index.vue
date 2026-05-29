@@ -154,8 +154,10 @@ async function handleFileChange(event: Event): Promise<void> {
     const res = await uploadAdXlsx(file);
     ElMessage.success(`成功创建 ${res.count} 条队列记录`);
     queueDrawerVisible.value = true;
-  } catch {
-    ElMessage.error("文件上传失败，请检查文件格式后重试");
+  } catch (err: unknown) {
+    // 透传后端返回的实际错误描述（已由拦截器提取并包装到 Error.message 中）
+    const msg = err instanceof Error ? err.message : "文件解析失败，请检查 Excel 格式";
+    ElMessage.error(msg);
   } finally {
     uploadLoading.value = false;
   }

@@ -109,9 +109,12 @@ async function responseRejected(error: any): Promise<unknown> {
       ElMessage.error(msg || "无权限访问");
       return Promise.reject(new Error(msg || "Permission Denied"));
 
-    default:
-      ElMessage.error(msg || "请求失败");
-      return Promise.reject(new Error(msg || "Request Error"));
+    default: {
+      // api_v2 端点采用 DRF 标准错误格式 {detail: "..."}，需展开公共字段兼容
+      const detailMsg: string = msg || response.data?.detail || "请求失败";
+      ElMessage.error(detailMsg);
+      return Promise.reject(new Error(detailMsg));
+    }
   }
 }
 

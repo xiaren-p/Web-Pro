@@ -35,7 +35,7 @@ _START_PREFIX: str = "START "
 _END_TOKEN: str = "END"
 _TARGET_SITES: tuple[str, ...] = ("DE", "IT", "FR", "ES", "UK")
 
-_SHOP_RE = re.compile(r"^[a-zA-Z]+$")
+_SHOP_RE = re.compile(r"^[a-zA-Z0-9]+$")
 _AD_NAME_RE = re.compile(
     r"^[a-zA-Z0-9+]+(?:-[a-zA-Z0-9+]+)*(?:\s+[a-zA-Z0-9+]+(?:-[a-zA-Z0-9+]+)*)*$"
 )
@@ -142,37 +142,33 @@ def _read_site_keywords(file_path: str) -> dict[str, dict[str, list[str]]]:
     return result
 
 
-def _validate_row(row: pd.Series, excel_row_num: int) -> None:
-    """校验单行的店铺名 / 广告活动名称 / SKU 格式合规性。
+def _get_group_error(shop: str, ad_name: str, group: pd.DataFrame) -> str | None:
+    """校验一个（店铺 × 广告活动）分组的合规性。
+
+    依次检查店铺名、广告活动名称、组内每条 SKU，遇到第一处问题即返回错误描述。
+    全部合规返回 None。
 
     Args:
-        row (pd.Series): 单行数据。
-        excel_row_num (int): Excel 行号（1-based，含表头）。
+        shop (str): 店铺名（已 ffill 归一化）。
+        ad_name (str): 广告活动名称（已 ffill 归一化）。
+        group (pd.DataFrame): 该分组的所有数据行。
 
     Returns:
-        None
-
-    Raises:
-        ValueError: 任何字段不满足合规规则时抛出，文案携带行号。
+        str | None: 错误描述字符串；无错误返回 None。
     """
-    shop_name = str(row[_COL_SHOP])
-    if not _SHOP_RE.match(shop_name):
-        raise ValueError(
-            f"第 {excel_row_num} 行 {_COL_SHOP}='{shop_name}' 格式不合规（仅允许英文字母）"
-        )
+    if not _SHOP_RE.match(shop):
+        return f"{_COL_SHOP}='{shop}' 格式不合规（仅允许英文字母和数字）"
 
-    ad_name = str(row[_COL_AD_NAME])
     if not _AD_NAME_RE.match(ad_name):
-        raise ValueError(
-            f"第 {excel_row_num} 行 {_COL_AD_NAME}='{ad_name}' 格式不合规"
-        )
+        return f"{_COL_AD_NAME}='{ad_name}' 格式不合规"
 
-    if pd.notna(row[_COL_SKU]):
-        sku = str(row[_COL_SKU])
-        if not _SKU_RE.match(sku):
-            raise ValueError(
-                f"第 {excel_row_num} 行 {_COL_SKU}='{sku}' 格式不合规（仅允许字母/数字/横杠）"
-            )
+    for _, row in group.iterrows():
+        if pd.notna(row[_COL_SKU]):
+            sku = str(row[_COL_SKU])
+            if not _SKU_RE.match(sku):
+                return f"{_COL_SKU}='{sku}' 格式不合规（仅允许字母/数字/横杠）"
+
+    return None
 
 
 # ── 内部核心解析实现 ────────────────────────────────────────────────────────────
@@ -216,35 +212,50 @@ def _do_parse_and_create(
     df[_COL_AD_NAME] = df.groupby(shop_group_id)[_COL_AD_NAME].ffill()
     df = df.dropna(subset=[_COL_SHOP, _COL_AD_NAME])
 
-    # 5. 逐行合规校验（命中第一处错误即终止，不创建任何记录）
-    for index, row in df.iterrows():
-        try:
-            _validate_row(row, excel_row_num=int(index) + 2)  # type: ignore[arg-type]
-        except ValueError as exc:
-            return [], str(exc)
-
-    # 6. 按（店铺 × 广告活动 × 国家）三维展开，构造队列记录
+    # 5. 按（店铺 × 广告活动 × 国家）三维展开，内联校验并构造队列记录。
+    #    格式不合规的分组不阻断整体上传，改为以 FAILED 状态落库并在 msg 中注明原因，
+    #    其余合规分组正常以 SUCCESS 状态写入。
     records_to_create: list[AdUploadQueue] = []
     for shop, shop_group in df.groupby(_COL_SHOP, sort=False):
         for ad_name, ad_group in shop_group.groupby(_COL_AD_NAME, sort=False):
-            skus: list[str] = ad_group[_COL_SKU].dropna().astype(str).tolist()
-            if not skus:
-                continue
-            for site in _TARGET_SITES:
-                keywords: list[str] = site_keywords.get(site, {}).get(str(ad_name), [])
-                records_to_create.append(
-                    AdUploadQueue(
-                        campaign_name=str(ad_name),
-                        shop=str(shop),
-                        country=site,
-                        ad_type="sp",
-                        skus=skus,
-                        keywords=keywords,
-                        parse_status=AdParseStatus.SUCCESS,
-                        msg="成功",
-                        created_by=user,
+            error_msg = _get_group_error(str(shop), str(ad_name), ad_group)
+
+            if error_msg:
+                # 校验失败：5 个站点全部以 FAILED 状态落库，SKU/关键词留空
+                for site in _TARGET_SITES:
+                    records_to_create.append(
+                        AdUploadQueue(
+                            campaign_name=str(ad_name),
+                            shop=str(shop),
+                            country=site,
+                            ad_type="sp",
+                            skus=[],
+                            keywords=[],
+                            parse_status=AdParseStatus.FAILED,
+                            msg=error_msg,
+                            created_by=user,
+                        )
                     )
-                )
+            else:
+                # 校验通过：正常展开 5 个站点
+                skus: list[str] = ad_group[_COL_SKU].dropna().astype(str).tolist()
+                if not skus:
+                    continue
+                for site in _TARGET_SITES:
+                    keywords: list[str] = site_keywords.get(site, {}).get(str(ad_name), [])
+                    records_to_create.append(
+                        AdUploadQueue(
+                            campaign_name=str(ad_name),
+                            shop=str(shop),
+                            country=site,
+                            ad_type="sp",
+                            skus=skus,
+                            keywords=keywords,
+                            parse_status=AdParseStatus.SUCCESS,
+                            msg="成功",
+                            created_by=user,
+                        )
+                    )
 
     if not records_to_create:
         return [], "文件中未解析出有效广告数据，请检查主表内容"
