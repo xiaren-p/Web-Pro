@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("api_v2", "0003_aduploadqueue_campaign_status"),
+        ("api_v2", "0005_merge_20260529"),
     ]
 
     operations = [
