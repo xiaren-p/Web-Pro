@@ -211,11 +211,13 @@ def _write_request_log(
 def _parse_result_error(resp_json: dict[str, Any]) -> str | None:
     """从领星接口响应中提取业务级错误描述。
 
-    领星广告接口无论成功与否均返回 HTTP 200，需按以下优先级判断失败：
-    1. 顶层 code != 0 → 服务端拒绝请求（如 21408 服务器繁忙），提取 message 作为错误描述。
-    2. result 条目 code 以 "Error" 结尾（如 "dateError"） → 创建失败，提取 descriptionCn，
-       回退到 description。
-    3. 其余情况（code=0 且 result 无错误条目） → 创建成功，返回 None。
+    领星广告接口判断规则：
+    1. 顶层 code != 200 → 服务端拒绝请求（如 21408 服务器繁忙），提取 message 作为错误描述。
+       本接口唯一成功码为 200，不存在其他成功码。
+    2. code == 200 但 result 数组含 code 以 "Error" 结尾的条目 → 业务失败（如 dateError）。
+       中文描述优先从 entityAndReason[].descriptionCn 提取，回退到 result[].description。
+    3. code == 200 且 result 中无任何错误条目 → 创建成功，返回 None。
+       result 可能为空也可能非空，只要不含 xxxError 条目均视为成功。
 
     Args:
         resp_json (dict[str, Any]): 接口原始响应字典。
@@ -223,19 +225,31 @@ def _parse_result_error(resp_json: dict[str, Any]) -> str | None:
     Returns:
         str | None: 失败时返回错误描述字符串；成功时返回 None。
     """
-    # 优先判断顶层 code，非 0 视为整体失败
-    top_code = resp_json.get("code", 0)
-    if top_code != 0:
+    # 唯一成功码为 200，其余均视为服务端错误
+    top_code = resp_json.get("code")
+    if top_code != 200:
         msg = resp_json.get("message") or f"接口返回错误码 {top_code}"
         return msg
 
-    # 再检查 result 数组中的逐条错误
+    # code == 200 时检查 result 数组中的业务级错误条目
     result: list[dict[str, Any]] = resp_json.get("result") or []
-    for item in result:
-        code = str(item.get("code", ""))
-        if code.lower().endswith("error"):
-            return item.get("descriptionCn") or item.get("description") or "未知错误"
-    return None
+    error_items = [
+        item for item in result
+        if str(item.get("code", "")).lower().endswith("error")
+    ]
+    if not error_items:
+        return None
+
+    # 从 entityAndReason 取 descriptionCn（更友好的中文描述），回退到 result 的 description
+    entity_reasons: list[dict[str, Any]] = resp_json.get("entityAndReason") or []
+    cn_desc = next(
+        (e.get("descriptionCn") for e in entity_reasons if e.get("descriptionCn")),
+        None,
+    )
+    if cn_desc:
+        return cn_desc
+
+    return error_items[0].get("description") or "未知错误"
 
 
 def _submit_single(queue: AdUploadQueue) -> None:
