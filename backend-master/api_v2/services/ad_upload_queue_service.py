@@ -263,73 +263,67 @@ def _do_parse_and_create(
     df = df.dropna(subset=[_COL_SHOP, _COL_AD_NAME])
 
     # 5. 按（店铺 × 广告活动 × 国家）三维展开，内联校验并构造队列记录。
-    #    格式不合规的分组不阻断整体上传，改为以 FAILED 状态落库并在 msg 中注明原因，
-    #    其余合规分组正常以 SUCCESS 状态写入。
-    #    手动广告（MANU）无关键词时直接跳过，不创建任何记录，仅记录 skipped_warnings 供前端提示。
+    #
+    #    核心拼接规则：
+    #      Excel 主表中的广告活动名（如 X-HLS-LQ-HJ）不含类型后缀。
+    #      服务层在落库时自动拼接，产出：
+    #        - "X-HLS-LQ-HJ AUTO"  ad_type="auto"   关键词可为空
+    #        - "X-HLS-LQ-HJ MANU"  ad_type="manual" 无关键词时跳过
+    #      关键词从站点子表中按原始广告活动名（不含后缀）查找。
+    #
+    #    前端 ad_type_filter 控制创建范围：
+    #      "all"    → 同时创建 auto 和 manual 两种记录
+    #      "auto"   → 仅创建 AUTO 记录
+    #      "manual" → 仅创建 MANU 记录
+    #
+    #    格式不合规的分组不阻断整体上传，以 FAILED 状态落库并在 msg 中注明原因。
     records_to_create: list[AdUploadQueue] = []
     skipped_warnings: list[str] = []
+
+    # 根据前端筛选参数确定本次需要创建的广告类型列表
+    if ad_type_filter == "all":
+        types_to_create: list[str] = ["auto", "manual"]
+    else:
+        types_to_create = [ad_type_filter]
+
     for shop, shop_group in df.groupby(_COL_SHOP, sort=False):
         for ad_name, ad_group in shop_group.groupby(_COL_AD_NAME, sort=False):
             # 先做组级合规校验（店铺/广告名/sku）
             error_msg = _get_group_error(str(shop), str(ad_name), ad_group)
             if error_msg:
-                # 校验失败：对所有 effective_sites 以 FAILED 状态落库，类型使用推断结果或默认 auto
-                inferred_type = _infer_ad_type(str(ad_name))
-                for site in effective_sites:
-                    records_to_create.append(
-                        AdUploadQueue(
-                            campaign_name=str(ad_name),
-                            shop=str(shop),
-                            country=site,
-                            ad_type=inferred_type,
-                            skus=[],
-                            keywords=[],
-                            parse_status=AdParseStatus.FAILED,
-                            msg=error_msg,
-                            created_by=user,
+                # 校验失败：对所有类型和站点以 FAILED 状态落库，campaign_name 含对应后缀
+                for ad_type in types_to_create:
+                    suffix = "AUTO" if ad_type == "auto" else "MANU"
+                    for site in effective_sites:
+                        records_to_create.append(
+                            AdUploadQueue(
+                                campaign_name=f"{ad_name} {suffix}",
+                                shop=str(shop),
+                                country=site,
+                                ad_type=ad_type,
+                                skus=[],
+                                keywords=[],
+                                parse_status=AdParseStatus.FAILED,
+                                msg=error_msg,
+                                created_by=user,
+                            )
                         )
-                    )
                 continue
 
-            # 合规：广告活动名必须以 AUTO 或 MANU 结尾以明确类型
-            last_token = str(ad_name).strip().rsplit(" ", 1)[-1].upper()
-            if last_token not in _AD_TYPE_MAP:
-                # 未标注类型视为格式错误：对所有 effective_sites 写 FAILED，提示要求后缀
-                for site in effective_sites:
-                    records_to_create.append(
-                        AdUploadQueue(
-                            campaign_name=str(ad_name),
-                            shop=str(shop),
-                            country=site,
-                            ad_type=_AD_TYPE_MAP.get(last_token, "auto"),
-                            skus=[],
-                            keywords=[],
-                            parse_status=AdParseStatus.FAILED,
-                            msg="广告活动名称必须以 AUTO 或 MANU 结尾以指示广告类型",
-                            created_by=user,
-                        )
-                    )
-                continue
-
-            inferred_type = _AD_TYPE_MAP[last_token]
-            # 如果前端指定了 ad_type_filter，需要与广告名中标注的类型一致，否则跳过
-            if ad_type_filter != "all" and ad_type_filter != inferred_type:
-                continue
-            types_to_create = [inferred_type]
-
-            # 按类型展开并针对每个站点处理
             skus: list[str] = ad_group[_COL_SKU].dropna().astype(str).tolist()
             if not skus:
                 continue
 
             for ad_type in types_to_create:
+                suffix = "AUTO" if ad_type == "auto" else "MANU"
+                campaign_name_with_suffix = f"{ad_name} {suffix}"
                 for site in effective_sites:
                     shop_site_key = f"{shop}-{site}"
                     if shop_site_key not in valid_shop_sites:
                         # 店铺-国家组合在 lx_shops 中不存在，以 FAILED 状态落库
                         records_to_create.append(
                             AdUploadQueue(
-                                campaign_name=str(ad_name),
+                                campaign_name=campaign_name_with_suffix,
                                 shop=str(shop),
                                 country=site,
                                 ad_type=ad_type,
@@ -342,16 +336,19 @@ def _do_parse_and_create(
                         )
                         continue
 
+                    # 关键词按原始广告活动名（不含后缀）在站点子表中查找
                     keywords: list[str] = site_keywords.get(site, {}).get(str(ad_name), [])
                     # 手动广告无关键词：跳过且记录提示
                     if ad_type == "manual" and not keywords:
-                        skipped_warnings.append(f"{ad_name}（{site}）没有关键词，不予创建")
+                        skipped_warnings.append(
+                            f"{campaign_name_with_suffix}（{site}）没有关键词，不予创建"
+                        )
                         continue
 
                     # 自动广告允许关键词为空
                     records_to_create.append(
                         AdUploadQueue(
-                            campaign_name=str(ad_name),
+                            campaign_name=campaign_name_with_suffix,
                             shop=str(shop),
                             country=site,
                             ad_type=ad_type,
