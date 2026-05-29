@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visible" title="广告新建队列" size="720px" destroy-on-close>
+  <el-drawer v-model="visible" title="广告新建队列" size="800px" destroy-on-close>
     <div class="queue-drawer">
       <!-- 顶部工具栏 -->
       <div class="queue-toolbar">
@@ -42,7 +42,7 @@
           show-overflow-tooltip
         />
 
-        <el-table-column prop="shop" label="店铺" width="120" show-overflow-tooltip />
+        <el-table-column prop="shop" label="店铺" width="90" show-overflow-tooltip />
 
         <el-table-column prop="country" label="国家" width="80" align="center" />
 
