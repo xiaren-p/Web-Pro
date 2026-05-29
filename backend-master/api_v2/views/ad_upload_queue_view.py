@@ -1,0 +1,139 @@
+"""广告上传队列视图（ad_upload_queue_view）。
+
+端点：
+  POST   /api/v2/ads/upload/              - 上传 xlsx，解析并创建队列记录
+  GET    /api/v2/ads/queue/               - 分页查询队列记录
+  DELETE /api/v2/ads/queue/bulk-delete/  - 批量删除队列记录
+
+职责：HTTP 参数解析与响应包装，所有业务逻辑委托 ad_upload_queue_service。
+"""
+
+import logging
+
+from rest_framework import status
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.request import Request
+from rest_framework.response import Response
+
+from api_v1.auth.bearer_token_auth import BearerTokenAuthentication
+from api_v2.models.ad_upload_queue import AdUploadQueue
+from api_v2.permissions.workflow_permission import IsV2Accessible
+from api_v2.serializers.ad_upload_queue_serializer import (
+    AdBulkDeleteSerializer,
+    AdUploadQueueSerializer,
+)
+from api_v2.services.ad_upload_queue_service import bulk_delete_queue, parse_and_create_queue
+
+logger = logging.getLogger(__name__)
+
+_AUTH = [BearerTokenAuthentication]
+_PERM = [IsV2Accessible]
+
+
+@api_view(["POST"])
+@authentication_classes(_AUTH)
+@permission_classes(_PERM)
+def upload_ad_xlsx(request: Request) -> Response:
+    """上传 xlsx 文件，解析后批量创建广告上传队列记录。
+
+    Args:
+        request (Request): multipart/form-data，file 字段为 .xlsx 文件。
+
+    Returns:
+        Response 201: {"count": N, "list": [...]}
+        Response 400: {"detail": "错误描述"}
+    """
+    file_obj = request.FILES.get("file")
+    if not file_obj:
+        return Response({"detail": "请上传 file 字段"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not str(file_obj.name).lower().endswith(".xlsx"):
+        return Response({"detail": "仅支持 .xlsx 格式文件"}, status=status.HTTP_400_BAD_REQUEST)
+
+    logger.info(
+        "[AdUploadQueueView][upload_ad_xlsx] 开始解析: filename=%s size=%s user=%s",
+        file_obj.name, file_obj.size, request.user,
+    )
+
+    created, error_msg = parse_and_create_queue(file_obj, request.user)
+
+    if error_msg:
+        logger.warning(
+            "[AdUploadQueueView][upload_ad_xlsx] 解析失败: %s user=%s",
+            error_msg, request.user,
+        )
+        return Response({"detail": error_msg}, status=status.HTTP_400_BAD_REQUEST)
+
+    data = AdUploadQueueSerializer(created, many=True).data
+    return Response({"count": len(created), "list": data}, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET"])
+@authentication_classes(_AUTH)
+@permission_classes(_PERM)
+def list_ad_queue(request: Request) -> Response:
+    """分页查询广告上传队列记录。
+
+    Query Params:
+        page (int): 页码，默认 1。
+        page_size (int): 每页条数，默认 20，最大 100。
+        parse_status (int): 0=失败 1=成功，不传则查全部。
+        shop (str): 按店铺名模糊过滤。
+        country (str): 按国家精确过滤（DE/IT/FR/ES/UK）。
+
+    Returns:
+        Response: {"total": N, "page": N, "page_size": N, "list": [...]}
+    """
+    qs = AdUploadQueue.objects.all()
+
+    parse_status_param = request.query_params.get("parse_status")
+    if parse_status_param is not None:
+        try:
+            qs = qs.filter(parse_status=int(parse_status_param))
+        except ValueError:
+            pass
+
+    shop_param = request.query_params.get("shop")
+    if shop_param:
+        qs = qs.filter(shop__icontains=shop_param)
+
+    country_param = request.query_params.get("country")
+    if country_param:
+        qs = qs.filter(country=country_param)
+
+    try:
+        page = max(1, int(request.query_params.get("page", 1)))
+        page_size = min(100, max(1, int(request.query_params.get("page_size", 20))))
+    except ValueError:
+        page, page_size = 1, 20
+
+    total = qs.count()
+    offset = (page - 1) * page_size
+    records = qs[offset: offset + page_size]
+
+    data = AdUploadQueueSerializer(records, many=True).data
+    return Response({"total": total, "page": page, "page_size": page_size, "list": data})
+
+
+@api_view(["DELETE"])
+@authentication_classes(_AUTH)
+@permission_classes(_PERM)
+def bulk_delete_ad_queue(request: Request) -> Response:
+    """批量删除广告上传队列记录。
+
+    Args:
+        request (Request): JSON body {"ids": [1, 2, 3]}
+
+    Returns:
+        Response: {"deleted_count": N}
+        Response 400: 参数校验错误详情
+    """
+    serializer = AdBulkDeleteSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    deleted_count = bulk_delete_queue(
+        serializer.validated_data["ids"],
+        request.user,
+    )
+    return Response({"deleted_count": deleted_count})

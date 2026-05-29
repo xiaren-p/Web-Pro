@@ -2,6 +2,11 @@
 
 from django.urls import path
 
+from api_v2.views.ad_upload_queue_view import (
+    bulk_delete_ad_queue,
+    list_ad_queue,
+    upload_ad_xlsx,
+)
 from api_v2.views.app_view import (
     create_app,
     delete_app,
@@ -23,4 +28,9 @@ urlpatterns = [
     path('developer/apps/create/', create_app, name='developer_apps_create'),
     path('developer/apps/<int:app_id>/', delete_app, name='developer_apps_delete'),
     path('developer/apps/<int:app_id>/rotate-secret/', rotate_secret, name='developer_apps_rotate'),
+
+    # 广告上传队列接口
+    path('ads/upload/', upload_ad_xlsx, name='ads_upload'),
+    path('ads/queue/', list_ad_queue, name='ads_queue_list'),
+    path('ads/queue/bulk-delete/', bulk_delete_ad_queue, name='ads_queue_bulk_delete'),
 ]

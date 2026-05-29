@@ -241,3 +241,82 @@ export function getNegativeKeywords(data: NegativeKeywordParams): Promise<Negati
     data,
   });
 }
+
+// ── 广告上传队列 ─────────────────────────────────────────────────────────────
+
+/** 广告上传队列单条记录结构 */
+export interface AdQueueItem {
+  id: number;
+  campaign_name: string;
+  shop: string;
+  country: string;
+  ad_type: string;
+  skus: string[];
+  keywords: string[];
+  parse_status: number;
+  parse_status_label: string;
+  msg: string;
+  created_at: string;
+}
+
+/** 广告队列列表查询参数 */
+export interface AdQueueQuery {
+  page?: number;
+  page_size?: number;
+  parse_status?: number;
+  shop?: string;
+  country?: string;
+}
+
+/** 广告队列列表分页响应结构 */
+export interface AdQueueListResponse {
+  total: number;
+  page: number;
+  page_size: number;
+  list: AdQueueItem[];
+}
+
+/**
+ * 上传 xlsx 文件，解析并批量创建广告上传队列记录。
+ *
+ * @param {File} file - 用户选择的 .xlsx 文件对象
+ * @returns {Promise<{ count: number; list: AdQueueItem[] }>} 创建成功的记录数与列表
+ */
+export function uploadAdXlsx(file: File): Promise<{ count: number; list: AdQueueItem[] }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return request({
+    url: "/v2/ads/upload/",
+    method: "post",
+    data: formData,
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+}
+
+/**
+ * 分页查询广告上传队列记录列表。
+ *
+ * @param {AdQueueQuery} params - 查询参数（页码、状态过滤等）
+ * @returns {Promise<AdQueueListResponse>} 分页列表响应
+ */
+export function getAdQueue(params: AdQueueQuery): Promise<AdQueueListResponse> {
+  return request({
+    url: "/v2/ads/queue/",
+    method: "get",
+    params,
+  });
+}
+
+/**
+ * 批量删除广告上传队列记录。
+ *
+ * @param {number[]} ids - 要删除的记录 ID 列表
+ * @returns {Promise<{ deleted_count: number }>} 实际删除数量
+ */
+export function bulkDeleteAdQueue(ids: number[]): Promise<{ deleted_count: number }> {
+  return request({
+    url: "/v2/ads/queue/bulk-delete/",
+    method: "delete",
+    data: { ids },
+  });
+}
