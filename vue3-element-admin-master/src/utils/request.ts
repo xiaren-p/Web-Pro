@@ -8,136 +8,156 @@ import { authConfig } from "@/settings";
 // 初始化token刷新组合式函数
 const { refreshTokenAndRetry } = useTokenRefresh();
 
+// ── 拦截器函数（提取为命名函数，供多实例复用）────────────────────────────────
+
 /**
- * 创建 HTTP 请求实例
+ * 请求拦截器：注入 Bearer Token，并处理 FormData Content-Type 自动清除。
+ */
+function requestFulfilled(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
+  const accessToken = AuthStorage.getAccessToken();
+
+  if (config.headers.Authorization !== "no-auth" && accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  } else {
+    delete config.headers.Authorization;
+  }
+
+  // 若为 FormData 上传，移除固定的 JSON Content-Type，让浏览器自动设置 multipart 边界
+  if (config.data instanceof FormData) {
+    try {
+      // @ts-ignore
+      if (config.headers && typeof (config.headers as any).delete === "function") {
+        (config.headers as any).delete("Content-Type");
+      }
+      if (config.headers) {
+        // @ts-ignore
+        delete config.headers["Content-Type"];
+        // @ts-ignore
+        delete config.headers["content-type"];
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return config;
+}
+
+function requestRejected(error: unknown): Promise<never> {
+  console.error("Request interceptor error:", error);
+  return Promise.reject(error);
+}
+
+/**
+ * 响应拦截器：解包统一返回格式 {code, data, msg}，处理 401/403/500 等错误码。
+ */
+function responseFulfilled(response: AxiosResponse<ApiResponse | any>): any {
+  if (response.config.responseType === "blob" || response.config.responseType === "arraybuffer") {
+    return response;
+  }
+
+  const body = response.data as any;
+
+  if (
+    !body ||
+    typeof body !== "object" ||
+    (!("code" in body) && response.status >= 200 && response.status < 300)
+  ) {
+    return body;
+  }
+
+  const { code, data, msg } = body as ApiResponse;
+
+  if (code === ApiCodeEnum.SUCCESS) {
+    return data;
+  }
+  if ((code as any) === 0) {
+    return body;
+  }
+
+  ElMessage.error(msg || "系统出错");
+  return Promise.reject(new Error(msg || "Business Error"));
+}
+
+async function responseRejected(error: any): Promise<unknown> {
+  console.error("Response interceptor error:", error);
+
+  const { config, response } = error;
+
+  if (!response) {
+    ElMessage.error("网络连接失败，请检查网络设置");
+    return Promise.reject(error);
+  }
+
+  const { code, msg } = response.data as ApiResponse;
+
+  switch (code) {
+    case ApiCodeEnum.AUTH_REQUIRED:
+    case ApiCodeEnum.ACCESS_TOKEN_INVALID:
+      if (authConfig.enableTokenRefresh) {
+        return refreshTokenAndRetry(config, httpRequest);
+      } else {
+        await redirectToLogin("登录已过期，请重新登录");
+        return Promise.reject(new Error(msg || "Access Token Invalid"));
+      }
+
+    case ApiCodeEnum.REFRESH_TOKEN_INVALID:
+      await redirectToLogin("登录已过期，请重新登录");
+      return Promise.reject(new Error(msg || "Refresh Token Invalid"));
+
+    case ApiCodeEnum.PERMISSION_DENIED:
+      ElMessage.error(msg || "无权限访问");
+      return Promise.reject(new Error(msg || "Permission Denied"));
+
+    default:
+      ElMessage.error(msg || "请求失败");
+      return Promise.reject(new Error(msg || "Request Error"));
+  }
+}
+
+// ── api_v1 请求实例 ───────────────────────────────────────────────────────────
+
+/**
+ * 默认请求实例，baseURL = VITE_APP_BASE_API（/api/v1）。
+ * 用于所有 api_v1 端点，直接以相对路径调用（如 `/ads/campaigns`）。
  */
 const httpRequest = axios.create({
   baseURL: import.meta.env.VITE_APP_BASE_API,
   timeout: 50000,
   headers: { "Content-Type": "application/json;charset=utf-8" },
   paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
-  withCredentials: true, // 允许跨域时自动带 cookie（session 登录场景）
+  withCredentials: true,
 });
 
-/**
- * 请求拦截器 - 添加 Authorization 头
- */
-httpRequest.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const accessToken = AuthStorage.getAccessToken();
+httpRequest.interceptors.request.use(requestFulfilled, requestRejected);
+httpRequest.interceptors.response.use(responseFulfilled, responseRejected);
 
-    // 如果 Authorization 设置为 no-auth，则不携带 Token
-    if (config.headers.Authorization !== "no-auth" && accessToken) {
-      config.headers.Authorization = `Bearer ${accessToken}`;
-    } else {
-      delete config.headers.Authorization;
-    }
-
-    // 若为 FormData 上传，移除固定的 JSON Content-Type，让浏览器自动设置 multipart 边界
-    if (config.data instanceof FormData) {
-      try {
-        // AxiosHeaders 情况
-        // @ts-ignore
-        if (config.headers && typeof (config.headers as any).delete === "function") {
-          // AxiosHeaders: 使用 delete 移除
-          (config.headers as any).delete("Content-Type");
-        }
-        // 普通对象情况
-        if (config.headers) {
-          // @ts-ignore
-          delete config.headers["Content-Type"];
-          // @ts-ignore
-          delete config.headers["content-type"];
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    return config;
-  },
-  (error) => {
-    console.error("Request interceptor error:", error);
-    return Promise.reject(error);
-  }
-);
+// ── api_v2 请求实例 ───────────────────────────────────────────────────────────
 
 /**
- * 响应拦截器 - 统一处理响应和错误
+ * api_v2 专用请求实例，baseURL 自动适配环境：
+ *   - 生产环境（VITE_APP_API_ORIGIN 非空）：`https://api.hanlis.cn/api/v2`
+ *     → 绝对 URL，Axios 完全忽略 VITE_APP_BASE_API 的 /api/v1，不再拼错。
+ *   - 开发环境（VITE_APP_API_ORIGIN 为空）：`/dev-api/api/v2`
+ *     → Vite 代理匹配 /dev-api/api/v2/* 并剥去 /dev-api，转发到 Django localhost:8000。
+ *
+ * 使用方式：`import { requestV2 } from "@/utils/request"`
+ * 路径只需写端点相对路径（如 `/ads/queue/`），无需拼接域名或版本前缀。
  */
-httpRequest.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse | any>) => {
-    // 如果响应是二进制数据，则直接返回response对象（用于文件下载、Excel导出、图片显示等）
-    if (response.config.responseType === "blob" || response.config.responseType === "arraybuffer") {
-      return response;
-    }
+const _v2BaseURL = import.meta.env.VITE_APP_API_ORIGIN
+  ? `${import.meta.env.VITE_APP_API_ORIGIN}/api/v2`
+  : `${import.meta.env.VITE_APP_BASE_API}/api/v2`;
 
-    const body = response.data as any;
+const httpRequestV2 = axios.create({
+  baseURL: _v2BaseURL,
+  timeout: 50000,
+  headers: { "Content-Type": "application/json;charset=utf-8" },
+  paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
+  withCredentials: true,
+});
 
-    // 兼容后端有时不使用统一返回包装的情况（例如登出返回空或true）
-    if (
-      !body ||
-      typeof body !== "object" ||
-      (!("code" in body) && response.status >= 200 && response.status < 300)
-    ) {
-      return body;
-    }
+httpRequestV2.interceptors.request.use(requestFulfilled, requestRejected);
+httpRequestV2.interceptors.response.use(responseFulfilled, responseRejected);
 
-    const { code, data, msg } = body as ApiResponse;
-
-    // 请求成功
-    if (code === ApiCodeEnum.SUCCESS) {
-      return data;
-    }
-    // 兼容 int 类型 0 状态码 (返回完整 body 以便获取 total 等兄弟字段)
-    if ((code as any) === 0) {
-      return body;
-    }
-
-    // 业务错误
-    ElMessage.error(msg || "系统出错");
-    return Promise.reject(new Error(msg || "Business Error"));
-  },
-  async (error) => {
-    console.error("Response interceptor error:", error);
-
-    const { config, response } = error;
-
-    // 网络错误或服务器无响应
-    if (!response) {
-      ElMessage.error("网络连接失败，请检查网络设置");
-      return Promise.reject(error);
-    }
-
-    const { code, msg } = response.data as ApiResponse;
-
-    switch (code) {
-      case ApiCodeEnum.AUTH_REQUIRED:
-      case ApiCodeEnum.ACCESS_TOKEN_INVALID:
-        // Access Token 过期
-        if (authConfig.enableTokenRefresh) {
-          // 启用了token刷新，尝试刷新
-          return refreshTokenAndRetry(config, httpRequest);
-        } else {
-          // 未启用token刷新，直接跳转登录页
-          await redirectToLogin("登录已过期，请重新登录");
-          return Promise.reject(new Error(msg || "Access Token Invalid"));
-        }
-
-      case ApiCodeEnum.REFRESH_TOKEN_INVALID:
-        // Refresh Token 过期，跳转登录页
-        await redirectToLogin("登录已过期，请重新登录");
-        return Promise.reject(new Error(msg || "Refresh Token Invalid"));
-
-      case ApiCodeEnum.PERMISSION_DENIED:
-        ElMessage.error(msg || "无权限访问");
-        return Promise.reject(new Error(msg || "Permission Denied"));
-
-      default:
-        ElMessage.error(msg || "请求失败");
-        return Promise.reject(new Error(msg || "Request Error"));
-    }
-  }
-);
-
+export { httpRequestV2 as requestV2 };
 export default httpRequest;

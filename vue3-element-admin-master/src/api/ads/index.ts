@@ -244,6 +244,8 @@ export function getNegativeKeywords(data: NegativeKeywordParams): Promise<Negati
 
 // ── 广告上传队列 ─────────────────────────────────────────────────────────────
 
+import { requestV2 } from "@/utils/request";
+
 /** 广告上传队列单条记录结构 */
 export interface AdQueueItem {
   id: number;
@@ -285,8 +287,8 @@ export interface AdQueueListResponse {
 export function uploadAdXlsx(file: File): Promise<{ count: number; list: AdQueueItem[] }> {
   const formData = new FormData();
   formData.append("file", file);
-  return request({
-    url: "/v2/ads/upload/",
+  return requestV2({
+    url: "/ads/upload/",
     method: "post",
     data: formData,
     headers: { "Content-Type": "multipart/form-data" },
@@ -300,8 +302,8 @@ export function uploadAdXlsx(file: File): Promise<{ count: number; list: AdQueue
  * @returns {Promise<AdQueueListResponse>} 分页列表响应
  */
 export function getAdQueue(params: AdQueueQuery): Promise<AdQueueListResponse> {
-  return request({
-    url: "/v2/ads/queue/",
+  return requestV2({
+    url: "/ads/queue/",
     method: "get",
     params,
   });
@@ -314,8 +316,8 @@ export function getAdQueue(params: AdQueueQuery): Promise<AdQueueListResponse> {
  * @returns {Promise<{ deleted_count: number }>} 实际删除数量
  */
 export function bulkDeleteAdQueue(ids: number[]): Promise<{ deleted_count: number }> {
-  return request({
-    url: "/v2/ads/queue/bulk-delete/",
+  return requestV2({
+    url: "/ads/queue/bulk-delete/",
     method: "delete",
     data: { ids },
   });
