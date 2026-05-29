@@ -202,6 +202,7 @@ def _do_parse_and_create(
     user: User | None,
     ad_type_filter: str,
     country_filter: list[str] | None,
+    bidding_params: dict[str, float] | None = None,
 ) -> tuple[list[AdUploadQueue], str | None, list[str]]:
     """执行 xlsx 解析并批量落库。
 
@@ -210,6 +211,8 @@ def _do_parse_and_create(
         user (User | None): 当前操作用户。
         ad_type_filter (str): 广告类型筛选，取値 "all" / "auto" / "manual"。
         country_filter (list[str] | None): 手动指定的国家代码列表；None 表示按表需求自动发现。
+        bidding_params (dict[str, float] | None): 竞价配置字典，键名与模型字段一致；
+            None 时全部使用字段默认值。
 
     Returns:
         tuple[list[AdUploadQueue], str | None, list[str]]:
@@ -217,6 +220,7 @@ def _do_parse_and_create(
             - error_msg：文件级错误时非 None，此时列表为空。
             - skipped_warnings：手动广告无关键词被跳过的提示信息列表。
     """
+    bp = bidding_params or {}  # 竞价参数快捷引用，缺键时使用模型字段默认值
     # 1. 读主表
     try:
         df = pd.read_excel(tmp_path, sheet_name=_MAIN_SHEET, engine="openpyxl")
@@ -306,6 +310,7 @@ def _do_parse_and_create(
                                 parse_status=AdParseStatus.FAILED,
                                 msg=error_msg,
                                 created_by=user,
+                                **{k: v for k, v in bp.items()},
                             )
                         )
                 continue
@@ -332,6 +337,7 @@ def _do_parse_and_create(
                                 parse_status=AdParseStatus.FAILED,
                                 msg=f"店铺不存在（{shop_site_key}）",
                                 created_by=user,
+                                **{k: v for k, v in bp.items()},
                             )
                         )
                         continue
@@ -357,6 +363,7 @@ def _do_parse_and_create(
                             parse_status=AdParseStatus.PENDING,
                             msg="队列中",
                             created_by=user,
+                            **{k: v for k, v in bp.items()},
                         )
                     )
 
@@ -381,6 +388,7 @@ def parse_and_create_queue(
     user: User | None,
     ad_type_filter: str = "all",
     country_filter: list[str] | None = None,
+    bidding_params: dict[str, float] | None = None,
 ) -> tuple[list[AdUploadQueue], str | None, list[str]]:
     """解析上传的 xlsx 文件并批量创建广告上传队列记录。
 
@@ -392,6 +400,8 @@ def parse_and_create_queue(
         user (User | None): 当前操作用户，用于记录创建者。
         ad_type_filter (str): "all"（默认，都创建）/ "auto"（仅自动）/ "manual"（仅手动）。
         country_filter (list[str] | None): 手动指定国家代码列表；None 表示按表需求。
+        bidding_params (dict[str, float] | None): 竞价配置，键名与 AdUploadQueue 竞价字段一致；
+            None 时全部使用字段默认值（每日预算 1，各竞价 0.10 / 0.12）。
 
     Returns:
         tuple[list[AdUploadQueue], str | None, list[str]]:
@@ -412,7 +422,7 @@ def parse_and_create_queue(
         return [], f"文件读取失败：{exc}", []
 
     try:
-        return _do_parse_and_create(tmp_path, user, ad_type_filter, country_filter)
+        return _do_parse_and_create(tmp_path, user, ad_type_filter, country_filter, bidding_params)
     finally:
         try:
             os.unlink(tmp_path)

@@ -112,6 +112,68 @@
           </div>
         </transition>
       </div>
+
+      <!-- 竞价设置 -->
+      <div class="upload-section">
+        <div class="upload-section__title">竞价设置</div>
+        <el-form label-width="140px" size="small" class="bidding-form">
+          <el-form-item label="每日预算（美元）">
+            <el-input-number
+              v-model="dailyBudget"
+              :min="0.01"
+              :step="0.5"
+              :precision="2"
+              style="width: 160px"
+            />
+          </el-form-item>
+          <el-form-item label="广告组默认竞价">
+            <el-input-number
+              v-model="defaultBid"
+              :min="0.01"
+              :step="0.01"
+              :precision="2"
+              style="width: 160px"
+            />
+          </el-form-item>
+          <el-divider content-position="left" style="margin: 8px 0">自动定向组竞价</el-divider>
+          <el-form-item label="紧密匹配">
+            <el-input-number
+              v-model="closeMatchBid"
+              :min="0.01"
+              :step="0.01"
+              :precision="2"
+              style="width: 160px"
+            />
+          </el-form-item>
+          <el-form-item label="同类匹配">
+            <el-input-number
+              v-model="looseMatchBid"
+              :min="0.01"
+              :step="0.01"
+              :precision="2"
+              style="width: 160px"
+            />
+          </el-form-item>
+          <el-form-item label="宽泛匹配">
+            <el-input-number
+              v-model="substitutesBid"
+              :min="0.01"
+              :step="0.01"
+              :precision="2"
+              style="width: 160px"
+            />
+          </el-form-item>
+          <el-form-item label="关联匹配">
+            <el-input-number
+              v-model="complementsBid"
+              :min="0.01"
+              :step="0.01"
+              :precision="2"
+              style="width: 160px"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
     </div>
 
     <!-- ── 步骤二：解析结果 ── -->
@@ -254,6 +316,14 @@ const adTypeFilter = ref<"all" | "auto" | "manual">("all");
 const useAutoSites = ref(true);
 const selectedCountries = ref<string[]>([]);
 
+// 竞价设置默认値
+const dailyBudget = ref<number>(1);
+const defaultBid = ref<number>(0.12);
+const closeMatchBid = ref<number>(0.12);
+const looseMatchBid = ref<number>(0.1);
+const substitutesBid = ref<number>(0.1);
+const complementsBid = ref<number>(0.1);
+
 /** 失败记录列表（computed，供结果表格使用） */
 const failedRows = computed(
   () => uploadResult.value?.list.filter((r) => r.parse_status === 0) ?? []
@@ -339,6 +409,12 @@ async function handleSubmit(): Promise<void> {
       file: selectedFile.value,
       adTypeFilter: adTypeFilter.value,
       countryFilter: useAutoSites.value ? [] : selectedCountries.value,
+      dailyBudget: dailyBudget.value,
+      defaultBid: defaultBid.value,
+      closeMatchBid: closeMatchBid.value,
+      looseMatchBid: looseMatchBid.value,
+      substitutesBid: substitutesBid.value,
+      complementsBid: complementsBid.value,
     });
     uploadResult.value = res;
     step.value = "result";
@@ -370,6 +446,12 @@ function handleReset(): void {
   adTypeFilter.value = "all";
   useAutoSites.value = true;
   selectedCountries.value = [];
+  dailyBudget.value = 1;
+  defaultBid.value = 0.12;
+  closeMatchBid.value = 0.12;
+  looseMatchBid.value = 0.1;
+  substitutesBid.value = 0.1;
+  complementsBid.value = 0.1;
 }
 </script>
 

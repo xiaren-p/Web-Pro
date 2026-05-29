@@ -66,6 +66,48 @@ class AdUploadQueue(models.Model):
         verbose_name="状态消息",
     )
 
+    daily_budget = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=1.00,
+        verbose_name="每日预算",
+    )
+
+    default_bid = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.12,
+        verbose_name="广告组默认竞价",
+    )
+
+    close_match_bid = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.12,
+        verbose_name="紧密匹配竞价",
+    )
+
+    loose_match_bid = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.10,
+        verbose_name="同类匹配竞价",
+    )
+
+    substitutes_bid = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.10,
+        verbose_name="宽泛匹配竞价",
+    )
+
+    complements_bid = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.10,
+        verbose_name="关联匹配竞价",
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="创建时间",

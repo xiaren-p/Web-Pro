@@ -18,6 +18,7 @@ class AdUploadQueueSerializer(serializers.ModelSerializer):
 
     parse_status_label = serializers.SerializerMethodField()
     ad_type_label = serializers.SerializerMethodField()
+    created_by_username = serializers.SerializerMethodField()
 
     class Meta:
         model = AdUploadQueue
@@ -33,6 +34,13 @@ class AdUploadQueueSerializer(serializers.ModelSerializer):
             "parse_status",
             "parse_status_label",
             "msg",
+            "daily_budget",
+            "default_bid",
+            "close_match_bid",
+            "loose_match_bid",
+            "substitutes_bid",
+            "complements_bid",
+            "created_by_username",
             "created_at",
         ]
         read_only_fields = fields
@@ -64,6 +72,19 @@ class AdUploadQueueSerializer(serializers.ModelSerializer):
             str: "手动" 或 "自动"。
         """
         return "手动" if obj.ad_type == "manual" else "自动"
+
+    def get_created_by_username(self, obj: AdUploadQueue) -> str:
+        """返回创建用户的用户名；未关联用户时返回空字符串。
+
+        Args:
+            obj (AdUploadQueue): 队列记录实例。
+
+        Returns:
+            str: 用户名，如 "admin"；无关联时返回 ""。
+        """
+        if obj.created_by_id is None:
+            return ""
+        return obj.created_by.username if obj.created_by else ""
 
 
 class AdBulkDeleteSerializer(serializers.Serializer):

@@ -132,6 +132,7 @@ def _build_form_data(
     profile_id: int,
     campaign_name: str,
     targeting_type: str,
+    daily_budget: float = 1.0,
 ) -> dict[str, Any]:
     """构造广告活动创建接口的 form-encoded 请求体。
 
@@ -142,6 +143,7 @@ def _build_form_data(
         profile_id (int): 广告 Profile ID。
         campaign_name (str): 广告活动名称（含 AUTO/MANU 后缀）。
         targeting_type (str): Amazon 广告定向类型，"AUTO" 或 "MANUAL"。
+        daily_budget (float): 每日预算（美元），默认 1.0。
 
     Returns:
         dict[str, Any]: requests.post 的 data 参数字典。
@@ -156,7 +158,7 @@ def _build_form_data(
         "params[campaigns][0][startDate]": today,
         "params[campaigns][0][endDate]": "",
         "params[campaigns][0][budget][budgetType]": "DAILY",
-        "params[campaigns][0][budget][budget]": 1,
+        "params[campaigns][0][budget][budget]": daily_budget,
         "params[campaigns][0][dynamicBidding][strategy]": "MANUAL",
         "params[campaigns][0][dynamicBidding][placementBidding][0][placement]": "PLACEMENT_TOP",
         "params[campaigns][0][dynamicBidding][placementBidding][0][percentage]": 0,
@@ -270,7 +272,12 @@ def _submit_single(queue: AdUploadQueue) -> None:
         return
 
     targeting_type = _extract_targeting_type(queue.campaign_name)
-    form_data = _build_form_data(profile_id, queue.campaign_name, targeting_type)
+    form_data = _build_form_data(
+        profile_id,
+        queue.campaign_name,
+        targeting_type,
+        float(queue.daily_budget),
+    )
     headers = _build_headers(profile_id)
 
     logger.info(

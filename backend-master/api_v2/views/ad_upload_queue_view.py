@@ -29,6 +29,16 @@ logger = logging.getLogger(__name__)
 _AUTH = [BearerTokenAuthentication]
 _PERM = [IsV2Accessible]
 
+# 竞价参数字段名与默认值映射
+_BIDDING_FIELDS: dict[str, float] = {
+    "daily_budget": 1.0,
+    "default_bid": 0.12,
+    "close_match_bid": 0.12,
+    "loose_match_bid": 0.10,
+    "substitutes_bid": 0.10,
+    "complements_bid": 0.10,
+}
+
 
 @api_view(["POST"])
 @authentication_classes(_AUTH)
@@ -67,8 +77,19 @@ def upload_ad_xlsx(request: Request) -> Response:
         if country_filter_raw else None
     )
 
+    # 解析竞价参数（缺失时全部使用字段默认值）
+    bidding_params: dict[str, float] = {}
+    for field, default in _BIDDING_FIELDS.items():
+        raw_val = request.data.get(field)
+        if raw_val is not None:
+            try:
+                bidding_params[field] = float(raw_val)
+            except (TypeError, ValueError):
+                bidding_params[field] = default
+
     created, error_msg, skipped_warnings = parse_and_create_queue(
-        file_obj, request.user, ad_type_filter, country_filter
+        file_obj, request.user, ad_type_filter, country_filter,
+        bidding_params if bidding_params else None,
     )
 
     if error_msg:
@@ -162,3 +183,33 @@ def bulk_delete_ad_queue(request: Request) -> Response:
         request.user,
     )
     return Response({"deleted_count": deleted_count})
+
+
+@api_view(["POST"])
+@authentication_classes(_AUTH)
+@permission_classes(_PERM)
+def retry_ad_queue(request: Request) -> Response:
+    """将失败（parse_status=0）的队列记录重置为待提交（parse_status=1，队列中）。
+
+    Args:
+        request (Request): JSON body {"ids": [1, 2, 3]}
+
+    Returns:
+        Response: {"retried_count": N}
+        Response 400: ids 为空或非法
+    """
+    ids = request.data.get("ids", [])
+    if not ids or not isinstance(ids, list):
+        return Response({"detail": "ids 不能为空"}, status=status.HTTP_400_BAD_REQUEST)
+
+    logger.info(
+        "[AdUploadQueueView][retry_ad_queue] 重试队列记录: ids=%s user=%s",
+        ids, request.user,
+    )
+
+    retried_count = AdUploadQueue.objects.filter(
+        id__in=ids,
+        parse_status=AdParseStatus.FAILED,
+    ).update(parse_status=AdParseStatus.PENDING, msg="队列中")
+
+    return Response({"retried_count": retried_count})

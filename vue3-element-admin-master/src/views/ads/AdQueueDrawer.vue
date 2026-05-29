@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visible" title="广告新建队列" size="800px" destroy-on-close>
+  <el-drawer v-model="visible" title="广告新建队列" size="1150px" destroy-on-close>
     <div class="queue-drawer">
       <!-- 顶部工具栏 -->
       <div class="queue-toolbar">
@@ -49,6 +49,8 @@
 
         <el-table-column prop="ad_type_label" label="广告类型" width="90" align="center" />
 
+        <el-table-column prop="created_by_username" label="提交人" width="90" align="center" show-overflow-tooltip />
+
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.parse_status === 2 ? 'success' : row.parse_status === 1 ? 'primary' : 'danger'" size="small">
@@ -57,7 +59,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="140" align="center">
+        <el-table-column label="操作" width="180" align="center">
           <template #default="{ row }">
             <el-button
               v-if="row.parse_status === 0"
@@ -67,6 +69,16 @@
               @click="showFailReason(row)"
             >
               查看原因
+            </el-button>
+            <el-button
+              v-if="row.parse_status === 0"
+              type="warning"
+              link
+              size="small"
+              :loading="retryingId === row.id"
+              @click="handleRetry(row)"
+            >
+              重试
             </el-button>
             <el-button
               type="danger"
@@ -117,7 +129,7 @@ import type { AdQueueItem, AdQueueQuery } from "@/api/ads/index";
 import { ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
-import { bulkDeleteAdQueue, getAdQueue } from "@/api/ads/index";
+import { bulkDeleteAdQueue, getAdQueue, retryAdQueue } from "@/api/ads/index";
 
 const props = defineProps<{
   visible: boolean;
@@ -161,6 +173,9 @@ const currentFailMsg = ref("");
 
 // 单条删除加载态
 const deletingId = ref<number | null>(null);
+
+// 单条重试加载态
+const retryingId = ref<number | null>(null);
 
 /**
  * 加载队列记录列表（分页）。
@@ -280,6 +295,25 @@ async function handleSingleDelete(row: AdQueueItem): Promise<void> {
 function showFailReason(row: AdQueueItem): void {
   currentFailMsg.value = row.msg || "暂无错误信息";
   failDialogVisible.value = true;
+}
+
+/**
+ * 将单条失败记录重置为待提交状态。
+ *
+ * @param {AdQueueItem} row - 要重试的队列记录行
+ * @returns {Promise<void>}
+ */
+async function handleRetry(row: AdQueueItem): Promise<void> {
+  retryingId.value = row.id;
+  try {
+    await retryAdQueue([row.id]);
+    ElMessage.success("已重置为队列中");
+    await loadQueue();
+  } catch {
+    ElMessage.error("重试失败，请重试");
+  } finally {
+    retryingId.value = null;
+  }
 }
 </script>
 

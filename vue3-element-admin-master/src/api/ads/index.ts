@@ -259,6 +259,13 @@ export interface AdQueueItem {
   parse_status: number;
   parse_status_label: string;
   msg: string;
+  daily_budget: string;
+  default_bid: string;
+  close_match_bid: string;
+  loose_match_bid: string;
+  substitutes_bid: string;
+  complements_bid: string;
+  created_by_username: string;
   created_at: string;
 }
 
@@ -288,7 +295,7 @@ export interface AdUploadResponse {
   list: AdQueueItem[];
 }
 
-/** 上传请求参数：包含文件、广告类型筛选和国家筛选 */
+/** 上传请求参数：包含文件、广告类型筛选、国家筛选和竞价设置 */
 export interface AdUploadParams {
   /** 用户选择的 .xlsx 文件对象 */
   file: File;
@@ -296,6 +303,18 @@ export interface AdUploadParams {
   adTypeFilter: "all" | "auto" | "manual";
   /** 手动指定的国家代码列表；空数组表示按表需求自动读取 */
   countryFilter: string[];
+  /** 每日预算（美元） */
+  dailyBudget: number;
+  /** 广告组默认竞价 */
+  defaultBid: number;
+  /** 自动广告——紧密匹配竞价 */
+  closeMatchBid: number;
+  /** 自动广告——同类匹配竞价 */
+  looseMatchBid: number;
+  /** 自动广告——宽泛匹配竞价 */
+  substitutesBid: number;
+  /** 自动广告——关联匹配竞价 */
+  complementsBid: number;
 }
 
 /**
@@ -311,6 +330,12 @@ export function uploadAdXlsx(params: AdUploadParams): Promise<AdUploadResponse> 
   if (params.countryFilter.length > 0) {
     formData.append("country_filter", params.countryFilter.join(","));
   }
+  formData.append("daily_budget", String(params.dailyBudget));
+  formData.append("default_bid", String(params.defaultBid));
+  formData.append("close_match_bid", String(params.closeMatchBid));
+  formData.append("loose_match_bid", String(params.looseMatchBid));
+  formData.append("substitutes_bid", String(params.substitutesBid));
+  formData.append("complements_bid", String(params.complementsBid));
   return requestV2({
     url: "/ads/upload/",
     method: "post",
@@ -343,6 +368,20 @@ export function bulkDeleteAdQueue(ids: number[]): Promise<{ deleted_count: numbe
   return requestV2({
     url: "/ads/queue/bulk-delete/",
     method: "delete",
+    data: { ids },
+  });
+}
+
+/**
+ * 将失败队列记录重置为待提交（队列中）状态。
+ *
+ * @param {number[]} ids - 要重试的记录 ID 列表
+ * @returns {Promise<{ retried_count: number }>} 实际重置的条数
+ */
+export function retryAdQueue(ids: number[]): Promise<{ retried_count: number }> {
+  return requestV2({
+    url: "/ads/queue/retry/",
+    method: "post",
     data: { ids },
   });
 }

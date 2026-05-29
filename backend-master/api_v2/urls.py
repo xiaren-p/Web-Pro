@@ -6,6 +6,7 @@ from api_v2.views.ad_campaign_submit_view import submit_pending_campaigns
 from api_v2.views.ad_upload_queue_view import (
     bulk_delete_ad_queue,
     list_ad_queue,
+    retry_ad_queue,
     upload_ad_xlsx,
 )
 from api_v2.views.app_view import (
@@ -34,5 +35,6 @@ urlpatterns = [
     path('ads/upload/', upload_ad_xlsx, name='ads_upload'),
     path('ads/queue/', list_ad_queue, name='ads_queue_list'),
     path('ads/queue/bulk-delete/', bulk_delete_ad_queue, name='ads_queue_bulk_delete'),
+    path('ads/queue/retry/', retry_ad_queue, name='ads_queue_retry'),
     path('ads/submit/', submit_pending_campaigns, name='ads_campaign_submit'),
 ]
