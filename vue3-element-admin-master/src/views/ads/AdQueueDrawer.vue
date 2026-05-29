@@ -22,6 +22,7 @@
           >
             <el-option label="队列中" :value="1" />
             <el-option label="失败" :value="0" />
+            <el-option label="成功" :value="2" />
           </el-select>
         </div>
       </div>
@@ -50,7 +51,7 @@
 
         <el-table-column label="状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.parse_status === 1 ? 'success' : 'danger'" size="small">
+            <el-tag :type="row.parse_status === 2 ? 'success' : row.parse_status === 1 ? 'primary' : 'danger'" size="small">
               {{ row.parse_status_label }}
             </el-tag>
           </template>
