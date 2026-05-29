@@ -399,6 +399,7 @@ OAUTH2_PROVIDER = {
         'email': '邮符1地址',
         'phone': '手机号',
         'groups': 'Nextcloud 群组成员关系',
+        'api_v2': 'API v2 接口访问权限（Client Credentials 外部调用）',
     },
     'DEFAULT_SCOPES': ['openid', 'profile', 'email'],
     # 请求 scope 验证：请求的 scope 必须是 SCOPES 的子集
