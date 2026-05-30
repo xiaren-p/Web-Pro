@@ -68,13 +68,7 @@
             结尾且存在关键词的条目，AUTO 条目全部忽略
           </template>
         </div>
-        <el-alert
-          type="info"
-          show-icon
-          :closable="false"
-          style="margin-top: 12px;"
-          description="关键词匹配规则：单个单词（如 word、hello）或月搜索量大于 10000 时，采用精准匹配（exact）；其余情况采用宽泛匹配（broad）。"
-        />
+        
       </div>
 
       <!-- 投放国家 -->
@@ -202,6 +196,15 @@
           </div>
         </div>
       </div>
+      <!-- 关键词匹配规则说明（表单底部） -->
+      <el-alert
+        type="info"
+        show-icon
+        :closable="false"
+        style="margin-top: 6px"
+        description="关键词匹配规则：单个单词（如 word、hello）或月搜索量大于 10000 时，采用精准匹配（exact）；其余情况采用宽泛匹配（broad)。"
+      />
+
     </div>
 
     <!-- ── 步骤二：解析结果 ── -->
