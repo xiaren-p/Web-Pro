@@ -30,7 +30,7 @@ def submit_pending_campaigns_task(self) -> dict:
     logger.info("[submit_pending_campaigns_task] 任务启动")
 
     try:
-        from api_v2.services.ad_campaign_submit_service import process_pending_campaigns
+        from api_v2.services.ad_creation.ad_campaign_submit_service import process_pending_campaigns
         result = process_pending_campaigns()
     except Exception as exc:
         logger.error(

@@ -18,7 +18,7 @@ from rest_framework.response import Response
 
 from api_v1.auth.bearer_token_auth import BearerTokenAuthentication
 from api_v2.permissions.workflow_permission import IsV2Accessible
-from api_v2.services.ad_campaign_submit_service import process_pending_campaigns
+from api_v2.services.ad_creation.ad_campaign_submit_service import process_pending_campaigns
 
 logger = logging.getLogger(__name__)
 
