@@ -246,6 +246,26 @@ export function getNegativeKeywords(data: NegativeKeywordParams): Promise<Negati
 
 import { requestV2 } from "@/utils/request";
 
+/** 广告参数（由 xlsx 解析时写入，提交后只读） */
+export interface AdQueueParams {
+  skus: string[];
+  keywords: string[];
+  daily_budget: number;
+  default_bid: number;
+  close_match_bid: number;
+  loose_match_bid: number;
+  substitutes_bid: number;
+  complements_bid: number;
+}
+
+/** 广告各步骤产出 ID（每步成功后逐步填入） */
+export interface AdQueueStepIds {
+  campaign_id: string;
+  ad_group_id: string;
+  product_ad_ids: string[];
+  keyword_ids: string[];
+}
+
 /** 广告上传队列单条记录结构 */
 export interface AdQueueItem {
   id: number;
@@ -254,19 +274,14 @@ export interface AdQueueItem {
   country: string;
   ad_type: string;
   ad_type_label: string;
-  skus: string[];
-  keywords: string[];
+  params: AdQueueParams;
+  step_ids: AdQueueStepIds;
   parse_status: number;
   parse_status_label: string;
   msg: string;
-  daily_budget: string;
-  default_bid: string;
-  close_match_bid: string;
-  loose_match_bid: string;
-  substitutes_bid: string;
-  complements_bid: string;
   created_by_username: string;
-  created_at: string;
+  /** 格式化后的创建时间（"2026-05-30 10:23"），由后端定型，前端直接展示 */
+  created_at_display: string;
 }
 
 /** 广告队列列表查询参数 */
@@ -276,6 +291,10 @@ export interface AdQueueQuery {
   parse_status?: number;
   shop?: string;
   country?: string;
+  /** 创建时间起始日期，格式 YYYY-MM-DD */
+  date_start?: string;
+  /** 创建时间截止日期，格式 YYYY-MM-DD */
+  date_end?: string;
 }
 
 /** 广告队列列表分页响应结构 */

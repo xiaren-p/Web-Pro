@@ -1,28 +1,43 @@
 <template>
-  <el-drawer v-model="visible" title="广告新建队列" size="1150px" destroy-on-close>
+  <el-drawer v-model="visible" title="广告新建队列" size="1200px" destroy-on-close>
     <div class="queue-drawer">
       <!-- 顶部工具栏 -->
       <div class="queue-toolbar">
-        <el-button
-          type="danger"
-          :disabled="selectedIds.length === 0"
-          :loading="deleteLoading"
-          @click="handleBulkDelete"
-        >
-          批量删除（{{ selectedIds.length }}）
-        </el-button>
+        <div class="queue-toolbar__left">
+          <el-button
+            type="danger"
+            plain
+            :disabled="selectedIds.length === 0"
+            :loading="deleteLoading"
+            @click="handleBulkDelete"
+          >
+            批量删除
+            <span v-if="selectedIds.length > 0" class="selected-badge">{{ selectedIds.length }}</span>
+          </el-button>
+        </div>
 
-        <div class="queue-toolbar__filters">
+        <div class="queue-toolbar__right">
+          <el-date-picker
+            v-model="filterDateRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            range-separator="—"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            style="width: 230px"
+            @change="handleFilterChange"
+          />
           <el-select
             v-model="filterStatus"
-            placeholder="状态筛选"
+            placeholder="全部状态"
             clearable
-            style="width: 120px"
+            style="width: 110px"
             @change="handleFilterChange"
           >
             <el-option label="队列中" :value="1" />
-            <el-option label="失败" :value="0" />
             <el-option label="成功" :value="2" />
+            <el-option label="失败" :value="0" />
+            <el-option label="异常" :value="3" />
           </el-select>
         </div>
       </div>
@@ -32,46 +47,53 @@
         v-loading="tableLoading"
         :data="tableData"
         row-key="id"
+        stripe
+        border
+        highlight-current-row
         @selection-change="handleSelectionChange"
       >
-        <el-table-column type="selection" width="50" />
+        <el-table-column type="selection" width="46" />
 
         <el-table-column
           prop="campaign_name"
           label="广告活动"
-          min-width="180"
+          min-width="200"
           show-overflow-tooltip
         />
 
-        <el-table-column prop="shop" label="店铺" width="90" show-overflow-tooltip />
+        <el-table-column prop="shop" label="店铺" width="100" show-overflow-tooltip />
 
-        <el-table-column prop="country" label="国家" width="80" align="center" />
+        <el-table-column prop="country" label="国家" width="70" align="center" />
 
-        <el-table-column prop="ad_type_label" label="广告类型" width="90" align="center" />
+        <el-table-column prop="ad_type_label" label="类型" width="70" align="center" />
 
-        <el-table-column prop="created_by_username" label="提交人" width="90" align="center" show-overflow-tooltip />
-
-        <el-table-column label="状态" width="100" align="center">
+        <el-table-column label="状态" width="90" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.parse_status === 2 ? 'success' : row.parse_status === 1 ? 'primary' : 'danger'" size="small">
+            <el-tag
+              :type="statusTagType(row.parse_status)"
+              size="small"
+              round
+            >
               {{ row.parse_status_label }}
             </el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="180" align="center">
+        <el-table-column prop="created_at_display" label="创建时间" width="142" align="center" />
+
+        <el-table-column label="操作" width="148" align="center" fixed="right">
           <template #default="{ row }">
             <el-button
-              v-if="row.parse_status === 0"
-              type="danger"
+              v-if="row.parse_status === 0 || row.parse_status === 3"
+              type="info"
               link
               size="small"
               @click="showFailReason(row)"
             >
-              查看原因
+              原因
             </el-button>
             <el-button
-              v-if="row.parse_status === 0"
+              v-if="row.parse_status === 0 || row.parse_status === 3"
               type="warning"
               link
               size="small"
@@ -109,9 +131,11 @@
     </div>
   </el-drawer>
 
-  <!-- 失败原因弹窗 -->
-  <el-dialog v-model="failDialogVisible" title="失败原因" width="480px">
-    <p class="fail-reason-text">{{ currentFailMsg }}</p>
+  <!-- 失败/异常原因弹窗 -->
+  <el-dialog v-model="failDialogVisible" title="执行原因" width="480px">
+    <div class="fail-reason-box">
+      <p class="fail-reason-text">{{ currentFailMsg }}</p>
+    </div>
     <template #footer>
       <el-button @click="failDialogVisible = false">关闭</el-button>
     </template>
@@ -121,7 +145,8 @@
 <script setup lang="ts">
 /**
  * 广告新建队列抽屉组件。
- * 展示当前所有广告新建队列记录，支持状态过滤、多选批量删除、单条删除、失败原因查看。
+ * 展示当前登录用户的广告新建队列记录，支持日期范围 + 状态过滤、
+ * 多选批量删除、单条删除、失败/异常原因查看与颗粒重试。
  * 所属板块：ads。
  */
 import type { AdQueueItem, AdQueueQuery } from "@/api/ads/index";
@@ -167,7 +192,10 @@ const deleteLoading = ref(false);
 // 状态过滤
 const filterStatus = ref<number | undefined>(undefined);
 
-// 失败原因弹窗
+// 日期范围过滤，默认近三天
+const filterDateRange = ref<[string, string] | null>(getDefaultDateRange());
+
+// 失败/异常原因弹窗
 const failDialogVisible = ref(false);
 const currentFailMsg = ref("");
 
@@ -178,7 +206,39 @@ const deletingId = ref<number | null>(null);
 const retryingId = ref<number | null>(null);
 
 /**
- * 加载队列记录列表（分页）。
+ * 获取近三天日期范围（含今天），格式为 YYYY-MM-DD。
+ * 使用本地日期而非 UTC，避免东八区用户凌晨出现日期偏差。
+ *
+ * @returns {[string, string]} [起始日期, 截止日期]
+ */
+function getDefaultDateRange(): [string, string] {
+  const fmt = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 2);
+  return [fmt(start), fmt(end)];
+}
+
+/**
+ * 根据 parse_status 值返回对应的 el-tag type。
+ *
+ * @param {number} status - 状态值（0=失败 1=队列中 2=成功 3=异常）
+ * @returns {string} Element Plus tag 类型字符串
+ */
+function statusTagType(status: number): string {
+  if (status === 2) return "success";
+  if (status === 1) return "primary";
+  if (status === 3) return "warning";
+  return "danger";
+}
+
+/**
+ * 加载队列记录列表（分页），携带日期范围与状态过滤参数。
  *
  * @returns {Promise<void>}
  */
@@ -192,6 +252,10 @@ async function loadQueue(): Promise<void> {
     };
     if (filterStatus.value !== undefined) {
       params.parse_status = filterStatus.value;
+    }
+    if (filterDateRange.value) {
+      params.date_start = filterDateRange.value[0];
+      params.date_end = filterDateRange.value[1];
     }
     const res = await getAdQueue(params);
     tableData.value = res.list;
@@ -288,9 +352,9 @@ async function handleSingleDelete(row: AdQueueItem): Promise<void> {
 }
 
 /**
- * 展示失败记录的错误原因弹窗。
+ * 展示失败/异常记录的执行原因弹窗。
  *
- * @param {AdQueueItem} row - 失败的队列记录行
+ * @param {AdQueueItem} row - 失败或异常的队列记录行
  */
 function showFailReason(row: AdQueueItem): void {
   currentFailMsg.value = row.msg || "暂无错误信息";
@@ -298,7 +362,7 @@ function showFailReason(row: AdQueueItem): void {
 }
 
 /**
- * 将单条失败记录重置为待提交状态。
+ * 将失败/异常记录重置为队列中（PENDING）状态，保留已完成步骤 ID，从断点继续。
  *
  * @param {AdQueueItem} row - 要重试的队列记录行
  * @returns {Promise<void>}
@@ -321,35 +385,67 @@ async function handleRetry(row: AdQueueItem): Promise<void> {
 .queue-drawer {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 4px 0;
+  gap: 14px;
+  padding: 2px 0 8px;
 }
 
+/* 工具栏 */
 .queue-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--el-fill-color-extra-light);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
 
-  &__filters {
+  &__left {
     display: flex;
+    align-items: center;
     gap: 8px;
+  }
+
+  &__right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
 }
 
+/* 已选数量角标 */
+.selected-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: #fff;
+  background: var(--el-color-danger);
+  border-radius: 9px;
+}
+
+/* 分页 */
 .queue-pagination {
   display: flex;
   justify-content: flex-end;
-  margin-top: 4px;
+  padding-top: 4px;
 }
 
-.text-muted {
-  font-size: 13px;
-  color: #c0c4cc;
+/* 失败/异常原因弹窗 */
+.fail-reason-box {
+  padding: 4px 2px;
 }
 
 .fail-reason-text {
-  line-height: 1.6;
-  color: #f56c6c;
+  margin: 0;
+  line-height: 1.7;
+  color: var(--el-color-danger);
   word-break: break-all;
+  white-space: pre-wrap;
 }
 </style>

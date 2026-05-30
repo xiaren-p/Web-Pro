@@ -19,6 +19,7 @@ class AdUploadQueueSerializer(serializers.ModelSerializer):
     parse_status_label = serializers.SerializerMethodField()
     ad_type_label = serializers.SerializerMethodField()
     created_by_username = serializers.SerializerMethodField()
+    created_at_display = serializers.SerializerMethodField()
 
     class Meta:
         model = AdUploadQueue
@@ -35,7 +36,7 @@ class AdUploadQueueSerializer(serializers.ModelSerializer):
             "parse_status_label",
             "msg",
             "created_by_username",
-            "created_at",
+            "created_at_display",
         ]
         read_only_fields = fields
 
@@ -80,6 +81,23 @@ class AdUploadQueueSerializer(serializers.ModelSerializer):
         if obj.created_by_id is None:
             return ""
         return obj.created_by.username if obj.created_by else ""
+
+    def get_created_at_display(self, obj: AdUploadQueue) -> str:
+        """返回格式化后的创建时间字符串，前端直接展示，无需二次处理。
+
+        使用 Django 本地时区（settings.TIME_ZONE）格式化，精确到分钟。
+
+        Args:
+            obj (AdUploadQueue): 队列记录实例。
+
+        Returns:
+            str: 格式如 "2026-05-30 10:23"；created_at 为空时返回 ""。
+        """
+        from django.utils.timezone import localtime
+
+        if obj.created_at is None:
+            return ""
+        return localtime(obj.created_at).strftime("%Y-%m-%d %H:%M")
 
 
 class AdBulkDeleteSerializer(serializers.Serializer):

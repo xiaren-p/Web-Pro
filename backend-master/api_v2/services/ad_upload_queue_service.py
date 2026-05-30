@@ -455,16 +455,16 @@ def parse_and_create_queue(
 
 
 def bulk_delete_queue(ids: list[int], user: User | None) -> int:
-    """按 ID 列表批量删除队列记录。
+    """按 ID 列表批量删除队列记录，仅允许删除当前用户自己创建的记录。
 
     Args:
         ids (list[int]): 要删除的记录 ID 列表。
-        user (User | None): 当前操作用户（仅用于日志）。
+        user (User | None): 当前操作用户；同时用于隔离数据范围和日志。
 
     Returns:
         int: 实际删除的记录数。
     """
-    deleted_count, _ = AdUploadQueue.objects.filter(id__in=ids).delete()
+    deleted_count, _ = AdUploadQueue.objects.filter(id__in=ids, created_by=user).delete()
     logger.info(
         "[AdUploadQueueService][bulk_delete_queue] 批量删除完成: count=%s user=%s",
         deleted_count, user,

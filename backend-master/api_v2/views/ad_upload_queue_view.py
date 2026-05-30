@@ -123,14 +123,16 @@ def list_ad_queue(request: Request) -> Response:
     Query Params:
         page (int): 页码，默认 1。
         page_size (int): 每页条数，默认 20，最大 100。
-        parse_status (int): 0=失败 1=队列中 2=成功，不传则查全部。
+        parse_status (int): 0=失败 1=队列中 2=成功 3=异常，不传则查全部。
+        date_start (str): 创建时间起始日期，格式 YYYY-MM-DD，包含当天。
+        date_end (str): 创建时间截止日期，格式 YYYY-MM-DD，包含当天。
         shop (str): 按店铺名模糊过滤。
         country (str): 按国家精确过滤（DE/IT/FR/ES/UK）。
 
     Returns:
         Response: {"total": N, "page": N, "page_size": N, "list": [...]}
     """
-    qs = AdUploadQueue.objects.all()
+    qs = AdUploadQueue.objects.filter(created_by=request.user).select_related("created_by")
 
     parse_status_param = request.query_params.get("parse_status")
     if parse_status_param is not None:
@@ -138,6 +140,14 @@ def list_ad_queue(request: Request) -> Response:
             qs = qs.filter(parse_status=int(parse_status_param))
         except ValueError:
             pass
+
+    date_start_param = request.query_params.get("date_start")
+    if date_start_param:
+        qs = qs.filter(created_at__date__gte=date_start_param)
+
+    date_end_param = request.query_params.get("date_end")
+    if date_end_param:
+        qs = qs.filter(created_at__date__lte=date_end_param)
 
     shop_param = request.query_params.get("shop")
     if shop_param:
@@ -209,8 +219,10 @@ def retry_ad_queue(request: Request) -> Response:
 
     # FAILED 和 ANOMALY 均可重试；不清除已落库的 campaign_id / ad_group_id 等 ID，
     # 由 _submit_single 按"跳过已完成步骤"逻辑从断点续跑。
+    # 额外校验 created_by，防止越权操作他人记录。
     retried_count = AdUploadQueue.objects.filter(
         id__in=ids,
+        created_by=request.user,
         parse_status__in=[AdParseStatus.FAILED, AdParseStatus.ANOMALY],
     ).update(parse_status=AdParseStatus.PENDING, msg="队列中")
 
