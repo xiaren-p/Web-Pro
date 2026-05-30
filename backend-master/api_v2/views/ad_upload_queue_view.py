@@ -207,9 +207,11 @@ def retry_ad_queue(request: Request) -> Response:
         ids, request.user,
     )
 
+    # FAILED 和 ANOMALY 均可重试；不清除已落库的 campaign_id / ad_group_id 等 ID，
+    # 由 _submit_single 按"跳过已完成步骤"逻辑从断点续跑。
     retried_count = AdUploadQueue.objects.filter(
         id__in=ids,
-        parse_status=AdParseStatus.FAILED,
+        parse_status__in=[AdParseStatus.FAILED, AdParseStatus.ANOMALY],
     ).update(parse_status=AdParseStatus.PENDING, msg="队列中")
 
     return Response({"retried_count": retried_count})

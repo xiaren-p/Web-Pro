@@ -16,7 +16,7 @@ from api_v2.models.ad_upload_queue import AdUploadQueue
 from api_v2.services.ad_creation.ad_lx_client import (
     LX_ADS_API_URL,
     build_lx_headers,
-    parse_lx_result_error,
+    parse_lx_result,
     write_request_log,
 )
 
@@ -69,8 +69,10 @@ def create_campaign(
     queue: AdUploadQueue,
     profile_id: int,
     targeting_type: str,
-) -> tuple[str, str | None]:
+) -> tuple[str, str, str | None]:
     """向领星接口提交广告活动创建请求。
+
+    result 列表中可能包含多个条目；若部分失败视为「异常」，全部失败视为「失败」。
 
     Args:
         queue (AdUploadQueue): 当前队列记录，持有 campaign_name / daily_budget 等字段。
@@ -78,15 +80,16 @@ def create_campaign(
         targeting_type (str): "AUTO" 或 "MANUAL"。
 
     Returns:
-        tuple[str, str | None]:
-            - campaign_id: 成功时为接口返回的 campaignId，失败时为空字符串。
-            - error_msg: 失败时为错误描述；成功时为 None。
+        tuple[str, str, str | None]:
+            - campaign_id: 成功/异常时从首个成功结果中提取的 campaignId；失败时为空字符串。
+            - status: "SUCCESS" | "ANOMALY" | "FAILED"。
+            - details: ANOMALY/FAILED 时的描述；SUCCESS 时为 None。
     """
     form_data = build_campaign_form_data(
         profile_id=profile_id,
         campaign_name=queue.campaign_name,
         targeting_type=targeting_type,
-        daily_budget=float(queue.daily_budget),
+        daily_budget=float((queue.params or {}).get("daily_budget", 1.00)),
     )
     headers = build_lx_headers(profile_id)
 
@@ -114,22 +117,28 @@ def create_campaign(
             exc,
             exc_info=True,
         )
-        return "", str(exc)
+        return "", "FAILED", str(exc)
 
-    error_msg = parse_lx_result_error(resp_json)
-    if error_msg is not None:
+    status, details = parse_lx_result(resp_json)
+    if status == "FAILED":
         logger.warning(
             "[AdCampaignService] 广告活动创建失败: id=%s campaign=%s error=%s",
             queue.pk,
             queue.campaign_name,
-            error_msg,
+            details,
         )
-        return "", error_msg
+        return "", "FAILED", details
 
-    result_items: list[dict[str, Any]] = resp_json.get("result") or []
-    campaign_id: str = result_items[0].get("campaignId", "") if result_items else ""
+    # 从首个成功的 result 条目中提取 campaignId
+    campaign_id = ""
+    for item in (resp_json.get("result") or []):
+        if item.get("code") == "SUCCESS" and item.get("campaignId"):
+            campaign_id = str(item["campaignId"])
+            break
+
     logger.info(
-        "[AdCampaignService] 广告活动创建成功: id=%s campaignId=%s",
+        "[AdCampaignService] 广告活动创建%s: id=%s campaignId=%s",
+        "成功" if status == "SUCCESS" else "异常",
         queue.pk,
         campaign_id,
     )
@@ -140,4 +149,4 @@ def create_campaign(
         response_body=resp_json,
         purpose=f"创建广告活动: {queue.campaign_name}",
     )
-    return campaign_id, None
+    return campaign_id, status, details

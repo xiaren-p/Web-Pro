@@ -3,12 +3,13 @@
 职责：
   1. 查询 parse_status=PENDING 的队列记录。
   2. 通过 LxAdsProfile 按「店铺-国家」匹配 profile_id。
-  3. 调度第一步（创建广告活动）和第二步（创建广告组），按结果写入最终状态。
+  3. 调度第一步（创建广告活动）、第二步（创建广告组）、第三步（创建广告投放），按结果写入最终状态。
 
 HTTP 请求细节、请求体构造、响应解析分别由以下模块负责：
-  - api_v2.services.ad_lx_client        — 底层共享客户端工具
-  - api_v2.services.ad_campaign_service — 广告活动（Step 1）
-  - api_v2.services.ad_group_service    — 广告组（Step 2）
+  - api_v2.services.ad_lx_client           — 底层共享客户端工具
+  - api_v2.services.ad_campaign_service    — 广告活动（Step 1）
+  - api_v2.services.ad_group_service       — 广告组（Step 2）
+  - api_v2.services.ad_product_ad_service  — 广告投放（Step 3）
 """
 
 from __future__ import annotations
@@ -19,6 +20,8 @@ from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
 from api_v2.models.ad_upload_queue import AdParseStatus, AdUploadQueue
 from api_v2.services.ad_creation.ad_campaign_service import create_campaign
 from api_v2.services.ad_creation.ad_group_service import create_ad_group
+from api_v2.services.ad_creation.ad_keyword_service import create_keywords
+from api_v2.services.ad_creation.ad_product_ad_service import create_product_ads
 
 logger = logging.getLogger(__name__)
 
@@ -70,11 +73,13 @@ def _find_profile_id(shop: str, country: str) -> int | None:
 
 
 def _submit_single(queue: AdUploadQueue) -> None:
-    """处理单条队列记录的完整两阶段提交流程。
+    """处理单条队列记录的完整三阶段提交流程。
 
-    第一步：调用 create_campaign 创建广告活动，成功后获取 campaignId。
-    第二步：调用 create_ad_group 创建广告组，AUTO 广告同步提交四种自动定向竞价。
-    任一步骤失败均将 parse_status 置为 FAILED 并写入错误描述。
+    状态流转规则：
+    - 任一步骤「全部失败」→ parse_status=FAILED，写入 msg，立即停止后续步骤。
+    - 步骤「部分成功」→ parse_status=ANOMALY，积累异常说明，继续下一步骤。
+    - 每步执行完毕立即将关键 ID（campaign_id / ad_group_id / product_ad_ids）落库，
+      方便前端在重试时跳过已完成步骤。
 
     Args:
         queue (AdUploadQueue): 待提交的队列记录实例。
@@ -87,25 +92,105 @@ def _submit_single(queue: AdUploadQueue) -> None:
         return
 
     targeting_type = _extract_targeting_type(queue.campaign_name)
+    anomaly_parts: list[str] = []
 
-    # ── 第一步：创建广告活动 ─────────────────────────────────────────────────────
-    campaign_id, campaign_error = create_campaign(queue, profile_id, targeting_type)
-    if campaign_error:
-        queue.parse_status = AdParseStatus.FAILED
-        queue.msg = campaign_error
-        queue.save(update_fields=["parse_status", "msg"])
-        return
+    # ── 第一步：创建广告活动（已有 campaign_id 时跳过）──────────────────────────
+    if queue.step_ids.get("campaign_id"):
+        campaign_id = queue.step_ids["campaign_id"]
+        logger.info(
+            "[AdCampaignSubmitService] Step1 已完成，跳过: campaign_id=%s id=%s",
+            campaign_id, queue.pk,
+        )
+    else:
+        campaign_id, step1_status, step1_detail = create_campaign(queue, profile_id, targeting_type)
+        if step1_status == "FAILED":
+            queue.parse_status = AdParseStatus.FAILED
+            queue.msg = step1_detail or "广告活动创建失败"
+            queue.save(update_fields=["parse_status", "msg"])
+            return
 
-    # ── 第二步：创建广告组 ───────────────────────────────────────────────────────
-    ag_error = create_ad_group(queue, profile_id, campaign_id, targeting_type)
-    if ag_error:
-        queue.parse_status = AdParseStatus.FAILED
-        queue.msg = f"广告活动已创建（{campaign_id}），广告组创建失败：{ag_error}"
-        queue.save(update_fields=["parse_status", "msg"])
-        return
+        queue.step_ids = {**queue.step_ids, "campaign_id": campaign_id}
+        queue.save(update_fields=["step_ids"])
+        if step1_status == "ANOMALY" and step1_detail:
+            anomaly_parts.append(f"[广告活动] {step1_detail}")
 
-    queue.parse_status = AdParseStatus.SUCCESS
-    queue.msg = "成功"
+    # ── 第二步：创建广告组（已有 ad_group_id 时跳过）───────────────────────────
+    if queue.step_ids.get("ad_group_id"):
+        ad_group_id = queue.step_ids["ad_group_id"]
+        logger.info(
+            "[AdCampaignSubmitService] Step2 已完成，跳过: ad_group_id=%s id=%s",
+            ad_group_id, queue.pk,
+        )
+    else:
+        ad_group_id, step2_status, step2_detail = create_ad_group(
+            queue, profile_id, campaign_id, targeting_type
+        )
+        if step2_status == "FAILED":
+            queue.parse_status = AdParseStatus.FAILED
+            queue.msg = f"广告活动已创建（{campaign_id}），广告组创建失败：{step2_detail}"
+            queue.save(update_fields=["parse_status", "msg"])
+            return
+
+        queue.step_ids = {**queue.step_ids, "ad_group_id": ad_group_id}
+        queue.save(update_fields=["step_ids"])
+        if step2_status == "ANOMALY" and step2_detail:
+            anomaly_parts.append(f"[广告组] {step2_detail}")
+
+    # ── 第三步：创建广告投放（已有 product_ad_ids 时跳过）───────────────────────
+    if queue.step_ids.get("product_ad_ids"):
+        product_ad_ids = queue.step_ids["product_ad_ids"]
+        logger.info(
+            "[AdCampaignSubmitService] Step3 已完成，跳过: product_ad_ids=%s id=%s",
+            product_ad_ids, queue.pk,
+        )
+    else:
+        product_ad_ids, step3_status, step3_detail = create_product_ads(
+            queue, profile_id, campaign_id, ad_group_id
+        )
+        if step3_status == "FAILED":
+            queue.parse_status = AdParseStatus.FAILED
+            queue.msg = (
+                f"广告活动已创建（{campaign_id}）、广告组已创建（{ad_group_id}），广告投放创建失败：{step3_detail}"
+            )
+            queue.save(update_fields=["parse_status", "msg"])
+            return
+
+        queue.step_ids = {**queue.step_ids, "product_ad_ids": product_ad_ids}
+        queue.save(update_fields=["step_ids"])
+        if step3_status == "ANOMALY" and step3_detail:
+            anomaly_parts.append(f"[广告投放] {step3_detail}")
+
+    # ── 第四步：创建关键词（仅 MANUAL；已有 keyword_ids 时跳过）────────────────
+    if targeting_type == "MANUAL":
+        if queue.step_ids.get("keyword_ids"):
+            logger.info(
+                "[AdCampaignSubmitService] Step4 已完成，跳过: keyword_ids=%s id=%s",
+                queue.step_ids["keyword_ids"], queue.pk,
+            )
+        else:
+            keyword_ids, step4_status, step4_detail = create_keywords(
+                queue, profile_id, campaign_id, ad_group_id
+            )
+            if step4_status == "FAILED":
+                queue.parse_status = AdParseStatus.FAILED
+                queue.msg = (
+                    f"广告活动已创建（{campaign_id}）、广告组已创建（{ad_group_id}）、广告投放已创建，关键词创建失败：{step4_detail}"
+                )
+                queue.save(update_fields=["parse_status", "msg"])
+                return
+
+            queue.step_ids = {**queue.step_ids, "keyword_ids": keyword_ids}
+            queue.save(update_fields=["step_ids"])
+            if step4_status == "ANOMALY" and step4_detail:
+                anomaly_parts.append(f"[关键词] {step4_detail}")
+
+    # ── 最终状态 ─────────────────────────────────────────────────────────────────
+    if anomaly_parts:
+        queue.parse_status = AdParseStatus.ANOMALY
+        queue.msg = "；".join(anomaly_parts)
+    else:
+        queue.parse_status = AdParseStatus.SUCCESS
+        queue.msg = "成功"
     queue.save(update_fields=["parse_status", "msg"])
 
 
@@ -129,12 +214,15 @@ def process_pending_campaigns() -> dict[str, int]:
     logger.info("[AdCampaignSubmitService] 开始批量提交，共 %s 条。", total)
 
     submitted = 0
+    anomaly = 0
     failed = 0
     for queue in pending_qs.iterator():
         try:
             _submit_single(queue)
             if queue.parse_status == AdParseStatus.SUCCESS:
                 submitted += 1
+            elif queue.parse_status == AdParseStatus.ANOMALY:
+                anomaly += 1
             else:
                 failed += 1
         except Exception as exc:
@@ -147,9 +235,10 @@ def process_pending_campaigns() -> dict[str, int]:
             )
 
     logger.info(
-        "[AdCampaignSubmitService] 批量提交完成: total=%s submitted=%s failed=%s",
+        "[AdCampaignSubmitService] 批量提交完成: total=%s submitted=%s anomaly=%s failed=%s",
         total,
         submitted,
+        anomaly,
         failed,
     )
-    return {"total": total, "submitted": submitted, "failed": failed}
+    return {"total": total, "submitted": submitted, "anomaly": anomaly, "failed": failed}

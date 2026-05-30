@@ -29,17 +29,11 @@ class AdUploadQueueSerializer(serializers.ModelSerializer):
             "country",
             "ad_type",
             "ad_type_label",
-            "skus",
-            "keywords",
+            "params",
+            "step_ids",
             "parse_status",
             "parse_status_label",
             "msg",
-            "daily_budget",
-            "default_bid",
-            "close_match_bid",
-            "loose_match_bid",
-            "substitutes_bid",
-            "complements_bid",
             "created_by_username",
             "created_at",
         ]
@@ -59,6 +53,7 @@ class AdUploadQueueSerializer(serializers.ModelSerializer):
             AdParseStatus.PENDING: "队列中",
             AdParseStatus.SUCCESS: "成功",
             AdParseStatus.FAILED: "失败",
+            AdParseStatus.ANOMALY: "异常",
         }
         return label_map.get(obj.parse_status, "未知")
 

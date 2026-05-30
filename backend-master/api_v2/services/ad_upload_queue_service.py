@@ -40,6 +40,16 @@ _SITE_NAME_RE = re.compile(r"^[A-Z]{2}$")
 # 广告类型推断：广告活动名末尾 token 决定投放类型（AUTO → 自动投放，MANU → 手动投放）
 _AD_TYPE_MAP: dict[str, str] = {"AUTO": "auto", "MANU": "manual"}
 
+# 竞价参数各字段默认値（与 AdUploadQueue.params 结构对齐）
+_BIDDING_DEFAULTS: dict[str, float] = {
+    "daily_budget": 1.00,
+    "default_bid": 0.12,
+    "close_match_bid": 0.12,
+    "loose_match_bid": 0.10,
+    "substitutes_bid": 0.10,
+    "complements_bid": 0.10,
+}
+
 _SHOP_RE = re.compile(r"^[a-zA-Z0-9]+$")
 _AD_NAME_RE = re.compile(
     r"^[a-zA-Z0-9+]+(?:-[a-zA-Z0-9+]+)*(?:\s+[a-zA-Z0-9+]+(?:-[a-zA-Z0-9+]+)*)*$"
@@ -48,6 +58,26 @@ _SKU_RE = re.compile(r"^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$")
 
 
 # ── 内部解析辅助函数 ────────────────────────────────────────────────────────────
+
+def _build_params(skus: list[str], keywords: list[str], bp: dict[str, float]) -> dict:
+    """构造广告队列记录的 params 字段完整内容。
+
+    将 skus、keywords 与各竞价字段封装为单一字典，bp 缺键时取各字段默认値。
+
+    Args:
+        skus (list[str]): SKU 列表。
+        keywords (list[str]): 关键词列表。
+        bp (dict[str, float]): 竞价参数，键名与 _BIDDING_DEFAULTS 一致。
+
+    Returns:
+        dict: params 字段的完整内容。
+    """
+    return {
+        "skus": skus,
+        "keywords": keywords,
+        **{k: bp.get(k, default) for k, default in _BIDDING_DEFAULTS.items()},
+    }
+
 
 def _infer_ad_type(ad_name: str) -> str:
     """根据广告活动名称末尾 token 推断广告类型。
@@ -305,12 +335,10 @@ def _do_parse_and_create(
                                 shop=str(shop),
                                 country=site,
                                 ad_type=ad_type,
-                                skus=[],
-                                keywords=[],
+                                params=_build_params([], [], bp),
                                 parse_status=AdParseStatus.FAILED,
                                 msg=error_msg,
                                 created_by=user,
-                                **{k: v for k, v in bp.items()},
                             )
                         )
                 continue
@@ -332,12 +360,10 @@ def _do_parse_and_create(
                                 shop=str(shop),
                                 country=site,
                                 ad_type=ad_type,
-                                skus=[],
-                                keywords=[],
+                                params=_build_params([], [], bp),
                                 parse_status=AdParseStatus.FAILED,
                                 msg=f"店铺不存在（{shop_site_key}）",
                                 created_by=user,
-                                **{k: v for k, v in bp.items()},
                             )
                         )
                         continue
@@ -358,12 +384,10 @@ def _do_parse_and_create(
                             shop=str(shop),
                             country=site,
                             ad_type=ad_type,
-                            skus=skus,
-                            keywords=keywords,
+                            params=_build_params(skus, keywords, bp),
                             parse_status=AdParseStatus.PENDING,
                             msg="队列中",
                             created_by=user,
-                            **{k: v for k, v in bp.items()},
                         )
                     )
 

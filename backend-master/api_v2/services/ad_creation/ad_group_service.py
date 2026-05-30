@@ -16,7 +16,7 @@ from api_v2.models.ad_upload_queue import AdUploadQueue
 from api_v2.services.ad_creation.ad_lx_client import (
     LX_ADS_API_URL,
     build_lx_headers,
-    parse_lx_result_error,
+    parse_lx_result,
     write_request_log,
 )
 
@@ -120,10 +120,12 @@ def create_ad_group(
     profile_id: int,
     campaign_id: str,
     targeting_type: str,
-) -> str | None:
+) -> tuple[str, str, str | None]:
     """向领星接口提交广告组创建请求。
 
     AUTO 广告同步提交四个 auto_targets（紧密匹配、同类匹配、宽泛匹配、关联匹配）。
+    result 列表中可能包含多个条目（adGroup + 各 auto_target）；
+    部分失败视为「异常」，全部失败视为「失败」，均不影响 adGroupId 提取。
     广告组名称自动取当天日期（DD/MM/YYYY）。
 
     Args:
@@ -133,17 +135,21 @@ def create_ad_group(
         targeting_type (str): "AUTO" 或 "MANUAL"。
 
     Returns:
-        str | None: 失败时返回错误描述；成功返回 None。
+        tuple[str, str, str | None]:
+            - ad_group_id: 成功/异常时从首个成功结果中提取的 adGroupId；失败时为空字符串。
+            - status: "SUCCESS" | "ANOMALY" | "FAILED"。
+            - details: ANOMALY/FAILED 时的描述；SUCCESS 时为 None。
     """
+    _p = queue.params or {}
     form_data = build_ad_group_form_data(
         profile_id=profile_id,
         campaign_id=campaign_id,
         targeting_type=targeting_type,
-        default_bid=float(queue.default_bid),
-        close_match_bid=float(queue.close_match_bid),
-        loose_match_bid=float(queue.loose_match_bid),
-        substitutes_bid=float(queue.substitutes_bid),
-        complements_bid=float(queue.complements_bid),
+        default_bid=float(_p.get("default_bid", 0.12)),
+        close_match_bid=float(_p.get("close_match_bid", 0.12)),
+        loose_match_bid=float(_p.get("loose_match_bid", 0.10)),
+        substitutes_bid=float(_p.get("substitutes_bid", 0.10)),
+        complements_bid=float(_p.get("complements_bid", 0.10)),
     )
     headers = build_ad_group_headers(profile_id, campaign_id, targeting_type)
 
@@ -171,28 +177,37 @@ def create_ad_group(
             exc,
             exc_info=True,
         )
-        return str(exc)
+        return "", "FAILED", str(exc)
 
-    error_msg = parse_lx_result_error(resp_json)
-    if error_msg is None:
-        logger.info(
-            "[AdGroupService] 广告组创建成功: id=%s campaignId=%s",
+    status, details = parse_lx_result(resp_json)
+    if status == "FAILED":
+        logger.warning(
+            "[AdGroupService] 广告组创建失败: id=%s campaignId=%s error=%s",
             queue.pk,
             campaign_id,
+            details,
         )
-        write_request_log(
-            url=LX_ADS_API_URL,
-            headers=headers,
-            params=form_data,
-            response_body=resp_json,
-            purpose=f"创建广告组: campaignId={campaign_id} targeting={targeting_type}",
-        )
-        return None
+        return "", "FAILED", details
 
-    logger.warning(
-        "[AdGroupService] 广告组创建失败: id=%s campaignId=%s error=%s",
+    # 从首个成功的 result 条目中提取 adGroupId
+    ad_group_id = ""
+    for item in (resp_json.get("result") or []):
+        if item.get("code") == "SUCCESS" and item.get("adGroupId"):
+            ad_group_id = str(item["adGroupId"])
+            break
+
+    logger.info(
+        "[AdGroupService] 广告组创建%s: id=%s campaignId=%s adGroupId=%s",
+        "成功" if status == "SUCCESS" else "异常",
         queue.pk,
         campaign_id,
-        error_msg,
+        ad_group_id,
     )
-    return error_msg
+    write_request_log(
+        url=LX_ADS_API_URL,
+        headers=headers,
+        params=form_data,
+        response_body=resp_json,
+        purpose=f"创建广告组: campaignId={campaign_id} targeting={targeting_type}",
+    )
+    return ad_group_id, status, details

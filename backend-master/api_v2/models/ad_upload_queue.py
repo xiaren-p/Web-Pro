@@ -1,6 +1,26 @@
 """广告活动上传队列记录表（api_v2_ad_upload_queue）。
 
 由 xlsx 文件解析后，按（广告活动 × 国家）粒度拆分落库，每条记录对应一个站点的独立队列项。
+
+params 字段结构：
+    {
+        "skus": ["SKU-001", ...],
+        "keywords": ["keyword1", ...],
+        "daily_budget": 1.00,
+        "default_bid": 0.12,
+        "close_match_bid": 0.12,
+        "loose_match_bid": 0.10,
+        "substitutes_bid": 0.10,
+        "complements_bid": 0.10
+    }
+
+step_ids 字段结构（各步骤提交成功后逐步填入）：
+    {
+        "campaign_id": "",
+        "ad_group_id": "",
+        "product_ad_ids": [],
+        "keyword_ids": []
+    }
 """
 
 from django.contrib.auth.models import User
@@ -13,6 +33,31 @@ class AdParseStatus(models.IntegerChoices):
     FAILED = 0, "失败"
     PENDING = 1, "队列中"
     SUCCESS = 2, "成功"
+    ANOMALY = 3, "异常"
+
+
+def _default_params() -> dict:
+    """广告参数字段默认值工厂。"""
+    return {
+        "skus": [],
+        "keywords": [],
+        "daily_budget": 1.00,
+        "default_bid": 0.12,
+        "close_match_bid": 0.12,
+        "loose_match_bid": 0.10,
+        "substitutes_bid": 0.10,
+        "complements_bid": 0.10,
+    }
+
+
+def _default_step_ids() -> dict:
+    """步骤产出 ID 字段默认值工厂。"""
+    return {
+        "campaign_id": "",
+        "ad_group_id": "",
+        "product_ad_ids": [],
+        "keyword_ids": [],
+    }
 
 
 class AdUploadQueue(models.Model):
@@ -44,14 +89,14 @@ class AdUploadQueue(models.Model):
         verbose_name="广告类型",
     )
 
-    skus = models.JSONField(
-        default=list,
-        verbose_name="SKU 列表",
+    params = models.JSONField(
+        default=_default_params,
+        verbose_name="广告参数",
     )
 
-    keywords = models.JSONField(
-        default=list,
-        verbose_name="关键词列表",
+    step_ids = models.JSONField(
+        default=_default_step_ids,
+        verbose_name="步骤产出 ID",
     )
 
     parse_status = models.IntegerField(
@@ -64,48 +109,6 @@ class AdUploadQueue(models.Model):
     msg = models.TextField(
         default="成功",
         verbose_name="状态消息",
-    )
-
-    daily_budget = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=1.00,
-        verbose_name="每日预算",
-    )
-
-    default_bid = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0.12,
-        verbose_name="广告组默认竞价",
-    )
-
-    close_match_bid = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0.12,
-        verbose_name="紧密匹配竞价",
-    )
-
-    loose_match_bid = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0.10,
-        verbose_name="同类匹配竞价",
-    )
-
-    substitutes_bid = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0.10,
-        verbose_name="宽泛匹配竞价",
-    )
-
-    complements_bid = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0.10,
-        verbose_name="关联匹配竞价",
     )
 
     created_at = models.DateTimeField(

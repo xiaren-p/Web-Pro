@@ -84,41 +84,59 @@ def build_lx_headers(
     return headers
 
 
-def parse_lx_result_error(resp_json: dict[str, Any]) -> str | None:
-    """从领星接口响应中提取业务级错误描述。
+def parse_lx_result(resp_json: dict[str, Any]) -> tuple[str, str | None]:
+    """解析领星接口响应，将结果分类为成功 / 异常 / 失败三档。
 
-    判断规则：
-    1. 顶层 code != 200 → 服务端拒绝，提取 message 作为错误描述。
-    2. code == 200 且 result[] 含 code 以 "Error" 结尾的条目 → 业务失败；
-       中文描述优先从 entityAndReason[].descriptionCn 提取，回退到 result[].description。
-    3. code == 200 且无任何错误条目 → 成功，返回 None。
+    分类规则：
+    1. 顶层 code != 200 → "FAILED"（服务端错误）。
+    2. 全部 result[].code == "SUCCESS" 且 entityAndReason 为空 → "SUCCESS"。
+    3. 部分 result[].code == "SUCCESS"，其余失败 → "ANOMALY"（部分成功，不中止后续步骤）。
+    4. 无任何 result[].code == "SUCCESS" → "FAILED"。
+
+    错误/异常描述优先从 entityAndReason 拼合（entityName + descriptionCn/description），
+    兜底取首个失败 result 条目的 description 或 code。
 
     Args:
         resp_json (dict[str, Any]): 接口原始响应字典。
 
     Returns:
-        str | None: 失败时返回错误描述；成功返回 None。
+        tuple[str, str | None]:
+            - status: "SUCCESS" | "ANOMALY" | "FAILED"。
+            - details: ANOMALY/FAILED 时的描述文本；SUCCESS 时为 None。
     """
     top_code = resp_json.get("code")
     if top_code != 200:
-        return resp_json.get("message") or f"接口返回错误码 {top_code}"
+        msg = resp_json.get("message") or f"接口返回错误码 {top_code}"
+        return "FAILED", msg
 
     result: list[dict[str, Any]] = resp_json.get("result") or []
-    error_items = [
-        item for item in result
-        if str(item.get("code", "")).lower().endswith("error")
-    ]
-    if not error_items:
-        return None
-
     entity_reasons: list[dict[str, Any]] = resp_json.get("entityAndReason") or []
-    cn_desc = next(
-        (e.get("descriptionCn") for e in entity_reasons if e.get("descriptionCn")),
-        None,
-    )
-    if cn_desc:
-        return cn_desc
-    return error_items[0].get("description") or "未知错误"
+
+    succeeded = [r for r in result if r.get("code") == "SUCCESS"]
+    failed = [r for r in result if r.get("code") != "SUCCESS"]
+
+    # 全部成功且无异常条目 → 成功
+    if not failed and not entity_reasons:
+        return "SUCCESS", None
+
+    # 构造错误/异常描述
+    if entity_reasons:
+        parts: list[str] = []
+        for er in entity_reasons:
+            name: str = er.get("entityName") or ""
+            desc: str = er.get("descriptionCn") or er.get("description") or ""
+            parts.append(f"{name}: {desc}" if name else desc)
+        details: str = "；".join(p for p in parts if p) or "部分操作异常"
+    elif failed:
+        first = failed[0]
+        details = first.get("description") or first.get("code") or "未知错误"
+    else:
+        details = "部分操作失败"
+
+    # 有成功条目 → 异常（部分成功）；无成功条目 → 完全失败
+    if succeeded:
+        return "ANOMALY", details
+    return "FAILED", details
 
 
 def write_request_log(
@@ -127,6 +145,7 @@ def write_request_log(
     params: dict[str, Any],
     response_body: dict[str, Any],
     purpose: str,
+    param_type: str = ParamType.FORM,
 ) -> None:
     """将对外 HTTP 请求记录写入 ApiRequestLog 日志表。
 
@@ -135,15 +154,16 @@ def write_request_log(
     Args:
         url (str): 请求 URL。
         headers (dict[str, str]): 实际发送的请求头。
-        params (dict[str, Any]): 请求传参（form-encoded 字典）。
+        params (dict[str, Any]): 请求传参（form 字典或 JSON 对象）。
         response_body (dict[str, Any]): 接口响应内容。
         purpose (str): 本次请求的作用描述。
+        param_type (str): 传参方式，默认为 ParamType.FORM；传入 ParamType.JSON 适用于 JSON 体请求。
     """
     try:
         ApiRequestLog.objects.create(
             url=url,
             method=HttpMethod.POST,
-            param_type=ParamType.FORM,
+            param_type=param_type,
             request_headers=headers,
             request_params=params,
             response_body=response_body,
