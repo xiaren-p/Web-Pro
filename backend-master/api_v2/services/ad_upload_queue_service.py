@@ -32,6 +32,7 @@ _COL_AD_NAME: str = "广告活动名称"
 _COL_SKU: str = "SKU"
 _REQUIRED_COLS: tuple[str, ...] = (_COL_SHOP, _COL_AD_NAME, _COL_SKU)
 _KEYWORD_HEADER: str = "关键词"
+_MONTHLY_VOL_HEADER: str = "月搜索量"
 _START_PREFIX: str = "START "
 _END_TOKEN: str = "END"
 # 子表名合规性校验：仅接受标准两位大写国家代码（如 DE / UK / US），超出范围的子表直接跳过。
@@ -59,14 +60,15 @@ _SKU_RE = re.compile(r"^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$")
 
 # ── 内部解析辅助函数 ────────────────────────────────────────────────────────────
 
-def _build_params(skus: list[str], keywords: list[str], bp: dict[str, float]) -> dict:
+def _build_params(skus: list[str], keywords: list[dict], bp: dict[str, float]) -> dict:
     """构造广告队列记录的 params 字段完整内容。
 
     将 skus、keywords 与各竞价字段封装为单一字典，bp 缺键时取各字段默认値。
 
     Args:
         skus (list[str]): SKU 列表。
-        keywords (list[str]): 关键词列表。
+        keywords (list[dict]): 关键词列表，每个元素格式为
+            {"keyword": str, "monthly_search_volume": int}。
         bp (dict[str, float]): 竞价参数，键名与 _BIDDING_DEFAULTS 一致。
 
     Returns:
@@ -94,8 +96,24 @@ def _infer_ad_type(ad_name: str) -> str:
     return _AD_TYPE_MAP.get(last_token, "auto")
 
 
+def _find_col_index(row: pd.Series, header: str) -> int:
+    """在候选表头行中查找指定列名的索引。
+
+    Args:
+        row (pd.Series): 当前候选表头行。
+        header (str): 要找的列名（完全匹配）。
+
+    Returns:
+        int: 命中时返回 0-based 列索引；未命中返回 -1。
+    """
+    for col_idx, val in enumerate(row):
+        if str(val).strip() == header:
+            return col_idx
+    return -1
+
+
 def _find_keyword_col_index(row: pd.Series) -> int:
-    """在候选表头行中查找"关键词"列的索引。
+    """在候选表头行中查找"关键词"列的索引（尝试 _find_col_index 的快捷包装）。
 
     Args:
         row (pd.Series): 当前候选表头行。
@@ -103,26 +121,30 @@ def _find_keyword_col_index(row: pd.Series) -> int:
     Returns:
         int: 命中时返回 0-based 列索引；未命中返回 -1。
     """
-    for col_idx, val in enumerate(row):
-        if str(val).strip() == _KEYWORD_HEADER:
-            return col_idx
-    return -1
+    return _find_col_index(row, _KEYWORD_HEADER)
 
 
-def _parse_site_sheet(df: pd.DataFrame) -> dict[str, list[str]]:
+def _parse_site_sheet(df: pd.DataFrame) -> dict[str, list[dict]]:
     """解析单个站点 sheet，提取"广告活动名 → 关键词列表"映射。
 
     使用状态机识别 START <广告名> → 表头 → 数据行 → END 块结构。
+    表头行需包含"关键词"列；"月搜索量"列可选，缺失时默认为 0。
 
     Args:
         df (pd.DataFrame): 已用 header=None 读出的整张站点 sheet。
 
     Returns:
-        dict[str, list[str]]: {"广告活动名": ["关键词1", ...]}。
+        dict[str, list[dict]]: {
+            "广告活动名": [
+                {"keyword": "关键词文本", "monthly_search_volume": 12000},
+                ...
+            ]
+        }。
     """
-    keywords_map: dict[str, list[str]] = {}
+    keywords_map: dict[str, list[dict]] = {}
     current_ad_name: str = ""
     keyword_col_index: int = -1
+    monthly_vol_col_index: int = -1
     state: str = "searching"
 
     for _, row in df.iterrows():
@@ -137,6 +159,7 @@ def _parse_site_sheet(df: pd.DataFrame) -> dict[str, list[str]]:
 
         if state == "reading_header":
             keyword_col_index = _find_keyword_col_index(row)
+            monthly_vol_col_index = _find_col_index(row, _MONTHLY_VOL_HEADER)
             state = "reading_data" if keyword_col_index >= 0 else "searching"
             continue
 
@@ -145,12 +168,25 @@ def _parse_site_sheet(df: pd.DataFrame) -> dict[str, list[str]]:
             state = "searching"
             current_ad_name = ""
             keyword_col_index = -1
+            monthly_vol_col_index = -1
             continue
 
         if 0 <= keyword_col_index < len(row):
             kw = row[keyword_col_index]
             if pd.notna(kw):
-                keywords_map[current_ad_name].append(str(kw).strip())
+                # 提取月搜索量；列不存在或内容缺失时默认为 0
+                monthly_vol: int = 0
+                if 0 <= monthly_vol_col_index < len(row):
+                    raw_vol = row[monthly_vol_col_index]
+                    if pd.notna(raw_vol):
+                        try:
+                            monthly_vol = int(float(raw_vol))
+                        except (ValueError, TypeError):
+                            monthly_vol = 0
+                keywords_map[current_ad_name].append({
+                    "keyword": str(kw).strip(),
+                    "monthly_search_volume": monthly_vol,
+                })
 
     return keywords_map
 
@@ -165,9 +201,17 @@ def _read_site_keywords(file_path: str) -> dict[str, dict[str, list[str]]]:
         file_path (str): xlsx 文件绝对路径。
 
     Returns:
-        dict[str, dict[str, list[str]]]: {"DE": {"广告活动名": ["kw1", ...]}, ...}
+        dict[str, dict[str, list[dict]]]: {
+            "DE": {
+                "广告活动名": [
+                    {"keyword": "iphone case", "monthly_search_volume": 12000},
+                    ...
+                ]
+            },
+            ...
+        }
     """
-    result: dict[str, dict[str, list[str]]] = {}
+    result: dict[str, dict[str, list[dict]]] = {}
     try:
         xls = pd.ExcelFile(file_path, engine="openpyxl")
         sheet_names = xls.sheet_names
@@ -369,7 +413,7 @@ def _do_parse_and_create(
                         continue
 
                     # 关键词按原始广告活动名（不含后缀）在站点子表中查找
-                    keywords: list[str] = site_keywords.get(site, {}).get(str(ad_name), [])
+                    keywords: list[dict] = site_keywords.get(site, {}).get(str(ad_name), [])
                     # 手动广告无关键词：跳过且记录提示
                     if ad_type == "manual" and not keywords:
                         skipped_warnings.append(

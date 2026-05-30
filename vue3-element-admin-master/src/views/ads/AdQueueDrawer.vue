@@ -228,9 +228,9 @@ function getDefaultDateRange(): [string, string] {
  * 根据 parse_status 值返回对应的 el-tag type。
  *
  * @param {number} status - 状态值（0=失败 1=队列中 2=成功 3=异常）
- * @returns {string} Element Plus tag 类型字符串
+ * @returns {"primary" | "success" | "warning" | "info" | "danger"} Element Plus tag 类型
  */
-function statusTagType(status: number): string {
+function statusTagType(status: number): "primary" | "success" | "warning" | "info" | "danger" {
   if (status === 2) return "success";
   if (status === 1) return "primary";
   if (status === 3) return "warning";

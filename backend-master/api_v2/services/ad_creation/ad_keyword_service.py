@@ -49,16 +49,35 @@ def build_keyword_json_payload(
     """
     ad_group_id_int = int(ad_group_id)
 
-    keyword_list: list[dict[str, Any]] = [
-        {
+
+    def is_single_word(text: str) -> bool:
+        """判断是否为单个单词（仅字母/数字/下划线/不含空格和标点）。"""
+        import re
+        return bool(re.fullmatch(r"[\w-]+", text))
+
+    keyword_list: list[dict[str, Any]] = []
+    for kw in keywords:
+        # 支持 kw 为 str 或 dict
+        if isinstance(kw, dict):
+            text = kw.get("keyword", "")
+            monthly_search_volume = kw.get("monthly_search_volume", 0)
+        else:
+            text = str(kw)
+            monthly_search_volume = 0
+
+        # 匹配规则：单个单词或月搜索量>10000为exact，否则broad
+        if is_single_word(text) or (isinstance(monthly_search_volume, (int, float)) and monthly_search_volume > 10000):
+            match_type = "exact"
+        else:
+            match_type = "broad"
+
+        keyword_list.append({
             "campaignId": campaign_id,
             "adGroupId": ad_group_id_int,
             "state": "enabled",
-            "matchType": "broad",
-            "keywordText": kw,
-        }
-        for kw in keywords
-    ]
+            "matchType": match_type,
+            "keywordText": text,
+        })
 
     inner_param: dict[str, Any] = {
         "_token": "",
@@ -134,7 +153,15 @@ def create_keywords(
             - status: "SUCCESS" | "ANOMALY" | "FAILED"。
             - details: ANOMALY/FAILED 时的描述；SUCCESS 时为 None。
     """
-    keywords: list[str] = (queue.params or {}).get("keywords") or []
+    raw_keywords: list = (queue.params or {}).get("keywords") or []
+    # 居容旧格式（list[str]）与新格式（list[{keyword, monthly_search_volume}]）两种写入
+    keywords: list[str] = [
+        entry["keyword"] if isinstance(entry, dict) else str(entry)
+        for entry in raw_keywords
+        if (isinstance(entry, dict) and entry.get("keyword")) or (
+            not isinstance(entry, dict) and entry
+        )
+    ]
     if not keywords:
         logger.warning(
             "[AdKeywordService] 关键词列表为空，跳过关键词提交步骤: id=%s", queue.pk

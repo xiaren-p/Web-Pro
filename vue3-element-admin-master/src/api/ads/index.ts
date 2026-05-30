@@ -246,10 +246,16 @@ export function getNegativeKeywords(data: NegativeKeywordParams): Promise<Negati
 
 import { requestV2 } from "@/utils/request";
 
+/** 关键词条目：文本 + 月搜索量 */
+export interface AdKeyword {
+  keyword: string;
+  monthly_search_volume: number;
+}
+
 /** 广告参数（由 xlsx 解析时写入，提交后只读） */
 export interface AdQueueParams {
   skus: string[];
-  keywords: string[];
+  keywords: AdKeyword[];
   daily_budget: number;
   default_bid: number;
   close_match_bid: number;

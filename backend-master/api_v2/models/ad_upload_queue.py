@@ -5,7 +5,10 @@
 params 字段结构：
     {
         "skus": ["SKU-001", ...],
-        "keywords": ["keyword1", ...],
+        "keywords": [
+            {"keyword": "iphone case", "monthly_search_volume": 12000},
+            ...
+        ],
         "daily_budget": 1.00,
         "default_bid": 0.12,
         "close_match_bid": 0.12,
