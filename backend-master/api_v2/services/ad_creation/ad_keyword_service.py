@@ -237,7 +237,65 @@ def create_keywords(
         )
         return [], "FAILED", str(exc), []
 
-    status, details = parse_lx_result(resp_json)
+    # ── 幂等处理："关键词已存在"视为已完成，不阻塞流程 ─────────────────────────────
+    # 领星 API 对重复关键词返回"关键词已存在"，业务语义上等同于幂等成功。
+    # 需从 entityAndReason 和 result[] 两处同时识别，避免 parse_lx_result 误判为失败。
+    raw_entity_reasons: list[dict] = resp_json.get("entityAndReason") or []
+    raw_result_items: list[dict] = resp_json.get("result") or []
+
+    # 1. 从 entityAndReason 收集"已存在"的关键词文本
+    already_exists_texts: set[str] = {
+        er["entityName"]
+        for er in raw_entity_reasons
+        if er.get("entityName")
+        and "已存在" in (er.get("descriptionCn") or er.get("description") or "")
+    }
+
+    # 2. 从 result[] 按索引对齐补充（部分接口仅在 result 条目中描述错误）
+    for i, item in enumerate(raw_result_items):
+        desc = item.get("description") or item.get("descriptionCn") or ""
+        if "已存在" in desc and i < len(keywords):
+            already_exists_texts.add(keywords[i])
+
+    # 3. 构造过滤"已存在"后的虚拟响应，用于 parse_lx_result 状态判断
+    if already_exists_texts:
+        filtered_entity_reasons = [
+            er for er in raw_entity_reasons
+            if not (
+                er.get("entityName") in already_exists_texts
+                and "已存在" in (er.get("descriptionCn") or er.get("description") or "")
+            )
+        ]
+        # 将"已存在"对应的 result 条目替换为虚拟 SUCCESS 占位（无 keywordId）
+        filtered_results = [
+            (
+                {"code": "SUCCESS"}
+                if (
+                    i < len(keywords)
+                    and keywords[i] in already_exists_texts
+                    and item.get("code") != "SUCCESS"
+                )
+                else item
+            )
+            for i, item in enumerate(raw_result_items)
+        ]
+        resp_for_parse: dict = {
+            **resp_json,
+            "result": filtered_results,
+            "entityAndReason": filtered_entity_reasons,
+        }
+    else:
+        resp_for_parse = resp_json
+
+    if already_exists_texts:
+        logger.info(
+            "[AdKeywordService] 关键词已存在（幂等忽略）: id=%s count=%s keywords=%s",
+            queue.pk,
+            len(already_exists_texts),
+            list(already_exists_texts),
+        )
+
+    status, details = parse_lx_result(resp_for_parse)
 
     # 合并预校验跳过的关键词说明到最终状态
     if skip_detail:
@@ -258,14 +316,18 @@ def create_keywords(
 
     # 通过索引对齐收集成功条目的 keywordId 与对应关键词文本
     # Amazon Ads API 批量接口的 result 顺序与提交顺序严格对应
-    result_items: list[dict] = resp_json.get("result") or []
+    # "关键词已存在"的条目无 keywordId，但同样计入 succeeded_keyword_texts
     keyword_ids: list[str] = []
     succeeded_keyword_texts: list[str] = []
-    for i, item in enumerate(result_items):
+    for i, item in enumerate(raw_result_items):
+        kw_text: str | None = keywords[i] if i < len(keywords) else None
         if item.get("code") == "SUCCESS" and item.get("keywordId"):
             keyword_ids.append(str(item["keywordId"]))
-            if i < len(keywords):
-                succeeded_keyword_texts.append(keywords[i])
+            if kw_text:
+                succeeded_keyword_texts.append(kw_text)
+        elif kw_text and kw_text in already_exists_texts:
+            # 关键词已存在：幂等成功，无 keywordId 但标记为已完成防止重复提交
+            succeeded_keyword_texts.append(kw_text)
 
     logger.info(
         "[AdKeywordService] 关键词创建%s: id=%s campaignId=%s success_count=%s",
