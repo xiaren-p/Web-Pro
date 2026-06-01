@@ -11,6 +11,7 @@
 import logging
 import json
 
+from django.db.models import Case, IntegerField, Value, When
 from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.request import Request
@@ -199,6 +200,16 @@ def list_ad_queue(request: Request) -> Response:
     country_param = request.query_params.get("country")
     if country_param:
         qs = qs.filter(country=country_param)
+
+    # 固定排序：队列中（parse_status=1）始终置顶，其余按创建时间倒序。
+    # 该排序在后端完成，确保分页场景下排序稳定一致。
+    qs = qs.annotate(
+        status_priority=Case(
+            When(parse_status=AdParseStatus.PENDING, then=Value(0)),
+            default=Value(1),
+            output_field=IntegerField(),
+        )
+    ).order_by("status_priority", "-created_at", "-id")
 
     try:
         page = max(1, int(request.query_params.get("page", 1)))
