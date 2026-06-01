@@ -9,6 +9,7 @@
 """
 
 import logging
+import json
 
 from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
@@ -87,9 +88,34 @@ def upload_ad_xlsx(request: Request) -> Response:
             except (TypeError, ValueError):
                 bidding_params[field] = default
 
+    # 解析按国家预算覆盖（JSON 字符串）
+    # 示例：{"PL": 2, "SE": 9}
+    daily_budget_by_country: dict[str, float] | None = None
+    raw_daily_budget_by_country = request.data.get("daily_budget_by_country")
+    if raw_daily_budget_by_country:
+        try:
+            parsed = json.loads(str(raw_daily_budget_by_country))
+            if isinstance(parsed, dict):
+                normalized: dict[str, float] = {}
+                for key, value in parsed.items():
+                    country = str(key).strip().upper()
+                    if not country:
+                        continue
+                    try:
+                        numeric_value = float(value)
+                    except (TypeError, ValueError):
+                        continue
+                    if numeric_value > 0:
+                        normalized[country] = numeric_value
+                if normalized:
+                    daily_budget_by_country = normalized
+        except (TypeError, ValueError, json.JSONDecodeError):
+            daily_budget_by_country = None
+
     created, error_msg, skipped_warnings = parse_and_create_queue(
         file_obj, request.user, ad_type_filter, country_filter,
         bidding_params if bidding_params else None,
+        daily_budget_by_country,
     )
 
     if error_msg:

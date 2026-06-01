@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import requests
@@ -25,6 +26,20 @@ from api_v2.services.ad_creation.ad_lx_client import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_keyword_text(text: str) -> str:
+    """清洗关键词文本，移除标点符号并压缩多余空白。
+
+    Args:
+        text (str): 原始关键词文本。
+
+    Returns:
+        str: 去除标点后的关键词文本。
+    """
+    # 仅保留 Unicode 字母/数字/下划线与空白；其余符号（含中西文标点）统一移除。
+    sanitized = re.sub(r"[^\w\s]", "", text, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", sanitized, flags=re.UNICODE).strip()
 
 
 def build_keyword_json_payload(
@@ -52,7 +67,6 @@ def build_keyword_json_payload(
 
     def is_single_word(text: str) -> bool:
         """判断是否为单个单词（仅字母/数字/下划线/不含空格和标点）。"""
-        import re
         return bool(re.fullmatch(r"[\w-]+", text))
 
     keyword_list: list[dict[str, Any]] = []
@@ -65,8 +79,12 @@ def build_keyword_json_payload(
             text = str(kw)
             monthly_search_volume = 0
 
+        sanitized_text = sanitize_keyword_text(text)
+
         # 匹配规则：单个单词或月搜索量>10000为exact，否则broad
-        if is_single_word(text) or (isinstance(monthly_search_volume, (int, float)) and monthly_search_volume > 10000):
+        if is_single_word(sanitized_text) or (
+            isinstance(monthly_search_volume, (int, float)) and monthly_search_volume > 10000
+        ):
             match_type = "exact"
         else:
             match_type = "broad"
@@ -76,7 +94,7 @@ def build_keyword_json_payload(
             "adGroupId": ad_group_id_int,
             "state": "enabled",
             "matchType": match_type,
-            "keywordText": text,
+            "keywordText": sanitized_text,
         })
 
     inner_param: dict[str, Any] = {

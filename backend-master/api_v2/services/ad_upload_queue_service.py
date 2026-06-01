@@ -81,6 +81,29 @@ def _build_params(skus: list[str], keywords: list[dict], bp: dict[str, float]) -
     }
 
 
+def _resolve_daily_budget_by_site(
+    site: str,
+    bp: dict[str, float],
+    daily_budget_by_country: dict[str, float] | None,
+) -> float:
+    """按国家代码解析该站点应使用的每日预算。
+
+    优先级：daily_budget_by_country[site] > bp["daily_budget"] > 默认值 1.00。
+
+    Args:
+        site (str): 国家代码，如 "PL"、"SE"。
+        bp (dict[str, float]): 全局竞价参数。
+        daily_budget_by_country (dict[str, float] | None): 按国家预算覆盖映射。
+
+    Returns:
+        float: 当前站点每日预算。
+    """
+    default_daily_budget: float = float(bp.get("daily_budget", _BIDDING_DEFAULTS["daily_budget"]))
+    if not daily_budget_by_country:
+        return default_daily_budget
+    return float(daily_budget_by_country.get(site, default_daily_budget))
+
+
 def _infer_ad_type(ad_name: str) -> str:
     """根据广告活动名称末尾 token 推断广告类型。
 
@@ -277,6 +300,7 @@ def _do_parse_and_create(
     ad_type_filter: str,
     country_filter: list[str] | None,
     bidding_params: dict[str, float] | None = None,
+    daily_budget_by_country: dict[str, float] | None = None,
 ) -> tuple[list[AdUploadQueue], str | None, list[str]]:
     """执行 xlsx 解析并批量落库。
 
@@ -287,6 +311,8 @@ def _do_parse_and_create(
         country_filter (list[str] | None): 手动指定的国家代码列表；None 表示按表需求自动发现。
         bidding_params (dict[str, float] | None): 竞价配置字典，键名与模型字段一致；
             None 时全部使用字段默认值。
+        daily_budget_by_country (dict[str, float] | None): 按国家覆盖每日预算，
+            例如 {"PL": 2, "SE": 9}。
 
     Returns:
         tuple[list[AdUploadQueue], str | None, list[str]]:
@@ -373,13 +399,21 @@ def _do_parse_and_create(
                 for ad_type in types_to_create:
                     suffix = "AUTO" if ad_type == "auto" else "MANU"
                     for site in effective_sites:
+                        site_bp = {
+                            **bp,
+                            "daily_budget": _resolve_daily_budget_by_site(
+                                site,
+                                bp,
+                                daily_budget_by_country,
+                            ),
+                        }
                         records_to_create.append(
                             AdUploadQueue(
                                 campaign_name=f"{ad_name} {suffix}",
                                 shop=str(shop),
                                 country=site,
                                 ad_type=ad_type,
-                                params=_build_params([], [], bp),
+                                params=_build_params([], [], site_bp),
                                 parse_status=AdParseStatus.FAILED,
                                 msg=error_msg,
                                 created_by=user,
@@ -395,6 +429,14 @@ def _do_parse_and_create(
                 suffix = "AUTO" if ad_type == "auto" else "MANU"
                 campaign_name_with_suffix = f"{ad_name} {suffix}"
                 for site in effective_sites:
+                    site_bp = {
+                        **bp,
+                        "daily_budget": _resolve_daily_budget_by_site(
+                            site,
+                            bp,
+                            daily_budget_by_country,
+                        ),
+                    }
                     shop_site_key = f"{shop}-{site}"
                     if shop_site_key not in valid_shop_sites:
                         # 店铺-国家组合在 lx_shops 中不存在，以 FAILED 状态落库
@@ -404,7 +446,7 @@ def _do_parse_and_create(
                                 shop=str(shop),
                                 country=site,
                                 ad_type=ad_type,
-                                params=_build_params([], [], bp),
+                                params=_build_params([], [], site_bp),
                                 parse_status=AdParseStatus.FAILED,
                                 msg=f"店铺不存在（{shop_site_key}）",
                                 created_by=user,
@@ -428,7 +470,7 @@ def _do_parse_and_create(
                             shop=str(shop),
                             country=site,
                             ad_type=ad_type,
-                            params=_build_params(skus, keywords, bp),
+                            params=_build_params(skus, keywords, site_bp),
                             parse_status=AdParseStatus.PENDING,
                             msg="队列中",
                             created_by=user,
@@ -457,6 +499,7 @@ def parse_and_create_queue(
     ad_type_filter: str = "all",
     country_filter: list[str] | None = None,
     bidding_params: dict[str, float] | None = None,
+    daily_budget_by_country: dict[str, float] | None = None,
 ) -> tuple[list[AdUploadQueue], str | None, list[str]]:
     """解析上传的 xlsx 文件并批量创建广告上传队列记录。
 
@@ -470,6 +513,8 @@ def parse_and_create_queue(
         country_filter (list[str] | None): 手动指定国家代码列表；None 表示按表需求。
         bidding_params (dict[str, float] | None): 竞价配置，键名与 AdUploadQueue 竞价字段一致；
             None 时全部使用字段默认值（每日预算 1，各竞价 0.10 / 0.12）。
+        daily_budget_by_country (dict[str, float] | None): 按国家覆盖每日预算；
+            例如 {"PL": 2, "SE": 9}。未包含的国家使用 daily_budget。
 
     Returns:
         tuple[list[AdUploadQueue], str | None, list[str]]:
@@ -490,7 +535,14 @@ def parse_and_create_queue(
         return [], f"文件读取失败：{exc}", []
 
     try:
-        return _do_parse_and_create(tmp_path, user, ad_type_filter, country_filter, bidding_params)
+        return _do_parse_and_create(
+            tmp_path,
+            user,
+            ad_type_filter,
+            country_filter,
+            bidding_params,
+            daily_budget_by_country,
+        )
     finally:
         try:
             os.unlink(tmp_path)

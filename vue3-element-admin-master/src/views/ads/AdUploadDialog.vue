@@ -120,7 +120,7 @@
         <!-- 第一行：每日预算 + 广告组默认竞价 -->
         <div class="bidding-grid bidding-grid--top">
           <div class="bidding-item">
-            <span class="bidding-label">每日预算</span>
+            <span class="bidding-label">每日预算（其他国家）</span>
             <el-input-number
               v-model="dailyBudget"
               :min="0.01"
@@ -142,6 +142,44 @@
             />
           </div>
         </div>
+
+        <transition name="slide-down">
+          <div
+            v-if="shouldShowPlBudget || shouldShowSeBudget"
+            class="bidding-grid bidding-grid--country"
+          >
+            <div v-if="shouldShowPlBudget" class="bidding-item">
+              <span class="bidding-label">PL 每日预算</span>
+              <el-input-number
+                v-model="plDailyBudget"
+                :min="0.01"
+                :step="0.5"
+                :precision="2"
+                controls-position="right"
+                class="bidding-input"
+              />
+            </div>
+            <div v-if="shouldShowSeBudget" class="bidding-item">
+              <span class="bidding-label">SE 每日预算</span>
+              <el-input-number
+                v-model="seDailyBudget"
+                :min="0.01"
+                :step="0.5"
+                :precision="2"
+                controls-position="right"
+                class="bidding-input"
+              />
+            </div>
+          </div>
+        </transition>
+
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          class="budget-rule-alert"
+          :description="`预算规则：${budgetRuleText}。按表需求模式会默认展示 PL/SE 专属预算；若文件中不存在该站点，将自动忽略对应规则。`"
+        />
 
         <!-- 自动定向组竞价：四列网格 -->
         <div class="bidding-sub-title">
@@ -346,11 +384,31 @@ const selectedCountries = ref<string[]>([]);
 
 // 竞价设置默认値
 const dailyBudget = ref<number>(1);
+const plDailyBudget = ref<number>(2);
+const seDailyBudget = ref<number>(9);
 const defaultBid = ref<number>(0.12);
 const closeMatchBid = ref<number>(0.12);
 const looseMatchBid = ref<number>(0.1);
 const substitutesBid = ref<number>(0.1);
 const complementsBid = ref<number>(0.1);
+
+/** 是否展示 PL 专属预算输入框。按表需求时默认展示（文件无 PL 站点会自动忽略）。 */
+const shouldShowPlBudget = computed(() => {
+  return useAutoSites.value || selectedCountries.value.includes("PL");
+});
+
+/** 是否展示 SE 专属预算输入框。按表需求时默认展示（文件无 SE 站点会自动忽略）。 */
+const shouldShowSeBudget = computed(() => {
+  return useAutoSites.value || selectedCountries.value.includes("SE");
+});
+
+/** 预算规则预览文案。 */
+const budgetRuleText = computed(() => {
+  const parts: string[] = ["其他国家=1"];
+  if (shouldShowPlBudget.value) parts.push(`PL=${plDailyBudget.value}`);
+  if (shouldShowSeBudget.value) parts.push(`SE=${seDailyBudget.value}`);
+  return parts.join("，");
+});
 
 /** 失败记录列表（computed，供结果表格使用） */
 const failedRows = computed(
@@ -416,6 +474,22 @@ function toggleCountry(code: string): void {
   }
 }
 
+/**
+ * 构造按国家预算映射。
+ *
+ * @returns {Record<string, number>} 预算映射，如 { PL: 2, SE: 9 }
+ */
+function buildDailyBudgetByCountry(): Record<string, number> {
+  const mapping: Record<string, number> = {};
+  if (shouldShowPlBudget.value) {
+    mapping.PL = plDailyBudget.value;
+  }
+  if (shouldShowSeBudget.value) {
+    mapping.SE = seDailyBudget.value;
+  }
+  return mapping;
+}
+
 // ── 上传提交 ───────────────────────────────────────────────────────────────────
 
 /**
@@ -438,6 +512,7 @@ async function handleSubmit(): Promise<void> {
       adTypeFilter: adTypeFilter.value,
       countryFilter: useAutoSites.value ? [] : selectedCountries.value,
       dailyBudget: dailyBudget.value,
+      dailyBudgetByCountry: buildDailyBudgetByCountry(),
       defaultBid: defaultBid.value,
       closeMatchBid: closeMatchBid.value,
       looseMatchBid: looseMatchBid.value,
@@ -475,6 +550,8 @@ function handleReset(): void {
   useAutoSites.value = true;
   selectedCountries.value = [];
   dailyBudget.value = 1;
+  plDailyBudget.value = 2;
+  seDailyBudget.value = 9;
   defaultBid.value = 0.12;
   closeMatchBid.value = 0.12;
   looseMatchBid.value = 0.1;
@@ -660,6 +737,10 @@ function handleReset(): void {
   &--auto {
     grid-template-columns: repeat(4, 1fr);
   }
+
+  &--country {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .bidding-item {
@@ -702,6 +783,20 @@ function handleReset(): void {
     flex-shrink: 0;
     padding: 0 8px;
     white-space: nowrap;
+  }
+}
+
+.budget-rule-alert {
+  margin-top: 2px;
+}
+
+@media (max-width: 768px) {
+  .bidding-grid {
+    &--top,
+    &--country,
+    &--auto {
+      grid-template-columns: 1fr;
+    }
   }
 }
 

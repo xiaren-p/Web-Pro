@@ -335,6 +335,8 @@ export interface AdUploadParams {
   countryFilter: string[];
   /** 每日预算（美元） */
   dailyBudget: number;
+  /** 按国家覆盖每日预算（示例：{ PL: 2, SE: 9 }） */
+  dailyBudgetByCountry?: Record<string, number>;
   /** 广告组默认竞价 */
   defaultBid: number;
   /** 自动广告——紧密匹配竞价 */
@@ -361,6 +363,9 @@ export function uploadAdXlsx(params: AdUploadParams): Promise<AdUploadResponse> 
     formData.append("country_filter", params.countryFilter.join(","));
   }
   formData.append("daily_budget", String(params.dailyBudget));
+  if (params.dailyBudgetByCountry && Object.keys(params.dailyBudgetByCountry).length > 0) {
+    formData.append("daily_budget_by_country", JSON.stringify(params.dailyBudgetByCountry));
+  }
   formData.append("default_bid", String(params.defaultBid));
   formData.append("close_match_bid", String(params.closeMatchBid));
   formData.append("loose_match_bid", String(params.looseMatchBid));
