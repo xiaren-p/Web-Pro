@@ -88,30 +88,38 @@ def create_product_ads(
     profile_id: int,
     campaign_id: str,
     ad_group_id: str,
-) -> tuple[list[str], str, str | None]:
+    skus_override: list[str] | None = None,
+) -> tuple[list[str], str, str | None, list[str]]:
     """向领星接口批量提交广告投放（productAds）创建请求。
 
     queue.skus 中每个 SKU 对应 result 列表中的一个条目；
     部分失败视为「异常」，全部失败视为「失败」。
+    支持传入 skus_override 以便重试时仅提交上次失败的 SKU 子集。
 
     Args:
         queue (AdUploadQueue): 当前队列记录，持有 skus 字段。
         profile_id (int): 广告 Profile ID。
         campaign_id (str): 第一步创建广告活动后返回的 campaignId。
         ad_group_id (str): 第二步创建广告组后返回的 adGroupId。
+        skus_override (list[str] | None): 若不为 None，则以此列表替代
+            queue.params["skus"] 作为本次提交的 SKU 集合（用于部分重试）。
 
     Returns:
-        tuple[list[str], str, str | None]:
+        tuple[list[str], str, str | None, list[str]]:
             - product_ad_ids: 成功/异常时所有成功条目的 productAdId 列表；失败时为空列表。
             - status: "SUCCESS" | "ANOMALY" | "FAILED"。
             - details: ANOMALY/FAILED 时的描述；SUCCESS 时为 None。
+            - succeeded_skus: 本次提交中成功创建的 SKU 列表（与响应 result 顺序对齐）。
     """
-    skus: list[str] = (queue.params or {}).get("skus") or []
+    skus: list[str] = (
+        skus_override if skus_override is not None
+        else ((queue.params or {}).get("skus") or [])
+    )
     if not skus:
         logger.warning(
             "[AdProductAdService] SKU 列表为空，跳过广告投放步骤: id=%s", queue.pk
         )
-        return [], "FAILED", "SKU 列表为空，无法创建广告投放"
+        return [], "FAILED", "SKU 列表为空，无法创建广告投放", []
 
     form_data = build_product_ad_form_data(
         profile_id=profile_id,
@@ -146,9 +154,21 @@ def create_product_ads(
             exc,
             exc_info=True,
         )
-        return [], "FAILED", str(exc)
+        return [], "FAILED", str(exc), []
 
     status, details = parse_lx_result(resp_json)
+
+    # "广告商品已存在" 属于幂等场景：SKU 已在亚马逊侧创建，目标状态已达成。
+    # 将所有提交的 SKU 视为成功，写入 succeeded_skus 供调度层写入跳过信号，不记录任何异常。
+    if status == "FAILED" and details and "已存在" in details:
+        logger.info(
+            "[AdProductAdService] 广告投放已存在，视为成功（幂等）: id=%s campaignId=%s skus=%s",
+            queue.pk,
+            campaign_id,
+            skus,
+        )
+        return [], "SUCCESS", None, list(skus)
+
     if status == "FAILED":
         logger.warning(
             "[AdProductAdService] 广告投放创建失败: id=%s campaignId=%s error=%s",
@@ -156,14 +176,18 @@ def create_product_ads(
             campaign_id,
             details,
         )
-        return [], "FAILED", details
+        return [], "FAILED", details, []
 
-    # 收集所有成功条目的 productAdId
-    product_ad_ids: list[str] = [
-        str(item["productAdId"])
-        for item in (resp_json.get("result") or [])
-        if item.get("code") == "SUCCESS" and item.get("productAdId")
-    ]
+    # 通过索引对齐收集成功条目的 productAdId 与对应 SKU
+    # Amazon Ads API 批量接口的 result 顺序与提交顺序严格对应
+    result_items: list[dict] = resp_json.get("result") or []
+    product_ad_ids: list[str] = []
+    succeeded_skus: list[str] = []
+    for i, item in enumerate(result_items):
+        if item.get("code") == "SUCCESS" and item.get("productAdId"):
+            product_ad_ids.append(str(item["productAdId"]))
+            if i < len(skus):
+                succeeded_skus.append(skus[i])
 
     logger.info(
         "[AdProductAdService] 广告投放创建%s: id=%s campaignId=%s success_count=%s",
@@ -179,4 +203,4 @@ def create_product_ads(
         response_body=resp_json,
         purpose=f"创建广告投放: campaignId={campaign_id} adGroupId={ad_group_id} sku_count={len(skus)}",
     )
-    return product_ad_ids, status, details
+    return product_ad_ids, status, details, succeeded_skus

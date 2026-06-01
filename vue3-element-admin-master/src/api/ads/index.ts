@@ -301,6 +301,11 @@ export interface AdQueueQuery {
   date_start?: string;
   /** 创建时间截止日期，格式 YYYY-MM-DD */
   date_end?: string;
+  /**
+   * 按用户 ID 过滤（仅管理员可用）。
+   * 不传时默认查看当前登录用户自己的队列。
+   */
+  user_id?: number;
 }
 
 /** 广告队列列表分页响应结构 */

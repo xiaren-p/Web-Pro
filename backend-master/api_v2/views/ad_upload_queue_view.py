@@ -132,7 +132,24 @@ def list_ad_queue(request: Request) -> Response:
     Returns:
         Response: {"total": N, "page": N, "page_size": N, "list": [...]}
     """
-    qs = AdUploadQueue.objects.filter(created_by=request.user).select_related("created_by")
+    # 超管或公司管理员可通过 user_id 参数查看其他用户的队列；其余用户强制过滤为自己
+    from api_v1.models.system.user_profile import AdminLevel  # noqa: PLC0415
+    _profile = getattr(request.user, "profile", None)
+    _admin_level = getattr(_profile, "admin_level", None) if _profile else None
+    can_view_all: bool = bool(
+        request.user.is_superuser or _admin_level == AdminLevel.COMPANY_ADMIN
+    )
+
+    user_id_param = request.query_params.get("user_id")
+    if can_view_all and user_id_param:
+        try:
+            qs = AdUploadQueue.objects.filter(
+                created_by_id=int(user_id_param)
+            ).select_related("created_by")
+        except (ValueError, TypeError):
+            qs = AdUploadQueue.objects.filter(created_by=request.user).select_related("created_by")
+    else:
+        qs = AdUploadQueue.objects.filter(created_by=request.user).select_related("created_by")
 
     parse_status_param = request.query_params.get("parse_status")
     if parse_status_param is not None:

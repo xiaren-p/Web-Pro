@@ -31,6 +31,22 @@
         </div>
 
         <div class="queue-toolbar__right">
+          <!-- 用户筛选器：仅拥有 ads:queue:view-all 权限时可见 -->
+          <el-select
+            v-if="canViewAll"
+            v-model="filterUserId"
+            placeholder="全部用户"
+            clearable
+            style="width: 150px"
+            @change="handleFilterChange"
+          >
+            <el-option
+              v-for="u in userOptions"
+              :key="u.value"
+              :label="u.label"
+              :value="u.value"
+            />
+          </el-select>
           <el-date-picker
             v-model="filterDateRange"
             type="daterange"
@@ -155,16 +171,20 @@
 <script setup lang="ts">
 /**
  * 广告新建队列抽屉组件。
- * 展示当前登录用户的广告新建队列记录，支持日期范围 + 状态过滤、
- * 多选批量删除、单条删除、失败/异常原因查看与颗粒重试。
+ * 展示广告新建队列记录，支持日期范围 + 状态过滤、多选批量删除、
+ * 单条删除、失败/异常原因查看与颗粒重试。
+ * 拥有 ads:queue:view-all 权限的用户可加载用户筛选器，查看其他用户的队列。
  * 所属板块：ads。
  */
 import type { AdQueueItem, AdQueueQuery } from "@/api/ads/index";
+import type { UserPageVO } from "@/api/user";
 
 import { computed, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 import { bulkDeleteAdQueue, getAdQueue, retryAdQueue } from "@/api/ads/index";
+import { UserAPI } from "@/api/user";
+import { hasPerm } from "@/utils/auth";
 
 const props = defineProps<{
   visible: boolean;
@@ -174,6 +194,9 @@ const emit = defineEmits<{
   (e: "update:visible", value: boolean): void;
 }>();
 
+/** 拥有 ads:queue:view-all 权限的用户可看到用户筛选器 */
+const canViewAll = computed(() => hasPerm("ads:queue:view-all"));
+
 /** 双向绑定抽屉显隐，打开时自动加载第一页 */
 const visible = ref(props.visible);
 watch(
@@ -182,6 +205,7 @@ watch(
     visible.value = val;
     if (val) {
       currentPage.value = 1;
+      if (canViewAll.value) loadUserOptions();
       loadQueue();
     }
   }
@@ -198,6 +222,10 @@ const tableLoading = ref(false);
 // 多选状态
 const selectedIds = ref<number[]>([]);
 const deleteLoading = ref(false);
+
+// 用户筛选（仅拥有 ads:queue:view-all 权限时可用）
+const filterUserId = ref<number | undefined>(undefined);
+const userOptions = ref<{ label: string; value: number }[]>([]);
 
 // 状态过滤
 const filterStatus = ref<number | undefined>(undefined);
@@ -246,8 +274,25 @@ function getDefaultDateRange(): [string, string] {
   return [fmt(start), fmt(end)];
 }
 
-/**
- * 根据 parse_status 值返回对应的 el-tag type。
+/** * 加载用户列表，用于管理员筛选器。
+ * 仅在 canViewAll=true 时调用，重复调用不会重复请求。
+ *
+ * @returns {Promise<void>}
+ */
+async function loadUserOptions(): Promise<void> {
+  if (userOptions.value.length > 0) return;
+  try {
+    const res = await UserAPI.getPage({ pageNum: 1, pageSize: 100 });
+    userOptions.value = (res.list ?? []).map((u: UserPageVO) => ({
+      label: u.nickname ? `${u.nickname} (${u.username})` : (u.username ?? String(u.id)),
+      value: Number(u.id),
+    }));
+  } catch {
+    // 用户列表加载失败不阻断主流程，静默失败
+  }
+}
+
+/** * 根据 parse_status 值返回对应的 el-tag type。
  *
  * @param {number} status - 状态值（0=失败 1=队列中 2=成功 3=异常）
  * @returns {"primary" | "success" | "warning" | "info" | "danger"} Element Plus tag 类型
@@ -278,6 +323,10 @@ async function loadQueue(): Promise<void> {
     if (filterDateRange.value) {
       params.date_start = filterDateRange.value[0];
       params.date_end = filterDateRange.value[1];
+    }
+    // 管理员选了具体用户时，传 user_id 参数到后端
+    if (canViewAll.value && filterUserId.value !== undefined) {
+      params.user_id = filterUserId.value;
     }
     const res = await getAdQueue(params);
     tableData.value = res.list;

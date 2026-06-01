@@ -13,6 +13,7 @@ from typing import Any
 import requests
 
 from api_v2.models.ad_upload_queue import AdUploadQueue
+from api_v2.services.ad_creation.ad_group_query_service import find_ad_group_id_by_name
 from api_v2.services.ad_creation.ad_lx_client import (
     LX_ADS_API_URL,
     build_lx_headers,
@@ -181,6 +182,53 @@ def create_ad_group(
 
     status, details = parse_lx_result(resp_json)
     if status == "FAILED":
+        # 广告组名称已存在：通过查询接口反查已有广告组的 adGroupId，继续后续步骤
+        if details and "already exists" in details:
+            group_name = build_ad_group_form_data(
+                profile_id=profile_id,
+                campaign_id=campaign_id,
+                targeting_type=targeting_type,
+                default_bid=0,
+                close_match_bid=0,
+                loose_match_bid=0,
+                substitutes_bid=0,
+                complements_bid=0,
+            ).get("params[adGroups][0][name]", "")
+            logger.info(
+                "[AdGroupService] 广告组名称已存在，尝试查询已有 adGroupId: "
+                "id=%s campaignId=%s name=%s",
+                queue.pk,
+                campaign_id,
+                group_name,
+            )
+            found_id = find_ad_group_id_by_name(profile_id, campaign_id, group_name)
+            if found_id:
+                logger.info(
+                    "[AdGroupService] 反查成功，使用已有广告组: id=%s adGroupId=%s",
+                    queue.pk,
+                    found_id,
+                )
+                # 反查到已有 adGroupId，立即落库到 step_ids。
+                # 防止调度层回写前流程中断导致下次重试时重走创建逻辑。
+                queue.step_ids = {**queue.step_ids, "ad_group_id": found_id}
+                queue.save(update_fields=["step_ids"])
+                return found_id, "SUCCESS", None
+            # 反查失败：返回明确错误，不以空字符串继续
+            logger.error(
+                "[AdGroupService] 广告组名称已存在但反查 adGroupId 失败，"
+                "需人工至领星后台查询广告组 ID 后手动写入 step_ids: "
+                "id=%s campaignId=%s name=%s",
+                queue.pk,
+                campaign_id,
+                group_name,
+            )
+            return (
+                "",
+                "FAILED",
+                f"广告组「{group_name}」已存在，但自动反查 adGroupId 失败，"
+                "请人工至领星后台查询广告组 ID 后手动更新 step_ids[ad_group_id]",
+            )
+
         logger.warning(
             "[AdGroupService] 广告组创建失败: id=%s campaignId=%s error=%s",
             queue.pk,
@@ -195,6 +243,23 @@ def create_ad_group(
         if item.get("code") == "SUCCESS" and item.get("adGroupId"):
             ad_group_id = str(item["adGroupId"])
             break
+
+    # 若响应标记为成功/异常但未能提取到 adGroupId，必须拦截并返回失败。
+    # 防止以空字符串写入 step_ids["ad_group_id"]，导致重试时跳过检查失效后重复创建。
+    if not ad_group_id:
+        logger.error(
+            "[AdGroupService] 广告组接口成功但 adGroupId 未提取到，"
+            "需人工至领星后台确认广告组是否已创建: id=%s campaignId=%s resp=%s",
+            queue.pk,
+            campaign_id,
+            resp_json,
+        )
+        return (
+            "",
+            "FAILED",
+            "广告组在亚马逊侧可能已创建但 adGroupId 提取失败，"
+            "请人工至领星后台查询广告组 ID 后手动更新 step_ids",
+        )
 
     logger.info(
         "[AdGroupService] 广告组创建%s: id=%s campaignId=%s adGroupId=%s",

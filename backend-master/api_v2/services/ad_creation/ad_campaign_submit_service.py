@@ -95,7 +95,10 @@ def _submit_single(queue: AdUploadQueue) -> None:
     anomaly_parts: list[str] = []
 
     # ── 第一步：创建广告活动（已有 campaign_id 时跳过）──────────────────────────
-    if queue.step_ids.get("campaign_id"):
+    # 注意：所有步骤均使用 "key" in step_ids 而非 .get("key") 做跳过判断。
+    # 原因：.get() 对 ""（空字符串）和 []（空列表）均返回 falsy，会导致已落库的步骤
+    # 被重复执行，引发亚马逊侧"已存在"类错误。
+    if "campaign_id" in queue.step_ids:
         campaign_id = queue.step_ids["campaign_id"]
         logger.info(
             "[AdCampaignSubmitService] Step1 已完成，跳过: campaign_id=%s id=%s",
@@ -103,6 +106,7 @@ def _submit_single(queue: AdUploadQueue) -> None:
         )
     else:
         campaign_id, step1_status, step1_detail = create_campaign(queue, profile_id, targeting_type)
+        # 注："名称已存在"情况已在 create_campaign 内部自动反查并返回 SUCCESS，此处不再单独处理。
         if step1_status == "FAILED":
             queue.parse_status = AdParseStatus.FAILED
             queue.msg = step1_detail or "广告活动创建失败"
@@ -115,7 +119,7 @@ def _submit_single(queue: AdUploadQueue) -> None:
             anomaly_parts.append(f"[广告活动] {step1_detail}")
 
     # ── 第二步：创建广告组（已有 ad_group_id 时跳过）───────────────────────────
-    if queue.step_ids.get("ad_group_id"):
+    if "ad_group_id" in queue.step_ids:
         ad_group_id = queue.step_ids["ad_group_id"]
         logger.info(
             "[AdCampaignSubmitService] Step2 已完成，跳过: ad_group_id=%s id=%s",
@@ -136,53 +140,117 @@ def _submit_single(queue: AdUploadQueue) -> None:
         if step2_status == "ANOMALY" and step2_detail:
             anomaly_parts.append(f"[广告组] {step2_detail}")
 
-    # ── 第三步：创建广告投放（已有 product_ad_ids 时跳过）───────────────────────
-    if queue.step_ids.get("product_ad_ids"):
+    # ── 第三步：创建广告投放 ──────────────────────────────────────────────────────
+    # 三级跳过判断：
+    #   1. "product_ad_ids" in step_ids → 全部 SKU 均已成功，跳过整步。
+    #   2. "succeeded_skus" in step_ids → 部分 SKU 已成功，仅重试剩余失败的 SKU。
+    #   3. 均无 → 全新提交所有 SKU。
+    if "product_ad_ids" in queue.step_ids:
         product_ad_ids = queue.step_ids["product_ad_ids"]
         logger.info(
             "[AdCampaignSubmitService] Step3 已完成，跳过: product_ad_ids=%s id=%s",
             product_ad_ids, queue.pk,
         )
     else:
-        product_ad_ids, step3_status, step3_detail = create_product_ads(
-            queue, profile_id, campaign_id, ad_group_id
+        prev_succeeded_skus: list[str] = queue.step_ids.get("succeeded_skus") or []
+        all_skus: list[str] = (queue.params or {}).get("skus") or []
+        # 仅重试上次失败的 SKU；首次提交时 skus_override=None（提交全部）
+        skus_to_submit: list[str] | None = (
+            [s for s in all_skus if s not in set(prev_succeeded_skus)]
+            if prev_succeeded_skus else None
         )
+
+        product_ad_ids, step3_status, step3_detail, new_succeeded_skus = create_product_ads(
+            queue, profile_id, campaign_id, ad_group_id,
+            skus_override=skus_to_submit,
+        )
+        # 合并本次成功的 SKU 与历史已成功的 SKU
+        all_succeeded_skus: list[str] = list(set(prev_succeeded_skus) | set(new_succeeded_skus))
+
         if step3_status == "FAILED":
-            queue.parse_status = AdParseStatus.FAILED
-            queue.msg = (
-                f"广告活动已创建（{campaign_id}）、广告组已创建（{ad_group_id}），广告投放创建失败：{step3_detail}"
+            # 全部 SKU 失败：降级为异常，不阻断关键词创建，保留历史已成功进度
+            logger.warning(
+                "[AdCampaignSubmitService] Step3 广告投放全部失败，降级为异常: id=%s detail=%s",
+                queue.pk, step3_detail,
             )
-            queue.save(update_fields=["parse_status", "msg"])
-            return
+            if prev_succeeded_skus:
+                queue.step_ids = {**queue.step_ids, "succeeded_skus": prev_succeeded_skus}
+                queue.save(update_fields=["step_ids"])
+            anomaly_parts.append(f"[广告投放] {step3_detail or '广告投放全部失败'}")
+        else:
+            if set(all_succeeded_skus) >= set(all_skus):
+                # 所有 SKU 均已成功，写入跳过信号并清理中间状态
+                new_step_ids = {k: v for k, v in queue.step_ids.items() if k != "succeeded_skus"}
+                new_step_ids["product_ad_ids"] = product_ad_ids
+                queue.step_ids = new_step_ids
+            else:
+                # 仍有 SKU 未成功，记录已成功的 SKU 供下次重试时跳过
+                queue.step_ids = {**queue.step_ids, "succeeded_skus": all_succeeded_skus}
+            queue.save(update_fields=["step_ids"])
+            if step3_status == "ANOMALY" and step3_detail:
+                anomaly_parts.append(f"[广告投放] {step3_detail}")
 
-        queue.step_ids = {**queue.step_ids, "product_ad_ids": product_ad_ids}
-        queue.save(update_fields=["step_ids"])
-        if step3_status == "ANOMALY" and step3_detail:
-            anomaly_parts.append(f"[广告投放] {step3_detail}")
-
-    # ── 第四步：创建关键词（仅 MANUAL；已有 keyword_ids 时跳过）────────────────
+    # ── 第四步：创建关键词（仅 MANUAL）───────────────────────────
+    # 三级跳过判断：
+    #   1. "keyword_ids" in step_ids → 所有有效关键词均已成功，跳过整步。
+    #   2. "succeeded_keyword_texts" in step_ids → 部分关键词已成功，仅重试剩余的。
+    #   3. 均无 → 全新提交所有关键词。
     if targeting_type == "MANUAL":
-        if queue.step_ids.get("keyword_ids"):
+        if "keyword_ids" in queue.step_ids:
             logger.info(
                 "[AdCampaignSubmitService] Step4 已完成，跳过: keyword_ids=%s id=%s",
                 queue.step_ids["keyword_ids"], queue.pk,
             )
         else:
-            keyword_ids, step4_status, step4_detail = create_keywords(
-                queue, profile_id, campaign_id, ad_group_id
-            )
-            if step4_status == "FAILED":
-                queue.parse_status = AdParseStatus.FAILED
-                queue.msg = (
-                    f"广告活动已创建（{campaign_id}）、广告组已创建（{ad_group_id}）、广告投放已创建，关键词创建失败：{step4_detail}"
-                )
-                queue.save(update_fields=["parse_status", "msg"])
-                return
+            raw_keywords: list = (queue.params or {}).get("keywords") or []
+            prev_succeeded_kw_texts: list[str] = queue.step_ids.get("succeeded_keyword_texts") or []
 
-            queue.step_ids = {**queue.step_ids, "keyword_ids": keyword_ids}
-            queue.save(update_fields=["step_ids"])
-            if step4_status == "ANOMALY" and step4_detail:
-                anomaly_parts.append(f"[关键词] {step4_detail}")
+            # 仅重试上次失败的关键词；首次提交时 keywords_override=None（提交全部）
+            keywords_to_submit: list | None = (
+                [
+                    kw for kw in raw_keywords
+                    if (kw["keyword"] if isinstance(kw, dict) else str(kw))
+                    not in set(prev_succeeded_kw_texts)
+                ]
+                if prev_succeeded_kw_texts else None
+            )
+
+            keyword_ids, step4_status, step4_detail, new_succeeded_kw_texts = create_keywords(
+                queue, profile_id, campaign_id, ad_group_id,
+                keywords_override=keywords_to_submit,
+            )
+            # 合并本次成功的关键词文本与历史已成功的文本
+            all_succeeded_kw_texts: list[str] = list(
+                set(prev_succeeded_kw_texts) | set(new_succeeded_kw_texts)
+            )
+
+            if step4_status == "FAILED":
+                # 前三步均已完成；关键词失败不影响已创建的广告活动/组/投放，降级为异常。
+                # 不写入 step_ids["keyword_ids"]，修正关键词后重试可重新提交。
+                logger.warning(
+                    "[AdCampaignSubmitService] Step4 关键词全部失败，降级为异常: id=%s detail=%s",
+                    queue.pk, step4_detail,
+                )
+                anomaly_parts.append(f"[关键词] {step4_detail or '关键词创建失败'}")
+            else:
+                # 计算原始关键词列表中有效的（’10词可提交的）文本集
+                effective_kw_texts: set[str] = {
+                    (kw["keyword"] if isinstance(kw, dict) else str(kw))
+                    for kw in raw_keywords
+                    if len((kw["keyword"] if isinstance(kw, dict) else str(kw)).split()) <= 10
+                }
+
+                if not effective_kw_texts or set(all_succeeded_kw_texts) >= effective_kw_texts:
+                    # 所有有效关键词均已成功，写入跳过信号并清理中间状态
+                    new_step_ids = {k: v for k, v in queue.step_ids.items() if k != "succeeded_keyword_texts"}
+                    new_step_ids["keyword_ids"] = keyword_ids
+                    queue.step_ids = new_step_ids
+                else:
+                    # 仍有关键词未成功，记录已成功文本供下次重试时跳过
+                    queue.step_ids = {**queue.step_ids, "succeeded_keyword_texts": all_succeeded_kw_texts}
+                queue.save(update_fields=["step_ids"])
+                if step4_status == "ANOMALY" and step4_detail:
+                    anomaly_parts.append(f"[关键词] {step4_detail}")
 
     # ── 最终状态 ─────────────────────────────────────────────────────────────────
     if anomaly_parts:

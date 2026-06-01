@@ -31,7 +31,7 @@ def build_keyword_json_payload(
     profile_id: int,
     campaign_id: str,
     ad_group_id: str,
-    keywords: list[str],
+    keywords: list,
 ) -> dict[str, Any]:
     """构造关键词创建接口的 JSON 请求体。
 
@@ -134,45 +134,79 @@ def create_keywords(
     profile_id: int,
     campaign_id: str,
     ad_group_id: str,
-) -> tuple[list[str], str, str | None]:
+    keywords_override: list | None = None,
+) -> tuple[list[str], str, str | None, list[str]]:
     """向领星接口批量提交 MANUAL 广告关键词创建请求。
 
     queue.keywords 中每个关键词对应 result 列表中的一个条目；
     部分失败视为「异常」，全部失败视为「失败」。
     关键词列表为空时直接返回失败，不发起请求。
+    支持传入 keywords_override 以便重试时仅提交上次失败的关键词子集。
 
     Args:
         queue (AdUploadQueue): 当前队列记录，持有 keywords 字段（关键词文本列表）。
         profile_id (int): 广告 Profile ID。
         campaign_id (str): 第一步创建广告活动后返回的 campaignId。
         ad_group_id (str): 第二步创建广告组后返回的 adGroupId。
+        keywords_override (list | None): 若不为 None，则以此列表替代
+            queue.params["keywords"] 作为本次提交的关键词集合（用于部分重试）。
 
     Returns:
-        tuple[list[str], str, str | None]:
+        tuple[list[str], str, str | None, list[str]]:
             - keyword_ids: 成功/异常时所有成功条目的 keywordId 列表；失败时为空列表。
             - status: "SUCCESS" | "ANOMALY" | "FAILED"。
             - details: ANOMALY/FAILED 时的描述；SUCCESS 时为 None。
+            - succeeded_keyword_texts: 本次提交中成功创建的关键词文本列表（与响应顺序对齐）。
     """
-    raw_keywords: list = (queue.params or {}).get("keywords") or []
-    # 居容旧格式（list[str]）与新格式（list[{keyword, monthly_search_volume}]）两种写入
+    raw_keywords: list = (
+        keywords_override if keywords_override is not None
+        else ((queue.params or {}).get("keywords") or [])
+    )
+
+    # 预校验：过滤超过 Amazon 10 词限制的关键词，防止整批被拒（Amazon 对单个关键词超限会拒绝整个请求）
+    valid_raw: list = []
+    skipped_kws: list[str] = []
+    for entry in raw_keywords:
+        text = entry["keyword"] if isinstance(entry, dict) else str(entry)
+        if not text:
+            continue
+        if len(text.split()) > 10:
+            skipped_kws.append(text)
+        else:
+            valid_raw.append(entry)
+
+    if skipped_kws:
+        logger.warning(
+            "[AdKeywordService] 关键词超过10词限制，已跳过提交: id=%s skipped=%s",
+            queue.pk, skipped_kws,
+        )
+
+    # 兼容旧格式（list[str]）与新格式（list[{keyword, monthly_search_volume}]）
     keywords: list[str] = [
         entry["keyword"] if isinstance(entry, dict) else str(entry)
-        for entry in raw_keywords
-        if (isinstance(entry, dict) and entry.get("keyword")) or (
-            not isinstance(entry, dict) and entry
-        )
+        for entry in valid_raw
     ]
-    if not keywords:
-        logger.warning(
-            "[AdKeywordService] 关键词列表为空，跳过关键词提交步骤: id=%s", queue.pk
-        )
-        return [], "FAILED", "关键词列表为空，MANUAL 广告无法提交关键词"
 
+    if not keywords:
+        detail = "关键词列表为空，MANUAL 广告无法提交关键词"
+        if skipped_kws:
+            detail = f"所有关键词均超过10个单词的 Amazon 限制，无法提交："
+            detail += "；".join(skipped_kws)
+        logger.warning("[AdKeywordService] %s id=%s", detail, queue.pk)
+        return [], "FAILED", detail, []
+
+    # 预校验跳过的说明，将在最终状态中与 API 响应合并
+    skip_detail: str | None = (
+        f"以下关键词超过10词已跳过："
+        + "；".join(skipped_kws)
+    ) if skipped_kws else None
+
+    # 传入 valid_raw（str 或 dict），使 build_keyword_json_payload 能正确读取 monthly_search_volume
     payload = build_keyword_json_payload(
         profile_id=profile_id,
         campaign_id=campaign_id,
         ad_group_id=ad_group_id,
-        keywords=keywords,
+        keywords=valid_raw,
     )
     headers = build_keyword_headers(profile_id, campaign_id)
 
@@ -201,9 +235,18 @@ def create_keywords(
             exc,
             exc_info=True,
         )
-        return [], "FAILED", str(exc)
+        return [], "FAILED", str(exc), []
 
     status, details = parse_lx_result(resp_json)
+
+    # 合并预校验跳过的关键词说明到最终状态
+    if skip_detail:
+        if status == "SUCCESS":
+            status = "ANOMALY"
+            details = skip_detail
+        else:
+            details = f"{details}；{skip_detail}" if details else skip_detail
+
     if status == "FAILED":
         logger.warning(
             "[AdKeywordService] 关键词创建失败: id=%s campaignId=%s error=%s",
@@ -211,14 +254,18 @@ def create_keywords(
             campaign_id,
             details,
         )
-        return [], "FAILED", details
+        return [], "FAILED", details, []
 
-    # 收集所有成功条目的 keywordId
-    keyword_ids: list[str] = [
-        str(item["keywordId"])
-        for item in (resp_json.get("result") or [])
-        if item.get("code") == "SUCCESS" and item.get("keywordId")
-    ]
+    # 通过索引对齐收集成功条目的 keywordId 与对应关键词文本
+    # Amazon Ads API 批量接口的 result 顺序与提交顺序严格对应
+    result_items: list[dict] = resp_json.get("result") or []
+    keyword_ids: list[str] = []
+    succeeded_keyword_texts: list[str] = []
+    for i, item in enumerate(result_items):
+        if item.get("code") == "SUCCESS" and item.get("keywordId"):
+            keyword_ids.append(str(item["keywordId"]))
+            if i < len(keywords):
+                succeeded_keyword_texts.append(keywords[i])
 
     logger.info(
         "[AdKeywordService] 关键词创建%s: id=%s campaignId=%s success_count=%s",
@@ -235,4 +282,4 @@ def create_keywords(
         purpose=f"创建关键词: campaignId={campaign_id} adGroupId={ad_group_id} kw_count={len(keywords)}",
         param_type=ParamType.JSON,
     )
-    return keyword_ids, status, details
+    return keyword_ids, status, details, succeeded_keyword_texts

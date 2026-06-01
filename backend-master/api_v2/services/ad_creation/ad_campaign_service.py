@@ -13,6 +13,7 @@ from typing import Any
 import requests
 
 from api_v2.models.ad_upload_queue import AdUploadQueue
+from api_v2.services.ad_creation.ad_campaign_query_service import find_campaign_id_by_name
 from api_v2.services.ad_creation.ad_lx_client import (
     LX_ADS_API_URL,
     build_lx_headers,
@@ -121,6 +122,44 @@ def create_campaign(
 
     status, details = parse_lx_result(resp_json)
     if status == "FAILED":
+        # 广告活动名称已存在：通过查询接口反查已有活动的 campaignId，继续后续步骤。
+        # 必须传入 profile_id 参数，防止跨 profile 误取同名活动。
+        if details and "名称已存在" in details:
+            logger.info(
+                "[AdCampaignService] 广告活动名称已存在，尝试查询已有 campaignId: "
+                "id=%s profile_id=%s name=%s",
+                queue.pk,
+                profile_id,
+                queue.campaign_name,
+            )
+            found_id = find_campaign_id_by_name(profile_id, queue.campaign_name)
+            if found_id:
+                logger.info(
+                    "[AdCampaignService] 反查成功，使用已有广告活动: id=%s campaignId=%s",
+                    queue.pk,
+                    found_id,
+                )
+                # 反查到已有 campaignId，立即落库到 step_ids。
+                # 防止调度层回写前流程中断导致下次重试时重走创建逻辑。
+                queue.step_ids = {**queue.step_ids, "campaign_id": found_id}
+                queue.save(update_fields=["step_ids"])
+                return found_id, "SUCCESS", None
+            # 反查失败：返回明确错误，不以空字符串继续
+            logger.error(
+                "[AdCampaignService] 广告活动名称已存在且反查 campaignId 失败，"
+                "需人工至领星后台查询后手动写入 step_ids: "
+                "id=%s profile_id=%s name=%s",
+                queue.pk,
+                profile_id,
+                queue.campaign_name,
+            )
+            return (
+                "",
+                "FAILED",
+                f"广告活动「{queue.campaign_name}」已存在，但自动反查 campaignId 失败，"
+                "请人工至领星后台查询广告活动 ID 后手动更新 step_ids[campaign_id]",
+            )
+
         logger.warning(
             "[AdCampaignService] 广告活动创建失败: id=%s campaign=%s error=%s",
             queue.pk,
@@ -135,6 +174,23 @@ def create_campaign(
         if item.get("code") == "SUCCESS" and item.get("campaignId"):
             campaign_id = str(item["campaignId"])
             break
+
+    # 若响应标记为成功/异常但未能提取到 campaignId，必须拦截并返回失败。
+    # 防止以空字符串写入 step_ids["campaign_id"]，导致重试时跳过检查失效后重复创建。
+    if not campaign_id:
+        logger.error(
+            "[AdCampaignService] 广告活动接口成功但 campaignId 未提取到，"
+            "需人工至领星后台确认广告活动是否已创建: id=%s name=%s resp=%s",
+            queue.pk,
+            queue.campaign_name,
+            resp_json,
+        )
+        return (
+            "",
+            "FAILED",
+            "广告活动在亚马逊侧可能已创建但 campaignId 提取失败，"
+            "请人工至领星后台查询广告活动 ID 后手动更新 step_ids",
+        )
 
     logger.info(
         "[AdCampaignService] 广告活动创建%s: id=%s campaignId=%s",
