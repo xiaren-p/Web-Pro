@@ -44,7 +44,6 @@
         </template>
       </el-upload>
 
-
       <!-- 广告类型 -->
       <div class="upload-section">
         <div class="upload-section__title">广告类型</div>
@@ -68,7 +67,6 @@
             结尾且存在关键词的条目，AUTO 条目全部忽略
           </template>
         </div>
-        
       </div>
 
       <!-- 投放国家 -->
@@ -204,7 +202,6 @@
         style="margin-top: 6px"
         description="关键词匹配规则：单个单词（如 word、hello）或月搜索量大于 10000 时，采用精准匹配（exact）；其余情况采用宽泛匹配（broad)。"
       />
-
     </div>
 
     <!-- ── 步骤二：解析结果 ── -->

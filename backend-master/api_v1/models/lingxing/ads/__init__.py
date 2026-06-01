@@ -1,4 +1,13 @@
-from api_v1.models.lingxing.ads.basic.lx_ads_profile import AdsProfileStatus, AdsProfileType, LxAdsProfile
+from api_v1.models.lingxing.ads.basic import (
+    AdsProfileStatus, AdsProfileType, LxAdsProfile,
+    LxAdsPortfolio, PortfolioInBudgetStatus,
+    LxSpCampaign, SpCampaignTargetingType,
+    LxSpAdGroup,
+    LxSpAd,
+    LxSpKeyword, SpKeywordMatchType,
+    LxSpTarget, SpTargetExpressionType,
+    LxSpNegativeTarget, NegativeTargetType,
+)
 from api_v1.models.lingxing.ads.lx_ad_portfolios import LxAdPortfolios
 from api_v1.models.lingxing.ads.lx_campaign_info import LxCampaignInfo
 from api_v1.models.lingxing.ads.lx_campaign_metrics import LxCampaignMetrics
@@ -20,4 +29,12 @@ __all__ = [
     'LxAutoTargetingInfo', 'LxAutoTargetingMetrics',
     'LxAutoNegativeTargetingInfo', 'LxAutoNegativeTargetingMetrics',
     'LxNegativeKeywordInfo', 'LxNegativeKeywordMetrics',
+    # 基础数据子模块
+    'LxAdsPortfolio', 'PortfolioInBudgetStatus',
+    'LxSpCampaign', 'SpCampaignTargetingType',
+    'LxSpAdGroup',
+    'LxSpAd',
+    'LxSpKeyword', 'SpKeywordMatchType',
+    'LxSpTarget', 'SpTargetExpressionType',
+    'LxSpNegativeTarget', 'NegativeTargetType',
 ]

@@ -12,7 +12,21 @@
             @click="handleBulkDelete"
           >
             批量删除
-            <span v-if="selectedIds.length > 0" class="selected-badge">{{ selectedIds.length }}</span>
+            <span v-if="selectedIds.length > 0" class="selected-badge">
+              {{ selectedIds.length }}
+            </span>
+          </el-button>
+          <el-button
+            type="warning"
+            plain
+            :disabled="selectedRetryableIds.length === 0"
+            :loading="bulkRetryLoading"
+            @click="handleBulkRetry"
+          >
+            批量重试
+            <span v-if="selectedRetryableIds.length > 0" class="selected-badge">
+              {{ selectedRetryableIds.length }}
+            </span>
           </el-button>
         </div>
 
@@ -69,11 +83,7 @@
 
         <el-table-column label="状态" width="90" align="center">
           <template #default="{ row }">
-            <el-tag
-              :type="statusTagType(row.parse_status)"
-              size="small"
-              round
-            >
+            <el-tag :type="statusTagType(row.parse_status)" size="small" round>
               {{ row.parse_status_label }}
             </el-tag>
           </template>
@@ -151,7 +161,7 @@
  */
 import type { AdQueueItem, AdQueueQuery } from "@/api/ads/index";
 
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 import { bulkDeleteAdQueue, getAdQueue, retryAdQueue } from "@/api/ads/index";
@@ -204,6 +214,18 @@ const deletingId = ref<number | null>(null);
 
 // 单条重试加载态
 const retryingId = ref<number | null>(null);
+
+// 批量重试加载态
+const bulkRetryLoading = ref(false);
+
+/** 当前选中行中处于失败（0）或异常（3）状态的 ID 列表 */
+const selectedRetryableIds = computed(() => {
+  return tableData.value
+    .filter(
+      (r) => selectedIds.value.includes(r.id) && (r.parse_status === 0 || r.parse_status === 3)
+    )
+    .map((r) => r.id);
+});
 
 /**
  * 获取近三天日期范围（含今天），格式为 YYYY-MM-DD。
@@ -379,6 +401,37 @@ async function handleRetry(row: AdQueueItem): Promise<void> {
     retryingId.value = null;
   }
 }
+
+/**
+ * 批量重试：将选中的失败/异常记录重置为队列中状态。
+ * 非失败/异常状态的选中行将自动忽略，仅对可重试项操作。
+ *
+ * @returns {Promise<void>}
+ */
+async function handleBulkRetry(): Promise<void> {
+  if (selectedRetryableIds.value.length === 0) return;
+  try {
+    await ElMessageBox.confirm(
+      `确认批量重试选中的 ${selectedRetryableIds.value.length} 条失败/异常记录？`,
+      "批量重试",
+      { type: "warning", confirmButtonText: "确认重试", cancelButtonText: "取消" }
+    );
+  } catch {
+    return;
+  }
+
+  bulkRetryLoading.value = true;
+  try {
+    const res = await retryAdQueue(selectedRetryableIds.value);
+    ElMessage.success(`已重置 ${res.retried_count} 条记录为队列中`);
+    selectedIds.value = [];
+    await loadQueue();
+  } catch {
+    ElMessage.error("批量重试失败，请重试");
+  } finally {
+    bulkRetryLoading.value = false;
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -401,14 +454,14 @@ async function handleRetry(row: AdQueueItem): Promise<void> {
 
   &__left {
     display: flex;
-    align-items: center;
     gap: 8px;
+    align-items: center;
   }
 
   &__right {
     display: flex;
-    align-items: center;
     gap: 10px;
+    align-items: center;
   }
 }
 
