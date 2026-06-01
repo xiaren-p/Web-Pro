@@ -95,10 +95,13 @@ def _submit_single(queue: AdUploadQueue) -> None:
     anomaly_parts: list[str] = []
 
     # ── 第一步：创建广告活动（已有 campaign_id 时跳过）──────────────────────────
-    # 注意：所有步骤均使用 "key" in step_ids 而非 .get("key") 做跳过判断。
-    # 原因：.get() 对 ""（空字符串）和 []（空列表）均返回 falsy，会导致已落库的步骤
-    # 被重复执行，引发亚马逊侧"已存在"类错误。
-    if "campaign_id" in queue.step_ids:
+    # 跳过判断说明：
+    # - Step 1/2 使用 .get() 非空判断：_default_step_ids 工厂预填了所有 key（campaign_id=""，
+    #   ad_group_id=""），若用 "key" in step_ids 则新建记录也会跳过全部步骤，直接写 SUCCESS。
+    # - Step 3/4 使用独立完成标志位 product_ads_done / keywords_done：
+    #   区分「默认空列表」和「已存在视为成功的空列表」两种语义，
+    #   避免 [] 无法区分“未执行”和“已完成”两种语义。
+    if queue.step_ids.get("campaign_id"):
         campaign_id = queue.step_ids["campaign_id"]
         logger.info(
             "[AdCampaignSubmitService] Step1 已完成，跳过: campaign_id=%s id=%s",
@@ -119,7 +122,7 @@ def _submit_single(queue: AdUploadQueue) -> None:
             anomaly_parts.append(f"[广告活动] {step1_detail}")
 
     # ── 第二步：创建广告组（已有 ad_group_id 时跳过）───────────────────────────
-    if "ad_group_id" in queue.step_ids:
+    if queue.step_ids.get("ad_group_id"):
         ad_group_id = queue.step_ids["ad_group_id"]
         logger.info(
             "[AdCampaignSubmitService] Step2 已完成，跳过: ad_group_id=%s id=%s",
@@ -142,11 +145,11 @@ def _submit_single(queue: AdUploadQueue) -> None:
 
     # ── 第三步：创建广告投放 ──────────────────────────────────────────────────────
     # 三级跳过判断：
-    #   1. "product_ad_ids" in step_ids → 全部 SKU 均已成功，跳过整步。
+    #   1. step_ids["product_ads_done"] == True → 全部 SKU 已成功，跳过整步。
     #   2. "succeeded_skus" in step_ids → 部分 SKU 已成功，仅重试剩余失败的 SKU。
     #   3. 均无 → 全新提交所有 SKU。
-    if "product_ad_ids" in queue.step_ids:
-        product_ad_ids = queue.step_ids["product_ad_ids"]
+    if queue.step_ids.get("product_ads_done"):
+        product_ad_ids = queue.step_ids.get("product_ad_ids") or []
         logger.info(
             "[AdCampaignSubmitService] Step3 已完成，跳过: product_ad_ids=%s id=%s",
             product_ad_ids, queue.pk,
@@ -182,6 +185,7 @@ def _submit_single(queue: AdUploadQueue) -> None:
                 # 所有 SKU 均已成功，写入跳过信号并清理中间状态
                 new_step_ids = {k: v for k, v in queue.step_ids.items() if k != "succeeded_skus"}
                 new_step_ids["product_ad_ids"] = product_ad_ids
+                new_step_ids["product_ads_done"] = True
                 queue.step_ids = new_step_ids
             else:
                 # 仍有 SKU 未成功，记录已成功的 SKU 供下次重试时跳过
@@ -192,14 +196,14 @@ def _submit_single(queue: AdUploadQueue) -> None:
 
     # ── 第四步：创建关键词（仅 MANUAL）───────────────────────────
     # 三级跳过判断：
-    #   1. "keyword_ids" in step_ids → 所有有效关键词均已成功，跳过整步。
+    #   1. step_ids["keywords_done"] == True → 所有有效关键词均已成功，跳过整步。
     #   2. "succeeded_keyword_texts" in step_ids → 部分关键词已成功，仅重试剩余的。
     #   3. 均无 → 全新提交所有关键词。
     if targeting_type == "MANUAL":
-        if "keyword_ids" in queue.step_ids:
+        if queue.step_ids.get("keywords_done"):
             logger.info(
                 "[AdCampaignSubmitService] Step4 已完成，跳过: keyword_ids=%s id=%s",
-                queue.step_ids["keyword_ids"], queue.pk,
+                queue.step_ids.get("keyword_ids"), queue.pk,
             )
         else:
             raw_keywords: list = (queue.params or {}).get("keywords") or []
@@ -244,6 +248,7 @@ def _submit_single(queue: AdUploadQueue) -> None:
                     # 所有有效关键词均已成功，写入跳过信号并清理中间状态
                     new_step_ids = {k: v for k, v in queue.step_ids.items() if k != "succeeded_keyword_texts"}
                     new_step_ids["keyword_ids"] = keyword_ids
+                    new_step_ids["keywords_done"] = True
                     queue.step_ids = new_step_ids
                 else:
                     # 仍有关键词未成功，记录已成功文本供下次重试时跳过
