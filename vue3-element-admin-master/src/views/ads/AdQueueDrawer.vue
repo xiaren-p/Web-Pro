@@ -331,6 +331,7 @@ async function loadQueue(): Promise<void> {
     const res = await getAdQueue(params);
     tableData.value = res.list;
     total.value = res.total;
+    selectedIds.value = [];
   } catch {
     ElMessage.error("加载队列失败，请重试");
   } finally {
@@ -367,7 +368,11 @@ async function handleBulkDelete(): Promise<void> {
   deleteLoading.value = true;
   try {
     const res = await bulkDeleteAdQueue(selectedIds.value);
-    ElMessage.success(`已删除 ${res.deleted_count} 条记录`);
+    if (res.deleted_count > 0) {
+      ElMessage.success(`已删除 ${res.deleted_count} 条记录`);
+    } else {
+      ElMessage.warning("未删除任何记录，请确认是否有操作权限或记录已被删除");
+    }
     selectedIds.value = [];
     currentPage.value = 1;
     await loadQueue();
@@ -412,8 +417,12 @@ async function handleSingleDelete(row: AdQueueItem): Promise<void> {
   }
   deletingId.value = row.id;
   try {
-    await bulkDeleteAdQueue([row.id]);
-    ElMessage.success("删除成功");
+    const res = await bulkDeleteAdQueue([row.id]);
+    if (res.deleted_count > 0) {
+      ElMessage.success("删除成功");
+    } else {
+      ElMessage.warning("未删除记录，请确认是否有操作权限或记录已被删除");
+    }
     await loadQueue();
   } catch {
     ElMessage.error("删除失败，请重试");

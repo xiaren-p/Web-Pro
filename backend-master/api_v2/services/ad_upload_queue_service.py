@@ -560,9 +560,22 @@ def bulk_delete_queue(ids: list[int], user: User | None) -> int:
     Returns:
         int: 实际删除的记录数。
     """
-    deleted_count, _ = AdUploadQueue.objects.filter(id__in=ids, created_by=user).delete()
+    from api_v1.models.system.user_profile import AdminLevel
+
+    is_company_admin = bool(
+        getattr(getattr(user, "profile", None), "admin_level", None) == AdminLevel.COMPANY_ADMIN
+    )
+    can_delete_all = bool(getattr(user, "is_superuser", False) or is_company_admin)
+
+    queryset = AdUploadQueue.objects.filter(id__in=ids)
+    if not can_delete_all:
+        queryset = queryset.filter(created_by=user)
+
+    deleted_count, _ = queryset.delete()
     logger.info(
-        "[AdUploadQueueService][bulk_delete_queue] 批量删除完成: count=%s user=%s",
-        deleted_count, user,
+        "[AdUploadQueueService][bulk_delete_queue] 批量删除完成: count=%s user=%s can_delete_all=%s",
+        deleted_count,
+        user,
+        can_delete_all,
     )
     return deleted_count

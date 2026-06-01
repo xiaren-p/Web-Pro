@@ -262,11 +262,22 @@ def retry_ad_queue(request: Request) -> Response:
 
     # FAILED 和 ANOMALY 均可重试；不清除已落库的 campaign_id / ad_group_id 等 ID，
     # 由 _submit_single 按"跳过已完成步骤"逻辑从断点续跑。
-    # 额外校验 created_by，防止越权操作他人记录。
-    retried_count = AdUploadQueue.objects.filter(
+    # 权限与列表页保持一致：超管/公司管理员可操作所有记录，其余用户仅可操作自己记录。
+    from api_v1.models.system.user_profile import AdminLevel  # noqa: PLC0415
+
+    profile = getattr(request.user, "profile", None)
+    admin_level = getattr(profile, "admin_level", None) if profile else None
+    can_retry_all = bool(
+        request.user.is_superuser or admin_level == AdminLevel.COMPANY_ADMIN
+    )
+
+    queryset = AdUploadQueue.objects.filter(
         id__in=ids,
-        created_by=request.user,
         parse_status__in=[AdParseStatus.FAILED, AdParseStatus.ANOMALY],
-    ).update(parse_status=AdParseStatus.PENDING, msg="队列中")
+    )
+    if not can_retry_all:
+        queryset = queryset.filter(created_by=request.user)
+
+    retried_count = queryset.update(parse_status=AdParseStatus.PENDING, msg="队列中")
 
     return Response({"retried_count": retried_count})
