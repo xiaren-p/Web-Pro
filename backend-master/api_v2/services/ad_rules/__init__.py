@@ -5,6 +5,11 @@ from api_v2.services.ad_rules.campaign_product_service import (
     get_campaign_product_profile,
     get_product_fields_by_asins,
 )
+from api_v2.services.ad_rules.strategy_matcher import (
+    check_field_match,
+    check_time_match,
+    match_strategy_against_product,
+)
 from api_v2.services.ad_rules.ad_time_pricing_service import (
     match_strategy,
     process_new_ads,
@@ -15,7 +20,10 @@ __all__ = [
     "get_asins_by_campaign",
     "get_product_fields_by_asins",
     "get_campaign_product_profile",
-    # 分时策略
+    # 策略匹配
+    "check_time_match",
+    "check_field_match",
+    "match_strategy_against_product",
     "match_strategy",
     "process_new_ads",
 ]
