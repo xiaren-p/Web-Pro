@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from typing import Any
 
@@ -141,124 +140,120 @@ def match_strategy(
 # 主流程：扫描新广告并命中策略
 # ============================================================
 
-def _process_single_campaign(cid: int, pid: int, existing_keys: set[tuple[int, int]]) -> tuple[list[AdTimePricingHit], int, int, str | None]:
-    """处理单个 campaign 下的所有新广告，返回待写入的命中记录列表。
-
-    在 ThreadPoolExecutor 中并行调用。
-
-    Args:
-        cid: campaign_id
-        pid: profile_id
-        existing_keys: 已存在的 (ad_id, profile_id) 集合
-
-    Returns:
-        (records, processed, hits, error_msg)
-    """
-    records: list[AdTimePricingHit] = []
-    processed = 0
-    hits = 0
-
-    try:
-        # 步骤 1+2：获取 ASIN 和产品画像（同 campaign 下所有广告共享）
-        asins = get_asins_by_campaign(cid, pid)
-        pinfo = None
-        if asins:
-            fields = get_product_fields_by_asins(asins)
-            pinfo = {"asins": asins, **fields}
-
-        # 获取该 campaign 下的广告
-        ads = LxSpAd.objects.filter(campaign_id=cid, profile_id=pid)
-        for ad in ads:
-            ad_id = ad.ad_id
-
-            # 已存在 → 跳过
-            if (ad_id, pid) in existing_keys:
-                continue
-
-            processed += 1
-
-            # 无 ASIN 或产品信息 → 写空记录
-            if pinfo is None or not pinfo.get("asins"):
-                records.append(AdTimePricingHit(
-                    ad_id=ad_id, profile_id=pid,
-                    is_time_pricing=TimePricingHitStatus.NO,
-                ))
-                continue
-
-            # 匹配分时策略
-            result = match_strategy(
-                profile_id=pid,
-                product_assorts=pinfo["assorts"],
-                product_labels=pinfo["labels"],
-                product_uids=pinfo["principal_uids"],
-            )
-
-            if result:
-                records.append(AdTimePricingHit(
-                    ad_id=ad_id, profile_id=pid,
-                    hit_time_pricing_rules=result["strategy_name"],
-                    is_time_pricing=TimePricingHitStatus.YES,
-                ))
-                hits += 1
-            else:
-                records.append(AdTimePricingHit(
-                    ad_id=ad_id, profile_id=pid,
-                    is_time_pricing=TimePricingHitStatus.NO,
-                ))
-
-        return (records, processed, hits, None)
-
-    except Exception as e:
-        return ([], processed, hits, f"campaign={cid}, profile={pid}: {e}")
-
-
 def process_new_ads() -> dict[str, Any]:
-    """扫描所有 LxSpCampaign，对其下新广告并行执行分时策略匹配。
+    """扫描所有 LxSpCampaign，对其下新广告串行执行分时策略匹配。
 
-    优化要点：
-      1. 一次性预查所有已存在的 (ad_id, profile_id)，避免逐条 N+1 查询。
-      2. 同 campaign 下的产品画像只计算一次，所有广告共享。
-      3. 使用 ThreadPoolExecutor 并行处理各 campaign 的 I/O 密集型查询。
-      4. 最终使用 bulk_create 批量写入，减少 DB 往返。
+    串行执行确保 Django ORM 连接稳定，日志可追踪每一步。
+    确认串行版本稳定后，可启用并行版 process_new_ads_parallel()。
 
     Returns:
         {"total_campaigns": int, "new_ads_processed": int, "hits": int, "errors": [str]}
     """
     campaigns = LxSpCampaign.objects.all()
     total_campaigns = campaigns.count()
+    logger.info("[process_new_ads] 开始扫描，campaign 总数=%d", total_campaigns)
 
     # 预查所有已存在的 (ad_id, profile_id)
     existing_keys: set[tuple[int, int]] = set(
         AdTimePricingHit.objects.values_list("ad_id", "profile_id")
     )
+    logger.info("[process_new_ads] 已有命中记录数=%d", len(existing_keys))
 
     total_processed = 0
+    total_ads = 0
     total_hits = 0
     all_records: list[AdTimePricingHit] = []
     errors: list[str] = []
+    skipped_campaigns = 0
 
-    # 确保每个线程有独立的 DB 连接（Django 默认线程局部连接）
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {
-            executor.submit(_process_single_campaign, camp.campaign_id, camp.profile_id, existing_keys): camp
-            for camp in campaigns
-        }
-        for future in as_completed(futures):
-            records, processed, hits, err = future.result()
-            all_records.extend(records)
-            total_processed += processed
-            total_hits += hits
-            if err:
-                logger.error("[ad_time_pricing_service][process_new_ads] %s", err)
-                errors.append(err)
+    for camp in campaigns:
+        cid = camp.campaign_id
+        pid = camp.profile_id
 
-    # 批量写入（close 后 DB 连接自动提交）
+        try:
+            # 步骤 1：获取 ASIN 列表
+            asins = get_asins_by_campaign(cid, pid)
+            if not asins:
+                logger.debug("[process_new_ads] campaign=%d profile=%d 无 ASIN，跳过", cid, pid)
+                skipped_campaigns += 1
+                continue
+
+            # 步骤 2：获取产品画像（同 campaign 共享）
+            fields = get_product_fields_by_asins(asins)
+            pinfo = {"asins": asins, **fields}
+            logger.debug(
+                "[process_new_ads] campaign=%d profile=%d asins=%d assorts=%d labels=%d uids=%d",
+                cid, pid, len(pinfo["asins"]), len(pinfo["assorts"]),
+                len(pinfo["labels"]), len(pinfo["principal_uids"]),
+            )
+
+            # 获取该 campaign 下的广告
+            ads = LxSpAd.objects.filter(campaign_id=cid, profile_id=pid)
+            campaign_ads = 0
+            campaign_new = 0
+
+            for ad in ads:
+                ad_id = ad.ad_id
+                total_ads += 1
+                campaign_ads += 1
+
+                # 已存在 → 跳过
+                if (ad_id, pid) in existing_keys:
+                    continue
+
+                total_processed += 1
+                campaign_new += 1
+
+                # 匹配分时策略
+                result = match_strategy(
+                    profile_id=pid,
+                    product_assorts=pinfo["assorts"],
+                    product_labels=pinfo["labels"],
+                    product_uids=pinfo["principal_uids"],
+                )
+
+                if result:
+                    all_records.append(AdTimePricingHit(
+                        ad_id=ad_id, profile_id=pid,
+                        hit_time_pricing_rules=result["strategy_name"],
+                        is_time_pricing=TimePricingHitStatus.YES,
+                    ))
+                    total_hits += 1
+                else:
+                    all_records.append(AdTimePricingHit(
+                        ad_id=ad_id, profile_id=pid,
+                        is_time_pricing=TimePricingHitStatus.NO,
+                    ))
+
+            if campaign_new > 0:
+                logger.info(
+                    "[process_new_ads] campaign=%d profile=%d ads=%d new=%d hits_in_batch=%d",
+                    cid, pid, campaign_ads, campaign_new,
+                    sum(1 for r in all_records[-campaign_new:] if r.is_time_pricing == TimePricingHitStatus.YES),
+                )
+
+        except Exception as e:
+            err_msg = f"campaign={cid}, profile={pid}: {e}"
+            logger.error("[process_new_ads] %s", err_msg, exc_info=True)
+            errors.append(err_msg)
+
+    # 批量写入
     if all_records:
-        AdTimePricingHit.objects.bulk_create(all_records, batch_size=500)
+        try:
+            created = AdTimePricingHit.objects.bulk_create(all_records, batch_size=500)
+            logger.info("[process_new_ads] bulk_create 写入 %d 条", len(created))
+        except Exception as e:
+            logger.error("[process_new_ads] bulk_create 失败: %s", e, exc_info=True)
+            # 降级逐条写入
+            for rec in all_records:
+                try:
+                    rec.save()
+                except Exception as e2:
+                    logger.error("[process_new_ads] save 失败 ad=%d profile=%d: %s", rec.ad_id, rec.profile_id, e2)
 
     logger.info(
-        "[ad_time_pricing_service][process_new_ads] 完成：campaigns=%d, new_ads=%d, hits=%d, errors=%d",
-        total_campaigns, total_processed, total_hits, len(errors),
+        "[process_new_ads] 完成：campaigns=%d skipped=%d ads=%d new=%d hits=%d errors=%d",
+        total_campaigns, skipped_campaigns, total_ads, total_processed, total_hits, len(errors),
     )
     return {
         "total_campaigns": total_campaigns,
