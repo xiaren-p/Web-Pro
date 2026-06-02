@@ -24,8 +24,14 @@
           ；
         </div>
       </div>
-      <el-form :model="form" label-width="100px" class="form-main">
-        <el-form-item label="模板名称">
+      <el-form
+        ref="formRefEl"
+        :model="form"
+        :rules="formRules"
+        label-width="100px"
+        class="form-main"
+      >
+        <el-form-item label="模板名称" prop="name">
           <el-input
             v-model="form.name"
             maxlength="50"
@@ -34,7 +40,7 @@
             style="width: 350px"
           />
         </el-form-item>
-        <el-form-item label="适用店铺">
+        <el-form-item label="适用店铺" prop="shops">
           <el-select
             v-model="form.shops"
             multiple
@@ -554,7 +560,7 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="权重">
+        <el-form-item label="权重" prop="weight">
           <div style="display: flex; align-items: center">
             <el-input-number
               v-model="form.weight"
@@ -746,6 +752,16 @@ interface TimeSegment {
 const emit = defineEmits<{
   (e: "saved"): void;
 }>();
+
+// ── 表单验证规则 ──────────────────────────────────────────────────────────────
+
+const formRefEl = ref();
+
+const formRules = {
+  name: [{ required: true, message: "请输入模板名称", trigger: "blur" }],
+  shops: [{ required: true, min: 1, message: "请选择适用店铺", trigger: "change" }],
+  weight: [{ required: true, message: "请输入权重", trigger: "blur" }],
+};
 
 // ── 响应式状态 ────────────────────────────────────────────────────────────────
 
@@ -1406,7 +1422,11 @@ function onCancel() {
   visible.value = false;
 }
 
-async function onSubmit() {
+/** 提交表单：先验证，再创建或更新策略。 */
+async function onSubmit(): Promise<void> {
+  const valid = await formRefEl.value?.validate().catch(() => false);
+  if (!valid) return;
+
   try {
     const payload = buildPayload();
     if (editingId.value) {
@@ -1418,8 +1438,8 @@ async function onSubmit() {
     }
     visible.value = false;
     emit("saved");
-  } catch (error: any) {
-    const msg = error?.response?.data?.msg || error?.message || "操作失败";
+  } catch (error: unknown) {
+    const msg = (error as any)?.response?.data?.msg || (error as any)?.message || "操作失败";
     ElMessage.error(msg);
   }
 }
