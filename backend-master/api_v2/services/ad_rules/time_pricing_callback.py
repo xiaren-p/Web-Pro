@@ -16,18 +16,21 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone as dt_timezone
 from typing import Any
 
 
+from api_v1.models.lingxing.ads.basic.lx_sp_ad import LxSpAd
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStrategy, StrategyStatus
+from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
 from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
 from api_v2.models.sp_bid_adjustment import (
     AdjustmentStatusChoices, ExecutionStatusChoices, ExecutionTypeChoices, SpBidAdjustment,
 )
-from api_v2.services.ad_rules.campaign_product_service import (
-    get_asins_by_campaign, get_product_fields_by_asins,
+from api_v2.services.ad_rules.ad_time_pricing_service import (
+    _extract_principal_uids, _parse_str_or_json_field,
 )
 from api_v2.services.ad_rules.strategy_matcher import match_strategy_against_product
 from api_v2.services.ad_rules.time_pricing_executor import (
@@ -148,54 +151,123 @@ def _preload_callback_data(
 # 回调后重新命中策略
 # ============================================================
 
-def _re_match_strategy(hit: AdTimePricingHit) -> None:
-    """回调后重新命中分时策略，更新 hit_time_pricing_rules。
+def _re_match_batch(
+    hits_to_update: list[AdTimePricingHit],
+) -> None:
+    """批量重新命中分时策略：预加载 ASIN/产品/策略，更新 hit_time_pricing_rules。
 
-    优先级：
-      1. 若用户手动设置了 user_manual_time_rules → 直接写入 hit_time_pricing_rules
-      2. 否则重新执行 campaign → ASIN → 产品 → 策略命中链
+    原来逐条 3 次 DB（12K×3=36K 次），优化为 3 次 DB 全量预加载 + 内存匹配。
 
     Args:
-        hit: 刚完成回调的命中记录
+        hits_to_update: 待重新命中的记录列表
     """
-    manual_rules = hit.user_manual_time_rules
-    if manual_rules and isinstance(manual_rules, list) and len(manual_rules) > 0:
-        first = manual_rules[0]
-        hit.hit_time_pricing_rules = str(first) if isinstance(first, (int, str)) else ""
-        hit.hit_auto_bid_rules = ""
-        hit.save(update_fields=["hit_time_pricing_rules", "hit_auto_bid_rules", "updated_at"])
-        logger.info("[time_pricing_callback] campaign=%d 使用手动规则: %s", hit.campaign_id, hit.hit_time_pricing_rules)
+    if not hits_to_update:
         return
 
-    try:
-        asins = get_asins_by_campaign(hit.campaign_id, hit.profile_id)
-        if not asins:
-            hit.hit_time_pricing_rules = ""
-            hit.hit_auto_bid_rules = ""
-            hit.save(update_fields=["hit_time_pricing_rules", "hit_auto_bid_rules", "updated_at"])
-            return
+    # 分离手动规则和自动命中的记录
+    manual: list[AdTimePricingHit] = []
+    auto: list[AdTimePricingHit] = []
+    for h in hits_to_update:
+        m = h.user_manual_time_rules
+        if m and isinstance(m, list) and len(m) > 0:
+            manual.append(h)
+        else:
+            auto.append(h)
 
-        fields = get_product_fields_by_asins(asins)
-        strategies = list(
-            LxTimePricingStrategy.objects
-            .filter(status=StrategyStatus.ACTIVE)
-            .order_by("weight", "-created_at")
-        )
+    # 手动规则：直接写入
+    for h in manual:
+        first = h.user_manual_time_rules[0]
+        h.hit_time_pricing_rules = str(first) if isinstance(first, (int, str)) else ""
+        h.hit_auto_bid_rules = ""
+    if manual:
+        AdTimePricingHit.objects.bulk_update(manual, ["hit_time_pricing_rules", "hit_auto_bid_rules", "updated_at"])
+        logger.info("[time_pricing_callback] 手动规则重命中 %d 条", len(manual))
+
+    if not auto:
+        return
+
+    # 批量预加载：ASINs + 产品字段 + 策略
+    strategies = list(
+        LxTimePricingStrategy.objects
+        .filter(status=StrategyStatus.ACTIVE)
+        .order_by("weight", "-created_at")
+    )
+    if not strategies:
+        for h in auto:
+            h.hit_time_pricing_rules = ""
+            h.hit_auto_bid_rules = ""
+        AdTimePricingHit.objects.bulk_update(auto, ["hit_time_pricing_rules", "hit_auto_bid_rules", "updated_at"])
+        return
+
+    # 批量查所有 ASIN：全量查询 + 内存 set 配对过滤
+    campaign_asins: dict[tuple[int, int], list[str]] = defaultdict(list)
+    all_asins: set[str] = set()
+    valid_pairs: set[tuple[int, int]] = {(h.campaign_id, h.profile_id) for h in auto}
+    try:
+        for ad in LxSpAd.objects.all().only("campaign_id", "profile_id", "asin").iterator():
+            if not ad.asin:
+                continue
+            key = (ad.campaign_id, ad.profile_id)
+            if key in valid_pairs:
+                campaign_asins[key].append(ad.asin)
+                all_asins.add(ad.asin)
+    except Exception:
+        logger.exception("[time_pricing_callback] 批量查 ASIN 失败")
+
+    # 批量查产品字段
+    asin_fields: dict[str, dict] = {}
+    if all_asins:
+        try:
+            for p in LxProductInfo.objects.filter(asin__in=list(all_asins)).only(
+                "asin", "assort", "label", "principal_list",
+            ).iterator():
+                asin_fields[p.asin] = {
+                    "assorts": _parse_str_or_json_field(p.assort),
+                    "labels": _parse_str_or_json_field(p.label),
+                    "principal_uids": _extract_principal_uids(p.principal_list),
+                }
+        except Exception:
+            logger.exception("[time_pricing_callback] 批量查产品信息失败")
+
+    # 内存匹配
+    for h in auto:
+        asins = campaign_asins.get((h.campaign_id, h.profile_id), [])
+        if not asins:
+            h.hit_time_pricing_rules = ""
+            h.hit_auto_bid_rules = ""
+            continue
+
+        # 聚合产品字段
+        merged_assorts: list[str] = []
+        merged_labels: list[str] = []
+        merged_uids: list[int] = []
+        seen_a, seen_l, seen_u = set(), set(), set()
+        for a in asins:
+            f = asin_fields.get(a)
+            if not f:
+                continue
+            for v in f["assorts"]:
+                if v not in seen_a:
+                    seen_a.add(v); merged_assorts.append(v)
+            for v in f["labels"]:
+                if v not in seen_l:
+                    seen_l.add(v); merged_labels.append(v)
+            for v in f["principal_uids"]:
+                if v not in seen_u:
+                    seen_u.add(v); merged_uids.append(v)
+
         result = match_strategy_against_product(
-            profile_id=hit.profile_id,
-            product_assorts=fields["assorts"],
-            product_labels=fields["labels"],
-            product_uids=fields["principal_uids"],
+            profile_id=h.profile_id,
+            product_assorts=merged_assorts,
+            product_labels=merged_labels,
+            product_uids=merged_uids,
             strategies=strategies,
         )
-        hit.hit_time_pricing_rules = str(result["strategy_id"]) if result else ""
-        hit.hit_auto_bid_rules = ""
-        hit.save(update_fields=["hit_time_pricing_rules", "hit_auto_bid_rules", "updated_at"])
-        logger.info("[time_pricing_callback] campaign=%d 重新命中: time=%s", hit.campaign_id, hit.hit_time_pricing_rules)
+        h.hit_time_pricing_rules = str(result["strategy_id"]) if result else ""
+        h.hit_auto_bid_rules = ""
 
-    except Exception:
-        logger.exception("[time_pricing_callback] campaign=%d 重新命中异常", hit.campaign_id)
-        # 命中失败不阻塞主流程，record 保持上一次的规则
+    AdTimePricingHit.objects.bulk_update(auto, ["hit_time_pricing_rules", "hit_auto_bid_rules", "updated_at"])
+    logger.info("[time_pricing_callback] 自动命中重匹配 %d 条", len(auto))
 
 
 # ============================================================
@@ -293,8 +365,7 @@ def execute_time_pricing_callback() -> dict[str, Any]:
 
     _write_batch(adjustments, hits_to_update)
 
-    for hit in hits_to_update:
-        _re_match_strategy(hit)
+    _re_match_batch(hits_to_update)
 
     logger.info("[time_pricing_callback] 完成 processed=%d called_back=%d errors=%d", processed, called_back, len(errors))
     return {"processed": processed, "called_back": called_back, "errors": errors}

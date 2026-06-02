@@ -18,8 +18,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone as dt_timezone
 from typing import Any
 
-from django.db.models import Q
-
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from api_v1.models.lingxing.ads.basic.lx_sp_keyword import LxSpKeyword
@@ -167,9 +165,10 @@ def _find_matching_rules(
 def _build_item_map(
     campaign_keys: set[tuple[int, int]],
 ) -> dict[tuple[int, int], list[dict[str, Any]]]:
-    """批量查询所有 target 和 keyword，按 (campaign_id, profile_id) 建立内存映射。
+    """批量查询全量投放项，内存过滤匹配 campaign_keys。
 
-    一次查询全量 LxSpTarget + LxSpKeyword，避免逐条 N+1。
+    2 次 SQL 查全量 LxSpTarget + LxSpKeyword，Python set 过滤。
+    避免大规模 Q OR 条件导致 MySQL 查询异常。
 
     Args:
         campaign_keys: 需要查询的 (campaign_id, profile_id) 集合
@@ -179,36 +178,25 @@ def _build_item_map(
     """
     item_map: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
 
-    # 收集所有需要查询的 campaign 对
-    pairs_list = list(campaign_keys)
+    for t in LxSpTarget.objects.filter(bid__isnull=False).iterator():
+        key = (t.campaign_id, t.profile_id)
+        if key in campaign_keys:
+            item_map[key].append({
+                "item_type": "target",
+                "item_id": t.target_id,
+                "ad_group_id": t.ad_group_id,
+                "bid": float(t.bid),
+            })
 
-    # 批量查 target（auto）
-    if pairs_list:
-        q_target = Q()
-        for cid, pid in pairs_list:
-            q_target |= Q(campaign_id=cid, profile_id=pid)
-        for t in LxSpTarget.objects.filter(q_target).iterator():
-            if t.bid is not None:
-                item_map[(t.campaign_id, t.profile_id)].append({
-                    "item_type": "target",
-                    "item_id": t.target_id,
-                    "ad_group_id": t.ad_group_id,
-                    "bid": float(t.bid),
-                })
-
-    # 批量查 keyword（manual）
-    if pairs_list:
-        q_kw = Q()
-        for cid, pid in pairs_list:
-            q_kw |= Q(campaign_id=cid, profile_id=pid)
-        for k in LxSpKeyword.objects.filter(q_kw).iterator():
-            if k.bid is not None:
-                item_map[(k.campaign_id, k.profile_id)].append({
-                    "item_type": "keyword",
-                    "item_id": k.keyword_id,
-                    "ad_group_id": k.ad_group_id,
-                    "bid": float(k.bid),
-                })
+    for k in LxSpKeyword.objects.filter(bid__isnull=False).iterator():
+        key = (k.campaign_id, k.profile_id)
+        if key in campaign_keys:
+            item_map[key].append({
+                "item_type": "keyword",
+                "item_id": k.keyword_id,
+                "ad_group_id": k.ad_group_id,
+                "bid": float(k.bid),
+            })
 
     return item_map
 
