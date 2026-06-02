@@ -13,6 +13,39 @@ from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_error, drf_ok
 
 
+def _flatten_json_values(raw_values):
+    """将数据库字段值扁平化为独立标签列表。
+
+    LxProductInfo.label / assort 字段存储的是 JSON 数组字符串
+    （如 '["冬季", "万圣节"]'），需要解析并提取每个独立值后去重。
+
+    Args:
+        raw_values: values_list 返回的可迭代值集合
+
+    Returns:
+        扁平化、去重后的独立标签集合
+    """
+    import json
+
+    result = set()
+    for v in raw_values:
+        if not v:
+            continue
+        # 尝试 JSON 解析（兼容 "[]" 空数组和非法 JSON）
+        try:
+            parsed = json.loads(v)
+        except (json.JSONDecodeError, TypeError):
+            result.add(str(v))
+            continue
+        if isinstance(parsed, list):
+            for item in parsed:
+                if item and str(item).strip():
+                    result.add(str(item).strip())
+        else:
+            result.add(str(v))
+    return result
+
+
 class TimePricingStrategyViewSet(viewsets.ViewSet):
     """分时调价策略 CRUD（需要登录）。
 
@@ -58,30 +91,30 @@ class TimePricingStrategyViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="assorts")
     def assorts(self, request):
-        """获取归类选项（LxProductInfo.assort 去重）。"""
+        """获取归类选项（LxProductInfo.assort 去重，扁平化 JSON 数组）。"""
         values = (
             LxProductInfo.objects
             .exclude(assort__isnull=True)
             .exclude(assort="")
             .values_list("assort", flat=True)
             .distinct()
-            .order_by("assort")
         )
-        data = [{"value": v, "label": v} for v in values]
+        flat = _flatten_json_values(values)
+        data = [{"value": v, "label": v} for v in sorted(flat)]
         return drf_ok(data)
 
     @action(detail=False, methods=["get"], url_path="labels")
     def labels(self, request):
-        """获取标签选项（LxProductInfo.label 去重）。"""
+        """获取标签选项（LxProductInfo.label 去重，扁平化 JSON 数组）。"""
         values = (
             LxProductInfo.objects
             .exclude(label__isnull=True)
             .exclude(label="")
             .values_list("label", flat=True)
             .distinct()
-            .order_by("label")
         )
-        data = [{"value": v, "label": v} for v in values]
+        flat = _flatten_json_values(values)
+        data = [{"value": v, "label": v} for v in sorted(flat)]
         return drf_ok(data)
 
     # ============================================================
