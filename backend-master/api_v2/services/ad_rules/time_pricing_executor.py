@@ -228,7 +228,12 @@ def _get_ad_items(
     Returns:
         [{"item_type": "target"/"keyword", "item_id": int, "ad_group_id": int, "bid": float}]
     """
-    return item_map.get((campaign_id, profile_id), [])
+    all_items = item_map.get((campaign_id, profile_id), [])
+    if targeting_type == "auto":
+        return [it for it in all_items if it["item_type"] == "target"]
+    if targeting_type == "manual":
+        return [it for it in all_items if it["item_type"] == "keyword"]
+    return all_items
 
 
 # ============================================================

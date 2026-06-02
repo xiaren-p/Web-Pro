@@ -219,6 +219,22 @@ def _process_callback_chunk(
         try:
             strategy = strategy_map.get(int(hit.hit_time_pricing_rules))
             if not strategy:
+                # 策略已删：强制回调（按当前竞价写记录），再重新命中
+                items = _get_ad_items(hit.campaign_id, hit.profile_id, hit.targeting_type, item_map)
+                for item in items:
+                    is_target = item["item_type"] == "target"
+                    adjustments.append(SpBidAdjustment(
+                        target_id=item["item_id"] if is_target else None,
+                        keyword_id=item["item_id"] if not is_target else None,
+                        campaign_id=hit.campaign_id, profile_id=hit.profile_id,
+                        execution_type=ExecutionTypeChoices.TIME_PRICING_CALLBACK,
+                        time_pricing_rule_id=None, auto_rule_id=None,
+                        is_time_pricing=TimePricingHitStatus.NO,
+                        bid_before=None, bid_after=item["bid"],
+                        adjustment_status=AdjustmentStatusChoices.PENDING,
+                        adjustment_time=now_utc,
+                        execution_status=ExecutionStatusChoices.PENDING,
+                    ))
                 hit.is_time_pricing = TimePricingHitStatus.NO
                 hits_to_update.append(hit)
                 processed += 1
