@@ -3,6 +3,7 @@
 from django.urls import path
 
 from api_v2.views.ad_campaign_submit_view import submit_pending_campaigns
+from api_v2.views.ad_time_pricing_view import trigger_ad_time_pricing
 from api_v2.views.ad_upload_queue_view import (
     bulk_delete_ad_queue,
     list_ad_queue,
@@ -37,4 +38,7 @@ urlpatterns = [
     path('ads/queue/bulk-delete/', bulk_delete_ad_queue, name='ads_queue_bulk_delete'),
     path('ads/queue/retry/', retry_ad_queue, name='ads_queue_retry'),
     path('ads/submit/', submit_pending_campaigns, name='ads_campaign_submit'),
+
+    # 分时策略命中任务（手动触发 / 定时回调）
+    path('ads/time-pricing/run/', trigger_ad_time_pricing, name='ads_time_pricing_run'),
 ]

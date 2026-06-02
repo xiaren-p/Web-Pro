@@ -759,7 +759,18 @@ const formRefEl = ref();
 
 const formRules = {
   name: [{ required: true, message: "请输入模板名称", trigger: "blur" }],
-  shops: [{ required: true, min: 1, message: "请选择适用店铺", trigger: "change" }],
+  shops: [
+    {
+      validator: (_rule: unknown, value: unknown, cb: (err?: Error) => void) => {
+        if (!Array.isArray(value) || value.length === 0) {
+          cb(new Error("请选择适用店铺"));
+        } else {
+          cb();
+        }
+      },
+      trigger: "change",
+    },
+  ],
   weight: [{ required: true, message: "请输入权重", trigger: "blur" }],
 };
 

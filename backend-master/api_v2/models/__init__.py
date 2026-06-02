@@ -1,3 +1,8 @@
+from api_v2.models.ad_time_pricing_hit import (
+    AdTimePricingHit,
+    ManualRulesStatus,
+    TimePricingHitStatus,
+)
 from api_v2.models.ad_upload_queue import AdParseStatus, AdUploadQueue
 from api_v2.models.api_request_log import ApiRequestLog, HttpMethod, ParamType
 from api_v2.models.workflow_execution import ExecutionStatus, WorkflowExecution, WorkflowType
@@ -11,4 +16,7 @@ __all__ = [
     'ApiRequestLog',
     'HttpMethod',
     'ParamType',
+    'AdTimePricingHit',
+    'TimePricingHitStatus',
+    'ManualRulesStatus',
 ]
