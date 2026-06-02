@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone as dt_timezone
 from typing import Any
 
+from django.db import connections as db_connections
 from django.db.models import Q
 
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -310,6 +312,40 @@ def _write_start_batch(adjustments: list, hits_to_update: list) -> None:
         AdTimePricingHit.objects.bulk_update(hits_to_update, ["is_time_pricing", "updated_at"], batch_size=500)
 
 
+def _process_chunk_parallel(
+    hit_chunk: list[AdTimePricingHit],
+    strategy_map: dict[int, LxTimePricingStrategy],
+    item_map: dict,
+    now_utc: datetime,
+) -> tuple[list[SpBidAdjustment], list[AdTimePricingHit], int, int, list[str]]:
+    """线程入口：处理一批命中记录（纯内存计算）。"""
+    db_connections.close_all()
+    adjustments: list[SpBidAdjustment] = []
+    hits_to_update: list[AdTimePricingHit] = []
+    processed = 0
+    adjusted = 0
+    errors: list[str] = []
+
+    for hit in hit_chunk:
+        try:
+            strategy = strategy_map.get(int(hit.hit_time_pricing_rules))
+            if not strategy:
+                hit.is_time_pricing = TimePricingHitStatus.YES
+                hits_to_update.append(hit)
+                processed += 1
+                continue
+            changed = _process_start_for_hit(hit, strategy, item_map, now_utc, adjustments)
+            hit.is_time_pricing = TimePricingHitStatus.YES
+            hits_to_update.append(hit)
+            adjusted += changed
+            processed += 1
+        except Exception:
+            logger.exception("[time_pricing_executor] campaign=%d", hit.campaign_id)
+            errors.append(f"campaign={hit.campaign_id} profile={hit.profile_id}")
+
+    return adjustments, hits_to_update, processed, adjusted, errors
+
+
 def execute_time_pricing_start() -> dict[str, Any]:
     """执行"分时开始"：批量预加载 → 遍历匹配 → 批量写入。
 
@@ -327,30 +363,26 @@ def execute_time_pricing_start() -> dict[str, Any]:
     item_map, strategy_map = _preload_start_data(hits)
 
     now_utc = datetime.now(dt_timezone.utc)
+    # 分块并行处理
+    CHUNKS = 16
+    chunk_size = max(1, len(hits) // CHUNKS)
+    chunks = [hits[i:i + chunk_size] for i in range(0, len(hits), chunk_size)][:CHUNKS]
+
     adjustments: list[SpBidAdjustment] = []
     hits_to_update: list[AdTimePricingHit] = []
     processed = 0
     adjusted = 0
     errors: list[str] = []
 
-    for hit in hits:
-        try:
-            strategy = strategy_map.get(int(hit.hit_time_pricing_rules))
-            if not strategy:
-                hit.is_time_pricing = TimePricingHitStatus.YES
-                hits_to_update.append(hit)
-                processed += 1
-                continue
-
-            changed = _process_start_for_hit(hit, strategy, item_map, now_utc, adjustments)
-            hit.is_time_pricing = TimePricingHitStatus.YES
-            hits_to_update.append(hit)
-            adjusted += changed
-            processed += 1
-
-        except Exception:
-            logger.exception("[time_pricing_executor] campaign=%d", hit.campaign_id)
-            errors.append(f"campaign={hit.campaign_id} profile={hit.profile_id}")
+    with ThreadPoolExecutor(max_workers=CHUNKS) as executor:
+        futures = [executor.submit(_process_chunk_parallel, c, strategy_map, item_map, now_utc) for c in chunks]
+        for f in as_completed(futures):
+            adjs, htus, pr, adj, errs = f.result()
+            adjustments.extend(adjs)
+            hits_to_update.extend(htus)
+            processed += pr
+            adjusted += adj
+            errors.extend(errs)
 
     _write_start_batch(adjustments, hits_to_update)
     logger.info("[time_pricing_executor] 完成 processed=%d adjusted=%d errors=%d", processed, adjusted, len(errors))

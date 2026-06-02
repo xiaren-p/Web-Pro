@@ -16,8 +16,11 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone as dt_timezone
 from typing import Any
+
+from django.db import connections as db_connections
 
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStrategy, StrategyStatus
 from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
@@ -200,6 +203,41 @@ def _re_match_strategy(hit: AdTimePricingHit) -> None:
 # 主流程
 # ============================================================
 
+def _process_callback_chunk(
+    hit_chunk: list[AdTimePricingHit],
+    strategy_map: dict[int, LxTimePricingStrategy],
+    item_map: dict,
+    now_utc: datetime,
+) -> tuple[list[SpBidAdjustment], list[AdTimePricingHit], int, int, list[str]]:
+    """线程入口：处理一批命中记录的回调逻辑。"""
+    db_connections.close_all()
+    adjustments: list[SpBidAdjustment] = []
+    hits_to_update: list[AdTimePricingHit] = []
+    processed = 0
+    called_back = 0
+    errors: list[str] = []
+
+    for hit in hit_chunk:
+        try:
+            strategy = strategy_map.get(int(hit.hit_time_pricing_rules))
+            if not strategy:
+                hit.is_time_pricing = TimePricingHitStatus.NO
+                hits_to_update.append(hit)
+                processed += 1
+                continue
+            if not _process_callback_for_hit(hit, strategy, item_map, now_utc, adjustments):
+                continue
+            hit.is_time_pricing = TimePricingHitStatus.NO
+            hits_to_update.append(hit)
+            called_back += 1
+            processed += 1
+        except Exception:
+            logger.exception("[time_pricing_callback] campaign=%d", hit.campaign_id)
+            errors.append(f"campaign={hit.campaign_id} profile={hit.profile_id}")
+
+    return adjustments, hits_to_update, processed, called_back, errors
+
+
 def execute_time_pricing_callback() -> dict[str, Any]:
     """执行"分时回调"：遍历正在分时的记录，离开时段则回调竞价并重置 is_time_pricing。
 
@@ -219,32 +257,25 @@ def execute_time_pricing_callback() -> dict[str, Any]:
     item_map, strategy_map = _preload_callback_data(hits)
 
     now_utc = datetime.now(dt_timezone.utc)
+    CHUNKS = 16
+    chunk_size = max(1, len(hits) // CHUNKS)
+    chunks = [hits[i:i + chunk_size] for i in range(0, len(hits), chunk_size)][:CHUNKS]
+
     adjustments: list[SpBidAdjustment] = []
     hits_to_update: list[AdTimePricingHit] = []
     processed = 0
     called_back = 0
     errors: list[str] = []
 
-    for hit in hits:
-        try:
-            strategy = strategy_map.get(int(hit.hit_time_pricing_rules))
-            if not strategy:
-                hit.is_time_pricing = TimePricingHitStatus.NO
-                hits_to_update.append(hit)
-                processed += 1
-                continue
-
-            if not _process_callback_for_hit(hit, strategy, item_map, now_utc, adjustments):
-                continue  # 仍在分时时段
-
-            hit.is_time_pricing = TimePricingHitStatus.NO
-            hits_to_update.append(hit)
-            called_back += 1
-            processed += 1
-
-        except Exception:
-            logger.exception("[time_pricing_callback] campaign=%d", hit.campaign_id)
-            errors.append(f"campaign={hit.campaign_id} profile={hit.profile_id}")
+    with ThreadPoolExecutor(max_workers=CHUNKS) as executor:
+        futures = [executor.submit(_process_callback_chunk, c, strategy_map, item_map, now_utc) for c in chunks]
+        for f in as_completed(futures):
+            adjs, htus, pr, cb, errs = f.result()
+            adjustments.extend(adjs)
+            hits_to_update.extend(htus)
+            processed += pr
+            called_back += cb
+            errors.extend(errs)
 
     _write_batch(adjustments, hits_to_update)
 
