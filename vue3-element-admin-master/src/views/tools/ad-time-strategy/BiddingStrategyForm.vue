@@ -40,23 +40,29 @@
             placeholder="搜索店铺名称或 ID"
             style="width: 320px"
             @change="(vals: (string | number)[]) => onSelectChange(vals, shopOptions, 'shops')"
-            @visible-change="
-              (v: boolean) => {
-                if (!v) resetShopFilter();
-              }
-            "
+            @visible-change="handleSelectVisible"
+            @remove-tag="resetShopFilter"
           >
             <el-option
-              label="全选"
               :value="SELECT_ALL_MARKER"
               :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
-            />
+            >
+              <span style="display: flex; align-items: center; gap: 6px">
+                <span class="fake-checkbox" :class="{ checked: form.shops.length === shopOptions.length }">✓</span>
+                全选
+              </span>
+            </el-option>
             <el-option
               v-for="opt in filteredShopOptions"
               :key="opt.value"
               :label="opt.label"
               :value="opt.value"
-            />
+            >
+              <span style="display: flex; align-items: center; gap: 6px">
+                <span class="fake-checkbox" :class="{ checked: form.shops.includes(opt.value) }">✓</span>
+                {{ opt.label }}
+              </span>
+            </el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="模板状态">
@@ -110,21 +116,21 @@
               placeholder="请选择归类"
               size="small"
               style="width: 160px"
-              @change="
-                (vals: (string | number)[]) => onSelectChange(vals, assortOptions, 'categories')
-              "
+              @change="(vals: (string | number)[]) => onSelectChange(vals, assortOptions, 'categories')"
+              @visible-change="handleSelectVisible"
             >
-              <el-option
-                label="全选"
-                :value="SELECT_ALL_MARKER"
-                :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
-              />
-              <el-option
-                v-for="opt in assortOptions"
-                :key="String(opt.value)"
-                :label="opt.label"
-                :value="opt.value"
-              />
+              <el-option :value="SELECT_ALL_MARKER" :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }">
+                <span style="display: flex; align-items: center; gap: 6px">
+                  <span class="fake-checkbox" :class="{ checked: form.categories.length === assortOptions.length }">✓</span>
+                  全选
+                </span>
+              </el-option>
+              <el-option v-for="opt in assortOptions" :key="String(opt.value)" :label="opt.label" :value="opt.value">
+                <span style="display: flex; align-items: center; gap: 6px">
+                  <span class="fake-checkbox" :class="{ checked: form.categories.includes(String(opt.value)) }">✓</span>
+                  {{ opt.label }}
+                </span>
+              </el-option>
             </el-select>
             <el-select
               v-model="form.managers"
@@ -135,21 +141,21 @@
               placeholder="请选择负责人"
               size="small"
               style="width: 180px"
-              @change="
-                (vals: (string | number)[]) => onSelectChange(vals, managerOptions, 'managers')
-              "
+              @change="(vals: (string | number)[]) => onSelectChange(vals, managerOptions, 'managers')"
+              @visible-change="handleSelectVisible"
             >
-              <el-option
-                label="全选"
-                :value="SELECT_ALL_MARKER"
-                :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
-              />
-              <el-option
-                v-for="opt in managerOptions"
-                :key="String(opt.value)"
-                :label="opt.label"
-                :value="opt.value"
-              />
+              <el-option :value="SELECT_ALL_MARKER" :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }">
+                <span style="display: flex; align-items: center; gap: 6px">
+                  <span class="fake-checkbox" :class="{ checked: form.managers.length === managerOptions.length }">✓</span>
+                  全选
+                </span>
+              </el-option>
+              <el-option v-for="opt in managerOptions" :key="String(opt.value)" :label="opt.label" :value="opt.value">
+                <span style="display: flex; align-items: center; gap: 6px">
+                  <span class="fake-checkbox" :class="{ checked: form.managers.includes(opt.value) }">✓</span>
+                  {{ opt.label }}
+                </span>
+              </el-option>
             </el-select>
             <el-select
               v-model="form.tags"
@@ -161,18 +167,20 @@
               size="small"
               style="width: 160px"
               @change="(vals: (string | number)[]) => onSelectChange(vals, labelOptions, 'tags')"
+              @visible-change="handleSelectVisible"
             >
-              <el-option
-                label="全选"
-                :value="SELECT_ALL_MARKER"
-                :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
-              />
-              <el-option
-                v-for="opt in labelOptions"
-                :key="String(opt.value)"
-                :label="opt.label"
-                :value="opt.value"
-              />
+              <el-option :value="SELECT_ALL_MARKER" :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }">
+                <span style="display: flex; align-items: center; gap: 6px">
+                  <span class="fake-checkbox" :class="{ checked: form.tags.length === labelOptions.length }">✓</span>
+                  全选
+                </span>
+              </el-option>
+              <el-option v-for="opt in labelOptions" :key="String(opt.value)" :label="opt.label" :value="opt.value">
+                <span style="display: flex; align-items: center; gap: 6px">
+                  <span class="fake-checkbox" :class="{ checked: form.tags.includes(String(opt.value)) }">✓</span>
+                  {{ opt.label }}
+                </span>
+              </el-option>
             </el-select>
           </div>
         </el-form-item>
@@ -542,7 +550,7 @@
  */
 import type { TimePricingOption } from "@/api/ads/index";
 
-import { computed, reactive, ref } from "vue";
+import { computed, nextTick, reactive, ref } from "vue";
 import { WarningFilled } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 
@@ -694,6 +702,23 @@ function filterShopOptions(query: string): void {
 /** 下拉关闭时重置搜索关键词 */
 function resetShopFilter(): void {
   shopFilterQuery.value = "";
+}
+
+/**
+ * 下拉框展开时将滚动条重置到顶部。
+ * 修复 Element Plus 多选下拉因内容变化导致的滑块沉底问题。
+ *
+ * @param visible - 下拉框是否展开
+ */
+function handleSelectVisible(visible: boolean): void {
+  if (!visible) return;
+  nextTick(() => {
+    // 查找所有已展开的下拉面板，滚动到顶部
+    const wraps = document.querySelectorAll(".el-select-dropdown__wrap");
+    wraps.forEach((w) => {
+      (w as HTMLElement).scrollTop = 0;
+    });
+  });
 }
 
 // ---- 日历拖拽逻辑 ----
@@ -1237,3 +1262,27 @@ defineExpose({ open, openForEdit });
 </script>
 
 <style scoped lang="scss" src="./BiddingStrategyForm.scss"></style>
+
+<style lang="scss">
+/* 分时调价策略表单：多选下拉框——自定义勾选框（下拉 teleport 到 body，必须非 scoped） */
+.fake-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #dcdfe6;
+  border-radius: 2px;
+  font-size: 10px;
+  color: transparent;
+  background: #fff;
+  flex-shrink: 0;
+  transition: all .15s;
+
+  &.checked {
+    background: #409eff;
+    border-color: #409eff;
+    color: #fff;
+  }
+}
+</style>
