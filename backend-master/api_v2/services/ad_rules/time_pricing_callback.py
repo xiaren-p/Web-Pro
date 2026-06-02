@@ -100,7 +100,7 @@ def _process_callback_for_hit(
 
     for item in items:
         callback_bid = _calc_callback_bid(item["bid"], callback)
-        if callback_bid is None or callback_bid == item["bid"]:
+        if callback_bid is None:
             continue
         is_target = item["item_type"] == "target"
         adjustments.append(SpBidAdjustment(
