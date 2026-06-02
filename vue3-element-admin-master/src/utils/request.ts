@@ -8,10 +8,26 @@ import { authConfig } from "@/settings";
 // 初始化token刷新组合式函数
 const { refreshTokenAndRetry } = useTokenRefresh();
 
+// ── CSRF Token 工具 ──────────────────────────────────────────────────────────
+
+/**
+ * 从浏览器 cookie 中读取指定名称的 cookie 值。
+ *
+ * @param name - cookie 名称
+ * @returns cookie 值，若不存在则返回空字符串
+ */
+function getCookie(name: string): string {
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
 // ── 拦截器函数（提取为命名函数，供多实例复用）────────────────────────────────
 
 /**
- * 请求拦截器：注入 Bearer Token，并处理 FormData Content-Type 自动清除。
+ * 请求拦截器：注入 Bearer Token 与 CSRF Token，并处理 FormData Content-Type 自动清除。
+ *
+ * 注入 X-CSRFToken 头以配合 Django SessionAuthentication 的 CSRF 检查，
+ * 解决鉴权过期后重新登录时因 sessionid cookie 残留导致的 "CSRF token missing" 错误。
  */
 function requestFulfilled(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
   const accessToken = AuthStorage.getAccessToken();
@@ -20,6 +36,12 @@ function requestFulfilled(config: InternalAxiosRequestConfig): InternalAxiosRequ
     config.headers.Authorization = `Bearer ${accessToken}`;
   } else {
     delete config.headers.Authorization;
+  }
+
+  // 注入 CSRF Token：从 Django 设置的 csrftoken cookie 中读取，附加到 X-CSRFToken 头
+  const csrfToken = getCookie("csrftoken");
+  if (csrfToken) {
+    config.headers["X-CSRFToken"] = csrfToken;
   }
 
   // 若为 FormData 上传，移除固定的 JSON Content-Type，让浏览器自动设置 multipart 边界
