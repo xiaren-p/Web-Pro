@@ -28,7 +28,7 @@ _PERM = [IsV2Accessible]
 # 互斥锁 Cache Key 及最长持有时间（秒）
 # 超过此时间后锁自动释放，防止异常导致锁永久占用
 _LOCK_KEY = "ad_campaign_submit_running"
-_LOCK_TTL = 300
+_LOCK_TTL = 1500
 
 
 @api_view(["POST"])
