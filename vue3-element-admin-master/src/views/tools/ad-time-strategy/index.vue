@@ -84,14 +84,52 @@
         <el-table-column prop="creator" label="创建人" sortable min-width="110" />
         <el-table-column prop="weight" label="权重" sortable min-width="80" />
         <el-table-column prop="created_at" label="创建时间" sortable min-width="160" />
-        <el-table-column prop="shops" label="生效店铺" min-width="120">
+        <el-table-column label="生效店铺" min-width="140">
           <template #default="{ row }">
-            {{ (row.shops || []).join("、") || "-" }}
+            <template v-if="(row.shops || []).length > 0">
+              <el-popover placement="bottom" :width="260" trigger="hover" :show-after="200">
+                <template #reference>
+                  <el-link type="primary" :underline="false">
+                    {{ formatCondensed(row.shops, shopNameMap, totalShopCount, '店铺').text }}
+                  </el-link>
+                </template>
+                <div class="popover-list">
+                  <el-tag
+                    v-for="(sid, i) in row.shops"
+                    :key="i"
+                    size="small"
+                    style="margin: 2px"
+                  >
+                    {{ shopNameMap[String(sid)] || sid }}
+                  </el-tag>
+                </div>
+              </el-popover>
+            </template>
+            <template v-else>-</template>
           </template>
         </el-table-column>
-        <el-table-column label="标签" min-width="120">
+        <el-table-column label="标签" min-width="140">
           <template #default="{ row }">
-            {{ getFlatTags(row) }}
+            <template v-if="getTagArray(row).length > 0">
+              <el-popover placement="bottom" :width="220" trigger="hover" :show-after="200">
+                <template #reference>
+                  <el-link type="primary" :underline="false">
+                    {{ formatCondensed(getTagArray(row), {} as any, totalTagCount, '标签').text }}
+                  </el-link>
+                </template>
+                <div class="popover-list">
+                  <el-tag
+                    v-for="(t, i) in getTagArray(row)"
+                    :key="i"
+                    size="small"
+                    style="margin: 2px"
+                  >
+                    {{ t }}
+                  </el-tag>
+                </div>
+              </el-popover>
+            </template>
+            <template v-else>-</template>
           </template>
         </el-table-column>
         <el-table-column label="操作" min-width="140" fixed="right">
@@ -146,7 +184,8 @@ import { ArrowDown, QuestionFilled } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { ElTable } from "element-plus";
 import BiddingStrategyForm from "./BiddingStrategyForm.vue";
-import { getTimePricingList, deleteTimePricing } from "@/api/ads/index";
+import { getTimePricingList, deleteTimePricing, getShopOptions, getLabelOptions } from "@/api/ads/index";
+import type { TimePricingOption } from "@/api/ads/index";
 
 defineOptions({
   name: "AdTimeStrategy",
@@ -155,28 +194,64 @@ defineOptions({
 const STATUS_MAP: Record<number, string> = { 0: "暂停", 1: "开启" };
 const TYPE_MAP: Record<string, string> = { bidding_time: "竞价分时" };
 
+/** 店铺 profile_id → 展示名称 映射 */
+const shopNameMap = ref<Record<string, string>>({});
+/** 总可选的店铺数（用于判断"全部店铺"） */
+const totalShopCount = ref(0);
+/** 总可选的标签数（用于判断"全部标签"） */
+const totalTagCount = ref(0);
+
 /**
- * 从行数据中提取标签并扁平化为展示字符串。
- * 兼容 field_settings 为对象、JSON 字符串或缺失的情况。
+ * 扁平化标签数组为展示字符串，兼容多种数据格式。
  *
  * @param row - 表格行数据
- * @returns 扁平化的标签字符串，如 "爆款、清仓"，无数据时返回 "-"
+ * @returns 标签数组，无数据时返回空数组
  */
-function getFlatTags(row: Record<string, unknown>): string {
+function getTagArray(row: Record<string, unknown>): string[] {
   let fs = row.field_settings;
-  // 兼容后端返回 JSON 字符串的情况
   if (typeof fs === "string") {
-    try {
-      fs = JSON.parse(fs);
-    } catch {
-      fs = null;
-    }
+    try { fs = JSON.parse(fs); } catch { fs = null; }
   }
   const tags = (fs as Record<string, unknown> | null)?.tags;
-  if (Array.isArray(tags) && tags.length > 0) {
-    return tags.join("、");
+  return Array.isArray(tags) ? tags as string[] : [];
+}
+
+/**
+ * 生成"第一个名称 +N"的浓缩展示文本。
+ *
+ * @param values - 值列表
+ * @param nameMap - 值→名称的映射
+ * @param totalCount - 总选项数（用于判断"全部"）
+ * @returns ["全部XX", boolean] 或 ["浓缩文本", false]
+ */
+function formatCondensed(
+  values: (string | number)[],
+  nameMap: Record<string, string>,
+  totalCount: number,
+  allLabel: string,
+): { text: string; isAll: boolean } {
+  if (!values || values.length === 0) return { text: "-", isAll: false };
+  if (totalCount > 0 && values.length >= totalCount) {
+    return { text: `全部${allLabel}`, isAll: true };
   }
-  return "-";
+  const first = nameMap[String(values[0])] || String(values[0]);
+  const rest = values.length - 1;
+  return { text: rest > 0 ? `${first} +${rest}` : first, isAll: false };
+}
+
+/** 加载选项元数据（店铺名称映射 + 总数） */
+async function loadOptionMeta(): Promise<void> {
+  const [shops, labels] = await Promise.all([
+    getShopOptions().catch(() => [] as TimePricingOption[]),
+    getLabelOptions().catch(() => [] as TimePricingOption[]),
+  ]);
+  const map: Record<string, string> = {};
+  for (const s of shops) {
+    map[String(s.value)] = s.label;
+  }
+  shopNameMap.value = map;
+  totalShopCount.value = shops.length;
+  totalTagCount.value = labels.length;
 }
 
 const listQuery = reactive({
@@ -296,7 +371,20 @@ function onFormSaved(): void {
 
 onMounted(() => {
   fetchList();
+  loadOptionMeta();
 });
 </script>
 
 <style scoped lang="scss" src="./index.scss"></style>
+
+<style lang="scss">
+/* 分时策略列表——标签/店铺详情弹窗 */
+.popover-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+</style>
