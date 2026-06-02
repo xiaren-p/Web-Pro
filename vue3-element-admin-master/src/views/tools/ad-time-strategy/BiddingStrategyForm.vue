@@ -44,7 +44,9 @@
             collapse-tags-tooltip
             placeholder="搜索店铺名称或 ID"
             style="width: 320px"
-            @change="(vals: (string | number)[]) => onSelectChange(vals, filteredShopOptions, 'shops')"
+            @change="
+              (vals: (string | number)[]) => onSelectChange(vals, filteredShopOptions, 'shops')
+            "
             @visible-change="handleSelectVisible"
             @remove-tag="resetShopFilter"
           >
@@ -52,8 +54,13 @@
               :value="SELECT_ALL_MARKER"
               :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
             >
-              <span style="display: flex; align-items: center; gap: 6px">
-                <span class="fake-checkbox" :class="{ checked: form.shops.length === shopOptions.length }">✓</span>
+              <span style="display: flex; gap: 6px; align-items: center">
+                <span
+                  class="fake-checkbox"
+                  :class="{ checked: form.shops.length === shopOptions.length }"
+                >
+                  ✓
+                </span>
                 全选
               </span>
             </el-option>
@@ -63,8 +70,10 @@
               :label="opt.label"
               :value="opt.value"
             >
-              <span style="display: flex; align-items: center; gap: 6px">
-                <span class="fake-checkbox" :class="{ checked: form.shops.includes(opt.value) }">✓</span>
+              <span style="display: flex; gap: 6px; align-items: center">
+                <span class="fake-checkbox" :class="{ checked: form.shops.includes(opt.value) }">
+                  ✓
+                </span>
                 {{ opt.label }}
               </span>
             </el-option>
@@ -121,18 +130,38 @@
               placeholder="请选择归类"
               size="small"
               style="width: 160px"
-              @change="(vals: (string | number)[]) => onSelectChange(vals, assortOptions, 'categories')"
+              @change="
+                (vals: (string | number)[]) => onSelectChange(vals, assortOptions, 'categories')
+              "
               @visible-change="handleSelectVisible"
             >
-              <el-option :value="SELECT_ALL_MARKER" :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }">
-                <span style="display: flex; align-items: center; gap: 6px">
-                  <span class="fake-checkbox" :class="{ checked: form.categories.length === assortOptions.length }">✓</span>
+              <el-option
+                :value="SELECT_ALL_MARKER"
+                :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
+              >
+                <span style="display: flex; gap: 6px; align-items: center">
+                  <span
+                    class="fake-checkbox"
+                    :class="{ checked: form.categories.length === assortOptions.length }"
+                  >
+                    ✓
+                  </span>
                   全选
                 </span>
               </el-option>
-              <el-option v-for="opt in assortOptions" :key="String(opt.value)" :label="opt.label" :value="opt.value">
-                <span style="display: flex; align-items: center; gap: 6px">
-                  <span class="fake-checkbox" :class="{ checked: form.categories.includes(String(opt.value)) }">✓</span>
+              <el-option
+                v-for="opt in assortOptions"
+                :key="String(opt.value)"
+                :label="opt.label"
+                :value="opt.value"
+              >
+                <span style="display: flex; gap: 6px; align-items: center">
+                  <span
+                    class="fake-checkbox"
+                    :class="{ checked: form.categories.includes(String(opt.value)) }"
+                  >
+                    ✓
+                  </span>
                   {{ opt.label }}
                 </span>
               </el-option>
@@ -146,18 +175,38 @@
               placeholder="请选择负责人"
               size="small"
               style="width: 180px"
-              @change="(vals: (string | number)[]) => onSelectChange(vals, managerOptions, 'managers')"
+              @change="
+                (vals: (string | number)[]) => onSelectChange(vals, managerOptions, 'managers')
+              "
               @visible-change="handleSelectVisible"
             >
-              <el-option :value="SELECT_ALL_MARKER" :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }">
-                <span style="display: flex; align-items: center; gap: 6px">
-                  <span class="fake-checkbox" :class="{ checked: form.managers.length === managerOptions.length }">✓</span>
+              <el-option
+                :value="SELECT_ALL_MARKER"
+                :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
+              >
+                <span style="display: flex; gap: 6px; align-items: center">
+                  <span
+                    class="fake-checkbox"
+                    :class="{ checked: form.managers.length === managerOptions.length }"
+                  >
+                    ✓
+                  </span>
                   全选
                 </span>
               </el-option>
-              <el-option v-for="opt in managerOptions" :key="String(opt.value)" :label="opt.label" :value="opt.value">
-                <span style="display: flex; align-items: center; gap: 6px">
-                  <span class="fake-checkbox" :class="{ checked: form.managers.includes(opt.value) }">✓</span>
+              <el-option
+                v-for="opt in managerOptions"
+                :key="String(opt.value)"
+                :label="opt.label"
+                :value="opt.value"
+              >
+                <span style="display: flex; gap: 6px; align-items: center">
+                  <span
+                    class="fake-checkbox"
+                    :class="{ checked: form.managers.includes(opt.value) }"
+                  >
+                    ✓
+                  </span>
                   {{ opt.label }}
                 </span>
               </el-option>
@@ -174,15 +223,33 @@
               @change="(vals: (string | number)[]) => onSelectChange(vals, labelOptions, 'tags')"
               @visible-change="handleSelectVisible"
             >
-              <el-option :value="SELECT_ALL_MARKER" :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }">
-                <span style="display: flex; align-items: center; gap: 6px">
-                  <span class="fake-checkbox" :class="{ checked: form.tags.length === labelOptions.length }">✓</span>
+              <el-option
+                :value="SELECT_ALL_MARKER"
+                :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
+              >
+                <span style="display: flex; gap: 6px; align-items: center">
+                  <span
+                    class="fake-checkbox"
+                    :class="{ checked: form.tags.length === labelOptions.length }"
+                  >
+                    ✓
+                  </span>
                   全选
                 </span>
               </el-option>
-              <el-option v-for="opt in labelOptions" :key="String(opt.value)" :label="opt.label" :value="opt.value">
-                <span style="display: flex; align-items: center; gap: 6px">
-                  <span class="fake-checkbox" :class="{ checked: form.tags.includes(String(opt.value)) }">✓</span>
+              <el-option
+                v-for="opt in labelOptions"
+                :key="String(opt.value)"
+                :label="opt.label"
+                :value="opt.value"
+              >
+                <span style="display: flex; gap: 6px; align-items: center">
+                  <span
+                    class="fake-checkbox"
+                    :class="{ checked: form.tags.includes(String(opt.value)) }"
+                  >
+                    ✓
+                  </span>
                   {{ opt.label }}
                 </span>
               </el-option>
@@ -278,18 +345,29 @@
                 </el-select>
                 <el-time-select
                   v-model="seg.startTime"
-                  start="00:00" step="01:00" end="24:00"
-                  placeholder="1:00" style="width: 90px" size="small"
+                  start="00:00"
+                  step="01:00"
+                  end="24:00"
+                  placeholder="1:00"
+                  style="width: 90px"
+                  size="small"
                 />
                 <span class="tilde">~</span>
                 <el-time-select
                   v-model="seg.endTime"
-                  start="00:00" step="01:00" end="24:00"
-                  placeholder="6:00" style="width: 90px" size="small"
+                  start="00:00"
+                  step="01:00"
+                  end="24:00"
+                  placeholder="6:00"
+                  style="width: 90px"
+                  size="small"
                 />
                 <el-button
                   v-if="form.timeSegments.length > 1"
-                  link type="danger" size="small" style="margin-left: 8px"
+                  link
+                  type="danger"
+                  size="small"
+                  style="margin-left: 8px"
                   @click="removeSegment(idx)"
                 >
                   删除时段
@@ -307,50 +385,137 @@
                   <el-option label="竞价低于" value="bid_below_fixed" />
                 </el-select>
                 <!-- 百分比 / 固定值类规则 -->
-                <template v-if="['percent_decrease','percent_increase','fixed_decrease','fixed_increase'].includes(rule.operateType)">
-                  <el-input-number v-model="rule.operateValue" size="small" :controls="false" style="width: 70px; margin-left: 8px" />
+                <template
+                  v-if="
+                    [
+                      'percent_decrease',
+                      'percent_increase',
+                      'fixed_decrease',
+                      'fixed_increase',
+                    ].includes(rule.operateType)
+                  "
+                >
+                  <el-input-number
+                    v-model="rule.operateValue"
+                    size="small"
+                    :controls="false"
+                    style="width: 70px; margin-left: 8px"
+                  />
                   <template v-if="rule.operateType === 'percent_decrease'">
                     <span class="text">%，降低后，最低不低于</span>
-                    <el-input-number v-model="rule.limitValue" size="small" :controls="false" style="width: 70px; margin: 0 8px" /><span class="text">€</span>
+                    <el-input-number
+                      v-model="rule.limitValue"
+                      size="small"
+                      :controls="false"
+                      style="width: 70px; margin: 0 8px"
+                    />
+                    <span class="text">€</span>
                   </template>
                   <template v-else-if="rule.operateType === 'percent_increase'">
                     <span class="text">%，提高后，最高不超过</span>
-                    <el-input-number v-model="rule.limitValue" size="small" :controls="false" style="width: 70px; margin: 0 8px" /><span class="text">€</span>
+                    <el-input-number
+                      v-model="rule.limitValue"
+                      size="small"
+                      :controls="false"
+                      style="width: 70px; margin: 0 8px"
+                    />
+                    <span class="text">€</span>
                   </template>
                   <template v-else-if="rule.operateType === 'fixed_decrease'">
                     <span class="text">€，降低后，最低不低于</span>
-                    <el-input-number v-model="rule.limitValue" size="small" :controls="false" style="width: 70px; margin: 0 8px" /><span class="text">€</span>
+                    <el-input-number
+                      v-model="rule.limitValue"
+                      size="small"
+                      :controls="false"
+                      style="width: 70px; margin: 0 8px"
+                    />
+                    <span class="text">€</span>
                   </template>
                   <template v-else-if="rule.operateType === 'fixed_increase'">
                     <span class="text">€，提高后，最高不超过</span>
-                    <el-input-number v-model="rule.limitValue" size="small" :controls="false" style="width: 70px; margin: 0 8px" /><span class="text">€</span>
+                    <el-input-number
+                      v-model="rule.limitValue"
+                      size="small"
+                      :controls="false"
+                      style="width: 70px; margin: 0 8px"
+                    />
+                    <span class="text">€</span>
                   </template>
                 </template>
                 <template v-else-if="rule.operateType === 'fixed'">
                   <span class="text" style="margin: 0 8px">€</span>
-                  <el-input-number v-model="rule.operateValue" size="small" :controls="false" style="width: 70px" />
+                  <el-input-number
+                    v-model="rule.operateValue"
+                    size="small"
+                    :controls="false"
+                    style="width: 70px"
+                  />
                 </template>
                 <!-- 竞价高于/低于 -->
                 <template v-else-if="rule.operateType === 'bid_above_fixed'">
-                  <span class="text" style="margin: 0 4px"> €</span>
-                  <el-input-number v-model="rule.triggerValue" size="small" :controls="false" style="width: 80px" />
+                  <span class="text" style="margin: 0 4px">€</span>
+                  <el-input-number
+                    v-model="rule.triggerValue"
+                    size="small"
+                    :controls="false"
+                    style="width: 80px"
+                  />
                   <span class="text" style="margin: 0 4px">的，固定调到 €</span>
-                  <el-input-number v-model="rule.targetValue" size="small" :controls="false" style="width: 80px" />
+                  <el-input-number
+                    v-model="rule.targetValue"
+                    size="small"
+                    :controls="false"
+                    style="width: 80px"
+                  />
                 </template>
                 <template v-else-if="rule.operateType === 'bid_below_fixed'">
-                  <span class="text" style="margin: 0 4px"> €</span>
-                  <el-input-number v-model="rule.triggerValue" size="small" :controls="false" style="width: 80px" />
+                  <span class="text" style="margin: 0 4px">€</span>
+                  <el-input-number
+                    v-model="rule.triggerValue"
+                    size="small"
+                    :controls="false"
+                    style="width: 80px"
+                  />
                   <span class="text" style="margin: 0 4px">的，固定调到 €</span>
-                  <el-input-number v-model="rule.targetValue" size="small" :controls="false" style="width: 80px" />
+                  <el-input-number
+                    v-model="rule.targetValue"
+                    size="small"
+                    :controls="false"
+                    style="width: 80px"
+                  />
                 </template>
-                <el-button v-if="seg.rules.length > 1" link type="danger" size="small" style="margin-left: 6px" @click="removeRule(idx, ri)">×</el-button>
+                <el-button
+                  v-if="seg.rules.length > 1"
+                  link
+                  type="danger"
+                  size="small"
+                  style="margin-left: 6px"
+                  @click="removeRule(idx, ri)"
+                >
+                  ×
+                </el-button>
               </div>
-              <el-button link type="primary" size="small" style="margin-top: 4px" @click="addRule(idx)">+ 添加规则</el-button>
+              <el-button
+                link
+                type="primary"
+                size="small"
+                style="margin-top: 4px"
+                @click="addRule(idx)"
+              >
+                + 添加规则
+              </el-button>
             </div>
             <div class="segment-tools">
-              <el-button style="height: auto; padding: 5px 15px" @click="addSegment">+ 添加时间段</el-button>
+              <el-button style="height: auto; padding: 5px 15px" @click="addSegment">
+                + 添加时间段
+              </el-button>
               <div class="grid-tips" style="margin-left: 20px">
-                <el-icon color="#f5a623" style="margin-right: 4px; font-size: 14px; vertical-align: -2px"><WarningFilled /></el-icon>
+                <el-icon
+                  color="#f5a623"
+                  style="margin-right: 4px; font-size: 14px; vertical-align: -2px"
+                >
+                  <WarningFilled />
+                </el-icon>
                 <span class="orange">未设置的时段默认使用基准价</span>
               </div>
             </div>
@@ -625,7 +790,13 @@ const form = reactive({
       startTime: "01:00",
       endTime: "06:00",
       rules: [
-        { operateType: "percent_decrease", operateValue: 0.02, limitValue: 0.02, triggerValue: 0, targetValue: 0 },
+        {
+          operateType: "percent_decrease",
+          operateValue: 0.02,
+          limitValue: 0.02,
+          triggerValue: 0,
+          targetValue: 0,
+        },
       ],
     },
   ] as TimeSegment[],
@@ -676,9 +847,7 @@ const shopFilterQuery = ref("");
 const filteredShopOptions = computed(() => {
   const q = shopFilterQuery.value.toLowerCase().trim();
   if (!q) return shopOptions.value;
-  return shopOptions.value.filter(
-    (opt) => String(opt.label).toLowerCase().includes(q)
-  );
+  return shopOptions.value.filter((opt) => String(opt.label).toLowerCase().includes(q));
 });
 
 /**
@@ -998,7 +1167,15 @@ function addSegment(): void {
     dayOfWeek: "1",
     startTime: "",
     endTime: "",
-    rules: [{ operateType: "percent_decrease", operateValue: 0, limitValue: 0, triggerValue: 0, targetValue: 0 }],
+    rules: [
+      {
+        operateType: "percent_decrease",
+        operateValue: 0,
+        limitValue: 0,
+        triggerValue: 0,
+        targetValue: 0,
+      },
+    ],
   });
 }
 
@@ -1101,7 +1278,14 @@ function buildPayload(): Record<string, unknown> {
   const timeSettings: Record<string, unknown> =
     form.mode === "calendar"
       ? { grid: form.grid }
-      : { segments: form.timeSegments.map((seg) => ({ dayOfWeek: seg.dayOfWeek, startTime: seg.startTime, endTime: seg.endTime, rules: seg.rules })) };
+      : {
+          segments: form.timeSegments.map((seg) => ({
+            dayOfWeek: seg.dayOfWeek,
+            startTime: seg.startTime,
+            endTime: seg.endTime,
+            rules: seg.rules,
+          })),
+        };
 
   return {
     name: form.name,
@@ -1149,7 +1333,15 @@ interface TimePricingApiData {
   time_mode?: string;
   time_settings?: {
     grid?: (GridCell | null)[][];
-    segments?: { dayOfWeek: string; startTime: string; endTime: string; rules?: TimeSegmentRule[]; operateType?: string; operateValue?: number; limitValue?: number }[];
+    segments?: {
+      dayOfWeek: string;
+      startTime: string;
+      endTime: string;
+      rules?: TimeSegmentRule[];
+      operateType?: string;
+      operateValue?: number;
+      limitValue?: number;
+    }[];
   };
   callback_settings?: {
     type?: string;
@@ -1192,7 +1384,15 @@ function fillForm(data: TimePricingApiData): void {
       dayOfWeek: s.dayOfWeek || "1",
       startTime: s.startTime || "",
       endTime: s.endTime || "",
-      rules: s.rules || [{ operateType: s.operateType || "percent_decrease", operateValue: s.operateValue ?? 0, limitValue: s.limitValue ?? 0, triggerValue: 0, targetValue: 0 }],
+      rules: s.rules || [
+        {
+          operateType: s.operateType || "percent_decrease",
+          operateValue: s.operateValue ?? 0,
+          limitValue: s.limitValue ?? 0,
+          triggerValue: 0,
+          targetValue: 0,
+        },
+      ],
     }));
   }
   const cb = data.callback_settings || {};
@@ -1253,7 +1453,13 @@ function resetForm(): void {
       startTime: "01:00",
       endTime: "06:00",
       rules: [
-        { operateType: "percent_decrease", operateValue: 0.02, limitValue: 0.02, triggerValue: 0, targetValue: 0 },
+        {
+          operateType: "percent_decrease",
+          operateValue: 0.02,
+          limitValue: 0.02,
+          triggerValue: 0,
+          targetValue: 0,
+        },
       ],
     },
   ];
@@ -1298,22 +1504,22 @@ defineExpose({ open, openForEdit });
 /* 分时调价策略表单：多选下拉框——自定义勾选框（下拉 teleport 到 body，必须非 scoped） */
 .fake-checkbox {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   width: 14px;
   height: 14px;
-  border: 1px solid #dcdfe6;
-  border-radius: 2px;
   font-size: 10px;
   color: transparent;
   background: #fff;
-  flex-shrink: 0;
-  transition: all .15s;
+  border: 1px solid #dcdfe6;
+  border-radius: 2px;
+  transition: all 0.15s;
 
   &.checked {
+    color: #fff;
     background: #409eff;
     border-color: #409eff;
-    color: #fff;
   }
 }
 </style>

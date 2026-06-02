@@ -90,16 +90,11 @@
               <el-popover placement="bottom" :width="260" trigger="hover" :show-after="200">
                 <template #reference>
                   <el-link type="primary" :underline="false">
-                    {{ formatCondensed(row.shops, shopNameMap, totalShopCount, '店铺').text }}
+                    {{ formatCondensed(row.shops, shopNameMap, totalShopCount, "店铺").text }}
                   </el-link>
                 </template>
                 <div class="popover-list">
-                  <el-tag
-                    v-for="(sid, i) in row.shops"
-                    :key="i"
-                    size="small"
-                    style="margin: 2px"
-                  >
+                  <el-tag v-for="(sid, i) in row.shops" :key="i" size="small" style="margin: 2px">
                     {{ shopNameMap[String(sid)] || sid }}
                   </el-tag>
                 </div>
@@ -114,7 +109,7 @@
               <el-popover placement="bottom" :width="220" trigger="hover" :show-after="200">
                 <template #reference>
                   <el-link type="primary" :underline="false">
-                    {{ formatCondensed(getTagArray(row), {} as any, totalTagCount, '标签').text }}
+                    {{ formatCondensed(getTagArray(row), {} as any, totalTagCount, "标签").text }}
                   </el-link>
                 </template>
                 <div class="popover-list">
@@ -184,7 +179,12 @@ import { ArrowDown, QuestionFilled } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { ElTable } from "element-plus";
 import BiddingStrategyForm from "./BiddingStrategyForm.vue";
-import { getTimePricingList, deleteTimePricing, getShopOptions, getLabelOptions } from "@/api/ads/index";
+import {
+  getTimePricingList,
+  deleteTimePricing,
+  getShopOptions,
+  getLabelOptions,
+} from "@/api/ads/index";
 import type { TimePricingOption } from "@/api/ads/index";
 
 defineOptions({
@@ -210,10 +210,14 @@ const totalTagCount = ref(0);
 function getTagArray(row: Record<string, unknown>): string[] {
   let fs = row.field_settings;
   if (typeof fs === "string") {
-    try { fs = JSON.parse(fs); } catch { fs = null; }
+    try {
+      fs = JSON.parse(fs);
+    } catch {
+      fs = null;
+    }
   }
   const tags = (fs as Record<string, unknown> | null)?.tags;
-  return Array.isArray(tags) ? tags as string[] : [];
+  return Array.isArray(tags) ? (tags as string[]) : [];
 }
 
 /**
@@ -228,7 +232,7 @@ function formatCondensed(
   values: (string | number)[],
   nameMap: Record<string, string>,
   totalCount: number,
-  allLabel: string,
+  allLabel: string
 ): { text: string; isAll: boolean } {
   if (!values || values.length === 0) return { text: "-", isAll: false };
   if (totalCount > 0 && values.length >= totalCount) {
@@ -384,7 +388,7 @@ onMounted(() => {
   flex-wrap: wrap;
   gap: 2px;
   max-height: 200px;
-  overflow-y: auto;
   padding: 4px 0;
+  overflow-y: auto;
 }
 </style>
