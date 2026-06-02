@@ -54,17 +54,31 @@ class LxTimePricingStrategy(models.Model):
         verbose_name="模板状态",
     )
 
-    start_time = models.BigIntegerField(
+    start_month = models.IntegerField(
         null=True,
         blank=True,
-        verbose_name="模板开始时间（毫秒时间戳）",
+        verbose_name="生效起始月（1-12）",
         help_text="null 表示不限",
     )
 
-    end_time = models.BigIntegerField(
+    start_day = models.IntegerField(
         null=True,
         blank=True,
-        verbose_name="模板结束时间（毫秒时间戳）",
+        verbose_name="生效起始日（1-31）",
+        help_text="null 表示不限",
+    )
+
+    end_month = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="生效结束月（1-12）",
+        help_text="null 表示不限",
+    )
+
+    end_day = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="生效结束日（1-31）",
         help_text="null 表示不限",
     )
 

@@ -91,7 +91,7 @@
         </el-table-column>
         <el-table-column label="标签" min-width="120">
           <template #default="{ row }">
-            {{ ((row.field_settings || {}).tags || []).join("、") || "-" }}
+            {{ getFlatTags(row) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" min-width="140" fixed="right">
@@ -154,6 +154,30 @@ defineOptions({
 
 const STATUS_MAP: Record<number, string> = { 0: "暂停", 1: "开启" };
 const TYPE_MAP: Record<string, string> = { bidding_time: "竞价分时" };
+
+/**
+ * 从行数据中提取标签并扁平化为展示字符串。
+ * 兼容 field_settings 为对象、JSON 字符串或缺失的情况。
+ *
+ * @param row - 表格行数据
+ * @returns 扁平化的标签字符串，如 "爆款、清仓"，无数据时返回 "-"
+ */
+function getFlatTags(row: Record<string, unknown>): string {
+  let fs = row.field_settings;
+  // 兼容后端返回 JSON 字符串的情况
+  if (typeof fs === "string") {
+    try {
+      fs = JSON.parse(fs);
+    } catch {
+      fs = null;
+    }
+  }
+  const tags = (fs as Record<string, unknown> | null)?.tags;
+  if (Array.isArray(tags) && tags.length > 0) {
+    return tags.join("、");
+  }
+  return "-";
+}
 
 const listQuery = reactive({
   keyword: "",
