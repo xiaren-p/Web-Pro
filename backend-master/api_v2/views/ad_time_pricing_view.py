@@ -42,17 +42,22 @@ def trigger_ad_time_pricing(request: Request) -> Response:
     })
 
 
+# 分时开始 / 回调任务的互斥锁
+_START_LOCK_KEY = "ad_time_pricing_start_lock"
+_CALLBACK_LOCK_KEY = "ad_time_pricing_callback_lock"
+_TASK_LOCK_TTL = 1800
+
+
 @api_view(["POST"])
 @authentication_classes([BearerTokenAuthentication])
 @permission_classes([])
 def trigger_time_pricing_start(request: Request) -> Response:
     """手动触发"分时开始"任务（异步 Celery 执行）。"""
+    if cache.get(_START_LOCK_KEY):
+        return Response({"code": "B0001", "data": None, "msg": "分时开始任务正在执行中"}, status=409)
+    cache.set(_START_LOCK_KEY, "1", timeout=_TASK_LOCK_TTL)
     task = run_time_pricing_start_task.delay()
-    return Response({
-        "code": "00000",
-        "data": {"task_id": task.id, "message": "分时开始任务已入队"},
-        "msg": "success",
-    })
+    return Response({"code": "00000", "data": {"task_id": task.id, "message": "分时开始任务已入队"}, "msg": "success"})
 
 
 @api_view(["POST"])
@@ -60,12 +65,11 @@ def trigger_time_pricing_start(request: Request) -> Response:
 @permission_classes([])
 def trigger_time_pricing_callback(request: Request) -> Response:
     """手动触发"分时回调"任务（异步 Celery 执行）。"""
+    if cache.get(_CALLBACK_LOCK_KEY):
+        return Response({"code": "B0001", "data": None, "msg": "分时回调任务正在执行中"}, status=409)
+    cache.set(_CALLBACK_LOCK_KEY, "1", timeout=_TASK_LOCK_TTL)
     task = run_time_pricing_callback_task.delay()
-    return Response({
-        "code": "00000",
-        "data": {"task_id": task.id, "message": "分时回调任务已入队"},
-        "msg": "success",
-    })
+    return Response({"code": "00000", "data": {"task_id": task.id, "message": "分时回调任务已入队"}, "msg": "success"})
 
 
 @api_view(["DELETE"])

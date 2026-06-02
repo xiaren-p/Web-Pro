@@ -213,7 +213,6 @@ def execute_time_pricing_callback() -> dict[str, Any]:
                     keyword_id=item_id if not is_target else None,
                     campaign_id=hit.campaign_id,
                     profile_id=hit.profile_id,
-                    targeting_type=hit.targeting_type,
                     execution_type=ExecutionTypeChoices.TIME_PRICING_CALLBACK,
                     time_pricing_rule_id=strategy.id,
                     auto_rule_id=None,
