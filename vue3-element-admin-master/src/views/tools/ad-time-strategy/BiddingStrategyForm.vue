@@ -127,139 +127,96 @@
         </el-form-item>
         <el-form-item label="字段设置">
           <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%">
-            <el-select
-              v-model="form.categories"
-              multiple
-              filterable
-              collapse-tags
-              collapse-tags-tooltip
-              placeholder="请选择归类"
-              size="small"
-              style="width: 160px"
-              @change="
-                (vals: (string | number)[]) => onSelectChange(vals, assortOptions, 'categories')
-              "
-              @visible-change="handleSelectVisible"
-            >
-              <el-option
-                :value="SELECT_ALL_MARKER"
-                :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
+            <!-- 归类 -->
+            <div style="display: flex; gap: 4px; align-items: center">
+              <el-select
+                v-model="form.categories"
+                multiple
+                filterable
+                collapse-tags
+                collapse-tags-tooltip
+                placeholder="请选择归类"
+                size="small"
+                style="width: 140px"
+                :disabled="form.unlimitedCategories"
+                @change="(vals: (string | number)[]) => onSelectChange(vals, assortOptions, 'categories')"
+                @visible-change="handleSelectVisible"
               >
-                <span style="display: flex; gap: 6px; align-items: center">
-                  <span
-                    class="fake-checkbox"
-                    :class="{ checked: form.categories.length === assortOptions.length }"
-                  >
-                    ✓
+                <el-option :value="SELECT_ALL_MARKER" :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }">
+                  <span style="display: flex; gap: 6px; align-items: center">
+                    <span class="fake-checkbox" :class="{ checked: form.categories.length === assortOptions.length }">✓</span>
+                    全选
                   </span>
-                  全选
-                </span>
-              </el-option>
-              <el-option
-                v-for="opt in assortOptions"
-                :key="String(opt.value)"
-                :label="opt.label"
-                :value="opt.value"
+                </el-option>
+                <el-option v-for="opt in assortOptions" :key="String(opt.value)" :label="opt.label" :value="opt.value">
+                  <span style="display: flex; gap: 6px; align-items: center">
+                    <span class="fake-checkbox" :class="{ checked: form.categories.includes(String(opt.value)) }">✓</span>
+                    {{ opt.label }}
+                  </span>
+                </el-option>
+              </el-select>
+              <el-checkbox v-model="form.unlimitedCategories" size="small">不限</el-checkbox>
+            </div>
+            <!-- 负责人 -->
+            <div style="display: flex; gap: 4px; align-items: center">
+              <el-select
+                v-model="form.managers"
+                multiple
+                filterable
+                collapse-tags
+                collapse-tags-tooltip
+                placeholder="请选择负责人"
+                size="small"
+                style="width: 160px"
+                :disabled="form.unlimitedManagers"
+                @change="(vals: (string | number)[]) => onSelectChange(vals, managerOptions, 'managers')"
+                @visible-change="handleSelectVisible"
               >
-                <span style="display: flex; gap: 6px; align-items: center">
-                  <span
-                    class="fake-checkbox"
-                    :class="{ checked: form.categories.includes(String(opt.value)) }"
-                  >
-                    ✓
+                <el-option :value="SELECT_ALL_MARKER" :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }">
+                  <span style="display: flex; gap: 6px; align-items: center">
+                    <span class="fake-checkbox" :class="{ checked: form.managers.length === managerOptions.length }">✓</span>
+                    全选
                   </span>
-                  {{ opt.label }}
-                </span>
-              </el-option>
-            </el-select>
-            <el-select
-              v-model="form.managers"
-              multiple
-              filterable
-              collapse-tags
-              collapse-tags-tooltip
-              placeholder="请选择负责人"
-              size="small"
-              style="width: 180px"
-              @change="
-                (vals: (string | number)[]) => onSelectChange(vals, managerOptions, 'managers')
-              "
-              @visible-change="handleSelectVisible"
-            >
-              <el-option
-                :value="SELECT_ALL_MARKER"
-                :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
+                </el-option>
+                <el-option v-for="opt in managerOptions" :key="String(opt.value)" :label="opt.label" :value="opt.value">
+                  <span style="display: flex; gap: 6px; align-items: center">
+                    <span class="fake-checkbox" :class="{ checked: form.managers.includes(opt.value) }">✓</span>
+                    {{ opt.label }}
+                  </span>
+                </el-option>
+              </el-select>
+              <el-checkbox v-model="form.unlimitedManagers" size="small">不限</el-checkbox>
+            </div>
+            <!-- 标签 -->
+            <div style="display: flex; gap: 4px; align-items: center">
+              <el-select
+                v-model="form.tags"
+                multiple
+                filterable
+                collapse-tags
+                collapse-tags-tooltip
+                placeholder="请选择标签"
+                size="small"
+                style="width: 140px"
+                :disabled="form.unlimitedTags"
+                @change="(vals: (string | number)[]) => onSelectChange(vals, labelOptions, 'tags')"
+                @visible-change="handleSelectVisible"
               >
-                <span style="display: flex; gap: 6px; align-items: center">
-                  <span
-                    class="fake-checkbox"
-                    :class="{ checked: form.managers.length === managerOptions.length }"
-                  >
-                    ✓
+                <el-option :value="SELECT_ALL_MARKER" :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }">
+                  <span style="display: flex; gap: 6px; align-items: center">
+                    <span class="fake-checkbox" :class="{ checked: form.tags.length === labelOptions.length }">✓</span>
+                    全选
                   </span>
-                  全选
-                </span>
-              </el-option>
-              <el-option
-                v-for="opt in managerOptions"
-                :key="String(opt.value)"
-                :label="opt.label"
-                :value="opt.value"
-              >
-                <span style="display: flex; gap: 6px; align-items: center">
-                  <span
-                    class="fake-checkbox"
-                    :class="{ checked: form.managers.includes(opt.value) }"
-                  >
-                    ✓
+                </el-option>
+                <el-option v-for="opt in labelOptions" :key="String(opt.value)" :label="opt.label" :value="opt.value">
+                  <span style="display: flex; gap: 6px; align-items: center">
+                    <span class="fake-checkbox" :class="{ checked: form.tags.includes(String(opt.value)) }">✓</span>
+                    {{ opt.label }}
                   </span>
-                  {{ opt.label }}
-                </span>
-              </el-option>
-            </el-select>
-            <el-select
-              v-model="form.tags"
-              multiple
-              filterable
-              collapse-tags
-              collapse-tags-tooltip
-              placeholder="请选择标签"
-              size="small"
-              style="width: 160px"
-              @change="(vals: (string | number)[]) => onSelectChange(vals, labelOptions, 'tags')"
-              @visible-change="handleSelectVisible"
-            >
-              <el-option
-                :value="SELECT_ALL_MARKER"
-                :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
-              >
-                <span style="display: flex; gap: 6px; align-items: center">
-                  <span
-                    class="fake-checkbox"
-                    :class="{ checked: form.tags.length === labelOptions.length }"
-                  >
-                    ✓
-                  </span>
-                  全选
-                </span>
-              </el-option>
-              <el-option
-                v-for="opt in labelOptions"
-                :key="String(opt.value)"
-                :label="opt.label"
-                :value="opt.value"
-              >
-                <span style="display: flex; gap: 6px; align-items: center">
-                  <span
-                    class="fake-checkbox"
-                    :class="{ checked: form.tags.includes(String(opt.value)) }"
-                  >
-                    ✓
-                  </span>
-                  {{ opt.label }}
-                </span>
-              </el-option>
-            </el-select>
+                </el-option>
+              </el-select>
+              <el-checkbox v-model="form.unlimitedTags" size="small">不限</el-checkbox>
+            </div>
           </div>
         </el-form-item>
         <el-form-item label="分时设置" class="time-setting-item">
@@ -806,8 +763,11 @@ const form = reactive({
   baseValueType: "apply",
   baseFixedValue: null as number | null,
   categories: [] as string[],
+  unlimitedCategories: false,
   managers: [] as (number | string)[],
+  unlimitedManagers: false,
   tags: [] as string[],
+  unlimitedTags: false,
   weight: 1,
   mode: "byDay",
   grid: createEmptyGrid(),
@@ -1326,9 +1286,9 @@ function buildPayload(): Record<string, unknown> {
     base_value_type: form.baseValueType === "apply" ? 1 : 2,
     base_fixed_value: form.baseFixedValue,
     field_settings: {
-      categories: form.categories,
-      managers: form.managers,
-      tags: form.tags,
+      categories: form.unlimitedCategories ? [] : form.categories,
+      managers: form.unlimitedManagers ? [] : form.managers,
+      tags: form.unlimitedTags ? [] : form.tags,
     },
     time_mode: form.mode,
     time_settings: timeSettings,
@@ -1398,8 +1358,11 @@ function fillForm(data: TimePricingApiData): void {
   form.baseFixedValue = data.base_fixed_value ?? null;
   const fs = data.field_settings || {};
   form.categories = fs.categories || [];
+  form.unlimitedCategories = (fs.categories || []).length === 0;
   form.managers = fs.managers || [];
+  form.unlimitedManagers = (fs.managers || []).length === 0;
   form.tags = fs.tags || [];
+  form.unlimitedTags = (fs.tags || []).length === 0;
   form.weight = data.weight ?? 1;
   form.mode = data.time_mode || "byDay";
   const ts = data.time_settings || {};
@@ -1471,8 +1434,11 @@ function resetForm(): void {
   form.baseValueType = "apply";
   form.baseFixedValue = null;
   form.categories = [];
+  form.unlimitedCategories = false;
   form.managers = [];
+  form.unlimitedManagers = false;
   form.tags = [];
+  form.unlimitedTags = false;
   form.weight = 1;
   form.mode = "byDay";
   form.grid = Array(7)
