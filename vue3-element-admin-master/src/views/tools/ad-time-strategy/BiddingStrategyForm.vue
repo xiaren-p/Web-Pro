@@ -254,121 +254,98 @@
           </div>
 
           <div v-show="form.mode !== 'calendar'" class="time-segments-container">
-            <div v-for="(seg, idx) in form.timeSegments" :key="idx" class="time-segment-row">
-              <el-select
-                v-if="form.mode === 'byWeek'"
-                v-model="seg.dayOfWeek"
-                size="small"
-                style="width: 90px; margin-right: 8px"
-              >
-                <el-option label="周一" value="1" />
-                <el-option label="周二" value="2" />
-                <el-option label="周三" value="3" />
-                <el-option label="周四" value="4" />
-                <el-option label="周五" value="5" />
-                <el-option label="周六" value="6" />
-                <el-option label="周日" value="7" />
-              </el-select>
-              <el-time-select
-                v-model="seg.startTime"
-                start="00:00"
-                step="01:00"
-                end="24:00"
-                placeholder="1:00"
-                style="width: 90px"
-                size="small"
-              />
-              <span class="tilde">~</span>
-              <el-time-select
-                v-model="seg.endTime"
-                start="00:00"
-                step="01:00"
-                end="24:00"
-                placeholder="6:00"
-                style="width: 90px"
-                size="small"
-              />
-              <el-select
-                v-model="seg.operateType"
-                size="small"
-                style="width: 190px; margin-left: 12px"
-              >
-                <el-option label="在基准值上按百分比降低" value="percent_decrease" />
-                <el-option label="在基准值上按百分比提高" value="percent_increase" />
-                <el-option label="在基准值上按固定值增量" value="fixed_increase" />
-                <el-option label="在基准值上按固定值减量" value="fixed_decrease" />
-                <el-option label="使用固定值" value="fixed" />
-              </el-select>
-              <el-input-number
-                v-model="seg.operateValue"
-                size="small"
-                :controls="false"
-                style="width: 70px; margin-left: 12px"
-              />
-              <template v-if="seg.operateType === 'percent_decrease'">
-                <span class="text">%，降低后，最低不低于</span>
-                <el-input-number
-                  v-model="seg.limitValue"
+            <div v-for="(seg, idx) in form.timeSegments" :key="idx" class="time-segment-block">
+              <!-- 时间段头部：星期 + 时间范围 + 删除 -->
+              <div class="time-segment-header">
+                <el-select
+                  v-if="form.mode === 'byWeek'"
+                  v-model="seg.dayOfWeek"
                   size="small"
-                  :controls="false"
-                  style="width: 70px; margin: 0 8px"
+                  style="width: 90px"
+                >
+                  <el-option label="周一" value="1" />
+                  <el-option label="周二" value="2" />
+                  <el-option label="周三" value="3" />
+                  <el-option label="周四" value="4" />
+                  <el-option label="周五" value="5" />
+                  <el-option label="周六" value="6" />
+                  <el-option label="周日" value="7" />
+                </el-select>
+                <el-time-select
+                  v-model="seg.startTime"
+                  start="00:00" step="01:00" end="24:00"
+                  placeholder="1:00" style="width: 90px" size="small"
                 />
-                <span class="text">€</span>
-              </template>
-              <template v-else-if="seg.operateType === 'percent_increase'">
-                <span class="text">%，提高后，最高不超过</span>
-                <el-input-number
-                  v-model="seg.limitValue"
-                  size="small"
-                  :controls="false"
-                  style="width: 70px; margin: 0 8px"
+                <span class="tilde">~</span>
+                <el-time-select
+                  v-model="seg.endTime"
+                  start="00:00" step="01:00" end="24:00"
+                  placeholder="6:00" style="width: 90px" size="small"
                 />
-                <span class="text">€</span>
-              </template>
-              <template v-else-if="seg.operateType === 'fixed_decrease'">
-                <span class="text">€，降低后，最低不低于</span>
-                <el-input-number
-                  v-model="seg.limitValue"
-                  size="small"
-                  :controls="false"
-                  style="width: 70px; margin: 0 8px"
-                />
-                <span class="text">€</span>
-              </template>
-              <template v-else-if="seg.operateType === 'fixed_increase'">
-                <span class="text">€，提高后，最高不超过</span>
-                <el-input-number
-                  v-model="seg.limitValue"
-                  size="small"
-                  :controls="false"
-                  style="width: 70px; margin: 0 8px"
-                />
-                <span class="text">€</span>
-              </template>
-              <template v-else-if="seg.operateType === 'fixed'">
-                <span class="text" style="margin-left: 8px">€</span>
-              </template>
-              <el-button
-                v-if="form.timeSegments.length > 1"
-                link
-                type="danger"
-                style="margin-left: 8px"
-                @click="removeSegment(idx)"
-              >
-                删除
-              </el-button>
+                <el-button
+                  v-if="form.timeSegments.length > 1"
+                  link type="danger" size="small" style="margin-left: 8px"
+                  @click="removeSegment(idx)"
+                >
+                  删除时段
+                </el-button>
+              </div>
+              <!-- 规则列表 -->
+              <div v-for="(rule, ri) in seg.rules" :key="ri" class="time-rule-row">
+                <el-select v-model="rule.operateType" size="small" style="width: 210px">
+                  <el-option label="在基准值上按百分比降低" value="percent_decrease" />
+                  <el-option label="在基准值上按百分比提高" value="percent_increase" />
+                  <el-option label="在基准值上按固定值增量" value="fixed_increase" />
+                  <el-option label="在基准值上按固定值减量" value="fixed_decrease" />
+                  <el-option label="使用固定值" value="fixed" />
+                  <el-option label="竞价高于【】的，固定调到【】" value="bid_above_fixed" />
+                  <el-option label="竞价低于【】的，固定调到【】" value="bid_below_fixed" />
+                </el-select>
+                <!-- 百分比 / 固定值类规则 -->
+                <template v-if="['percent_decrease','percent_increase','fixed_decrease','fixed_increase'].includes(rule.operateType)">
+                  <el-input-number v-model="rule.operateValue" size="small" :controls="false" style="width: 70px; margin-left: 8px" />
+                  <template v-if="rule.operateType === 'percent_decrease'">
+                    <span class="text">%，降低后，最低不低于</span>
+                    <el-input-number v-model="rule.limitValue" size="small" :controls="false" style="width: 70px; margin: 0 8px" /><span class="text">€</span>
+                  </template>
+                  <template v-else-if="rule.operateType === 'percent_increase'">
+                    <span class="text">%，提高后，最高不超过</span>
+                    <el-input-number v-model="rule.limitValue" size="small" :controls="false" style="width: 70px; margin: 0 8px" /><span class="text">€</span>
+                  </template>
+                  <template v-else-if="rule.operateType === 'fixed_decrease'">
+                    <span class="text">€，降低后，最低不低于</span>
+                    <el-input-number v-model="rule.limitValue" size="small" :controls="false" style="width: 70px; margin: 0 8px" /><span class="text">€</span>
+                  </template>
+                  <template v-else-if="rule.operateType === 'fixed_increase'">
+                    <span class="text">€，提高后，最高不超过</span>
+                    <el-input-number v-model="rule.limitValue" size="small" :controls="false" style="width: 70px; margin: 0 8px" /><span class="text">€</span>
+                  </template>
+                </template>
+                <template v-else-if="rule.operateType === 'fixed'">
+                  <span class="text" style="margin: 0 8px">€</span>
+                  <el-input-number v-model="rule.operateValue" size="small" :controls="false" style="width: 70px" />
+                </template>
+                <!-- 竞价高于/低于 -->
+                <template v-else-if="rule.operateType === 'bid_above_fixed'">
+                  <span class="text" style="margin: 0 4px">竞价高于 €</span>
+                  <el-input-number v-model="rule.triggerValue" size="small" :controls="false" style="width: 80px" />
+                  <span class="text" style="margin: 0 4px">的，固定调到 €</span>
+                  <el-input-number v-model="rule.targetValue" size="small" :controls="false" style="width: 80px" />
+                </template>
+                <template v-else-if="rule.operateType === 'bid_below_fixed'">
+                  <span class="text" style="margin: 0 4px">竞价低于 €</span>
+                  <el-input-number v-model="rule.triggerValue" size="small" :controls="false" style="width: 80px" />
+                  <span class="text" style="margin: 0 4px">的，固定调到 €</span>
+                  <el-input-number v-model="rule.targetValue" size="small" :controls="false" style="width: 80px" />
+                </template>
+                <el-button v-if="seg.rules.length > 1" link type="danger" size="small" style="margin-left: 6px" @click="removeRule(idx, ri)">×</el-button>
+              </div>
+              <el-button link type="primary" size="small" style="margin-top: 4px" @click="addRule(idx)">+ 添加规则</el-button>
             </div>
             <div class="segment-tools">
-              <el-button style="height: auto; padding: 5px 15px" @click="addSegment">
-                +添加时间段
-              </el-button>
+              <el-button style="height: auto; padding: 5px 15px" @click="addSegment">+ 添加时间段</el-button>
               <div class="grid-tips" style="margin-left: 20px">
-                <el-icon
-                  color="#f5a623"
-                  style="margin-right: 4px; font-size: 14px; vertical-align: -2px"
-                >
-                  <WarningFilled />
-                </el-icon>
+                <el-icon color="#f5a623" style="margin-right: 4px; font-size: 14px; vertical-align: -2px"><WarningFilled /></el-icon>
                 <span class="orange">未设置的时段默认使用基准价</span>
               </div>
             </div>
@@ -575,14 +552,23 @@ interface GridCell {
   color: string;
 }
 
-/** 时间段配置项 */
+/** 单条竞价规则 */
+interface TimeSegmentRule {
+  operateType: string;
+  operateValue: number;
+  limitValue: number;
+  /** 竞价高于/低于：触发阈值 */
+  triggerValue: number;
+  /** 竞价高于/低于：固定调到该值 */
+  targetValue: number;
+}
+
+/** 时间段配置项（可含多条规则） */
 interface TimeSegment {
   dayOfWeek: string;
   startTime: string;
   endTime: string;
-  operateType: string;
-  operateValue: number;
-  limitValue: number;
+  rules: TimeSegmentRule[];
 }
 
 // ── defineEmits ───────────────────────────────────────────────────────────────
@@ -633,9 +619,9 @@ const form = reactive({
       dayOfWeek: "1",
       startTime: "01:00",
       endTime: "06:00",
-      operateType: "percent_decrease",
-      operateValue: 0.02,
-      limitValue: 0.02,
+      rules: [
+        { operateType: "percent_decrease", operateValue: 0.02, limitValue: 0.02, triggerValue: 0, targetValue: 0 },
+      ],
     },
   ] as TimeSegment[],
   invalidCallbackType: "previous",
@@ -999,18 +985,50 @@ function clearGrid(): void {
 }
 
 /** 新增一条分时时间段。 */
+/**
+ * 新增一条时间段。
+ */
 function addSegment(): void {
   form.timeSegments.push({
     dayOfWeek: "1",
     startTime: "",
     endTime: "",
+    rules: [{ operateType: "percent_decrease", operateValue: 0, limitValue: 0, triggerValue: 0, targetValue: 0 }],
+  });
+}
+
+/**
+ * 删除指定时间段。
+ *
+ * @param index - 时间段索引
+ */
+function removeSegment(index: number): void {
+  form.timeSegments.splice(index, 1);
+}
+
+/**
+ * 给指定时间段添加一条规则。
+ *
+ * @param segIdx - 时间段索引
+ */
+function addRule(segIdx: number): void {
+  form.timeSegments[segIdx].rules.push({
     operateType: "percent_decrease",
     operateValue: 0,
     limitValue: 0,
+    triggerValue: 0,
+    targetValue: 0,
   });
 }
-function removeSegment(index: number) {
-  form.timeSegments.splice(index, 1);
+
+/**
+ * 删除指定时间段的某条规则。
+ *
+ * @param segIdx - 时间段索引
+ * @param ruleIdx - 规则索引
+ */
+function removeRule(segIdx: number, ruleIdx: number): void {
+  form.timeSegments[segIdx].rules.splice(ruleIdx, 1);
 }
 /**
  * 加载所有下拉选项数据，新建时默认全选。
@@ -1074,9 +1092,11 @@ function buildPayload(): Record<string, unknown> {
     callbackSettings.fixed = form.invalidCallbackFixed;
   }
 
-  // 分时设置
+  // 分时设置：日历模式用 grid，按天/按周用 segments（含 rules）
   const timeSettings: Record<string, unknown> =
-    form.mode === "calendar" ? { grid: form.grid } : { segments: form.timeSegments };
+    form.mode === "calendar"
+      ? { grid: form.grid }
+      : { segments: form.timeSegments.map((seg) => ({ dayOfWeek: seg.dayOfWeek, startTime: seg.startTime, endTime: seg.endTime, rules: seg.rules })) };
 
   return {
     name: form.name,
@@ -1124,7 +1144,7 @@ interface TimePricingApiData {
   time_mode?: string;
   time_settings?: {
     grid?: (GridCell | null)[][];
-    segments?: TimeSegment[];
+    segments?: { dayOfWeek: string; startTime: string; endTime: string; rules?: TimeSegmentRule[]; operateType?: string; operateValue?: number; limitValue?: number }[];
   };
   callback_settings?: {
     type?: string;
@@ -1162,7 +1182,13 @@ function fillForm(data: TimePricingApiData): void {
   if (form.mode === "calendar" && ts.grid) {
     form.grid = ts.grid;
   } else if (ts.segments) {
-    form.timeSegments = ts.segments;
+    // 兼容旧格式（无 rules 字段的扁平数据）和新格式
+    form.timeSegments = (ts.segments as any[]).map((s: any) => ({
+      dayOfWeek: s.dayOfWeek || "1",
+      startTime: s.startTime || "",
+      endTime: s.endTime || "",
+      rules: s.rules || [{ operateType: s.operateType || "percent_decrease", operateValue: s.operateValue ?? 0, limitValue: s.limitValue ?? 0, triggerValue: 0, targetValue: 0 }],
+    }));
   }
   const cb = data.callback_settings || {};
   form.invalidCallbackType = cb.type || "previous";
@@ -1221,9 +1247,9 @@ function resetForm(): void {
       dayOfWeek: "1",
       startTime: "01:00",
       endTime: "06:00",
-      operateType: "percent_decrease",
-      operateValue: 0.02,
-      limitValue: 0.02,
+      rules: [
+        { operateType: "percent_decrease", operateValue: 0.02, limitValue: 0.02, triggerValue: 0, targetValue: 0 },
+      ],
     },
   ];
   form.invalidCallbackType = "previous";

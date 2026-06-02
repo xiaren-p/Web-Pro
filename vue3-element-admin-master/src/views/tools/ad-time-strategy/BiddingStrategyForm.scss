@@ -164,20 +164,38 @@
 }
 .time-segments-container {
   width: 100%;
-  .time-segment-row {
+  .time-segment-block {
+    margin-bottom: 20px;
+    padding: 12px;
+    background: #fafafa;
+    border: 1px solid #ebeef5;
+    border-radius: 4px;
+  }
+  .time-segment-header {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 0;
+    gap: 8px;
     align-items: center;
-    margin-bottom: 20px;
-    background: #fff;
+    margin-bottom: 8px;
     .tilde {
       margin: 0 10px;
       color: #666;
     }
+  }
+  .time-rule-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 0;
+    align-items: center;
+    margin: 6px 0 6px 12px;
+    padding: 6px 8px;
+    background: #fff;
+    border: 1px dashed #dcdfe6;
+    border-radius: 4px;
     .text {
       font-size: 13px;
       color: #333;
+      white-space: nowrap;
     }
   }
   .segment-tools {
