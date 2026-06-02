@@ -40,12 +40,7 @@
             style="width: 150px"
             @change="handleFilterChange"
           >
-            <el-option
-              v-for="u in userOptions"
-              :key="u.value"
-              :label="u.label"
-              :value="u.value"
-            />
+            <el-option v-for="u in userOptions" :key="u.value" :label="u.label" :value="u.value" />
           </el-select>
           <el-date-picker
             v-model="filterDateRange"

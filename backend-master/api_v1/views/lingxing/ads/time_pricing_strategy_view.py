@@ -4,7 +4,10 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
+from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStrategy
+from api_v1.models.lingxing.basic.lx_user import LxUser
+from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
 from api_v1.serializers.lingxing.ads_time_pricing_strategy_serializer import LxTimePricingStrategySerializer
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_error, drf_ok
@@ -22,6 +25,68 @@ class TimePricingStrategyViewSet(viewsets.ViewSet):
     """
 
     permission_classes = [IsAuthenticated]
+
+    # ============================================================
+    # 下拉选项接口
+    # ============================================================
+
+    @action(detail=False, methods=["get"], url_path="shops")
+    def shops(self, request):
+        """获取适用店铺选项（LxAdsProfile，profile_id 为值，name 为展示名）。"""
+        qs = LxAdsProfile.objects.filter(status=1).values("profile_id", "name", "country_code")
+        data = [
+            {
+                "value": item["profile_id"],
+                "label": f"{item['name']}（{item['country_code']}）",
+            }
+            for item in qs
+        ]
+        return drf_ok(data)
+
+    @action(detail=False, methods=["get"], url_path="managers")
+    def managers(self, request):
+        """获取负责人选项（LxUser，uid 为值，realname/username 为展示名）。"""
+        qs = LxUser.objects.filter(status=1).values("uid", "realname", "username")
+        data = [
+            {
+                "value": item["uid"],
+                "label": item["realname"] or item["username"] or f"用户{item['uid']}",
+            }
+            for item in qs
+        ]
+        return drf_ok(data)
+
+    @action(detail=False, methods=["get"], url_path="assorts")
+    def assorts(self, request):
+        """获取归类选项（LxProductInfo.assort 去重）。"""
+        values = (
+            LxProductInfo.objects
+            .exclude(assort__isnull=True)
+            .exclude(assort="")
+            .values_list("assort", flat=True)
+            .distinct()
+            .order_by("assort")
+        )
+        data = [{"value": v, "label": v} for v in values]
+        return drf_ok(data)
+
+    @action(detail=False, methods=["get"], url_path="labels")
+    def labels(self, request):
+        """获取标签选项（LxProductInfo.label 去重）。"""
+        values = (
+            LxProductInfo.objects
+            .exclude(label__isnull=True)
+            .exclude(label="")
+            .values_list("label", flat=True)
+            .distinct()
+            .order_by("label")
+        )
+        data = [{"value": v, "label": v} for v in values]
+        return drf_ok(data)
+
+    # ============================================================
+    # CRUD
+    # ============================================================
 
     @action(detail=False, methods=["get", "post"], url_path="")
     def list_or_create(self, request):
@@ -54,7 +119,7 @@ class TimePricingStrategyViewSet(viewsets.ViewSet):
             })
 
         # 新增
-        ser = LxTimePricingStrategySerializer(data=request.data)
+        ser = LxTimePricingStrategySerializer(data=request.data, context={"request": request})
         if not ser.is_valid():
             return drf_error("参数错误", status=400, data={"errors": ser.errors})
         obj = ser.save()

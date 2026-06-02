@@ -2,6 +2,12 @@
 from django.db import models
 
 
+class StrategyType(models.TextChoices):
+    """策略类型枚举。"""
+
+    BIDDING_TIME = "bidding_time", "竞价分时"
+
+
 class StrategyStatus(models.IntegerChoices):
     """策略模板状态枚举。"""
 
@@ -49,11 +55,17 @@ class LxTimePricingStrategy(models.Model):
     )
 
     start_time = models.BigIntegerField(
+        null=True,
+        blank=True,
         verbose_name="模板开始时间（毫秒时间戳）",
+        help_text="null 表示不限",
     )
 
     end_time = models.BigIntegerField(
+        null=True,
+        blank=True,
         verbose_name="模板结束时间（毫秒时间戳）",
+        help_text="null 表示不限",
     )
 
     base_value_type = models.IntegerField(
@@ -113,6 +125,20 @@ class LxTimePricingStrategy(models.Model):
         choices=ExecutionResultType.choices,
         default=ExecutionResultType.NO_NOTICE,
         verbose_name="执行结果通知",
+    )
+
+    type = models.CharField(
+        max_length=50,
+        choices=StrategyType.choices,
+        default=StrategyType.BIDDING_TIME,
+        verbose_name="策略类型",
+    )
+
+    creator = models.CharField(
+        max_length=100,
+        default="",
+        verbose_name="创建人",
+        help_text="创建该策略的用户名",
     )
 
     created_at = models.DateTimeField(

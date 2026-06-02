@@ -30,10 +30,21 @@
           />
         </el-form-item>
         <el-form-item label="适用店铺">
-          <el-select v-model="form.shop" placeholder="请选择" style="width: 220px">
-            <el-option label="请选择" value="" />
-            <el-option label="美国" value="US" />
-            <el-option label="英国" value="UK" />
+          <el-select
+            v-model="form.shops"
+            multiple
+            filterable
+            collapse-tags
+            collapse-tags-tooltip
+            placeholder="请选择店铺"
+            style="width: 320px"
+          >
+            <el-option
+              v-for="opt in shopOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="模板状态">
@@ -43,13 +54,17 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="生效时间">
-          <el-date-picker
-            v-model="form.effectiveTime"
-            type="daterange"
-            start-placeholder="请选择开始时间"
-            end-placeholder="请选择结束时间"
-            style="width: 350px"
-          />
+          <div style="display: flex; gap: 12px; align-items: center">
+            <el-date-picker
+              v-model="form.effectiveTime"
+              type="daterange"
+              start-placeholder="请选择开始时间"
+              end-placeholder="请选择结束时间"
+              style="width: 320px"
+              :disabled="form.timeUnlimited"
+            />
+            <el-checkbox v-model="form.timeUnlimited">不限</el-checkbox>
+          </div>
         </el-form-item>
         <el-form-item label="基准值">
           <el-radio-group v-model="form.baseValueType">
@@ -70,27 +85,38 @@
         <el-form-item label="字段设置">
           <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; width: 100%">
             <el-select
-              v-model="form.category"
+              v-model="form.categories"
+              multiple
+              filterable
+              collapse-tags
+              collapse-tags-tooltip
               placeholder="请选择归类"
               size="small"
-              style="width: 140px"
+              style="width: 160px"
             >
-              <el-option label="主推款" value="main" />
-              <el-option label="利润款" value="profit" />
-              <el-option label="清仓款" value="clearance" />
+              <el-option
+                v-for="opt in assortOptions"
+                :key="String(opt.value)"
+                :label="opt.label"
+                :value="opt.value"
+              />
             </el-select>
             <el-select
               v-model="form.managers"
               multiple
+              filterable
               collapse-tags
               collapse-tags-tooltip
               placeholder="请选择负责人"
               size="small"
-              style="width: 150px"
+              style="width: 180px"
             >
-              <el-option label="张三" value="zhangsan" />
-              <el-option label="李四" value="lisi" />
-              <el-option label="当前系统" value="system" />
+              <el-option
+                v-for="opt in managerOptions"
+                :key="String(opt.value)"
+                :label="opt.label"
+                :value="opt.value"
+              />
             </el-select>
             <el-select
               v-model="form.tags"
@@ -100,12 +126,14 @@
               collapse-tags-tooltip
               placeholder="请选择标签"
               size="small"
-              style="width: 150px"
+              style="width: 160px"
             >
-              <el-option label="爆款" value="hot" />
-              <el-option label="清仓" value="clearance" />
-              <el-option label="拉新" value="new" />
-              <el-option label="活动" value="campaign" />
+              <el-option
+                v-for="opt in labelOptions"
+                :key="String(opt.value)"
+                :label="opt.label"
+                :value="opt.value"
+              />
             </el-select>
           </div>
         </el-form-item>
@@ -469,27 +497,88 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from "vue";
+/**
+ * 分时调价策略表单弹窗：创建 / 编辑策略。
+ * 所属板块：tools → ad-time-strategy。
+ */
+import type { TimePricingOption } from "@/api/ads/index";
+
+import { computed, reactive, ref } from "vue";
 import { WarningFilled } from "@element-plus/icons-vue";
+import { ElMessage } from "element-plus";
+
+import {
+  createTimePricing,
+  getAssortOptions,
+  getLabelOptions,
+  getManagerOptions,
+  getShopOptions,
+  getTimePricingDetail,
+  updateTimePricing,
+} from "@/api/ads/index";
+
+// ── 内部类型 ──────────────────────────────────────────────────────────────────
+
+/** 日历网格单元格——分时竞价策略数据 */
+interface GridCell {
+  type: string;
+  operateValue: number | null;
+  limitValue: number | null;
+  groupId: number;
+  color: string;
+}
+
+/** 时间段配置项 */
+interface TimeSegment {
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  operateType: string;
+  operateValue: number;
+  limitValue: number;
+}
+
+// ── defineEmits ───────────────────────────────────────────────────────────────
+
+const emit = defineEmits<{
+  (e: "saved"): void;
+}>();
+
+// ── 响应式状态 ────────────────────────────────────────────────────────────────
 
 const visible = ref(false);
 const dialogTitle = ref("创建分时调竞价策略");
+const editingId = ref<number | null>(null);
+
+/** 下拉选项数据 */
+const shopOptions = ref<TimePricingOption[]>([]);
+const managerOptions = ref<TimePricingOption[]>([]);
+const assortOptions = ref<TimePricingOption[]>([]);
+const labelOptions = ref<TimePricingOption[]>([]);
+
+/** 创建空的 7×24 日历网格 */
+function createEmptyGrid(): (GridCell | null)[][] {
+  return Array(7)
+    .fill(0)
+    .map(() => Array<GridCell | null>(24).fill(null));
+}
 
 const form = reactive({
   name: "",
-  shop: "",
+  type: "bidding_time",
+  creator: "",
+  shops: [] as (number | string)[],
   status: "active",
-  effectiveTime: [],
+  effectiveTime: [] as Date[],
+  timeUnlimited: true,
   baseValueType: "apply",
   baseFixedValue: null as number | null,
-  category: "",
-  managers: [],
-  tags: [],
+  categories: [] as string[],
+  managers: [] as (number | string)[],
+  tags: [] as string[],
   weight: 1,
   mode: "byDay",
-  grid: Array(7)
-    .fill(0)
-    .map(() => Array(24).fill(null as any)),
+  grid: createEmptyGrid(),
   timeSegments: [
     {
       dayOfWeek: "1",
@@ -499,7 +588,7 @@ const form = reactive({
       operateValue: 0.02,
       limitValue: 0.02,
     },
-  ],
+  ] as TimeSegment[],
   invalidCallbackType: "previous",
   invalidCallbackMultiplier: 1.0 as number | null,
   invalidCallbackFixed: null as number | null,
@@ -587,7 +676,8 @@ function getCellClass(r: number, h: number) {
   }
 
   if (cellData) {
-    if (c < 23 && form.grid[r][c + 1] && form.grid[r][c + 1].groupId === cellData.groupId) {
+    const nextCell = c < 23 ? form.grid[r][c + 1] : null;
+    if (nextCell && nextCell.groupId === cellData.groupId) {
       classes.push("cell-merged-right");
     }
   }
@@ -701,9 +791,9 @@ function finishDrag() {
       }
     }
     currentSelection.value = { minR, maxR, minC, maxC };
-    strategyForm.operateType = startCell.operateType || "percent_increase";
-    strategyForm.operateValue = startCell.operateValue || "";
-    strategyForm.limitValue = startCell.limitValue || "";
+    strategyForm.operateType = startCell.type || "percent_increase";
+    strategyForm.operateValue = startCell.operateValue ?? null;
+    strategyForm.limitValue = startCell.limitValue ?? null;
   } else {
     // 新建分块
     editingGroupId.value = null;
@@ -749,10 +839,11 @@ function confirmStrategy() {
     // 修改已存在的组（仅改变策略内容）
     for (let r = 0; r < 7; r++) {
       for (let c = 0; c < 24; c++) {
-        if (form.grid[r][c]?.groupId === editingGroupId.value) {
-          form.grid[r][c].type = strategyForm.operateType;
-          form.grid[r][c].operateValue = strategyForm.operateValue;
-          form.grid[r][c].limitValue = strategyForm.limitValue;
+        const cell = form.grid[r][c];
+        if (cell && cell.groupId === editingGroupId.value) {
+          cell.type = strategyForm.operateType;
+          cell.operateValue = strategyForm.operateValue;
+          cell.limitValue = strategyForm.limitValue;
         }
       }
     }
@@ -778,12 +869,13 @@ function confirmStrategy() {
   editingGroupId.value = null;
 }
 
-function clearGrid() {
-  form.grid = Array(7)
-    .fill(0)
-    .map(() => Array(24).fill(null));
+/** 清空日历网格全部设置。 */
+function clearGrid(): void {
+  form.grid = createEmptyGrid();
 }
-function addSegment() {
+
+/** 新增一条分时时间段。 */
+function addSegment(): void {
   form.timeSegments.push({
     dayOfWeek: "1",
     startTime: "",
@@ -796,19 +888,232 @@ function addSegment() {
 function removeSegment(index: number) {
   form.timeSegments.splice(index, 1);
 }
+/** 加载所有下拉选项数据，并默认全选 */
+async function loadOptions(): Promise<void> {
+  try {
+    const [shops, managers, assorts, labels] = await Promise.all([
+      getShopOptions(),
+      getManagerOptions(),
+      getAssortOptions(),
+      getLabelOptions(),
+    ]);
+    shopOptions.value = shops;
+    managerOptions.value = managers;
+    assortOptions.value = assorts;
+    labelOptions.value = labels;
+
+    // 新建时默认全选
+    if (!editingId.value) {
+      form.shops = shops.map((o) => o.value);
+      form.categories = assorts.map((o) => String(o.value));
+      form.managers = managers.map((o) => o.value);
+      form.tags = labels.map((o) => String(o.value));
+    }
+  } catch {
+    // 选项加载失败不阻塞表单
+  }
+}
+
+/** 将表单数据转换为后端请求体 */
+function buildPayload(): Record<string, unknown> {
+  const startMs =
+    form.timeUnlimited || !form.effectiveTime?.[0]
+      ? null
+      : new Date(form.effectiveTime[0]).getTime();
+  const endMs =
+    form.timeUnlimited || !form.effectiveTime?.[1]
+      ? null
+      : new Date(form.effectiveTime[1]).getTime();
+
+  // 回调策略
+  const callbackSettings: Record<string, unknown> = {
+    type: form.invalidCallbackType,
+  };
+  if (form.invalidCallbackType === "multiplier") {
+    callbackSettings.multiplier = form.invalidCallbackMultiplier;
+  } else if (form.invalidCallbackType === "fixed") {
+    callbackSettings.fixed = form.invalidCallbackFixed;
+  }
+
+  // 分时设置
+  const timeSettings: Record<string, unknown> =
+    form.mode === "calendar" ? { grid: form.grid } : { segments: form.timeSegments };
+
+  return {
+    name: form.name,
+    type: "bidding_time",
+    shops: form.shops,
+    status: form.status === "active" ? 1 : 0,
+    start_time: startMs,
+    end_time: endMs,
+    base_value_type: form.baseValueType === "apply" ? 1 : 2,
+    base_fixed_value: form.baseFixedValue,
+    field_settings: {
+      categories: form.categories,
+      managers: form.managers,
+      tags: form.tags,
+    },
+    time_mode: form.mode,
+    time_settings: timeSettings,
+    callback_settings: callbackSettings,
+    weight: form.weight,
+    execution_result: form.executionResult === "notice" ? 1 : 2,
+  };
+}
+
+/** 将后端数据填充到表单 */
+/** 后端 API 返回的策略详情数据结构 */
+interface TimePricingApiData {
+  name?: string;
+  type?: string;
+  creator?: string;
+  shops?: (number | string)[];
+  status?: number;
+  start_time?: number | null;
+  end_time?: number | null;
+  base_value_type?: number;
+  base_fixed_value?: number | null;
+  field_settings?: {
+    categories?: string[];
+    managers?: (number | string)[];
+    tags?: string[];
+  };
+  time_mode?: string;
+  time_settings?: {
+    grid?: (GridCell | null)[][];
+    segments?: TimeSegment[];
+  };
+  callback_settings?: {
+    type?: string;
+    multiplier?: number | null;
+    fixed?: number | null;
+  };
+  weight?: number;
+  execution_result?: number;
+}
+
+/**
+ * 将后端返回数据填充到表单。
+ *
+ * @param data - 后端返回的策略详情对象
+ */
+function fillForm(data: TimePricingApiData): void {
+  form.name = data.name || "";
+  form.type = data.type || "bidding_time";
+  form.creator = data.creator || "";
+  form.shops = data.shops || [];
+  form.status = data.status === 1 ? "active" : "inactive";
+  if (data.start_time && data.end_time) {
+    form.effectiveTime = [new Date(data.start_time), new Date(data.end_time)];
+    form.timeUnlimited = false;
+  } else {
+    form.effectiveTime = [];
+    form.timeUnlimited = true;
+  }
+  form.baseValueType = data.base_value_type === 2 ? "fixed" : "apply";
+  form.baseFixedValue = data.base_fixed_value ?? null;
+  const fs = data.field_settings || {};
+  form.categories = fs.categories || [];
+  form.managers = fs.managers || [];
+  form.tags = fs.tags || [];
+  form.weight = data.weight ?? 1;
+  form.mode = data.time_mode || "byDay";
+  const ts = data.time_settings || {};
+  if (form.mode === "calendar" && ts.grid) {
+    form.grid = ts.grid;
+  } else if (ts.segments) {
+    form.timeSegments = ts.segments;
+  }
+  const cb = data.callback_settings || {};
+  form.invalidCallbackType = cb.type || "previous";
+  form.invalidCallbackMultiplier = cb.multiplier ?? 1.0;
+  form.invalidCallbackFixed = cb.fixed ?? null;
+  form.executionResult = data.execution_result === 1 ? "notice" : "no_notice";
+}
+
 function onCancel() {
   visible.value = false;
 }
-function onSubmit() {
-  // TODO: 校验并提交
-  visible.value = false;
+
+async function onSubmit() {
+  try {
+    const payload = buildPayload();
+    if (editingId.value) {
+      await updateTimePricing(editingId.value, payload);
+      ElMessage.success("策略更新成功");
+    } else {
+      await createTimePricing(payload as any);
+      ElMessage.success("策略创建成功");
+    }
+    visible.value = false;
+    emit("saved");
+  } catch (error: any) {
+    const msg = error?.response?.data?.msg || error?.message || "操作失败";
+    ElMessage.error(msg);
+  }
 }
 
-// 暴露方法用于外部控制弹窗显示
-function open() {
-  visible.value = true;
+/** 重置表单到默认值 */
+function resetForm(): void {
+  editingId.value = null;
+  dialogTitle.value = "创建分时调竞价策略";
+  form.name = "";
+  form.type = "bidding_time";
+  form.creator = "";
+  form.shops = [];
+  form.status = "active";
+  form.effectiveTime = [];
+  form.timeUnlimited = true;
+  form.baseValueType = "apply";
+  form.baseFixedValue = null;
+  form.categories = [];
+  form.managers = [];
+  form.tags = [];
+  form.weight = 1;
+  form.mode = "byDay";
+  form.grid = Array(7)
+    .fill(0)
+    .map(() => Array(24).fill(null));
+  form.timeSegments = [
+    {
+      dayOfWeek: "1",
+      startTime: "01:00",
+      endTime: "06:00",
+      operateType: "percent_decrease",
+      operateValue: 0.02,
+      limitValue: 0.02,
+    },
+  ];
+  form.invalidCallbackType = "previous";
+  form.invalidCallbackMultiplier = 1.0;
+  form.invalidCallbackFixed = null;
+  form.executionResult = "no_notice";
 }
-defineExpose({ open });
+
+/** 外部调用：打开创建弹窗 */
+function open(): void {
+  resetForm();
+  visible.value = true;
+  loadOptions();
+}
+
+/** 外部调用：打开编辑弹窗 */
+async function openForEdit(id: number): Promise<void> {
+  resetForm();
+  editingId.value = id;
+  dialogTitle.value = "编辑分时调竞价策略";
+  try {
+    const data = await getTimePricingDetail(id);
+    fillForm(data as unknown as TimePricingApiData);
+  } catch {
+    ElMessage.error("加载策略详情失败");
+    return;
+  }
+  visible.value = true;
+  loadOptions();
+}
+
+defineExpose({ open, openForEdit });
 </script>
 
 <style scoped lang="scss" src="./BiddingStrategyForm.scss"></style>

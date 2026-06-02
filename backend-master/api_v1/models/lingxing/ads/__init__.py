@@ -23,7 +23,7 @@ from api_v1.models.lingxing.ads.lx_negative_keyword_info import LxNegativeKeywor
 from api_v1.models.lingxing.ads.lx_negative_keyword_metrics import LxNegativeKeywordMetrics
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import (
     BaseValueType, ExecutionResultType,
-    LxTimePricingStrategy, StrategyStatus,
+    LxTimePricingStrategy, StrategyStatus, StrategyType,
 )
 
 __all__ = [
@@ -42,5 +42,5 @@ __all__ = [
     'LxSpTarget', 'SpTargetExpressionType',
     'LxSpNegativeTarget', 'NegativeTargetType',
     # 分时调价策略
-    'LxTimePricingStrategy', 'StrategyStatus', 'BaseValueType', 'ExecutionResultType',
+    'LxTimePricingStrategy', 'StrategyStatus', 'StrategyType', 'BaseValueType', 'ExecutionResultType',
 ]

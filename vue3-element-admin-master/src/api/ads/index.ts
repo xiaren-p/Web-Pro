@@ -420,3 +420,150 @@ export function retryAdQueue(ids: number[]): Promise<{ retried_count: number }> 
     data: { ids },
   });
 }
+
+// ── 分时调价策略 ─────────────────────────────────────────────────────────────
+
+/** 下拉选项结构 */
+export interface TimePricingOption {
+  value: number | string;
+  label: string;
+}
+
+/** 分时调价策略表单数据 */
+export interface TimePricingFormData {
+  id?: number;
+  name: string;
+  type?: string;
+  shops: (number | string)[];
+  status: number;
+  start_time: number;
+  end_time: number;
+  base_value_type: number;
+  base_fixed_value?: number | null;
+  field_settings: {
+    categories: string[];
+    managers: (number | string)[];
+    tags: string[];
+  };
+  time_mode: string;
+  time_settings: Record<string, unknown>;
+  callback_settings: Record<string, unknown>;
+  weight: number;
+  execution_result: number;
+  creator?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** 策略列表查询参数 */
+export interface TimePricingQuery {
+  pageNum?: number;
+  pageSize?: number;
+  keyword?: string;
+  status?: number | string;
+  timeMode?: string;
+}
+
+/** 策略列表响应 */
+export interface TimePricingListResponse {
+  total: number;
+  list: TimePricingFormData[];
+  pageNum: number;
+  pageSize: number;
+}
+
+/**
+ * 获取策略列表（分页 + 筛选）。
+ */
+export function getTimePricingList(params: TimePricingQuery): Promise<TimePricingListResponse> {
+  return request({
+    url: "/ads/time-pricing-strategy",
+    method: "get",
+    params,
+  });
+}
+
+/**
+ * 新增策略。
+ */
+export function createTimePricing(data: TimePricingFormData): Promise<TimePricingFormData> {
+  return request({
+    url: "/ads/time-pricing-strategy",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 获取单条策略详情。
+ */
+export function getTimePricingDetail(id: number): Promise<TimePricingFormData> {
+  return request({
+    url: `/ads/time-pricing-strategy/${id}/form`,
+    method: "get",
+  });
+}
+
+/**
+ * 更新策略。
+ */
+export function updateTimePricing(
+  id: number,
+  data: Partial<TimePricingFormData>
+): Promise<TimePricingFormData> {
+  return request({
+    url: `/ads/time-pricing-strategy/${id}`,
+    method: "put",
+    data,
+  });
+}
+
+/**
+ * 删除策略（支持批量）。
+ */
+export function deleteTimePricing(ids: number[]): Promise<void> {
+  return request({
+    url: `/ads/time-pricing-strategy/${ids.join(",")}`,
+    method: "delete",
+  });
+}
+
+/**
+ * 获取店铺下拉选项（LxAdsProfile.name + profile_id）。
+ */
+export function getShopOptions(): Promise<TimePricingOption[]> {
+  return request({
+    url: "/ads/time-pricing-strategy/shops",
+    method: "get",
+  });
+}
+
+/**
+ * 获取负责人下拉选项（LxUser.realname + uid）。
+ */
+export function getManagerOptions(): Promise<TimePricingOption[]> {
+  return request({
+    url: "/ads/time-pricing-strategy/managers",
+    method: "get",
+  });
+}
+
+/**
+ * 获取归类下拉选项（LxProductInfo.assort 去重）。
+ */
+export function getAssortOptions(): Promise<TimePricingOption[]> {
+  return request({
+    url: "/ads/time-pricing-strategy/assorts",
+    method: "get",
+  });
+}
+
+/**
+ * 获取标签下拉选项（LxProductInfo.label 去重）。
+ */
+export function getLabelOptions(): Promise<TimePricingOption[]> {
+  return request({
+    url: "/ads/time-pricing-strategy/labels",
+    method: "get",
+  });
+}
