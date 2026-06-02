@@ -38,3 +38,16 @@ def trigger_ad_time_pricing(request: Request) -> Response:
         "data": {"task_id": task.id, "message": "分时策略命中任务已入队"},
         "msg": "success",
     })
+
+
+@api_view(["DELETE"])
+@authentication_classes([BearerTokenAuthentication])
+@permission_classes([])
+def unlock_ad_time_pricing(request: Request) -> Response:
+    """强制清除分时策略任务锁（紧急情况下使用）。"""
+    cache.delete(_AD_TIME_PRICING_LOCK_KEY)
+    return Response({
+        "code": "00000",
+        "data": None,
+        "msg": "锁已清除，可以重新触发任务",
+    })
