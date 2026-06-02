@@ -30,22 +30,27 @@
           />
         </el-form-item>
         <el-form-item label="适用店铺">
-          <el-select
-            v-model="form.shops"
-            multiple
-            filterable
-            collapse-tags
-            collapse-tags-tooltip
-            placeholder="请选择店铺"
-            style="width: 320px"
-          >
-            <el-option
-              v-for="opt in shopOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
-            />
-          </el-select>
+          <div style="display: flex; gap: 8px; align-items: center">
+            <el-select
+              v-model="form.shops"
+              multiple
+              filterable
+              collapse-tags
+              collapse-tags-tooltip
+              placeholder="请选择店铺"
+              style="width: 280px"
+            >
+              <el-option
+                v-for="opt in shopOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+            <el-button link type="primary" size="small" @click="toggleAllShops">
+              {{ isAllShopsSelected ? "取消" : "全选" }}
+            </el-button>
+          </div>
         </el-form-item>
         <el-form-item label="模板状态">
           <el-radio-group v-model="form.status">
@@ -83,58 +88,73 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="字段设置">
-          <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; width: 100%">
-            <el-select
-              v-model="form.categories"
-              multiple
-              filterable
-              collapse-tags
-              collapse-tags-tooltip
-              placeholder="请选择归类"
-              size="small"
-              style="width: 160px"
-            >
-              <el-option
-                v-for="opt in assortOptions"
-                :key="String(opt.value)"
-                :label="opt.label"
-                :value="opt.value"
-              />
-            </el-select>
-            <el-select
-              v-model="form.managers"
-              multiple
-              filterable
-              collapse-tags
-              collapse-tags-tooltip
-              placeholder="请选择负责人"
-              size="small"
-              style="width: 180px"
-            >
-              <el-option
-                v-for="opt in managerOptions"
-                :key="String(opt.value)"
-                :label="opt.label"
-                :value="opt.value"
-              />
-            </el-select>
-            <el-select
-              v-model="form.tags"
-              multiple
-              filterable
-              collapse-tags
-              collapse-tags-tooltip
-              placeholder="请选择标签"
-              size="small"
-              style="width: 160px"
-            >
-              <el-option
-                v-for="opt in labelOptions"
-                :key="String(opt.value)"
-                :label="opt.label"
-                :value="opt.value"
-              />
-            </el-select>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%">
+            <div style="display: flex; gap: 4px; align-items: center">
+              <el-select
+                v-model="form.categories"
+                multiple
+                filterable
+                collapse-tags
+                collapse-tags-tooltip
+                placeholder="请选择归类"
+                size="small"
+                style="width: 140px"
+              >
+                <el-option
+                  v-for="opt in assortOptions"
+                  :key="String(opt.value)"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+              <el-button link size="small" @click="toggleAllCategories">
+                {{ isAllCategoriesSelected ? "取消" : "全选" }}
+              </el-button>
+            </div>
+            <div style="display: flex; gap: 4px; align-items: center">
+              <el-select
+                v-model="form.managers"
+                multiple
+                filterable
+                collapse-tags
+                collapse-tags-tooltip
+                placeholder="请选择负责人"
+                size="small"
+                style="width: 150px"
+              >
+                <el-option
+                  v-for="opt in managerOptions"
+                  :key="String(opt.value)"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+              <el-button link size="small" @click="toggleAllManagers">
+                {{ isAllManagersSelected ? "取消" : "全选" }}
+              </el-button>
+            </div>
+            <div style="display: flex; gap: 4px; align-items: center">
+              <el-select
+                v-model="form.tags"
+                multiple
+                filterable
+                collapse-tags
+                collapse-tags-tooltip
+                placeholder="请选择标签"
+                size="small"
+                style="width: 140px"
+              >
+                <el-option
+                  v-for="opt in labelOptions"
+                  :key="String(opt.value)"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+              <el-button link size="small" @click="toggleAllTags">
+                {{ isAllTagsSelected ? "取消" : "全选" }}
+              </el-button>
+            </div>
           </div>
         </el-form-item>
         <el-form-item label="分时设置" class="time-setting-item">
@@ -596,6 +616,64 @@ const form = reactive({
 });
 
 const weekRows = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+
+// ── 全选 / 取消全选辅助 ──────────────────────────────────────────────────────
+
+/** 适用店铺是否已全选 */
+const isAllShopsSelected = computed(
+  () => shopOptions.value.length > 0 && form.shops.length === shopOptions.value.length
+);
+
+/** 归类是否已全选 */
+const isAllCategoriesSelected = computed(
+  () => assortOptions.value.length > 0 && form.categories.length === assortOptions.value.length
+);
+
+/** 负责人是否已全选 */
+const isAllManagersSelected = computed(
+  () => managerOptions.value.length > 0 && form.managers.length === managerOptions.value.length
+);
+
+/** 标签是否已全选 */
+const isAllTagsSelected = computed(
+  () => labelOptions.value.length > 0 && form.tags.length === labelOptions.value.length
+);
+
+/** 切换适用店铺全选/取消 */
+function toggleAllShops(): void {
+  if (isAllShopsSelected.value) {
+    form.shops = [];
+  } else {
+    form.shops = shopOptions.value.map((o) => o.value);
+  }
+}
+
+/** 切换归类全选/取消 */
+function toggleAllCategories(): void {
+  if (isAllCategoriesSelected.value) {
+    form.categories = [];
+  } else {
+    form.categories = assortOptions.value.map((o) => String(o.value));
+  }
+}
+
+/** 切换负责人全选/取消 */
+function toggleAllManagers(): void {
+  if (isAllManagersSelected.value) {
+    form.managers = [];
+  } else {
+    form.managers = managerOptions.value.map((o) => o.value);
+  }
+}
+
+/** 切换标签全选/取消 */
+function toggleAllTags(): void {
+  if (isAllTagsSelected.value) {
+    form.tags = [];
+  } else {
+    form.tags = labelOptions.value.map((o) => String(o.value));
+  }
+}
 
 // ---- 日历拖拽逻辑 ----
 const isDragging = ref(false);

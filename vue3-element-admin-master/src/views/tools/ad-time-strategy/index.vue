@@ -89,6 +89,11 @@
             {{ (row.shops || []).join("、") || "-" }}
           </template>
         </el-table-column>
+        <el-table-column label="标签" min-width="120">
+          <template #default="{ row }">
+            {{ ((row.field_settings || {}).tags || []).join("、") || "-" }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" min-width="140" fixed="right">
           <template #header>
             操作
