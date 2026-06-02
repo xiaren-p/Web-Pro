@@ -265,15 +265,12 @@ def _process_start_for_hit(
     items = _get_ad_items(hit.campaign_id, hit.profile_id, hit.targeting_type, item_map)
     if not items:
         return 0
-    changed = 0
     for item in items:
         bid_after = item["bid"]
         for rule in matching_rules:
             nb = _calc_new_bid(bid_after, rule)
             if nb is not None and nb != bid_after:
                 bid_after = nb
-        if bid_after == item["bid"]:
-            continue
         is_target = item["item_type"] == "target"
         adjustments.append(SpBidAdjustment(
             target_id=item["item_id"] if is_target else None,
@@ -287,8 +284,7 @@ def _process_start_for_hit(
             adjustment_time=now_utc,
             execution_status=ExecutionStatusChoices.PENDING,
         ))
-        changed += 1
-    return changed
+    return len(items)
 
 
 def _write_start_batch(adjustments: list, hits_to_update: list) -> None:
