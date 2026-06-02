@@ -92,20 +92,6 @@ class AuthViewSet(viewsets.ViewSet):
             return [AllowAny()]
         return super().get_permissions()
 
-    def get_authenticators(self):
-        """login / captcha / refresh_token 动作排除 SessionAuthentication。
-
-        ssoSession 会在浏览器留下持久 Session Cookie，用户退出后该 Cookie 仍在。
-        若登录请求被 SessionAuthentication 可见，就会强制校验 CSRF token，
-        而前端 login 请求未携带 CSRF token → CSRF Failed。
-        """
-        from rest_framework.authentication import SessionAuthentication
-        base = super().get_authenticators()
-        action = getattr(self, 'action', None)
-        if action in ('login', 'captcha', 'refresh_token'):
-            return [a for a in base if not isinstance(a, SessionAuthentication)]
-        return base
-
     @action(detail=False, methods=["post"], url_path="login")
     def login(self, request):  # pragma: no cover
         """用户登录：验证码校验 → 账号密码认证 → 签发 Token。"""

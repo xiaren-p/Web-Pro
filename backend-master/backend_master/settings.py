@@ -338,7 +338,10 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'api_v1.auth.BearerTokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+        # SessionAuthentication 已移除：本项目 API 鉴权完全走 Bearer Token，
+        # Django Session 仅用于 OIDC SSO（走 Django 模板视图，不经过 DRF）。
+        # 保留 SessionAuthentication 会导致 Bearer 过期而 sessionid cookie 仍有效时，
+        # DRF 退化为 Session 鉴权并强制校验 CSRF → "CSRF token missing/incorrect"。
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
