@@ -19,11 +19,11 @@ class ManualRulesStatus(models.IntegerChoices):
 class AdTimePricingHit(models.Model):
     """广告分时策略命中记录表。
 
-    记录每条广告（ad_id + profile_id）的分时策略命中结果。
+    以 LxSpCampaign 的 (campaign_id, profile_id) 为粒度，记录广告活动是否命中分时策略。
     """
 
-    ad_id = models.BigIntegerField(
-        verbose_name="广告 ID",
+    campaign_id = models.BigIntegerField(
+        verbose_name="广告活动 ID",
     )
 
     profile_id = models.BigIntegerField(
@@ -82,11 +82,10 @@ class AdTimePricingHit(models.Model):
         verbose_name = "广告分时策略命中记录"
         verbose_name_plural = verbose_name
         ordering = ["-created_at"]
-        unique_together = (("ad_id", "profile_id"),)
+        unique_together = (("campaign_id", "profile_id"),)
         indexes = [
-            models.Index(fields=["ad_id", "profile_id"]),
-            models.Index(fields=["is_time_pricing"]),
+            models.Index(fields=["campaign_id", "profile_id"]),
         ]
 
     def __str__(self) -> str:
-        return f"AdTimePricingHit<ad={self.ad_id}, profile={self.profile_id}>"
+        return f"AdTimePricingHit<campaign={self.campaign_id}, profile={self.profile_id}>"

@@ -332,9 +332,9 @@ def process_new_ads() -> dict[str, Any]:
             }
     logger.info("[process_new_ads] 产品信息预加载完成，命中 ASIN=%d", len(asin_to_fields))
 
-    # 1e. 预查所有已存在的命中记录 key
+    # 1e. 预查所有已存在的命中记录 (campaign_id, profile_id)
     existing_keys: set[tuple[int, int]] = set(
-        AdTimePricingHit.objects.values_list("ad_id", "profile_id")
+        AdTimePricingHit.objects.values_list("campaign_id", "profile_id")
     )
     logger.info("[process_new_ads] 已有命中记录数=%d", len(existing_keys))
 
@@ -433,34 +433,33 @@ def process_new_ads() -> dict[str, Any]:
                         seen_u.add(val)
                         merged_uids.append(val)
 
-            # 遍历该 campaign 下每条广告，匹配策略
-            for ad in ads:
-                ad_id = ad["ad_id"]
-                if (ad_id, pid) in existing_keys:
-                    continue
-                thread_processed += 1
+            # campaign 粒度：已存在记录则跳过
+            if (cid, pid) in existing_keys:
+                continue
+            thread_processed += 1
 
-                result = _match_strategy_in_memory(
+            # 匹配分时策略（以 campaign 下所有 ASIN 聚合后的产品字段为准）
+            result = _match_strategy_in_memory(
+                profile_id=pid,
+                product_assorts=merged_assorts,
+                product_labels=merged_labels,
+                product_uids=merged_uids,
+                strategies=strategies,
+            )
+            if result:
+                thread_hits.append(AdTimePricingHit(
+                    campaign_id=cid,
                     profile_id=pid,
-                    product_assorts=merged_assorts,
-                    product_labels=merged_labels,
-                    product_uids=merged_uids,
-                    strategies=strategies,
-                )
-                if result:
-                    thread_hits.append(AdTimePricingHit(
-                        ad_id=ad_id,
-                        profile_id=pid,
-                        hit_time_pricing_rules=result["strategy_name"],
-                        is_time_pricing=TimePricingHitStatus.YES,
-                    ))
-                    thread_hit_count += 1
-                else:
-                    thread_hits.append(AdTimePricingHit(
-                        ad_id=ad_id,
-                        profile_id=pid,
-                        is_time_pricing=TimePricingHitStatus.NO,
-                    ))
+                    hit_time_pricing_rules=str(result["strategy_id"]),
+                    is_time_pricing=TimePricingHitStatus.NO,
+                ))
+                thread_hit_count += 1
+            else:
+                thread_hits.append(AdTimePricingHit(
+                    campaign_id=cid,
+                    profile_id=pid,
+                    is_time_pricing=TimePricingHitStatus.NO,
+                ))
 
         return {
             "hits": thread_hits,
@@ -522,7 +521,7 @@ def process_new_ads() -> dict[str, Any]:
                     total_written += 1
                 except Exception as e2:
                     logger.error(
-                        "[process_new_ads] 逐条写入失败 ad=%d: %s", rec.ad_id, e2,
+                        "[process_new_ads] 逐条写入失败 campaign=%d: %s", rec.campaign_id, e2,
                     )
 
     for i in range(0, len(all_results), FLUSH_BATCH_SIZE):
