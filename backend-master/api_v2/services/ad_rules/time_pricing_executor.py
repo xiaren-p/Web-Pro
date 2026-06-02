@@ -18,7 +18,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone as dt_timezone
 from typing import Any
 
-from django.db import connections as db_connections
 from django.db.models import Q
 
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -318,8 +317,7 @@ def _process_chunk_parallel(
     item_map: dict,
     now_utc: datetime,
 ) -> tuple[list[SpBidAdjustment], list[AdTimePricingHit], int, int, list[str]]:
-    """线程入口：处理一批命中记录（纯内存计算）。"""
-    db_connections.close_all()
+    """线程入口：处理一批命中记录（纯内存计算，不查 DB）。"""
     adjustments: list[SpBidAdjustment] = []
     hits_to_update: list[AdTimePricingHit] = []
     processed = 0

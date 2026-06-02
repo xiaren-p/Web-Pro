@@ -20,7 +20,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone as dt_timezone
 from typing import Any
 
-from django.db import connections as db_connections
 
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStrategy, StrategyStatus
 from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
@@ -209,8 +208,7 @@ def _process_callback_chunk(
     item_map: dict,
     now_utc: datetime,
 ) -> tuple[list[SpBidAdjustment], list[AdTimePricingHit], int, int, list[str]]:
-    """线程入口：处理一批命中记录的回调逻辑。"""
-    db_connections.close_all()
+    """线程入口：处理一批命中记录的回调逻辑（纯内存计算，不查 DB）。"""
     adjustments: list[SpBidAdjustment] = []
     hits_to_update: list[AdTimePricingHit] = []
     processed = 0
