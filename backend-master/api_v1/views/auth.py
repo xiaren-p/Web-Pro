@@ -6,6 +6,7 @@
 import logging
 
 from django.contrib.auth import authenticate, login as django_login, logout as django_logout
+from django.middleware.csrf import rotate_token
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -19,6 +20,66 @@ from api_v1.utils.captcha import generate_captcha, validate_captcha
 from django.views.decorators.csrf import csrf_exempt
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_captcha(text: str) -> str:
+    """对验证码文本做 NFKC 归一化，用于大小写不敏感 + 全半角兼容比对。
+
+    Args:
+        text: 原始验证码文本
+
+    Returns:
+        归一化后的小写 stripped 字符串
+    """
+    if not text:
+        return ""
+    try:
+        import unicodedata
+        return unicodedata.normalize("NFKC", str(text)).strip().lower()
+    except Exception:
+        return str(text).strip().lower()
+
+
+def _validate_captcha_request(captcha_key: str, captcha_code: str, request) -> str | None:
+    """验证图形验证码。返回 None 表示通过，否则返回错误信息字符串。
+
+    验证顺序：
+    1. 共享 cache 验证（validate_captcha）
+    2. 万能验证码（ALLOW_CAPTCHA_BYPASS + CAPTCHA_MASTER_CODE）
+    3. Session 回退验证
+
+    Args:
+        captcha_key: 验证码 key
+        captcha_code: 用户输入的验证码
+        request: DRF request 对象
+
+    Returns:
+        None 表示验证通过；非空字符串为错误信息。
+    """
+    # 第 1 层：共享 cache 验证
+    if validate_captcha(captcha_key, captcha_code):
+        return None
+
+    # 第 2 层：万能验证码（开发/测试用途）
+    bypass_allowed = getattr(settings, "ALLOW_CAPTCHA_BYPASS", False)
+    master_code = getattr(settings, "CAPTCHA_MASTER_CODE", None)
+    if bypass_allowed and master_code and str(captcha_code) == str(master_code):
+        return None
+
+    # 第 3 层：Session 回退验证
+    sess_val = request.session.get(f"captcha:{captcha_key}")
+    if not sess_val or not isinstance(sess_val, str) or not sess_val.strip():
+        return "验证码错误"
+
+    if _normalize_captcha(sess_val) == _normalize_captcha(captcha_code):
+        try:
+            del request.session[f"captcha:{captcha_key}"]
+        except Exception:
+            pass
+        return None
+
+    return "验证码错误"
+
 
 class AuthViewSet(viewsets.ViewSet):
     """身份认证相关接口（登录/登出/刷新 token 等）"""
@@ -47,71 +108,32 @@ class AuthViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="login")
     def login(self, request):  # pragma: no cover
-        t0 = timezone.now()
-        username = (request.data or {}).get('username')
-        password = (request.data or {}).get('password')
-        # 验证图形验证码（前端应同时提交 captchaKey 与 captchaCode）
-        captcha_key = (request.data or {}).get('captchaKey')
-        captcha_code = (request.data or {}).get('captchaCode')
+        """用户登录：验证码校验 → 账号密码认证 → 签发 Token。"""
+        payload = request.data or {}
+        username = payload.get("username")
+        password = payload.get("password")
+        captcha_key = payload.get("captchaKey")
+        captcha_code = payload.get("captchaCode")
+
+        # 1. 参数校验
         if not captcha_key or not captcha_code:
             return drf_error("验证码缺失", status=400)
-        try:
-            # 首先尝试使用共享 cache 验证
-            if not validate_captcha(captcha_key, captcha_code):
-                # 若 cache 验证失败，尝试回退到 session（若客户端与服务在同一浏览器，会携带 sessionid）
-                # 开发/测试用途：允许通过配置的万能验证码跳过校验（需在 .env 中设置 ALLOW_CAPTCHA_BYPASS=true 与 CAPTCHA_MASTER_CODE）
-                try:
-                    # 检查是否启用了万能验证码并匹配
-                    bypass_allowed = getattr(settings, 'ALLOW_CAPTCHA_BYPASS', False)
-                    master_code = getattr(settings, 'CAPTCHA_MASTER_CODE', None)
-                    if bypass_allowed and master_code and str(captcha_code) == str(master_code):
-                        # 万能验证码命中，直接通过
-                        pass
-                    else:
-                        sess_val = request.session.get(f"captcha:{captcha_key}")
-                        if sess_val and isinstance(sess_val, str) and sess_val.strip():
-                            # reuse captcha normalization from utils.captcha
-                            try:
-                                import unicodedata
-                            except Exception:
-                                unicodedata = None
-
-                            def _norm(s: str) -> str:
-                                if s is None:
-                                    return ''
-                                s2 = str(s)
-                                if unicodedata:
-                                    try:
-                                        s2 = unicodedata.normalize('NFKC', s2)
-                                    except Exception:
-                                        pass
-                                return s2.strip().lower()
-
-                            if _norm(sess_val) == _norm(captcha_code):
-                                # session 验证通过，删除 session 存储并继续
-                                try:
-                                    del request.session[f"captcha:{captcha_key}"]
-                                except Exception:
-                                    pass
-                            else:
-                                return drf_error("验证码错误", status=400)
-                        else:
-                            return drf_error("验证码错误", status=400)
-                except Exception:
-                    return drf_error("验证码校验失败", status=400)
-        except Exception:
-            return drf_error("验证码校验失败", status=400)
         if not username or not password:
             return drf_error("用户名或密码不能为空", status=400)
 
-        # 校验账号密码
+        # 2. 验证码校验
+        captcha_err = _validate_captcha_request(captcha_key, captcha_code, request)
+        if captcha_err:
+            return drf_error(captcha_err, status=400)
+
+        # 3. 账号密码认证
         user = authenticate(username=username, password=password)
         if not user:
             return drf_error("用户名或密码错误", status=401)
 
-        # 生成 access / refresh token
-        access_ttl = getattr(settings, 'ACCESS_TOKEN_EXPIRE_SECONDS', 86400)
-        refresh_ttl = getattr(settings, 'REFRESH_TOKEN_EXPIRE_SECONDS', 7 * 86400)
+        # 4. 签发 Token
+        access_ttl = getattr(settings, "ACCESS_TOKEN_EXPIRE_SECONDS", 86400)
+        refresh_ttl = getattr(settings, "REFRESH_TOKEN_EXPIRE_SECONDS", 7 * 86400)
         at = AuthToken.objects.create(
             user=user,
             access_token=uuid.uuid4().hex,
@@ -120,13 +142,12 @@ class AuthViewSet(viewsets.ViewSet):
             refresh_expires_at=timezone.now() + timezone.timedelta(seconds=refresh_ttl),
         )
 
-        resp = {
+        return drf_ok({
             "accessToken": at.access_token,
             "refreshToken": at.refresh_token,
             "tokenType": "Bearer",
             "expiresIn": access_ttl,
-        }
-        return drf_ok(resp)
+        })
 
     @csrf_exempt
     @action(detail=False, methods=["post"], url_path="refresh-token")
@@ -207,6 +228,9 @@ class AuthViewSet(viewsets.ViewSet):
             return drf_error("认证失败，请先登录系统", status=401)
 
         django_login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        # 建立新 session 后必须轮换 CSRF token，否则浏览器中旧的 csrftoken cookie
+        # 与新 session 不匹配，后续 API 请求将报 "CSRF token incorrect"。
+        rotate_token(request)
         logger.info(
             "[AuthViewSet][sso_session] 用户 %s 换取 Django Session 成功", user.username,
         )
