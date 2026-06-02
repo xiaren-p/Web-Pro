@@ -13,8 +13,11 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from datetime import datetime, timezone as dt_timezone
 from typing import Any
+
+from django.db.models import Q
 
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -157,153 +160,198 @@ def _find_matching_rules(
 
 
 # ============================================================
-# 查询待调整的广告投放（target / keyword）
+# 批量预加载投放项（target / keyword）→ 内存映射
 # ============================================================
 
-def _get_ad_items(
-    campaign_id: int, profile_id: int, targeting_type: str,
-) -> list[dict[str, Any]]:
-    """按投放类型查询关联的广告投放项及其当前竞价。
+def _build_item_map(
+    campaign_keys: set[tuple[int, int]],
+) -> dict[tuple[int, int], list[dict[str, Any]]]:
+    """批量查询所有 target 和 keyword，按 (campaign_id, profile_id) 建立内存映射。
+
+    一次查询全量 LxSpTarget + LxSpKeyword，避免逐条 N+1。
 
     Args:
-        campaign_id: 广告活动 ID
-        profile_id: 店铺 Profile ID
-        targeting_type: 投放类型（"auto" / "manual"）
+        campaign_keys: 需要查询的 (campaign_id, profile_id) 集合
 
     Returns:
-        [{"item_type": "target"/"keyword", "item_id": int, "ad_group_id": int, "bid": float}]
+        {(campaign_id, profile_id): [{"item_type", "item_id", "ad_group_id", "bid"}]}
     """
-    items: list[dict[str, Any]] = []
+    item_map: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
 
-    if targeting_type == "auto":
-        qs = LxSpTarget.objects.filter(campaign_id=campaign_id, profile_id=profile_id)
-        for t in qs:
+    # 收集所有需要查询的 campaign 对
+    pairs_list = list(campaign_keys)
+
+    # 批量查 target（auto）
+    if pairs_list:
+        q_target = Q()
+        for cid, pid in pairs_list:
+            q_target |= Q(campaign_id=cid, profile_id=pid)
+        for t in LxSpTarget.objects.filter(q_target).iterator():
             if t.bid is not None:
-                items.append({
+                item_map[(t.campaign_id, t.profile_id)].append({
                     "item_type": "target",
                     "item_id": t.target_id,
                     "ad_group_id": t.ad_group_id,
                     "bid": float(t.bid),
                 })
 
-    elif targeting_type == "manual":
-        qs = LxSpKeyword.objects.filter(campaign_id=campaign_id, profile_id=profile_id)
-        for k in qs:
+    # 批量查 keyword（manual）
+    if pairs_list:
+        q_kw = Q()
+        for cid, pid in pairs_list:
+            q_kw |= Q(campaign_id=cid, profile_id=pid)
+        for k in LxSpKeyword.objects.filter(q_kw).iterator():
             if k.bid is not None:
-                items.append({
+                item_map[(k.campaign_id, k.profile_id)].append({
                     "item_type": "keyword",
                     "item_id": k.keyword_id,
                     "ad_group_id": k.ad_group_id,
                     "bid": float(k.bid),
                 })
 
-    return items
+    return item_map
+
+
+def _get_ad_items(
+    campaign_id: int, profile_id: int, targeting_type: str,
+    item_map: dict[tuple[int, int], list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    """从预加载的内存映射中获取投放项（不查 DB）。
+
+    Args:
+        campaign_id: 广告活动 ID
+        profile_id: 店铺 Profile ID
+        targeting_type: 投放类型（"auto" / "manual"）
+        item_map: _build_item_map 构建的内存映射
+
+    Returns:
+        [{"item_type": "target"/"keyword", "item_id": int, "ad_group_id": int, "bid": float}]
+    """
+    return item_map.get((campaign_id, profile_id), [])
 
 
 # ============================================================
 # 主流程
 # ============================================================
 
-def execute_time_pricing_start() -> dict[str, Any]:
-    """执行"分时开始"：遍历待分时记录，匹配时间区间，计算并写入调整。
+def _preload_start_data(
+    hits: list[AdTimePricingHit],
+) -> tuple[dict[tuple[int, int], list[dict[str, Any]]], dict[int, LxTimePricingStrategy]]:
+    """批量预加载分时开始所需的投放项和策略数据。
+
+    Args:
+        hits: 待处理的命中记录列表
 
     Returns:
-        {"processed": int, "adjusted": int, "errors": [str]}
+        (item_map, strategy_map) 元组
     """
-    # 1. 取待分时记录
-    hits = AdTimePricingHit.objects.filter(
-        is_time_pricing=TimePricingHitStatus.NO,
-        hit_time_pricing_rules__gt="",  # 有命中策略
-    )
-    if not hits.exists():
+    item_map = _build_item_map({(h.campaign_id, h.profile_id) for h in hits})
+    strategy_ids = {int(h.hit_time_pricing_rules) for h in hits if h.hit_time_pricing_rules}
+    strategy_map = {
+        s.id: s for s in LxTimePricingStrategy.objects.filter(pk__in=strategy_ids).only(
+            "id", "shops", "time_mode", "time_settings", "callback_settings",
+        )
+    }
+    logger.info("[time_pricing_executor] 预加载: items=%d strategies=%d", len(item_map), len(strategy_map))
+    return item_map, strategy_map
+
+
+def _process_start_for_hit(
+    hit: AdTimePricingHit, strategy: LxTimePricingStrategy,
+    item_map: dict, now_utc: datetime, adjustments: list[SpBidAdjustment],
+) -> int:
+    """处理单条命中记录，计算竞价并收集调整记录。
+
+    Returns:
+        实际发生竞价变化的投放项数；0 表示无匹配规则或无投放项。
+    """
+    matching_rules = _find_matching_rules(strategy.time_settings or {}, hit.timezone or "", strategy.time_mode)
+    if not matching_rules:
+        return 0
+    items = _get_ad_items(hit.campaign_id, hit.profile_id, hit.targeting_type, item_map)
+    if not items:
+        return 0
+    changed = 0
+    for item in items:
+        bid_after = item["bid"]
+        for rule in matching_rules:
+            nb = _calc_new_bid(bid_after, rule)
+            if nb is not None and nb != bid_after:
+                bid_after = nb
+        if bid_after == item["bid"]:
+            continue
+        is_target = item["item_type"] == "target"
+        adjustments.append(SpBidAdjustment(
+            target_id=item["item_id"] if is_target else None,
+            keyword_id=item["item_id"] if not is_target else None,
+            campaign_id=hit.campaign_id, profile_id=hit.profile_id,
+            execution_type=ExecutionTypeChoices.TIME_PRICING_START,
+            time_pricing_rule_id=strategy.id, auto_rule_id=None,
+            is_time_pricing=TimePricingHitStatus.YES,
+            bid_before=item["bid"], bid_after=bid_after,
+            adjustment_status=AdjustmentStatusChoices.PENDING,
+            adjustment_time=now_utc,
+            execution_status=ExecutionStatusChoices.PENDING,
+        ))
+        changed += 1
+    return changed
+
+
+def _write_start_batch(adjustments: list, hits_to_update: list) -> None:
+    """批量写入 SpBidAdjustment 和 AdTimePricingHit。
+
+    Args:
+        adjustments: 待写入的调整记录列表
+        hits_to_update: 待更新 is_time_pricing 的记录列表
+    """
+    if adjustments:
+        SpBidAdjustment.objects.bulk_create(adjustments, batch_size=500)
+    if hits_to_update:
+        AdTimePricingHit.objects.bulk_update(hits_to_update, ["is_time_pricing", "updated_at"], batch_size=500)
+
+
+def execute_time_pricing_start() -> dict[str, Any]:
+    """执行"分时开始"：批量预加载 → 遍历匹配 → 批量写入。
+
+    Returns:
+        {"processed": int, "adjusted": int, "errors": list[str]}
+    """
+    hits = list(AdTimePricingHit.objects.filter(
+        is_time_pricing=TimePricingHitStatus.NO, hit_time_pricing_rules__gt="",
+    ))
+    if not hits:
         logger.info("[time_pricing_executor] 无待分时记录")
         return {"processed": 0, "adjusted": 0, "errors": []}
 
-    logger.info("[time_pricing_executor] 待分时记录数=%d", hits.count())
+    logger.info("[time_pricing_executor] 待分时记录数=%d", len(hits))
+    item_map, strategy_map = _preload_start_data(hits)
 
+    now_utc = datetime.now(dt_timezone.utc)
+    adjustments: list[SpBidAdjustment] = []
+    hits_to_update: list[AdTimePricingHit] = []
     processed = 0
     adjusted = 0
     errors: list[str] = []
 
     for hit in hits:
         try:
-            # 2. 加载命中的策略
-            strategy_id = int(hit.hit_time_pricing_rules)
-            strategy = LxTimePricingStrategy.objects.filter(pk=strategy_id).first()
+            strategy = strategy_map.get(int(hit.hit_time_pricing_rules))
             if not strategy:
-                logger.warning("[time_pricing_executor] 策略不存在 id=%d，标记已处理", strategy_id)
                 hit.is_time_pricing = TimePricingHitStatus.YES
-                hit.save(update_fields=["is_time_pricing", "updated_at"])
+                hits_to_update.append(hit)
                 processed += 1
                 continue
 
-            time_settings = strategy.time_settings or {}
-            tz = hit.timezone or ""
-
-            # 3. 判断当前时间是否在分时时间段内
-            matching_rules = _find_matching_rules(time_settings, tz, strategy.time_mode)
-            if not matching_rules:
-                # 不在时段内，跳过等待下次（可能下个小时就匹配了）
-                continue
-
-            # 4. 按投放类型查询关联投放项
-            items = _get_ad_items(hit.campaign_id, hit.profile_id, hit.targeting_type)
-            if not items:
-                # 无投放项，标记已处理避免无限重试
-                hit.is_time_pricing = TimePricingHitStatus.YES
-                hit.save(update_fields=["is_time_pricing", "updated_at"])
-                processed += 1
-                continue
-
+            changed = _process_start_for_hit(hit, strategy, item_map, now_utc, adjustments)
+            hit.is_time_pricing = TimePricingHitStatus.YES
+            hits_to_update.append(hit)
+            adjusted += changed
             processed += 1
 
-            # 5. 对每个投放项应用所有匹配规则，写出调整记录
-            now_utc = datetime.now(dt_timezone.utc)
-            for item in items:
-                item_id = item["item_id"]
-                bid_before = item["bid"]
-                bid_after = bid_before
+        except Exception:
+            logger.exception("[time_pricing_executor] campaign=%d", hit.campaign_id)
+            errors.append(f"campaign={hit.campaign_id} profile={hit.profile_id}")
 
-                # 多条规则链式叠加：每条规则基于上一条的结果继续计算
-                for rule in matching_rules:
-                    new_bid = _calc_new_bid(bid_after, rule)
-                    if new_bid is not None and new_bid != bid_after:
-                        bid_after = new_bid
-
-                # 只有竞价实际变化才写记录
-                if bid_after == bid_before:
-                    continue
-
-                is_target = item["item_type"] == "target"
-                SpBidAdjustment.objects.create(
-                    target_id=item_id if is_target else None,
-                    keyword_id=item_id if not is_target else None,
-                    campaign_id=hit.campaign_id,
-                    profile_id=hit.profile_id,
-                    execution_type=ExecutionTypeChoices.TIME_PRICING_START,
-                    time_pricing_rule_id=strategy.id,
-                    auto_rule_id=None,
-                    is_time_pricing=TimePricingHitStatus.YES,
-                    bid_before=bid_before,
-                    bid_after=bid_after,
-                    adjustment_status=AdjustmentStatusChoices.PENDING,
-                    adjustment_time=now_utc,
-                    execution_status=ExecutionStatusChoices.PENDING,
-                )
-                adjusted += 1
-                hit_written = True
-
-            # 6. 标记已分时（不管竞价是否变化，只要在时段内就算分时）
-            hit.is_time_pricing = TimePricingHitStatus.YES
-            hit.save(update_fields=["is_time_pricing", "updated_at"])
-
-        except Exception as e:
-            err = f"campaign={hit.campaign_id} profile={hit.profile_id}: {e}"
-            logger.error("[time_pricing_executor] %s", err, exc_info=True)
-            errors.append(err)
-
-    logger.info(
-        "[time_pricing_executor] 完成 processed=%d adjusted=%d errors=%d",
-        processed, adjusted, len(errors),
-    )
+    _write_start_batch(adjustments, hits_to_update)
+    logger.info("[time_pricing_executor] 完成 processed=%d adjusted=%d errors=%d", processed, adjusted, len(errors))
     return {"processed": processed, "adjusted": adjusted, "errors": errors}

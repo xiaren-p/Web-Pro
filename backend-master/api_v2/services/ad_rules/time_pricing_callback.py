@@ -29,7 +29,7 @@ from api_v2.services.ad_rules.campaign_product_service import (
 )
 from api_v2.services.ad_rules.strategy_matcher import match_strategy_against_product
 from api_v2.services.ad_rules.time_pricing_executor import (
-    _find_matching_rules, _get_ad_items,
+    _build_item_map, _find_matching_rules, _get_ad_items,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,9 +39,7 @@ logger = logging.getLogger(__name__)
 # 回调竞价计算
 # ============================================================
 
-def _calc_callback_bid(
-    current_bid: float, callback_settings: dict,
-) -> float | None:
+def _calc_callback_bid(current_bid: float, callback_settings: dict) -> float | None:
     """基于 LxSpKeyword/LxSpTarget 的当前竞价计算回调竞价。
 
     Args:
@@ -52,19 +50,96 @@ def _calc_callback_bid(
         回调后竞价；若策略为 none 则返回 None（不调整）
     """
     cb_type = callback_settings.get("type", "none")
-
     if cb_type == "multiplier":
         mul = float(callback_settings.get("multiplier", 1.0) or 1.0)
         return current_bid * mul
-
     if cb_type == "fixed":
         return float(callback_settings.get("fixed", current_bid) or current_bid)
-
     if cb_type == "previous":
         return current_bid
-
-    # "none"：不回调
     return None
+
+
+# ============================================================
+# 单条记录的回调处理（拆分自主流程，控制函数 ≤50 行）
+# ============================================================
+
+def _process_callback_for_hit(
+    hit: AdTimePricingHit,
+    strategy: LxTimePricingStrategy,
+    item_map: dict[tuple[int, int], list[dict[str, Any]]],
+    now_utc: datetime,
+    adjustments: list[SpBidAdjustment],
+) -> bool:
+    """处理单条命中记录的回调逻辑。
+
+    若已离开分时时段，按回调策略计算并收集 SpBidAdjustment 记录。
+
+    Args:
+        hit: 待处理的命中记录
+        strategy: 对应的分时策略
+        item_map: 投放项内存映射
+        now_utc: 当前 UTC 时间
+        adjustments: 调整记录收集列表（引用传递，追加到此）
+
+    Returns:
+        True 表示已执行回调（is_time_pricing 应置 NO），False 表示仍在时段内不处理
+    """
+    if _find_matching_rules(strategy.time_settings or {}, hit.timezone or "", strategy.time_mode):
+        return False  # 仍在分时时段
+
+    callback = strategy.callback_settings or {}
+    cb_type = callback.get("type", "none")
+    items = _get_ad_items(hit.campaign_id, hit.profile_id, hit.targeting_type, item_map)
+
+    if not items or cb_type == "none":
+        return True  # 无投放项或不回调，直接标记结束
+
+    for item in items:
+        callback_bid = _calc_callback_bid(item["bid"], callback)
+        if callback_bid is None or callback_bid == item["bid"]:
+            continue
+        is_target = item["item_type"] == "target"
+        adjustments.append(SpBidAdjustment(
+            target_id=item["item_id"] if is_target else None,
+            keyword_id=item["item_id"] if not is_target else None,
+            campaign_id=hit.campaign_id,
+            profile_id=hit.profile_id,
+            execution_type=ExecutionTypeChoices.TIME_PRICING_CALLBACK,
+            time_pricing_rule_id=strategy.id,
+            auto_rule_id=None,
+            is_time_pricing=TimePricingHitStatus.NO,
+            bid_before=None,
+            bid_after=callback_bid,
+            adjustment_status=AdjustmentStatusChoices.PENDING,
+            adjustment_time=now_utc,
+            execution_status=ExecutionStatusChoices.PENDING,
+        ))
+    return True
+
+
+def _preload_callback_data(
+    hits: list[AdTimePricingHit],
+) -> tuple[dict[tuple[int, int], list[dict[str, Any]]], dict[int, LxTimePricingStrategy]]:
+    """批量预加载回调所需的投放项和策略数据。
+
+    Args:
+        hits: 待处理的命中记录列表
+
+    Returns:
+        (item_map, strategy_map) 元组
+        - item_map: (campaign_id, profile_id) → 投放项列表
+        - strategy_map: strategy_id → LxTimePricingStrategy
+    """
+    all_keys = {(h.campaign_id, h.profile_id) for h in hits}
+    item_map = _build_item_map(all_keys)
+    strategy_ids = {int(h.hit_time_pricing_rules) for h in hits if h.hit_time_pricing_rules}
+    strategy_map = {
+        s.id: s
+        for s in LxTimePricingStrategy.objects.filter(pk__in=strategy_ids)
+    }
+    logger.info("[time_pricing_callback] 预加载: items=%d strategies=%d", len(item_map), len(strategy_map))
+    return item_map, strategy_map
 
 
 # ============================================================
@@ -72,7 +147,7 @@ def _calc_callback_bid(
 # ============================================================
 
 def _re_match_strategy(hit: AdTimePricingHit) -> None:
-    """回调后重新命中分时策略。
+    """回调后重新命中分时策略，更新 hit_time_pricing_rules。
 
     优先级：
       1. 若用户手动设置了 user_manual_time_rules → 直接写入 hit_time_pricing_rules
@@ -81,20 +156,15 @@ def _re_match_strategy(hit: AdTimePricingHit) -> None:
     Args:
         hit: 刚完成回调的命中记录
     """
-    # 1. 用户手动规则优先
     manual_rules = hit.user_manual_time_rules
     if manual_rules and isinstance(manual_rules, list) and len(manual_rules) > 0:
         first = manual_rules[0]
         hit.hit_time_pricing_rules = str(first) if isinstance(first, (int, str)) else ""
         hit.hit_auto_bid_rules = ""
         hit.save(update_fields=["hit_time_pricing_rules", "hit_auto_bid_rules", "updated_at"])
-        logger.info(
-            "[time_pricing_callback] campaign=%d 使用用户手动分时规则: %s",
-            hit.campaign_id, hit.hit_time_pricing_rules,
-        )
+        logger.info("[time_pricing_callback] campaign=%d 使用手动规则: %s", hit.campaign_id, hit.hit_time_pricing_rules)
         return
 
-    # 2. 自动命中：重新走命中链路
     try:
         asins = get_asins_by_campaign(hit.campaign_id, hit.profile_id)
         if not asins:
@@ -116,20 +186,14 @@ def _re_match_strategy(hit: AdTimePricingHit) -> None:
             product_uids=fields["principal_uids"],
             strategies=strategies,
         )
-
         hit.hit_time_pricing_rules = str(result["strategy_id"]) if result else ""
         hit.hit_auto_bid_rules = ""
         hit.save(update_fields=["hit_time_pricing_rules", "hit_auto_bid_rules", "updated_at"])
-        logger.info(
-            "[time_pricing_callback] campaign=%d 重新命中: time=%s",
-            hit.campaign_id, hit.hit_time_pricing_rules,
-        )
+        logger.info("[time_pricing_callback] campaign=%d 重新命中: time=%s", hit.campaign_id, hit.hit_time_pricing_rules)
 
-    except Exception as e:
-        logger.error(
-            "[time_pricing_callback] campaign=%d 重新命中异常: %s",
-            hit.campaign_id, e, exc_info=True,
-        )
+    except Exception:
+        logger.exception("[time_pricing_callback] campaign=%d 重新命中异常", hit.campaign_id)
+        # 命中失败不阻塞主流程，record 保持上一次的规则
 
 
 # ============================================================
@@ -137,106 +201,71 @@ def _re_match_strategy(hit: AdTimePricingHit) -> None:
 # ============================================================
 
 def execute_time_pricing_callback() -> dict[str, Any]:
-    """执行"分时回调"：遍历正在分时的记录，离开时段则回调竞价。
-
-    对所有 is_time_pricing=YES 的记录，判断是否已离开分时时段，
-    若离开则按策略 callback_settings 恢复竞价，并重置 is_time_pricing=NO。
+    """执行"分时回调"：遍历正在分时的记录，离开时段则回调竞价并重置 is_time_pricing。
 
     Returns:
-        {"processed": int, "called_back": int, "errors": [str]}
+        {
+            "processed": int,    # 已处理的记录数（含跳过和无操作的）
+            "called_back": int,  # 实际执行回调的记录数
+            "errors": list[str], # 异常信息列表
+        }
     """
-    hits = AdTimePricingHit.objects.filter(
-        is_time_pricing=TimePricingHitStatus.YES,
-    )
-    if not hits.exists():
+    hits = list(AdTimePricingHit.objects.filter(is_time_pricing=TimePricingHitStatus.YES))
+    if not hits:
         logger.info("[time_pricing_callback] 无正在分时的记录")
         return {"processed": 0, "called_back": 0, "errors": []}
 
-    logger.info("[time_pricing_callback] 正在分时记录数=%d", hits.count())
+    logger.info("[time_pricing_callback] 正在分时记录数=%d", len(hits))
+    item_map, strategy_map = _preload_callback_data(hits)
 
+    now_utc = datetime.now(dt_timezone.utc)
+    adjustments: list[SpBidAdjustment] = []
+    hits_to_update: list[AdTimePricingHit] = []
     processed = 0
     called_back = 0
     errors: list[str] = []
 
     for hit in hits:
         try:
-            # 2. 加载命中的策略
-            strategy_id = int(hit.hit_time_pricing_rules)
-            strategy = LxTimePricingStrategy.objects.filter(pk=strategy_id).first()
+            strategy = strategy_map.get(int(hit.hit_time_pricing_rules))
             if not strategy:
-                # 策略已被删除，清除分时状态 + 尝试重新命中
                 hit.is_time_pricing = TimePricingHitStatus.NO
-                hit.save(update_fields=["is_time_pricing", "updated_at"])
-                _re_match_strategy(hit)
+                hits_to_update.append(hit)
                 processed += 1
                 continue
 
-            time_settings = strategy.time_settings or {}
-            tz = hit.timezone or ""
+            if not _process_callback_for_hit(hit, strategy, item_map, now_utc, adjustments):
+                continue  # 仍在分时时段
 
-            # 3. 判断当前时间是否仍在分时时段内
-            still_in_period = len(_find_matching_rules(time_settings, tz, strategy.time_mode)) > 0
-            if still_in_period:
-                # 仍在分时时段，不回调
-                continue
-
+            hit.is_time_pricing = TimePricingHitStatus.NO
+            hits_to_update.append(hit)
+            called_back += 1
             processed += 1
 
-            # 4. 获取回调策略
-            callback = strategy.callback_settings or {}
-            cb_type = callback.get("type", "none")
+        except Exception:
+            logger.exception("[time_pricing_callback] campaign=%d", hit.campaign_id)
+            errors.append(f"campaign={hit.campaign_id} profile={hit.profile_id}")
 
-            # 5. 查询投放项
-            items = _get_ad_items(hit.campaign_id, hit.profile_id, hit.targeting_type)
-            now_utc = datetime.now(dt_timezone.utc)
+    _write_batch(adjustments, hits_to_update)
 
-            if not items or cb_type == "none":
-                # 无投放项或策略为不回调 → 直接标记分时结束 + 重新命中
-                hit.is_time_pricing = TimePricingHitStatus.NO
-                hit.save(update_fields=["is_time_pricing", "updated_at"])
-                _re_match_strategy(hit)
-                called_back += 1
-                continue
+    for hit in hits_to_update:
+        _re_match_strategy(hit)
 
-            # 6. 对每个投放项：基于当前竞价（从 LxSpKeyword/LxSpTarget 取到的 bid）计算回调
-            for item in items:
-                item_id = item["item_id"]
-                is_target = item["item_type"] == "target"
-                current_bid = item["bid"]
-
-                callback_bid = _calc_callback_bid(current_bid, callback)
-                if callback_bid is None or callback_bid == current_bid:
-                    continue
-
-                SpBidAdjustment.objects.create(
-                    target_id=item_id if is_target else None,
-                    keyword_id=item_id if not is_target else None,
-                    campaign_id=hit.campaign_id,
-                    profile_id=hit.profile_id,
-                    execution_type=ExecutionTypeChoices.TIME_PRICING_CALLBACK,
-                    time_pricing_rule_id=strategy.id,
-                    auto_rule_id=None,
-                    is_time_pricing=TimePricingHitStatus.NO,
-                    bid_before=None,
-                    bid_after=callback_bid,
-                    adjustment_status=AdjustmentStatusChoices.PENDING,
-                    adjustment_time=now_utc,
-                    execution_status=ExecutionStatusChoices.PENDING,
-                )
-
-            # 7. 重置分时状态 + 重新命中策略
-            hit.is_time_pricing = TimePricingHitStatus.NO
-            hit.save(update_fields=["is_time_pricing", "updated_at"])
-            _re_match_strategy(hit)
-            called_back += 1
-
-        except Exception as e:
-            err = f"campaign={hit.campaign_id} profile={hit.profile_id}: {e}"
-            logger.error("[time_pricing_callback] %s", err, exc_info=True)
-            errors.append(err)
-
-    logger.info(
-        "[time_pricing_callback] 完成 processed=%d called_back=%d errors=%d",
-        processed, called_back, len(errors),
-    )
+    logger.info("[time_pricing_callback] 完成 processed=%d called_back=%d errors=%d", processed, called_back, len(errors))
     return {"processed": processed, "called_back": called_back, "errors": errors}
+
+
+def _write_batch(
+    adjustments: list[SpBidAdjustment],
+    hits_to_update: list[AdTimePricingHit],
+) -> None:
+    """批量写入调整记录和命中状态。
+
+    Args:
+        adjustments: 待写入的 SpBidAdjustment 列表
+        hits_to_update: 待写入的 AdTimePricingHit 列表
+    """
+    if adjustments:
+        SpBidAdjustment.objects.bulk_create(adjustments, batch_size=500)
+    if hits_to_update:
+        AdTimePricingHit.objects.bulk_update(hits_to_update, ["is_time_pricing", "updated_at"], batch_size=500)
