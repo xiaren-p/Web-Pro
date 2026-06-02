@@ -50,6 +50,10 @@ from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
 from api_v1.models.lingxing.sales.listing.lx_listing_remark import LxListingRemark
 from api_v1.models.lingxing.sales.listing.lx_order_profit import LxOrderProfit
 from api_v1.models.lingxing.sales.listing.lx_listing_metrics import LxListingMetrics
+from api_v1.models.lingxing.ads.lx_time_pricing_strategy import (
+    BaseValueType, ExecutionResultType,
+    LxTimePricingStrategy, StrategyStatus,
+)
 
 __all__ = [
     'TimeStampedModel',
@@ -68,4 +72,6 @@ __all__ = [
     'LxShopProfile', 'LxSellers', 'LxUserList',
     'LxShops', 'ShopStatus', 'HasAdsSetting',
     'LxListingInfo', 'LxProductInfo', 'LxListingRemark', 'LxOrderProfit', 'LxListingMetrics',
+    # 分时调价策略
+    'LxTimePricingStrategy', 'StrategyStatus', 'BaseValueType', 'ExecutionResultType',
 ]
