@@ -18,6 +18,11 @@
           <span class="orange">广告分时策略规则只能命中一次</span>
           ；
         </div>
+        <div>
+          3. 货币单位，
+          <span class="orange">仅供参考，以实际的店铺国家结算为准</span>
+          ；
+        </div>
       </div>
       <el-form :model="form" label-width="100px" class="form-main">
         <el-form-item label="模板名称">
@@ -39,7 +44,7 @@
             collapse-tags-tooltip
             placeholder="搜索店铺名称或 ID"
             style="width: 320px"
-            @change="(vals: (string | number)[]) => onSelectChange(vals, shopOptions, 'shops')"
+            @change="(vals: (string | number)[]) => onSelectChange(vals, filteredShopOptions, 'shops')"
             @visible-change="handleSelectVisible"
             @remove-tag="resetShopFilter"
           >
@@ -298,8 +303,8 @@
                   <el-option label="在基准值上按固定值增量" value="fixed_increase" />
                   <el-option label="在基准值上按固定值减量" value="fixed_decrease" />
                   <el-option label="使用固定值" value="fixed" />
-                  <el-option label="竞价高于【】的，固定调到【】" value="bid_above_fixed" />
-                  <el-option label="竞价低于【】的，固定调到【】" value="bid_below_fixed" />
+                  <el-option label="竞价高于" value="bid_above_fixed" />
+                  <el-option label="竞价低于" value="bid_below_fixed" />
                 </el-select>
                 <!-- 百分比 / 固定值类规则 -->
                 <template v-if="['percent_decrease','percent_increase','fixed_decrease','fixed_increase'].includes(rule.operateType)">
@@ -327,13 +332,13 @@
                 </template>
                 <!-- 竞价高于/低于 -->
                 <template v-else-if="rule.operateType === 'bid_above_fixed'">
-                  <span class="text" style="margin: 0 4px">竞价高于 €</span>
+                  <span class="text" style="margin: 0 4px"> €</span>
                   <el-input-number v-model="rule.triggerValue" size="small" :controls="false" style="width: 80px" />
                   <span class="text" style="margin: 0 4px">的，固定调到 €</span>
                   <el-input-number v-model="rule.targetValue" size="small" :controls="false" style="width: 80px" />
                 </template>
                 <template v-else-if="rule.operateType === 'bid_below_fixed'">
-                  <span class="text" style="margin: 0 4px">竞价低于 €</span>
+                  <span class="text" style="margin: 0 4px"> €</span>
                   <el-input-number v-model="rule.triggerValue" size="small" :controls="false" style="width: 80px" />
                   <span class="text" style="margin: 0 4px">的，固定调到 €</span>
                   <el-input-number v-model="rule.targetValue" size="small" :controls="false" style="width: 80px" />
@@ -672,7 +677,7 @@ const filteredShopOptions = computed(() => {
   const q = shopFilterQuery.value.toLowerCase().trim();
   if (!q) return shopOptions.value;
   return shopOptions.value.filter(
-    (opt) => String(opt.label).toLowerCase().includes(q) || String(opt.value).includes(q)
+    (opt) => String(opt.label).toLowerCase().includes(q)
   );
 });
 
