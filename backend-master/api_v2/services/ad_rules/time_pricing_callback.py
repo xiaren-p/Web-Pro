@@ -175,7 +175,7 @@ def execute_time_pricing_callback() -> dict[str, Any]:
             tz = hit.timezone or ""
 
             # 3. 判断当前时间是否仍在分时时段内
-            still_in_period = len(_find_matching_rules(time_settings, tz)) > 0
+            still_in_period = len(_find_matching_rules(time_settings, tz, strategy.time_mode)) > 0
             if still_in_period:
                 # 仍在分时时段，不回调
                 continue

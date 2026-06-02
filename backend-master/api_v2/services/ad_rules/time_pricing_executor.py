@@ -93,13 +93,14 @@ def _get_local_time_str(tz_name: str) -> str | None:
 
 
 def _find_matching_rules(
-    time_settings: dict, tz_name: str,
+    time_settings: dict, tz_name: str, time_mode: str = "byDay",
 ) -> list[dict]:
     """在策略的 time_settings 中查找当前时间命中的所有规则。
 
     Args:
         time_settings: 策略的 time_settings JSON 字段
         tz_name: 记录时区
+        time_mode: 策略的 time_mode 字段（"byDay"/"byWeek"/"calendar"）
 
     Returns:
         当前命中的所有规则列表（可能跨多个时间段），未命中返回空列表
@@ -108,7 +109,7 @@ def _find_matching_rules(
     if local_time is None:
         return []
 
-    mode = time_settings.get("mode", "byDay") if isinstance(time_settings, dict) else "byDay"
+    mode = time_mode
     segments = (time_settings or {}).get("segments", []) if isinstance(time_settings, dict) else []
 
     if mode == "calendar":
@@ -135,16 +136,17 @@ def _find_matching_rules(
         if not in_range:
             continue
 
-        # 按周模式下检查 dayOfWeek
-        day_of_week = seg.get("dayOfWeek", "")
-        if day_of_week:
-            try:
-                tz = ZoneInfo(tz_name)
-                weekday = str(datetime.now(tz).isoweekday())  # 1=Mon .. 7=Sun
-                if weekday != str(day_of_week):
+        # dayOfWeek 仅在 byWeek 模式下检查，byDay 模式忽略
+        if mode == "byWeek":
+            day_of_week = seg.get("dayOfWeek", "")
+            if day_of_week:
+                try:
+                    tz = ZoneInfo(tz_name)
+                    weekday = str(datetime.now(tz).isoweekday())
+                    if weekday != str(day_of_week):
+                        continue
+                except ZoneInfoNotFoundError:
                     continue
-            except ZoneInfoNotFoundError:
-                continue
 
         # 该时间段的所有规则都加入
         rules = seg.get("rules", [])
@@ -239,7 +241,7 @@ def execute_time_pricing_start() -> dict[str, Any]:
             tz = hit.timezone or ""
 
             # 3. 判断当前时间是否在分时时间段内
-            matching_rules = _find_matching_rules(time_settings, tz)
+            matching_rules = _find_matching_rules(time_settings, tz, strategy.time_mode)
             if not matching_rules:
                 # 不在时段内，跳过等待下次（可能下个小时就匹配了）
                 continue
