@@ -7,6 +7,7 @@ from api_v2.views.ad_time_pricing_view import (
     trigger_ad_time_pricing, trigger_time_pricing_callback,
     trigger_time_pricing_start, unlock_ad_time_pricing,
 )
+from api_v2.views.bid_adjustment_view import trigger_bid_adjustment
 from api_v2.views.ad_upload_queue_view import (
     bulk_delete_ad_queue,
     list_ad_queue,
@@ -47,4 +48,7 @@ urlpatterns = [
     path('ads/time-pricing/start/', trigger_time_pricing_start, name='ads_time_pricing_start'),
     path('ads/time-pricing/callback/', trigger_time_pricing_callback, name='ads_time_pricing_callback'),
     path('ads/time-pricing/unlock/', unlock_ad_time_pricing, name='ads_time_pricing_unlock'),
+
+    # 竞价调整执行
+    path('ads/bid-adjustment/run/', trigger_bid_adjustment, name='bid_adjustment_run'),
 ]
