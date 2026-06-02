@@ -5,6 +5,12 @@ from api_v2.models.ad_time_pricing_hit import (
 )
 from api_v2.models.ad_upload_queue import AdParseStatus, AdUploadQueue
 from api_v2.models.api_request_log import ApiRequestLog, HttpMethod, ParamType
+from api_v2.models.sp_bid_adjustment import (
+    AdjustmentStatusChoices,
+    ExecutionStatusChoices,
+    ExecutionTypeChoices,
+    SpBidAdjustment,
+)
 from api_v2.models.workflow_execution import ExecutionStatus, WorkflowExecution, WorkflowType
 
 __all__ = [
@@ -19,4 +25,8 @@ __all__ = [
     'AdTimePricingHit',
     'TimePricingHitStatus',
     'ManualRulesStatus',
+    'SpBidAdjustment',
+    'ExecutionTypeChoices',
+    'AdjustmentStatusChoices',
+    'ExecutionStatusChoices',
 ]

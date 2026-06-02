@@ -13,6 +13,7 @@ from typing import Any
 from django.db import connections
 from django.db.models import Q
 
+from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
 from api_v1.models.lingxing.ads.basic.lx_sp_ad import LxSpAd
 from api_v1.models.lingxing.ads.basic.lx_sp_campaign import LxSpCampaign
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStrategy, StrategyStatus
@@ -21,6 +22,38 @@ from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitSt
 from api_v2.services.ad_rules.strategy_matcher import match_strategy_against_product
 
 logger = logging.getLogger(__name__)
+
+# 国家代码 → 时区映射（涵盖亚马逊主流站点）
+_COUNTRY_TIMEZONE: dict[str, str] = {
+    "US": "America/Los_Angeles",
+    "CA": "America/Toronto",
+    "MX": "America/Mexico_City",
+    "BR": "America/Sao_Paulo",
+    "GB": "Europe/London",
+    "UK": "Europe/London",
+    "DE": "Europe/Berlin",
+    "FR": "Europe/Paris",
+    "IT": "Europe/Rome",
+    "ES": "Europe/Madrid",
+    "NL": "Europe/Amsterdam",
+    "SE": "Europe/Stockholm",
+    "PL": "Europe/Warsaw",
+    "BE": "Europe/Brussels",
+    "TR": "Europe/Istanbul",
+    "AE": "Asia/Dubai",
+    "SA": "Asia/Riyadh",
+    "IN": "Asia/Kolkata",
+    "JP": "Asia/Tokyo",
+    "AU": "Australia/Sydney",
+    "SG": "Asia/Singapore",
+    "CN": "Asia/Shanghai",
+}
+
+def _country_to_timezone(country_code: str) -> str:
+    """国家代码 → 时区。未知代码返回空字符串。"""
+    if not country_code:
+        return ""
+    return _COUNTRY_TIMEZONE.get(str(country_code).upper(), "")
 
 
 def match_strategy(
@@ -139,12 +172,27 @@ def process_new_ads() -> dict[str, Any]:
     # Phase 1：主线程批量预加载所有数据，构建内存映射
     # ——————————————————————————————————————————————————————
 
-    # 1a. 获取所有 campaign 的 (campaign_id, profile_id)
-    campaign_pairs = list(
-        LxSpCampaign.objects.values_list("campaign_id", "profile_id")
+    # 1a. 获取所有 campaign，构建 (cid,pid) → meta 映射
+    campaigns_raw = list(
+        LxSpCampaign.objects.values_list("campaign_id", "profile_id", "targeting_type")
     )
+    campaign_pairs: list[tuple[int, int]] = []
+    campaign_meta: dict[tuple[int, int], dict[str, str]] = {}
+    for cid, pid, tt in campaigns_raw:
+        campaign_pairs.append((cid, pid))
+        campaign_meta[(cid, pid)] = {"targeting_type": tt or "auto", "timezone": ""}
     total_campaigns = len(campaign_pairs)
     logger.info("[process_new_ads] campaign 总数=%d", total_campaigns)
+
+    # 1a2. 批量查询 profile → country_code，映射到时区
+    profile_ids = list({pid for _, pid in campaign_pairs})
+    profile_timezones: dict[int, str] = {}
+    for p in LxAdsProfile.objects.filter(profile_id__in=profile_ids).values("profile_id", "country_code"):
+        profile_timezones[p["profile_id"]] = _country_to_timezone(p["country_code"] or "")
+    # 填充时区到 campaign_meta
+    for (cid, pid), meta in campaign_meta.items():
+        meta["timezone"] = profile_timezones.get(pid, "")
+    logger.info("[process_new_ads] 时区映射完成，覆盖 profile 数=%d", len(profile_timezones))
 
     if not campaign_pairs:
         logger.info("[process_new_ads] 无 campaign 数据，退出")
@@ -251,18 +299,7 @@ def process_new_ads() -> dict[str, Any]:
     def _process_campaign_chunk(
         campaign_keys: list[tuple[int, int]],
     ) -> dict[str, Any]:
-        """子线程入口：处理一批 campaign，返回匹配结果列表。
-
-        关键安全措施：
-        - 入口处调用 connections.close_all() 确保每个线程拥有独立的 DB 连接。
-        - 线程内不执行任何 ORM 查询，纯内存匹配。
-
-        Args:
-            campaign_keys: 本线程负责的 (campaign_id, profile_id) 列表。
-
-        Returns:
-            {"hits": list[AdTimePricingHit], "processed": int, "hit_count": int}
-        """
+        """子线程入口：处理一批 campaign，返回匹配结果列表。"""
         connections.close_all()
 
         thread_hits: list[AdTimePricingHit] = []
@@ -315,10 +352,16 @@ def process_new_ads() -> dict[str, Any]:
                 product_uids=merged_uids,
                 strategies=strategies,
             )
+            meta = campaign_meta.get((cid, pid), {})
+            targeting_type = meta.get("targeting_type", "auto")
+            tz = meta.get("timezone", "")
+
             if result:
                 thread_hits.append(AdTimePricingHit(
                     campaign_id=cid,
                     profile_id=pid,
+                    targeting_type=targeting_type,
+                    timezone=tz,
                     hit_time_pricing_rules=str(result["strategy_id"]),
                     is_time_pricing=TimePricingHitStatus.NO,
                 ))
@@ -327,6 +370,8 @@ def process_new_ads() -> dict[str, Any]:
                 thread_hits.append(AdTimePricingHit(
                     campaign_id=cid,
                     profile_id=pid,
+                    targeting_type=targeting_type,
+                    timezone=tz,
                     is_time_pricing=TimePricingHitStatus.NO,
                 ))
 

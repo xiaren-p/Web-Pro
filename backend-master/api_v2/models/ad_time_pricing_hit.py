@@ -1,5 +1,7 @@
-"""广告分时策略命中记录表（ad_time_pricing_hit）。"""
+"""广告策略命中记录表（ad_time_pricing_hit）。"""
 from django.db import models
+
+from api_v1.models.lingxing.ads.basic.lx_sp_campaign import SpCampaignTargetingType
 
 
 class TimePricingHitStatus(models.IntegerChoices):
@@ -17,7 +19,7 @@ class ManualRulesStatus(models.IntegerChoices):
 
 
 class AdTimePricingHit(models.Model):
-    """广告分时策略命中记录表。
+    """广告策略命中记录表。
 
     以 LxSpCampaign 的 (campaign_id, profile_id) 为粒度，记录广告活动是否命中分时策略。
     """
@@ -30,17 +32,31 @@ class AdTimePricingHit(models.Model):
         verbose_name="店铺 Profile ID",
     )
 
+    targeting_type = models.CharField(
+        max_length=20,
+        choices=SpCampaignTargetingType.choices,
+        default=SpCampaignTargetingType.AUTO,
+        verbose_name="投放类型",
+    )
+
+    timezone = models.CharField(
+        max_length=50,
+        default="",
+        verbose_name="时区",
+    )
+
     hit_auto_bid_rules = models.CharField(
         max_length=255,
         default="",
         verbose_name="命中自动竞价规则",
+        help_text="命中的自动竞价规则 ID（单条）",
     )
 
     hit_time_pricing_rules = models.CharField(
         max_length=500,
         default="",
         verbose_name="命中分时策略规则",
-        help_text="命中策略的名称，多条用逗号分隔",
+        help_text="命中的策略 ID（单条）",
     )
 
     is_time_pricing = models.IntegerField(
@@ -59,6 +75,12 @@ class AdTimePricingHit(models.Model):
         default=list,
         verbose_name="用户手动设置竞价规则",
         help_text="竞价规则字符串列表",
+    )
+
+    user_manual_time_rules = models.JSONField(
+        default=list,
+        verbose_name="用户手动设置分时规则",
+        help_text="用户手动设置的分时规则字符串列表",
     )
 
     is_manual_rules = models.IntegerField(

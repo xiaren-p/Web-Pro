@@ -1396,10 +1396,78 @@ function onCancel() {
   visible.value = false;
 }
 
+/**
+ * 将 "HH:MM" 转为分钟数（0-1439），用于时段重叠判断。
+ */
+function _timeToMinutes(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * 检查分时时间段是否有重叠。
+ * 处理跨夜情况（如 22:00~02:00 与 01:00~06:00 冲突）。
+ *
+ * @returns 冲突描述字符串，无冲突返回 null
+ */
+function checkTimeOverlap(): string | null {
+  if (form.mode === "calendar") return null; // 日历模式不校验
+  const segs = form.timeSegments;
+  for (let i = 0; i < segs.length; i++) {
+    const a = segs[i];
+    if (!a.startTime || !a.endTime) continue;
+    // 跨周模式下只比较同一天的时段
+    if (form.mode === "byWeek" && a.dayOfWeek) {
+      for (let j = i + 1; j < segs.length; j++) {
+        const b = segs[j];
+        if (b.dayOfWeek !== a.dayOfWeek) continue;
+        if (!b.startTime || !b.endTime) continue;
+        if (_segmentsOverlap(a, b)) {
+          return `时段 ${_fmtSeg(a)} 与 ${_fmtSeg(b)} 时间重叠`;
+        }
+      }
+    } else {
+      // 按天模式：所有时段比较
+      for (let j = i + 1; j < segs.length; j++) {
+        const b = segs[j];
+        if (!b.startTime || !b.endTime) continue;
+        if (_segmentsOverlap(a, b)) {
+          return `时段 ${_fmtSeg(a)} 与 ${_fmtSeg(b)} 时间重叠`;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** 两个时段是否重叠（含跨夜处理） */
+function _segmentsOverlap(a: { startTime: string; endTime: string }, b: { startTime: string; endTime: string }): boolean {
+  const a1 = _timeToMinutes(a.startTime);
+  const a2 = _timeToMinutes(a.endTime);
+  const b1 = _timeToMinutes(b.startTime);
+  const b2 = _timeToMinutes(b.endTime);
+  // 跨夜：结束 < 开始，加 24h 到结束
+  const aEnd = a2 <= a1 ? a2 + 1440 : a2;
+  const bEnd = b2 <= b1 ? b2 + 1440 : b2;
+  // 标准区间重叠判断
+  return a1 < bEnd && b1 < aEnd;
+}
+
+function _fmtSeg(s: { startTime: string; endTime: string; dayOfWeek?: string }): string {
+  const day = s.dayOfWeek ? `周${["一","二","三","四","五","六","日"][Number(s.dayOfWeek)-1]} ` : "";
+  return `${day}${s.startTime}~${s.endTime}`;
+}
+
 /** 提交表单：先验证，再创建或更新策略。 */
 async function onSubmit(): Promise<void> {
   const valid = await formRefEl.value?.validate().catch(() => false);
   if (!valid) return;
+
+  const overlapErr = checkTimeOverlap();
+  if (overlapErr) {
+    ElMessage.warning(overlapErr);
+    return;
+  }
 
   try {
     const payload = buildPayload();
