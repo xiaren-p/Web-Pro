@@ -117,6 +117,16 @@ def _call_api(
 
     try:
         resp = requests.post(url, json=body, headers=headers, timeout=_API_TIMEOUT)
+        if resp.status_code == 401:
+            # Token 可能过期，强制刷新青龙缓存后重试一次
+            logger.warning("[bid_adjustment] 收到 401，尝试刷新 MIDDLE_API_HEADERS 后重试")
+            try:
+                from api_v2.services.qinglong_env_service import refresh_all
+                refresh_all()
+                headers = _get_middle_headers()
+                resp = requests.post(url, json=body, headers=headers, timeout=_API_TIMEOUT)
+            except Exception:
+                logger.exception("[bid_adjustment] 刷新重试失败")
         resp.raise_for_status()
     except requests.RequestException as e:
         logger.error("[bid_adjustment] API 请求失败 %s profile=%d: %s", url, profile_id, e)
@@ -129,7 +139,7 @@ def _call_api(
         return []
 
     data = resp.json()
-    is_success = data.get("success") is not False
+    is_success = data.get("code") in (0, 1)
     if not is_success:
         logger.error("[bid_adjustment] API 返回失败 %s profile=%d: %s", url, profile_id, data.get("message"))
         _log_api_err(
