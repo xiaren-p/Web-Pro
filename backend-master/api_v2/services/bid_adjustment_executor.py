@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # middle.hanlis.cn API 端点
 _TARGET_API = "https://middle.hanlis.cn/basicOpen/adReport/manage/putSpTarget"
 _KEYWORD_API = "https://middle.hanlis.cn/basicOpen/adReport/manage/putSpKeyword"
-_API_BATCH_SIZE = 5000
+_API_BATCH_SIZE = 500
 _API_TIMEOUT = 60
 
 
