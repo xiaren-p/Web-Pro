@@ -21,6 +21,10 @@ from api_v1.models.lingxing.ads.lx_auto_negative_targeting_info import LxAutoNeg
 from api_v1.models.lingxing.ads.lx_auto_negative_targeting_metrics import LxAutoNegativeTargetingMetrics
 from api_v1.models.lingxing.ads.lx_negative_keyword_info import LxNegativeKeywordInfo
 from api_v1.models.lingxing.ads.lx_negative_keyword_metrics import LxNegativeKeywordMetrics
+from api_v1.models.lingxing.ads.report import (
+    LxSpAdGroupReport, LxSpAdReport, LxSpCampaignReport,
+    LxSpKeywordReport, LxSpSearchTermReport, LxSpTargetReport,
+)
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import (
     BaseValueType, ExecutionResultType,
     LxTimePricingStrategy, StrategyStatus, StrategyType,
@@ -43,4 +47,6 @@ __all__ = [
     'LxSpNegativeTarget', 'NegativeTargetType',
     # 分时调价策略
     'LxTimePricingStrategy', 'StrategyStatus', 'StrategyType', 'BaseValueType', 'ExecutionResultType',
+    'LxSpCampaignReport', 'LxSpAdGroupReport', 'LxSpAdReport',
+    'LxSpKeywordReport', 'LxSpTargetReport', 'LxSpSearchTermReport',
 ]
