@@ -35,7 +35,7 @@ class LxApiErr(models.Model):
         default="",
         blank=True,
         verbose_name="请求参数",
-        help_text="请求体 JSON 文本（截断至 5000 字符）",
+        help_text="请求体 JSON 文本",
     )
 
     code = models.CharField(
