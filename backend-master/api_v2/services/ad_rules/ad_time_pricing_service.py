@@ -174,7 +174,9 @@ def process_new_ads() -> dict[str, Any]:
 
     # 1a. 获取所有 campaign，构建 (cid,pid) → meta 映射
     campaigns_raw = list(
-        LxSpCampaign.objects.values_list("campaign_id", "profile_id", "targeting_type")
+        LxSpCampaign.objects
+        .filter(state="enabled")
+        .values_list("campaign_id", "profile_id", "targeting_type")
     )
     campaign_pairs: list[tuple[int, int]] = []
     campaign_meta: dict[tuple[int, int], dict[str, str]] = {}

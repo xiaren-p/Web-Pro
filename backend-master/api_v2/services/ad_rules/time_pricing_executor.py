@@ -178,7 +178,7 @@ def _build_item_map(
     """
     item_map: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
 
-    for t in LxSpTarget.objects.filter(bid__isnull=False).iterator():
+    for t in LxSpTarget.objects.filter(bid__isnull=False, state="enabled").iterator():
         key = (t.campaign_id, t.profile_id)
         if key in campaign_keys:
             item_map[key].append({
@@ -188,7 +188,7 @@ def _build_item_map(
                 "bid": float(t.bid),
             })
 
-    for k in LxSpKeyword.objects.filter(bid__isnull=False).iterator():
+    for k in LxSpKeyword.objects.filter(bid__isnull=False, state="enabled").iterator():
         key = (k.campaign_id, k.profile_id)
         if key in campaign_keys:
             item_map[key].append({
