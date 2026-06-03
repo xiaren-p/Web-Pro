@@ -186,15 +186,22 @@ def process_new_ads() -> dict[str, Any]:
     total_campaigns = len(campaign_pairs)
     logger.info("[process_new_ads] campaign 总数=%d", total_campaigns)
 
-    # 1a2. 批量查询 profile → country_code，映射到时区
+    # 1a2. 批量查询 profile → country_code，映射到时区（仅状态正常的店铺）
     profile_ids = list({pid for _, pid in campaign_pairs})
     profile_timezones: dict[int, str] = {}
-    for p in LxAdsProfile.objects.filter(profile_id__in=profile_ids).values("profile_id", "country_code"):
+    for p in LxAdsProfile.objects.filter(profile_id__in=profile_ids, status=1).values("profile_id", "country_code"):
         profile_timezones[p["profile_id"]] = _country_to_timezone(p["country_code"] or "")
-    # 填充时区到 campaign_meta
+
+    # 剔除店铺状态异常（status=0）的 campaign
+    valid_pairs = {(cid, pid) for cid, pid in campaign_pairs if pid in profile_timezones}
+    campaign_pairs = [(cid, pid) for cid, pid in campaign_pairs if (cid, pid) in valid_pairs]
+    campaign_meta = {k: v for k, v in campaign_meta.items() if k in valid_pairs}
+
     for (cid, pid), meta in campaign_meta.items():
         meta["timezone"] = profile_timezones.get(pid, "")
-    logger.info("[process_new_ads] 时区映射完成，覆盖 profile 数=%d", len(profile_timezones))
+    logger.info("[process_new_ads] 时区映射完成，正常店铺 %d，已剔除 %d",
+                len(profile_timezones), total_campaigns - len(campaign_pairs))
+    total_campaigns = len(campaign_pairs)
 
     if not campaign_pairs:
         logger.info("[process_new_ads] 无 campaign 数据，退出")
