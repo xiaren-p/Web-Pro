@@ -52,9 +52,9 @@ def _calc_new_bid(current_bid: float, rule: dict) -> float | None:
     tgt = float(rule.get("targetValue", 0) or 0)
 
     if op == "percent_decrease":
-        return max(current_bid * (1 - val), lim) if val else current_bid
+        return max(current_bid * (1 - val / 100), lim) if val else current_bid
     if op == "percent_increase":
-        return min(current_bid * (1 + val), lim) if val else current_bid
+        return min(current_bid * (1 + val / 100), lim) if val else current_bid
     if op == "fixed_decrease":
         return max(current_bid - val, lim)
     if op == "fixed_increase":

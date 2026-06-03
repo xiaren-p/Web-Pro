@@ -779,7 +779,7 @@ const form = reactive({
       rules: [
         {
           operateType: "percent_decrease",
-          operateValue: 0.02,
+          operateValue: 2,
           limitValue: 0.02,
           triggerValue: 0,
           targetValue: 0,
@@ -1520,7 +1520,7 @@ function resetForm(): void {
       rules: [
         {
           operateType: "percent_decrease",
-          operateValue: 0.02,
+          operateValue: 2,
           limitValue: 0.02,
           triggerValue: 0,
           targetValue: 0,
