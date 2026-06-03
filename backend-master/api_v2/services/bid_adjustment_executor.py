@@ -107,7 +107,8 @@ def _call_api(
     # 查 sid
     sid = ""
     try:
-        sid = LxAdsProfile.objects.filter(profile_id=profile_id).values_list("sid", flat=True).first() or ""
+        sid_raw = LxAdsProfile.objects.filter(profile_id=profile_id).values_list("sid", flat=True).first() or "0"
+        sid = int(sid_raw) if str(sid_raw).isdigit() else 0
     except Exception:
         logger.warning("[bid_adjustment] 查询 sid 失败 profile=%d", profile_id, exc_info=True)
 
