@@ -175,12 +175,9 @@ def _build_item_payload(record: SpBidAdjustment) -> dict:
         {"keywordId"/"targetId": ..., "state": "", "bid": ..., "isBaseValue": 0, "baseType": "", "baseValue": ""}
     """
     bid = round(float(record.bid_after or 0), 2)
-    base = {"state": "", "bid": bid, "isBaseValue": 0, "baseType": "", "baseValue": ""}
     if record.keyword_id:
-        base["keywordId"] = record.keyword_id
-    else:
-        base["targetId"] = record.target_id
-    return base
+        return {"keywordId": record.keyword_id, "bid": bid, "isBaseValue": 0}
+    return {"targetId": record.target_id, "bid": bid, "isBaseValue": 0}
 
 
 # ============================================================
@@ -238,8 +235,8 @@ def _process_profile_group(
         results = _call_api(_TARGET_API, profile_id, "targetingClauses", batch)
         _apply_api_results(batch, results, group_updates, now_utc, "target")
 
-    # 批量更新返回结果
-    api_processed = [r for r in group_updates if r.execution_status != ExecutionStatusChoices.SUCCESS]
+    # 批量更新 API 调用后的所有记录（SUCCESS + FAILED）
+    api_processed = [r for r in group_updates if r.adjustment_status == AdjustmentStatusChoices.SUCCESS and r.msg != "竞价调整值不变，无需调整"]
     if api_processed:
         SpBidAdjustment.objects.bulk_update(
             api_processed,
