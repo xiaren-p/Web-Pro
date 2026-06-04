@@ -348,6 +348,10 @@ def process_new_ads() -> dict[str, Any]:
                         seen_u.add(val)
                         merged_uids.append(val)
 
+            # 无有效产品信息 → 不写入记录
+            if not merged_assorts and not merged_labels and not merged_uids:
+                continue
+
             # campaign 粒度：已存在记录则跳过
             if (cid, pid) in existing_keys:
                 continue

@@ -20,9 +20,9 @@ class LxSpTargetReport(models.Model):
         verbose_name="投放类别",
     )
 
-    targeting_expression = models.CharField(
-        max_length=100,
+    targeting_expression = models.TextField(
         default="",
+        blank=True,
         verbose_name="投放表达式",
     )
 
