@@ -1,13 +1,18 @@
 """广告分时策略命中——手动触发接口。"""
 from django.core.cache import cache
+from oauth2_provider.contrib.rest_framework import OAuth2Authentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from api_v1.auth import BearerTokenAuthentication
+from api_v2.permissions.workflow_permission import IsV2Accessible
 from api_v2.tasks.ad_time_pricing_callback_task import run_time_pricing_callback_task
 from api_v2.tasks.ad_time_pricing_start_task import run_time_pricing_start_task
 from api_v2.tasks.ad_time_pricing_task import run_ad_time_pricing_task
+
+_AUTH = [BearerTokenAuthentication, OAuth2Authentication]
+_PERM = [IsV2Accessible]
 
 # 互斥锁 cache key：确保同一时间只有一个分时策略命中任务在执行
 _AD_TIME_PRICING_LOCK_KEY = "ad_time_pricing_task_lock"
@@ -15,8 +20,8 @@ _AD_TIME_PRICING_LOCK_TTL = 1500  # 15 分钟，与任务 time_limit 一致
 
 
 @api_view(["POST"])
-@authentication_classes([BearerTokenAuthentication])
-@permission_classes([])
+@authentication_classes(_AUTH)
+@permission_classes(_PERM)
 def trigger_ad_time_pricing(request: Request) -> Response:
     """手动触发分时策略命中任务（异步 Celery 执行）。
 
@@ -49,8 +54,8 @@ _TASK_LOCK_TTL = 1800
 
 
 @api_view(["POST"])
-@authentication_classes([BearerTokenAuthentication])
-@permission_classes([])
+@authentication_classes(_AUTH)
+@permission_classes(_PERM)
 def trigger_time_pricing_start(request: Request) -> Response:
     """手动触发"分时开始"任务（异步 Celery 执行）。"""
     if cache.get(_START_LOCK_KEY):
@@ -61,8 +66,8 @@ def trigger_time_pricing_start(request: Request) -> Response:
 
 
 @api_view(["POST"])
-@authentication_classes([BearerTokenAuthentication])
-@permission_classes([])
+@authentication_classes(_AUTH)
+@permission_classes(_PERM)
 def trigger_time_pricing_callback(request: Request) -> Response:
     """手动触发"分时回调"任务（异步 Celery 执行）。"""
     if cache.get(_CALLBACK_LOCK_KEY):
@@ -73,8 +78,8 @@ def trigger_time_pricing_callback(request: Request) -> Response:
 
 
 @api_view(["DELETE"])
-@authentication_classes([BearerTokenAuthentication])
-@permission_classes([])
+@authentication_classes(_AUTH)
+@permission_classes(_PERM)
 def unlock_ad_time_pricing(request: Request) -> Response:
     """强制清除分时策略任务锁（紧急情况下使用）。"""
     cache.delete(_AD_TIME_PRICING_LOCK_KEY)
