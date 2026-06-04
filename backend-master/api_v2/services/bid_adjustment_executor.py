@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections import defaultdict
 from datetime import datetime, timezone as dt_timezone
 from typing import Any
@@ -20,7 +21,7 @@ from api_v2.models.lx_api_err import LxApiErr
 from api_v2.models.sp_bid_adjustment import (
     AdjustmentStatusChoices, ExecutionStatusChoices, ExecutionTypeChoices, SpBidAdjustment,
 )
-from api_v2.services.qinglong_env_service import get_cached_env
+from api_v2.services.qinglong_env_service import get_cached_env, refresh_with_task_trigger
 
 logger = logging.getLogger(__name__)
 
@@ -92,19 +93,7 @@ def _log_api_err(
 def _call_api(
     url: str, profile_id: int, items_key: str, payload: list[dict],
 ) -> list[dict]:
-    """调用 middle API，返回 apiResult 列表。
-
-    Args:
-        url: API 端点 URL
-        profile_id: 店铺 Profile ID
-        items_key: 请求体的列表字段名（"targetingClauses" / "keywords"）
-        payload: 待发送的投放项列表
-
-    Returns:
-        [{"code": "SUCCESS", "targetId"/"keywordId": ..., "description": ...}]
-        网络异常时返回空列表，错误日志已写入 LxApiErr
-    """
-    # 查 sid
+    """调用 middle API，返回 apiResult 列表。最多重试 3 次。"""
     sid = ""
     try:
         sid_raw = LxAdsProfile.objects.filter(profile_id=profile_id).values_list("sid", flat=True).first() or "0"
@@ -113,48 +102,74 @@ def _call_api(
         logger.warning("[bid_adjustment] 查询 sid 失败 profile=%d", profile_id, exc_info=True)
 
     body = {"sid": sid, "profile_id": profile_id, items_key: payload}
+    return _call_api_with_retry(url, body, profile_id)
+
+
+def _handle_response(resp: requests.Response) -> tuple[list[dict] | None, dict | None]:
+    """处理 middle API HTTP 响应。
+
+    Returns:
+        (apiResult, None) 成功时；(None, error_dict) 需要重试时；
+        (None, None) 不可重试的失败。
+        error_dict = {"code": str, "message": str, "retry": bool}
+    """
+    data = resp.json()
+    if data.get("code") in (0, 1):
+        return (data.get("data") or {}).get("apiResult", []), None
+    # 应用层错误（100、500等）
+    retry = data.get("code") not in (0, 1, "0", "1")
+    return None, {"code": str(data.get("code", "")), "message": data.get("message", ""), "retry": retry}
+
+
+def _call_api_with_retry(url: str, body: dict, profile_id: int) -> list[dict]:
+    """带重试机制的 HTTP POST 调用，最多 3 次。"""
     body_str = json.dumps(body, ensure_ascii=False)
     headers = _get_middle_headers()
+    last_code, last_error = "ERR", ""
 
-    try:
-        resp = requests.post(url, json=body, headers=headers, timeout=_API_TIMEOUT)
-        if resp.status_code == 401:
-            # Token 可能过期，强制刷新青龙缓存后重试一次
-            logger.warning("[bid_adjustment] 收到 401，尝试刷新 MIDDLE_API_HEADERS 后重试")
-            try:
-                from api_v2.services.qinglong_env_service import refresh_all
-                refresh_all()
-                headers = _get_middle_headers()
-                resp = requests.post(url, json=body, headers=headers, timeout=_API_TIMEOUT)
-            except Exception:
-                logger.exception("[bid_adjustment] 刷新重试失败")
-        resp.raise_for_status()
-    except requests.RequestException as e:
-        logger.error("[bid_adjustment] API 请求失败 %s profile=%d: %s", url, profile_id, e)
-        _log_api_err(
-            url=url,
-            request_body=body_str,
-            code=str(getattr(e, "response", None) and getattr(e.response, "status_code", "ERR") or "ERR"),
-            message=f"API 请求失败: {e}",
-        )
-        return []
+    for attempt in range(3):
+        try:
+            resp = requests.post(url, json=body, headers=headers, timeout=_API_TIMEOUT)
 
-    data = resp.json()
-    is_success = data.get("code") in (0, 1)
-    if not is_success:
-        logger.error("[bid_adjustment] API 返回失败 %s profile=%d: %s", url, profile_id, data.get("message"))
-        _log_api_err(
-            url=url,
-            request_body=body_str,
-            code=str(data.get("code", "")),
-            message=data.get("message", "API 返回失败"),
-        )
-        return []
+            if resp.status_code == 401 and attempt == 0:
+                logger.warning("[bid_adjustment] 401，刷新 MIDDLE_API_HEADERS")
+                try:
+                    refresh_with_task_trigger()
+                    headers = _get_middle_headers()
+                except Exception:
+                    logger.exception("[bid_adjustment] 刷新失败")
+                continue
 
-    api_result = (data.get("data") or {}).get("apiResult", [])
-    logger.info("[bid_adjustment] API 调用成功 %s profile=%d items=%d results=%d",
-                url, profile_id, len(payload), len(api_result))
-    return api_result
+            resp.raise_for_status()
+            result, err = _handle_response(resp)
+            if result is not None:
+                return result
+            if err and err.get("retry") and attempt < 2:
+                logger.warning("[bid_adjustment] code=%s 第%d次重试", err["code"], attempt + 1)
+                last_code, last_error = err["code"], err["message"]
+                time.sleep((attempt + 1) * 2)
+                continue
+            last_code, last_error = err["code"] if err else "", err["message"] if err else ""
+            break
+
+        except requests.Timeout:
+            if attempt < 2:
+                time.sleep((attempt + 1) * 3); continue
+            last_code, last_error = "TIMEOUT", "超时"
+        except requests.ConnectionError:
+            if attempt < 2:
+                time.sleep((attempt + 1) * 3); continue
+            last_code, last_error = "CONN_ERR", "连接失败"
+        except requests.RequestException as e:
+            if attempt < 2 and getattr(e, "response", None) is not None and e.response.status_code >= 500:
+                time.sleep((attempt + 1) * 2); continue
+            last_code = str(getattr(e, "response", None) and e.response.status_code or "ERR")
+            last_error = str(e)
+            break
+
+    _log_api_err(url=url, request_body=body_str, code=last_code, message=last_error)
+    logger.error("[bid_adjustment] API 最终失败 %s profile=%d: %s", url, profile_id, last_error)
+    return []
 
 
 # ============================================================
@@ -226,16 +241,10 @@ def _process_profile_group(
         )
 
     # 调用 API
-    for i in range(0, len(keywords), _API_BATCH_SIZE):
-        batch = keywords[i:i + _API_BATCH_SIZE]
-        results = _call_api(_KEYWORD_API, profile_id, "keywords", batch)
-        _apply_api_results(batch, results, group_updates, now_utc, "keyword")
-    for i in range(0, len(targets), _API_BATCH_SIZE):
-        batch = targets[i:i + _API_BATCH_SIZE]
-        results = _call_api(_TARGET_API, profile_id, "targetingClauses", batch)
-        _apply_api_results(batch, results, group_updates, now_utc, "target")
+    _call_api_batch(_KEYWORD_API, profile_id, "keywords", keywords, group_updates, now_utc)
+    _call_api_batch(_TARGET_API, profile_id, "targetingClauses", targets, group_updates, now_utc)
 
-    # 批量更新 API 调用后的所有记录（SUCCESS + FAILED）
+    # 批量更新 API 调用后的所有记录
     api_processed = [r for r in group_updates if r.adjustment_status == AdjustmentStatusChoices.SUCCESS and r.msg != "竞价调整值不变，无需调整"]
     if api_processed:
         SpBidAdjustment.objects.bulk_update(
@@ -245,6 +254,26 @@ def _process_profile_group(
         )
     sc = sum(1 for r in api_processed if r.execution_status == ExecutionStatusChoices.SUCCESS)
     return {"total": len(group), "success": success + sc, "failed": len(api_processed) - sc}
+
+
+def _call_api_batch(
+    api_url: str, profile_id: int, items_key: str,
+    items: list[dict], group_updates: list[SpBidAdjustment], now_utc: datetime,
+) -> None:
+    """分批调用 middle API 并应用结果。
+
+    Args:
+        api_url: API 端点 URL
+        profile_id: 店铺 Profile ID
+        items_key: 列表字段名
+        items: 待发送的投放项列表
+        group_updates: 当前 profile 的待更新记录列表
+        now_utc: 当前 UTC 时间
+    """
+    for i in range(0, len(items), _API_BATCH_SIZE):
+        batch = items[i:i + _API_BATCH_SIZE]
+        results = _call_api(api_url, profile_id, items_key, batch)
+        _apply_api_results(batch, results, group_updates, now_utc, items_key)
 
 
 def execute_bid_adjustment() -> dict[str, Any]:

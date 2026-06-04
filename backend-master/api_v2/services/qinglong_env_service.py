@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import requests
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 _CFG_URL = "QINGLONG_URL"
 _CFG_CLIENT_ID = "QINGLONG_CLIENT_ID"
 _CFG_CLIENT_SECRET = "QINGLONG_CLIENT_SECRET"
+_CFG_TASK_ID = "QINGLONG_REFRESH_MIDDLE_API_AUTH_TASK"
 
 # 需要定期同步并缓存的环境变量名列表
 TARGET_ENV_NAMES: list[str] = [
@@ -205,6 +207,48 @@ def refresh_all() -> dict[str, str]:
         )
 
     return {}
+
+
+def refresh_with_task_trigger() -> dict[str, str]:
+    """先触发青龙定时任务，再拉取最新环境变量写入缓存。
+
+    从前端系统参数 QINGLONG_TASK_NAME 读取任务名，搜索并执行。
+    若未配置则降级为普通刷新。
+
+    Returns:
+        dict[str, str]: 刷新后的 {变量名: 变量值} 字典；失败时返回空字典。
+    """
+    task_id_str = _get_config_value(_CFG_TASK_ID)
+    base_url = _get_config_value(_CFG_URL)
+    client_id = _get_config_value(_CFG_CLIENT_ID)
+    client_secret = _get_config_value(_CFG_CLIENT_SECRET)
+
+    if not all([base_url, client_id, client_secret]):
+        logger.warning("[QinglongEnvService] 青龙配置不完整，跳过")
+        return {}
+    if not task_id_str:
+        logger.warning("[QinglongEnvService] QINGLONG_REFRESH_MIDDLE_API_AUTH_TASK 未配置，降级为普通刷新")
+        return refresh_all()
+
+    try:
+        task_id = int(task_id_str)
+    except (ValueError, TypeError):
+        logger.error("[QinglongEnvService] QINGLONG_REFRESH_MIDDLE_API_AUTH_TASK 不是有效数字: %s", task_id_str)
+        return refresh_all()
+
+    try:
+        token = _fetch_token(base_url, client_id, client_secret)
+        logger.info("[QinglongEnvService] 触发青龙任务 id=%d", task_id)
+        requests.put(
+            f"{base_url.rstrip('/')}/open/crons/{task_id}/run",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        time.sleep(5)
+    except Exception:
+        logger.exception("[QinglongEnvService] 触发青龙任务失败，降级为普通刷新")
+
+    return refresh_all()
 
 
 def get_cached_env(name: str) -> str:
