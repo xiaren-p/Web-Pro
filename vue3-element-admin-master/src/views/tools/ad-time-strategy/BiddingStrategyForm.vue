@@ -281,8 +281,8 @@
           <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%">
             <el-radio-group v-model="form.mode">
               <el-radio value="byDay" label="byDay">按天</el-radio>
-              <el-radio value="byWeek" label="byWeek">按周</el-radio>
-              <el-radio value="calendar" label="calendar">日历模式</el-radio>
+              <el-radio value="byWeek" label="byWeek" disabled>按周（开发中）</el-radio>
+              <el-radio value="calendar" label="calendar" disabled>日历模式（开发中）</el-radio>
             </el-radio-group>
             <span
               class="desc orange-star"
