@@ -23,7 +23,7 @@ from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStr
 from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
 from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, ManualRulesStatus, TimePricingHitStatus
 from api_v2.services.ad_rules.strategy_matcher import match_strategy_against_product
-from api_v2.utils.timezone_utils import country_to_timezone
+from api_v2.utils.timezone_utils import country_to_timezone, get_fixed_utc_offset
 
 logger = logging.getLogger(__name__)
 
@@ -89,17 +89,17 @@ def _calc_strategy_times(
     seg_end: str,
     tz_name: str,
 ) -> tuple[datetime | None, datetime | None, datetime | None, datetime | None]:
-    """根据分时时段（HH:MM）+ 站点时区，计算当天四个时间。
+    """根据分时时段（HH:MM）+ 站点时区偏移，计算四个时间。
 
-    start = 今天 + seg_start 时刻（站点时区）
-    end   = 今天 + seg_end 时刻，若 end < start 则日期 +1（跨天）
-    _cn   = 对应北京时间
+    time_start / time_end：直接写入规则的 HH:MM，日期为今天（naive datetime，无时区）。
+      因为使用时区时间不分冬夏令时，规则写 1 点就是 1 点。
+    time_start_cn / time_end_cn：根据站点时区偏移量换算出的北京时间（naive datetime）。
 
     Args:
-        strategy: 匹配到的分时策略（仅用于校验月日字段非空，具体日期用当天）
-        seg_start: 时段起始 "HH:MM"
-        seg_end: 时段结束 "HH:MM"
-        tz_name: 站点时区名
+        strategy: 匹配到的分时策略（仅用于校验月日字段非空）
+        seg_start: 时段起始 "HH:MM"（规则原始时间）
+        seg_end: 时段结束 "HH:MM"（规则原始时间）
+        tz_name: 站点时区名（如 "Europe/London"）
 
     Returns:
         (time_start, time_end, time_start_cn, time_end_cn)
@@ -113,28 +113,24 @@ def _calc_strategy_times(
     today = datetime.now().date()
     year = today.year
 
-    try:
-        tz = ZoneInfo(tz_name)
-        tz_cn = ZoneInfo("Asia/Shanghai")
-    except (ZoneInfoNotFoundError, KeyError):
-        return None, None, None, None
-
     sh, sm_val = map(int, seg_start.split(":"))
     eh, em = map(int, seg_end.split(":"))
 
-    # 开始时间：今天 + 时段起始时刻（站点时区）
-    time_start = datetime(year, today.month, today.day, sh, sm_val, 0, tzinfo=tz)
-    # 结束时间：今天 + 时段结束时刻；若结束时刻 < 起始时刻则跨天（日期 +1）
-    time_end = datetime(year, today.month, today.day, eh, em, 0, tzinfo=tz)
+    # ── time_start / time_end：规则原始时间，不分冬夏令时，直接写 ──
+    time_start = datetime(year, today.month, today.day, sh, sm_val, 0)
+    time_end = datetime(year, today.month, today.day, eh, em, 0)
     if (eh, em) < (sh, sm_val):
-        time_end += timedelta(days=1)
+        time_end += timedelta(days=1)  # 跨天
 
-    start_cn = time_start.astimezone(tz_cn).replace(tzinfo=None)
-    end_cn = time_end.astimezone(tz_cn).replace(tzinfo=None)
-    time_start = time_start.replace(tzinfo=None)
-    time_end = time_end.replace(tzinfo=None)
+    # ── time_start_cn / time_end_cn：按站点时区固定 UTC 偏移换算北京时间 ──
+    offset_hours = get_fixed_utc_offset(tz_name)
+    # 站点时间 → UTC → 北京时间 (UTC+8)
+    start_utc = time_start - timedelta(hours=offset_hours)
+    end_utc = time_end - timedelta(hours=offset_hours)
+    time_start_cn = start_utc + timedelta(hours=8)
+    time_end_cn = end_utc + timedelta(hours=8)
 
-    return time_start, time_end, start_cn, end_cn
+    return time_start, time_end, time_start_cn, time_end_cn
 
 
 # ============================================================

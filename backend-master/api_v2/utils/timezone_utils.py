@@ -1,7 +1,7 @@
 """站点时区工具（timezone_utils）。
 
 根据 profile_id 或 timezone 字符串获取当前站点时间。
-提供国家代码 → 时区的标准映射。
+提供国家代码 → 时区的标准映射，以及时区 → 固定 UTC 偏移（不分冬夏令时）。
 """
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -31,6 +31,43 @@ _COUNTRY_TIMEZONE: dict[str, str] = {
     "SG": "Asia/Singapore",
     "CN": "Asia/Shanghai",
 }
+
+# 时区 → 固定 UTC 偏移（小时），不分冬夏令时
+_TIMEZONE_UTC_OFFSET: dict[str, int] = {
+    "America/Los_Angeles": -8,
+    "America/Toronto":      -5,
+    "America/Mexico_City":  -6,
+    "America/Sao_Paulo":    -3,
+    "Europe/London":         0,
+    "Europe/Berlin":         1,
+    "Europe/Paris":          1,
+    "Europe/Rome":           1,
+    "Europe/Madrid":         1,
+    "Europe/Amsterdam":      1,
+    "Europe/Stockholm":      1,
+    "Europe/Warsaw":         1,
+    "Europe/Brussels":       1,
+    "Europe/Istanbul":       3,
+    "Asia/Dubai":            4,
+    "Asia/Riyadh":           3,
+    "Asia/Kolkata":          5,
+    "Asia/Tokyo":            9,
+    "Australia/Sydney":     10,
+    "Asia/Singapore":        8,
+    "Asia/Shanghai":         8,
+}
+
+
+def get_fixed_utc_offset(tz_name: str) -> int:
+    """获取站点时区的固定 UTC 偏移（小时），不分冬夏令时。
+
+    Args:
+        tz_name: 时区名，如 "Europe/London"
+
+    Returns:
+        UTC 偏移小时数，未知时区返回 0
+    """
+    return _TIMEZONE_UTC_OFFSET.get(tz_name, 0)
 
 
 def country_to_timezone(country_code: str) -> str:
