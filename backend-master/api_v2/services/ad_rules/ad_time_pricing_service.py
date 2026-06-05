@@ -456,6 +456,8 @@ def process_new_ads() -> dict[str, Any]:
                 if user_strategy:
                     existing.hit_time_pricing_rules = existing.manual_rule_id
                     existing.rule_updated_today = True
+                    existing.is_callback = TimePricingHitStatus.NO
+                    existing.is_time_pricing = TimePricingHitStatus.NO
                     segments = (user_strategy.time_settings or {}).get("segments", [])
                     filtered = _filter_segments_for_today(segments, user_strategy.time_mode)
                     if filtered:
@@ -484,6 +486,9 @@ def process_new_ads() -> dict[str, Any]:
             result = match_strategy_against_product(pid, assorts, labels, uids, strategies)
             existing.hit_time_pricing_rules = str(result["strategy_id"]) if result else ""
             existing.rule_updated_today = True
+            # 新一天重新命中，重置分时和回调状态
+            existing.is_callback = TimePricingHitStatus.NO
+            existing.is_time_pricing = TimePricingHitStatus.NO
             if result:
                 matched_strategy = next(
                     (s for s in strategies if s.id == result["strategy_id"]), None,
@@ -544,6 +549,7 @@ def process_new_ads() -> dict[str, Any]:
             [
                 "hit_time_pricing_rules", "rule_updated_today",
                 "time_start", "time_end", "time_start_cn", "time_end_cn",
+                "is_callback", "is_time_pricing",
                 "updated_at",
             ],
             batch_size=500,
