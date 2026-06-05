@@ -82,10 +82,12 @@ def _in_time_range(hit: AdTimePricingHit) -> bool:
 # ============================================================
 
 def _get_active_rules(strategy: LxTimePricingStrategy) -> list[dict]:
-    """从策略 time_settings 中提取所有时段的所有规则（不做时间匹配）。
+    """从策略 time_settings 中提取今天适用的规则（按 dayOfWeek 过滤）。
 
-    时间匹配已在写入 AdTimePricingHit 时完成（time_start/time_end），
-    此处只需取出规则列表用于竞价计算。
+    三种模式：
+      - byDay：所有时段全部适用
+      - byWeek：只取 dayOfWeek 等于今天周几的时段
+      - calendar：所有时段全适用（暂不支持 grid 格式）
 
     Args:
         strategy: 分时策略
@@ -99,6 +101,16 @@ def _get_active_rules(strategy: LxTimePricingStrategy) -> list[dict]:
     segments = time_settings.get("segments", [])
     if not isinstance(segments, list):
         return []
+
+    time_mode = strategy.time_mode or "byDay"
+
+    # byWeek：按 dayOfWeek 过滤
+    if time_mode == "byWeek":
+        today_weekday = str(datetime.now(_TZ_CN).isoweekday())  # "1"=周一 … "7"=周日
+        segments = [
+            seg for seg in segments
+            if isinstance(seg, dict) and str(seg.get("dayOfWeek", "")) == today_weekday
+        ]
 
     rules: list[dict] = []
     for seg in segments:

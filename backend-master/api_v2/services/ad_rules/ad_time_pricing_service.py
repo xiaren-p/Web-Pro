@@ -131,6 +131,43 @@ def _calc_strategy_times(
     return time_start, time_end, time_start_cn, time_end_cn
 
 
+def _filter_segments_for_today(
+    segments: list[dict],
+    time_mode: str,
+) -> list[dict]:
+    """按当前日期过滤 segments，仅返回今天适用的时段。
+
+    三种模式过滤规则：
+      - byDay：全部返回（每天适用）
+      - byWeek：仅返回 dayOfWeek 等于今天周几的 seg（1=周一…7=周日）
+      - calendar：返回全部（日历模式不分 segments）
+
+    Args:
+        segments: 策略 time_settings 中的 segments 列表
+        time_mode: 策略 time_mode（byDay / byWeek / calendar）
+
+    Returns:
+        过滤后的 segments 列表
+    """
+    if not segments or not isinstance(segments, list):
+        return []
+
+    if time_mode == "byDay":
+        return [seg for seg in segments if isinstance(seg, dict)]
+
+    if time_mode == "byWeek":
+        today_weekday = str(datetime.now().isoweekday())  # "1" 周一 … "7" 周日
+        return [
+            seg for seg in segments
+            if isinstance(seg, dict) and str(seg.get("dayOfWeek", "")) == today_weekday
+        ]
+
+    if time_mode == "calendar":
+        return [seg for seg in segments if isinstance(seg, dict)]
+
+    return []
+
+
 # ============================================================
 # 策略匹配（便捷封装）
 # ============================================================
@@ -350,17 +387,15 @@ def process_new_ads() -> dict[str, Any]:
                 if not result:
                     continue
 
-                # 计算时间：取所有时段的 startTime 最早值、endTime 最晚值，
-                # 合并为一个覆盖全部时段的起止时间窗口。
-                # 例如 segments=[06:00-01:00, 22:00-02:00] → start=06:00, end=02:00
+                # 计算时间：先按 dayOfWeek/calendar 过滤，再取所有时段合并
                 matched_strategy = next(
                     (s for s in strategies if s.id == result["strategy_id"]), None,
                 )
                 ts = te = ts_cn = te_cn = None
                 if matched_strategy:
                     segments = (matched_strategy.time_settings or {}).get("segments", [])
-                    if segments and isinstance(segments, list):
-                        # 所有时段中取最早 start 和最晚 end
+                    filtered = _filter_segments_for_today(segments, matched_strategy.time_mode)
+                    if filtered:
                         seg_times = [
                             _calc_strategy_times(
                                 matched_strategy,
@@ -368,10 +403,7 @@ def process_new_ads() -> dict[str, Any]:
                                 seg.get("endTime", "00:00"),
                                 tz,
                             )
-                            for seg in segments
-                            if isinstance(seg, dict)
-                            and seg.get("startTime")
-                            and seg.get("endTime")
+                            for seg in filtered
                         ]
                         valid_times = [(t[0], t[1], t[2], t[3]) for t in seg_times if t[0] is not None]
                         if valid_times:
@@ -418,7 +450,8 @@ def process_new_ads() -> dict[str, Any]:
                     existing.hit_time_pricing_rules = existing.manual_rule_id
                     existing.rule_updated_today = True
                     segments = (user_strategy.time_settings or {}).get("segments", [])
-                    if segments and isinstance(segments, list):
+                    filtered = _filter_segments_for_today(segments, user_strategy.time_mode)
+                    if filtered:
                         seg_times = [
                             _calc_strategy_times(
                                 user_strategy,
@@ -426,10 +459,7 @@ def process_new_ads() -> dict[str, Any]:
                                 seg.get("endTime", "00:00"),
                                 tz,
                             )
-                            for seg in segments
-                            if isinstance(seg, dict)
-                            and seg.get("startTime")
-                            and seg.get("endTime")
+                            for seg in filtered
                         ]
                         valid_times = [(t[0], t[1], t[2], t[3]) for t in seg_times if t[0] is not None]
                         if valid_times:
@@ -453,7 +483,8 @@ def process_new_ads() -> dict[str, Any]:
                 )
                 if matched_strategy:
                     segments = (matched_strategy.time_settings or {}).get("segments", [])
-                    if segments and isinstance(segments, list):
+                    filtered = _filter_segments_for_today(segments, matched_strategy.time_mode)
+                    if filtered:
                         seg_times = [
                             _calc_strategy_times(
                                 matched_strategy,
@@ -461,10 +492,7 @@ def process_new_ads() -> dict[str, Any]:
                                 seg.get("endTime", "00:00"),
                                 tz,
                             )
-                            for seg in segments
-                            if isinstance(seg, dict)
-                            and seg.get("startTime")
-                            and seg.get("endTime")
+                            for seg in filtered
                         ]
                         valid_times = [(t[0], t[1], t[2], t[3]) for t in seg_times if t[0] is not None]
                         if valid_times:
