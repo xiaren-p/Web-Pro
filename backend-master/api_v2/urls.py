@@ -4,8 +4,7 @@ from django.urls import path
 
 from api_v2.views.ad_campaign_submit_view import submit_pending_campaigns
 from api_v2.views.ad_time_pricing_view import (
-    trigger_ad_time_pricing, trigger_time_pricing_callback,
-    trigger_time_pricing_start, unlock_ad_time_pricing,
+    trigger_ad_time_pricing, trigger_time_pricing, unlock_ad_time_pricing,
 )
 from api_v2.views.bid_adjustment_view import trigger_bid_adjustment
 from api_v2.views.ad_upload_queue_view import (
@@ -45,8 +44,7 @@ urlpatterns = [
 
     # 分时策略命中任务（手动触发 / 定时回调）
     path('ads/time-pricing/run/', trigger_ad_time_pricing, name='ads_time_pricing_run'),
-    path('ads/time-pricing/start/', trigger_time_pricing_start, name='ads_time_pricing_start'),
-    path('ads/time-pricing/callback/', trigger_time_pricing_callback, name='ads_time_pricing_callback'),
+    path('ads/time-pricing/execute/', trigger_time_pricing, name='ads_time_pricing_execute'),
     path('ads/time-pricing/unlock/', unlock_ad_time_pricing, name='ads_time_pricing_unlock'),
 
     # 竞价调整执行

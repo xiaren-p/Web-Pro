@@ -143,8 +143,7 @@ CELERY_TASK_ROUTES = {
     # ── single_thread_queue（concurrency=1）：须顺序执行的任务 ───────────────
     'api_v2.tasks.listing_image_upload_task.upload_listing_images_task':  {'queue': 'single_thread_queue'},
     'api_v2.tasks.ad_time_pricing_task.run_ad_time_pricing_task':         {'queue': 'single_thread_queue'},
-    'api_v2.tasks.ad_time_pricing_start_task.run_time_pricing_start_task':         {'queue': 'single_thread_queue'},
-    'api_v2.tasks.ad_time_pricing_callback_task.run_time_pricing_callback_task': {'queue': 'single_thread_queue'},
+    'api_v2.tasks.time_pricing_task.run_time_pricing_task':                       {'queue': 'single_thread_queue'},
     'api_v2.tasks.bid_adjustment_task.run_bid_adjustment_task':                   {'queue': 'single_thread_queue'},
 }
 
