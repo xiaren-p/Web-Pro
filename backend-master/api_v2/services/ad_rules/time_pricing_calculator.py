@@ -1,11 +1,8 @@
 """分时竞价计算与写入工具（time_pricing_calculator）。
 
-提供分时开始竞价计算、回调竞价计算、投放项实时查询和批量写入的通用逻辑。
+提供分时开始竞价计算、回调竞价计算、投放项分批查询和批量写入的通用逻辑。
 
-输入：timeline 命中记录 + 策略
-输出：SpBidAdjustment 调整记录列表 + AdTimePricingHit 的待更新标记
-
-注意：投放项改为每条 hit 实时 SQL 查询（fetch_ad_items），不再全表扫内存。
+注意：投放项按 (campaign_id, profile_id) 分批 Q 对象 SQL 查询，SQL 层过滤不走全表扫。
 """
 from __future__ import annotations
 
@@ -87,12 +84,61 @@ def calc_callback_bid(current_bid: float, callback_settings: dict) -> float | No
 # 投放项查询
 # ============================================================
 
-def fetch_ad_items(
+def build_item_map(
+    campaign_keys: set[tuple[int, int]],
+    batch_size: int = 500,
+) -> dict[tuple[int, int], list[dict[str, Any]]]:
+    """按 campaign_keys 精确查询投放项，SQL 层过滤，不扫全表。
+
+    将 campaign_keys 按 batch_size 分批构建 Q 对象查询，
+    避免单个 OR 超长 SQL，同时只返回命中的行。
+
+    Args:
+        campaign_keys: 需要查询的 (campaign_id, profile_id) 集合
+        batch_size: 每批 OR 条件数上限
+
+    Returns:
+        {(cid, pid): [{"item_type", "item_id", "ad_group_id", "bid"}]}
+    """
+    from django.db.models import Q
+
+    item_map: dict[tuple[int, int], list[dict[str, Any]]] = {}
+    keys_list = list(campaign_keys)
+
+    for offset in range(0, len(keys_list), batch_size):
+        chunk = keys_list[offset:offset + batch_size]
+        q = Q()
+        for cid, pid in chunk:
+            q |= Q(campaign_id=cid, profile_id=pid)
+
+        for t in LxSpTarget.objects.filter(q, bid__isnull=False, state="enabled").iterator():
+            key = (t.campaign_id, t.profile_id)
+            item_map.setdefault(key, []).append({
+                "item_type": "target",
+                "item_id": t.target_id,
+                "ad_group_id": t.ad_group_id,
+                "bid": float(t.bid),
+            })
+
+        for k in LxSpKeyword.objects.filter(q, bid__isnull=False, state="enabled").iterator():
+            key = (k.campaign_id, k.profile_id)
+            item_map.setdefault(key, []).append({
+                "item_type": "keyword",
+                "item_id": k.keyword_id,
+                "ad_group_id": k.ad_group_id,
+                "bid": float(k.bid),
+            })
+
+    return item_map
+
+
+def get_ad_items(
     campaign_id: int,
     profile_id: int,
     targeting_type: str,
+    item_map: dict[tuple[int, int], list[dict[str, Any]]],
 ) -> list[dict[str, Any]]:
-    """按广告活动和店铺实时查询投放项，不预加载全表。
+    """从预加载的 item_map 中按 targeting_type 过滤投放项。
 
     Args:
         campaign_id: 广告活动 ID
@@ -102,35 +148,12 @@ def fetch_ad_items(
     Returns:
         [{"item_type": "target"/"keyword", "item_id": int, "ad_group_id": int, "bid": float}]
     """
-    items: list[dict[str, Any]] = []
-
-    if targeting_type in ("auto", ""):
-        items.extend({
-            "item_type": "target",
-            "item_id": t.target_id,
-            "ad_group_id": t.ad_group_id,
-            "bid": float(t.bid),
-        } for t in LxSpTarget.objects.filter(
-            campaign_id=campaign_id,
-            profile_id=profile_id,
-            bid__isnull=False,
-            state="enabled",
-        ).iterator())
-
-    if targeting_type in ("manual", ""):
-        items.extend({
-            "item_type": "keyword",
-            "item_id": k.keyword_id,
-            "ad_group_id": k.ad_group_id,
-            "bid": float(k.bid),
-        } for k in LxSpKeyword.objects.filter(
-            campaign_id=campaign_id,
-            profile_id=profile_id,
-            bid__isnull=False,
-            state="enabled",
-        ).iterator())
-
-    return items
+    all_items = item_map.get((campaign_id, profile_id), [])
+    if targeting_type == "auto":
+        return [it for it in all_items if it["item_type"] == "target"]
+    if targeting_type == "manual":
+        return [it for it in all_items if it["item_type"] == "keyword"]
+    return all_items
 
 
 # ============================================================

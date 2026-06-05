@@ -5,9 +5,8 @@
   - 分时回调：is_callback=0（未回调）+ 不在时段内 → 写 CALLBACK + is_time_pricing=NO + is_callback=1
 
 完整执行链路（顺序不可颠倒）：
-  ① _preload_data()：预加载策略到内存 map（投放项改为每条 hit 实时 SQL 查，不扫全表）
-  ② _process_single_hit()：fetch_ad_items() 实时按 (campaign_id, profile_id, targeting_type) 查 DB
-     → 判断时段 → 分流到 _do_start / _do_callback
+  ① _preload_data()：预加载策略 + 投放项（投放项按 campaign_keys 分批 Q 对象 SQL 查询，SQL 层过滤）
+  ② _process_single_hit()：从内存 item_map 取投放项 → 判断时段 → 分流到 _do_start / _do_callback
   ③ _do_start / _do_callback：纯内存计算竞价 → 收集 SpBidAdjustment + AdTimePricingHit 待写列表
   ④ write_batch()：先 bulk_create(SpBidAdjustment) → 再 bulk_update(AdTimePricingHit 状态)
 
@@ -41,7 +40,7 @@ from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStr
 from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
 from api_v2.models.sp_bid_adjustment import SpBidAdjustment
 from api_v2.services.ad_rules.time_pricing_calculator import (
-    calc_callback_bid, calc_new_bid, fetch_ad_items, write_batch,
+    build_item_map, calc_callback_bid, calc_new_bid, get_ad_items, write_batch,
 )
 
 logger = logging.getLogger(__name__)
@@ -112,19 +111,21 @@ def _find_matching_rules(
 
 def _preload_data(
     hits: list[AdTimePricingHit],
-) -> dict[int, LxTimePricingStrategy]:
-    """预加载策略数据。投放项改为每条 hit 实时 SQL 查询，不再全表扫内存。"""
+) -> tuple[dict, dict[int, LxTimePricingStrategy]]:
+    """预加载投放项和策略数据。投放项按 (campaign_id, profile_id) 分批 Q 查询，SQL 层过滤。"""
+    item_map = build_item_map({(h.campaign_id, h.profile_id) for h in hits})
     strategy_ids = {int(h.hit_time_pricing_rules) for h in hits if h.hit_time_pricing_rules}
     strategy_map = {
         s.id: s for s in LxTimePricingStrategy.objects.filter(pk__in=strategy_ids)
     }
-    logger.info("[time_pricing] strategies=%d", len(strategy_map))
-    return strategy_map
+    logger.info("[time_pricing] 预加载: items=%d strategies=%d", len(item_map), len(strategy_map))
+    return item_map, strategy_map
 
 
 def _process_chunk(
     hit_chunk: list[AdTimePricingHit],
     strategy_map: dict[int, LxTimePricingStrategy],
+    item_map: dict,
     now_utc: datetime,
 ) -> tuple[list[SpBidAdjustment], list[AdTimePricingHit], int, int, list[str]]:
     """线程入口：处理一批命中记录（纯内存计算）。"""
@@ -136,7 +137,7 @@ def _process_chunk(
 
     for hit in hit_chunk:
         try:
-            p, a = _process_single_hit(hit, strategy_map, now_utc, adjustments, hits_to_update)
+            p, a = _process_single_hit(hit, strategy_map, item_map, now_utc, adjustments, hits_to_update)
             processed += p; adjusted += a
         except Exception:
             logger.exception("[time_pricing] campaign=%d", hit.campaign_id)
@@ -148,6 +149,7 @@ def _process_chunk(
 def _process_single_hit(
     hit: AdTimePricingHit,
     strategy_map: dict[int, LxTimePricingStrategy],
+    item_map: dict,
     now_utc: datetime,
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
@@ -158,7 +160,7 @@ def _process_single_hit(
         logger.warning("[time_pricing] 策略不存在 campaign=%d", hit.campaign_id)
         return 0, 0
 
-    items = fetch_ad_items(hit.campaign_id, hit.profile_id, hit.targeting_type)
+    items = get_ad_items(hit.campaign_id, hit.profile_id, hit.targeting_type, item_map)
     if not items:
         logger.warning("[time_pricing] 无投放项 campaign=%d", hit.campaign_id)
         return 0, 0
@@ -253,7 +255,7 @@ def execute_time_pricing() -> dict[str, Any]:
         return {"processed": 0, "adjusted": 0, "errors": []}
 
     logger.info("[time_pricing] 记录数=%d", len(hits))
-    strategy_map = _preload_data(hits)
+    item_map, strategy_map = _preload_data(hits)
 
     now_utc = datetime.now(dt_timezone.utc)
     CHUNKS = 16
@@ -263,7 +265,7 @@ def execute_time_pricing() -> dict[str, Any]:
     adjustments, hits_to_update, processed, adjusted, errors = [], [], 0, 0, []
 
     with ThreadPoolExecutor(max_workers=CHUNKS) as executor:
-        futures = [executor.submit(_process_chunk, c, strategy_map, now_utc) for c in chunks]
+        futures = [executor.submit(_process_chunk, c, strategy_map, item_map, now_utc) for c in chunks]
         for f in as_completed(futures):
             adjs, htus, pr, adj, errs = f.result()
             adjustments.extend(adjs); hits_to_update.extend(htus)
