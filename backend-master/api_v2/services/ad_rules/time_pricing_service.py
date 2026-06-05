@@ -122,17 +122,6 @@ def _get_active_rules(strategy: LxTimePricingStrategy) -> list[dict]:
 # 主流程
 # ============================================================
 
-def _preload_data(
-    hits: list[AdTimePricingHit],
-) -> tuple[dict, dict[int, LxTimePricingStrategy]]:
-    """预加载投放项和策略数据。投放项按 (campaign_id, profile_id) 分批 Q 查询，SQL 层过滤。"""
-    item_map = build_item_map({(h.campaign_id, h.profile_id) for h in hits})
-    strategy_ids = {int(h.hit_time_pricing_rules) for h in hits if h.hit_time_pricing_rules}
-    strategy_map = {
-        s.id: s for s in LxTimePricingStrategy.objects.filter(pk__in=strategy_ids)
-    }
-    logger.info("[time_pricing] 预加载: items=%d strategies=%d", len(item_map), len(strategy_map))
-    return item_map, strategy_map
 
 
 def _process_chunk(
@@ -255,25 +244,61 @@ def _do_callback(
 def execute_time_pricing() -> dict[str, Any]:
     """并行处理所有 AdTimePricingHit 记录，执行分时开始或回调。
 
+    优化策略：
+      1. 先按 is_callback + _in_time_range 快速筛选需要处理的 hits（无 DB 查询）
+      2. 仅对需要处理的 hits 构建 item_map（减少 DB 查询范围）
+      3. 32 线程并行处理
+
     Returns:
         {"processed": int, "adjusted": int, "errors": list[str]}
     """
-    hits = list(AdTimePricingHit.objects.filter(hit_time_pricing_rules__gt=""))
-    if not hits:
+    t0 = datetime.now()
+    all_hits = list(AdTimePricingHit.objects.filter(hit_time_pricing_rules__gt=""))
+    if not all_hits:
         logger.info("[time_pricing] 无记录")
         return {"processed": 0, "adjusted": 0, "errors": []}
 
-    logger.info("[time_pricing] 记录数=%d", len(hits))
-    item_map, strategy_map = _preload_data(hits)
+    logger.info("[time_pricing] 全量记录数=%d 开始筛选需要处理的 hits", len(all_hits))
 
+    # ── 第一步：快速筛选需要处理的记录（纯内存，无 DB）──
+    strategy_ids = {int(h.hit_time_pricing_rules) for h in all_hits if h.hit_time_pricing_rules}
+    strategy_map = {
+        s.id: s for s in LxTimePricingStrategy.objects.filter(pk__in=strategy_ids)
+    }
+    logger.info("[time_pricing] 策略加载=%d 耗时=%.1fs", len(strategy_map), (datetime.now() - t0).total_seconds())
+
+    need_process: list[AdTimePricingHit] = []
+    for hit in all_hits:
+        if int(hit.hit_time_pricing_rules) not in strategy_map:
+            continue
+        in_period = _in_time_range(hit)
+        if hit.is_callback == TimePricingHitStatus.YES and in_period:
+            need_process.append(hit)
+        elif hit.is_callback == TimePricingHitStatus.NO and not in_period:
+            need_process.append(hit)
+
+    logger.info("[time_pricing] 筛选完成 需处理=%d/%d 耗时=%.1fs",
+                len(need_process), len(all_hits), (datetime.now() - t0).total_seconds())
+
+    if not need_process:
+        logger.info("[time_pricing] 无需处理的记录")
+        return {"processed": 0, "adjusted": 0, "errors": []}
+
+    # ── 第二步：仅对需要处理的 hits 构建 item_map ──
+    item_map = build_item_map({(h.campaign_id, h.profile_id) for h in need_process})
+    logger.info("[time_pricing] item_map 构建完成=%d campaigns 耗时=%.1fs",
+                len(item_map), (datetime.now() - t0).total_seconds())
+
+    # ── 第三步：多线程并行处理 ──
     now_utc = datetime.now(dt_timezone.utc)
-    CHUNKS = 16
-    chunk_size = max(1, len(hits) // CHUNKS)
-    chunks = [hits[i:i + chunk_size] for i in range(0, len(hits), chunk_size)][:CHUNKS]
+    MAX_WORKERS = 32
+    chunk_size = max(1, len(need_process) // MAX_WORKERS)
+    chunks = [need_process[i:i + chunk_size] for i in range(0, len(need_process), chunk_size)][:MAX_WORKERS]
+    logger.info("[time_pricing] 分 %d 个分片 %d 线程开始处理", len(chunks), MAX_WORKERS)
 
     adjustments, hits_to_update, processed, adjusted, errors = [], [], 0, 0, []
 
-    with ThreadPoolExecutor(max_workers=CHUNKS) as executor:
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [executor.submit(_process_chunk, c, strategy_map, item_map, now_utc) for c in chunks]
         for f in as_completed(futures):
             adjs, htus, pr, adj, errs = f.result()
@@ -281,6 +306,9 @@ def execute_time_pricing() -> dict[str, Any]:
             processed += pr; adjusted += adj
             errors.extend(errs)
 
+    logger.info("[time_pricing] 线程处理完成 耗时=%.1fs", (datetime.now() - t0).total_seconds())
+
     write_batch(adjustments, hits_to_update)
-    logger.info("[time_pricing] 完成 processed=%d adjusted=%d errors=%d", processed, adjusted, len(errors))
+    logger.info("[time_pricing] 完成 processed=%d adjusted=%d errors=%d 总耗时=%.1fs",
+                processed, adjusted, len(errors), (datetime.now() - t0).total_seconds())
     return {"processed": processed, "adjusted": adjusted, "errors": errors}
