@@ -5,9 +5,10 @@
   - 分时回调：is_callback=0（未回调）+ 当前不在时段内 → 写 CALLBACK + is_time_pricing=NO + is_callback=1
 
 时段判断：
-  直接使用 AdTimePricingHit 的 time_start_cn / time_end_cn 字段（北京时区 naive datetime），
+  直接使用 AdTimePricingHit 的 time_start_cn / time_end_cn 字段（北京时间 naive datetime），
   与当前北京时间比对，无需重复解析策略 time_settings。
-  上游 ad_time_pricing_service 在写入命中记录时已计算好四个时间值。
+  上游 ad_time_pricing_service 在写入命中记录时已根据规则时段 + 站点 UTC 偏移算好四个时间值。
+  多时段时取所有时段的最小 start 和最大 end 合并为一个覆盖窗口。
 
 完整执行链路：
   ① _preload_data()：预加载策略 + 投放项（投放项按 campaign_keys 分批 Q 对象 SQL 查询）
@@ -61,8 +62,8 @@ _TZ_CN = ZoneInfo("Asia/Shanghai")
 def _in_time_range(hit: AdTimePricingHit) -> bool:
     """判断当前北京时间是否在命中记录的时段内。
 
-    直接用 ad_time_pricing_hit 表已计算好的 time_start_cn / time_end_cn，
-    与当前北京时间比对，无需重复解析策略 time_settings。
+    用 ad_time_pricing_hit 表已计算好的 time_start_cn / time_end_cn（北京时间），
+    与当前北京时间 datetime.now(Asia/Shanghai) 比对。
 
     Args:
         hit: 分时命中记录（含 time_start_cn / time_end_cn）

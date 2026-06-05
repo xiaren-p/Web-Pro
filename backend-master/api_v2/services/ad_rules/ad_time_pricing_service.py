@@ -10,7 +10,6 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Any
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.db import connections
 from django.db.models import Q
@@ -91,19 +90,18 @@ def _calc_strategy_times(
 ) -> tuple[datetime | None, datetime | None, datetime | None, datetime | None]:
     """根据分时时段（HH:MM）+ 站点时区偏移，计算四个时间。
 
-    time_start / time_end：直接写入规则的 HH:MM，日期为今天（naive datetime，无时区）。
-      因为使用时区时间不分冬夏令时，规则写 1 点就是 1 点。
-    time_start_cn / time_end_cn：根据站点时区偏移量换算出的北京时间（naive datetime）。
+    time_start / time_end：规则原始时间（站点 local time naive datetime）。
+      规则写 06:00 就是 06:00，写 01:00 就是 01:00，日期用今天，如果 end < start 则跨天。
+      注意：站点 local time 与 UTC 关系为固定偏移（如 Europe/London=UTC+0），不分冬夏令时。
+    time_start_cn / time_end_cn：根据站点固定 UTC 偏移换算出的北京时间（naive datetime）。
 
-    Args:
-        strategy: 匹配到的分时策略（仅用于校验月日字段非空）
-        seg_start: 时段起始 "HH:MM"（规则原始时间）
-        seg_end: 时段结束 "HH:MM"（规则原始时间）
-        tz_name: 站点时区名（如 "Europe/London"）
-
-    Returns:
-        (time_start, time_end, time_start_cn, time_end_cn)
-        全部 naive datetime；月日或时区无效时返回 (None, None, None, None)
+    例如规则 06:00～01:00，站点 Europe/London（UTC+0）：
+      time_start     = 2026-06-05 06:00（站点时间）
+      time_end       = 2026-06-06 01:00（站点时间，跨天）
+      time_start_cn  = 2026-06-05 14:00（站点 06:00 = UTC 06:00 → BJ 14:00）
+      time_end_cn    = 2026-06-06 09:00（站点 01:00 = UTC 01:00 → BJ 09:00）
+      _in_time_range: 北京时间 14:00～09:00 之间 < 09:00 = 不在时段
+                       （正确：站点 06:00-01:00 对应 BJ 14:00-09:00）
     """
     sm = strategy.start_month
     sd = strategy.start_day
@@ -352,7 +350,9 @@ def process_new_ads() -> dict[str, Any]:
                 if not result:
                     continue
 
-                # 计算时间
+                # 计算时间：取所有时段的 startTime 最早值、endTime 最晚值，
+                # 合并为一个覆盖全部时段的起止时间窗口。
+                # 例如 segments=[06:00-01:00, 22:00-02:00] → start=06:00, end=02:00
                 matched_strategy = next(
                     (s for s in strategies if s.id == result["strategy_id"]), None,
                 )
@@ -360,13 +360,25 @@ def process_new_ads() -> dict[str, Any]:
                 if matched_strategy:
                     segments = (matched_strategy.time_settings or {}).get("segments", [])
                     if segments and isinstance(segments, list):
-                        first_seg = segments[0]
-                        ts, te, ts_cn, te_cn = _calc_strategy_times(
-                            matched_strategy,
-                            first_seg.get("startTime", "00:00"),
-                            first_seg.get("endTime", "00:00"),
-                            tz,
-                        )
+                        # 所有时段中取最早 start 和最晚 end
+                        seg_times = [
+                            _calc_strategy_times(
+                                matched_strategy,
+                                seg.get("startTime", "00:00"),
+                                seg.get("endTime", "00:00"),
+                                tz,
+                            )
+                            for seg in segments
+                            if isinstance(seg, dict)
+                            and seg.get("startTime")
+                            and seg.get("endTime")
+                        ]
+                        valid_times = [(t[0], t[1], t[2], t[3]) for t in seg_times if t[0] is not None]
+                        if valid_times:
+                            ts = min(t[0] for t in valid_times)
+                            te = max(t[1] for t in valid_times)
+                            ts_cn = min(t[2] for t in valid_times)
+                            te_cn = max(t[3] for t in valid_times)
 
                 new_records.append(AdTimePricingHit(
                     campaign_id=cid,
@@ -401,23 +413,30 @@ def process_new_ads() -> dict[str, Any]:
                 user_strategy = next(
                     (s for s in strategies if str(s.id) == str(existing.manual_rule_id)), None,
                 )
-                # 手动规则必须存在且为开启状态才生效
+                # 用户手动规则也支持多时段合并
                 if user_strategy:
                     existing.hit_time_pricing_rules = existing.manual_rule_id
                     existing.rule_updated_today = True
                     segments = (user_strategy.time_settings or {}).get("segments", [])
                     if segments and isinstance(segments, list):
-                        fs = segments[0]
-                        vals = _calc_strategy_times(
-                            user_strategy,
-                            fs.get("startTime", "00:00"),
-                            fs.get("endTime", "00:00"),
-                            tz,
-                        )
-                        existing.time_start = vals[0]
-                        existing.time_end = vals[1]
-                        existing.time_start_cn = vals[2]
-                        existing.time_end_cn = vals[3]
+                        seg_times = [
+                            _calc_strategy_times(
+                                user_strategy,
+                                seg.get("startTime", "00:00"),
+                                seg.get("endTime", "00:00"),
+                                tz,
+                            )
+                            for seg in segments
+                            if isinstance(seg, dict)
+                            and seg.get("startTime")
+                            and seg.get("endTime")
+                        ]
+                        valid_times = [(t[0], t[1], t[2], t[3]) for t in seg_times if t[0] is not None]
+                        if valid_times:
+                            existing.time_start = min(t[0] for t in valid_times)
+                            existing.time_end = max(t[1] for t in valid_times)
+                            existing.time_start_cn = min(t[2] for t in valid_times)
+                            existing.time_end_cn = max(t[3] for t in valid_times)
                     update_records.append(existing)
                     processed += 1
                     hit_count += 1
@@ -435,17 +454,24 @@ def process_new_ads() -> dict[str, Any]:
                 if matched_strategy:
                     segments = (matched_strategy.time_settings or {}).get("segments", [])
                     if segments and isinstance(segments, list):
-                        first_seg = segments[0]
-                        vals = _calc_strategy_times(
-                            matched_strategy,
-                            first_seg.get("startTime", "00:00"),
-                            first_seg.get("endTime", "00:00"),
-                            tz,
-                        )
-                        existing.time_start = vals[0]
-                        existing.time_end = vals[1]
-                        existing.time_start_cn = vals[2]
-                        existing.time_end_cn = vals[3]
+                        seg_times = [
+                            _calc_strategy_times(
+                                matched_strategy,
+                                seg.get("startTime", "00:00"),
+                                seg.get("endTime", "00:00"),
+                                tz,
+                            )
+                            for seg in segments
+                            if isinstance(seg, dict)
+                            and seg.get("startTime")
+                            and seg.get("endTime")
+                        ]
+                        valid_times = [(t[0], t[1], t[2], t[3]) for t in seg_times if t[0] is not None]
+                        if valid_times:
+                            existing.time_start = min(t[0] for t in valid_times)
+                            existing.time_end = max(t[1] for t in valid_times)
+                            existing.time_start_cn = min(t[2] for t in valid_times)
+                            existing.time_end_cn = max(t[3] for t in valid_times)
             update_records.append(existing)
             processed += 1
             if result:

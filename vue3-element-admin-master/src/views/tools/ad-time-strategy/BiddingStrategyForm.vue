@@ -139,18 +139,38 @@
                 size="small"
                 style="width: 140px"
                 :disabled="form.unlimitedCategories"
-                @change="(vals: (string | number)[]) => onSelectChange(vals, assortOptions, 'categories')"
+                @change="
+                  (vals: (string | number)[]) => onSelectChange(vals, assortOptions, 'categories')
+                "
                 @visible-change="handleSelectVisible"
               >
-                <el-option :value="SELECT_ALL_MARKER" :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }">
+                <el-option
+                  :value="SELECT_ALL_MARKER"
+                  :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
+                >
                   <span style="display: flex; gap: 6px; align-items: center">
-                    <span class="fake-checkbox" :class="{ checked: form.categories.length === assortOptions.length }">✓</span>
+                    <span
+                      class="fake-checkbox"
+                      :class="{ checked: form.categories.length === assortOptions.length }"
+                    >
+                      ✓
+                    </span>
                     全选
                   </span>
                 </el-option>
-                <el-option v-for="opt in assortOptions" :key="String(opt.value)" :label="opt.label" :value="opt.value">
+                <el-option
+                  v-for="opt in assortOptions"
+                  :key="String(opt.value)"
+                  :label="opt.label"
+                  :value="opt.value"
+                >
                   <span style="display: flex; gap: 6px; align-items: center">
-                    <span class="fake-checkbox" :class="{ checked: form.categories.includes(String(opt.value)) }">✓</span>
+                    <span
+                      class="fake-checkbox"
+                      :class="{ checked: form.categories.includes(String(opt.value)) }"
+                    >
+                      ✓
+                    </span>
                     {{ opt.label }}
                   </span>
                 </el-option>
@@ -169,18 +189,38 @@
                 size="small"
                 style="width: 160px"
                 :disabled="form.unlimitedManagers"
-                @change="(vals: (string | number)[]) => onSelectChange(vals, managerOptions, 'managers')"
+                @change="
+                  (vals: (string | number)[]) => onSelectChange(vals, managerOptions, 'managers')
+                "
                 @visible-change="handleSelectVisible"
               >
-                <el-option :value="SELECT_ALL_MARKER" :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }">
+                <el-option
+                  :value="SELECT_ALL_MARKER"
+                  :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
+                >
                   <span style="display: flex; gap: 6px; align-items: center">
-                    <span class="fake-checkbox" :class="{ checked: form.managers.length === managerOptions.length }">✓</span>
+                    <span
+                      class="fake-checkbox"
+                      :class="{ checked: form.managers.length === managerOptions.length }"
+                    >
+                      ✓
+                    </span>
                     全选
                   </span>
                 </el-option>
-                <el-option v-for="opt in managerOptions" :key="String(opt.value)" :label="opt.label" :value="opt.value">
+                <el-option
+                  v-for="opt in managerOptions"
+                  :key="String(opt.value)"
+                  :label="opt.label"
+                  :value="opt.value"
+                >
                   <span style="display: flex; gap: 6px; align-items: center">
-                    <span class="fake-checkbox" :class="{ checked: form.managers.includes(opt.value) }">✓</span>
+                    <span
+                      class="fake-checkbox"
+                      :class="{ checked: form.managers.includes(opt.value) }"
+                    >
+                      ✓
+                    </span>
                     {{ opt.label }}
                   </span>
                 </el-option>
@@ -202,15 +242,33 @@
                 @change="(vals: (string | number)[]) => onSelectChange(vals, labelOptions, 'tags')"
                 @visible-change="handleSelectVisible"
               >
-                <el-option :value="SELECT_ALL_MARKER" :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }">
+                <el-option
+                  :value="SELECT_ALL_MARKER"
+                  :style="{ borderBottom: '1px solid #eee', fontWeight: 'bold' }"
+                >
                   <span style="display: flex; gap: 6px; align-items: center">
-                    <span class="fake-checkbox" :class="{ checked: form.tags.length === labelOptions.length }">✓</span>
+                    <span
+                      class="fake-checkbox"
+                      :class="{ checked: form.tags.length === labelOptions.length }"
+                    >
+                      ✓
+                    </span>
                     全选
                   </span>
                 </el-option>
-                <el-option v-for="opt in labelOptions" :key="String(opt.value)" :label="opt.label" :value="opt.value">
+                <el-option
+                  v-for="opt in labelOptions"
+                  :key="String(opt.value)"
+                  :label="opt.label"
+                  :value="opt.value"
+                >
                   <span style="display: flex; gap: 6px; align-items: center">
-                    <span class="fake-checkbox" :class="{ checked: form.tags.includes(String(opt.value)) }">✓</span>
+                    <span
+                      class="fake-checkbox"
+                      :class="{ checked: form.tags.includes(String(opt.value)) }"
+                    >
+                      ✓
+                    </span>
                     {{ opt.label }}
                   </span>
                 </el-option>
@@ -326,12 +384,13 @@
                   size="small"
                 />
                 <el-button
-                  v-if="form.timeSegments.length > 1"
+                  v-if="false"
                   link
                   type="danger"
                   size="small"
                   style="margin-left: 8px"
-                  @click="removeSegment(idx)"
+                  @click="() => {}"
+                  disabled
                 >
                   删除时段
                 </el-button>
@@ -447,32 +506,13 @@
                     style="width: 80px"
                   />
                 </template>
-                <el-button
-                  v-if="seg.rules.length > 1"
-                  link
-                  type="danger"
-                  size="small"
-                  style="margin-left: 6px"
-                  @click="removeRule(idx, ri)"
-                >
+                <el-button v-if="false" link type="danger" size="small" style="margin-left: 6px">
                   ×
                 </el-button>
               </div>
-              <el-button
-                link
-                type="primary"
-                size="small"
-                style="margin-top: 4px"
-                @click="addRule(idx)"
-              >
-                + 添加规则
-              </el-button>
             </div>
             <div class="segment-tools">
-              <el-button style="height: auto; padding: 5px 15px" @click="addSegment">
-                + 添加时间段
-              </el-button>
-              <div class="grid-tips" style="margin-left: 20px">
+              <div class="grid-tips" style="margin-left: 0">
                 <el-icon
                   color="#f5a623"
                   style="margin-right: 4px; font-size: 14px; vertical-align: -2px"
@@ -773,7 +813,7 @@ const form = reactive({
   grid: createEmptyGrid(),
   timeSegments: [
     {
-      dayOfWeek: "1",
+      dayOfWeek: "",
       startTime: "01:00",
       endTime: "06:00",
       rules: [
@@ -1145,60 +1185,6 @@ function clearGrid(): void {
   form.grid = createEmptyGrid();
 }
 
-/** 新增一条分时时间段。 */
-/**
- * 新增一条时间段。
- */
-function addSegment(): void {
-  form.timeSegments.push({
-    dayOfWeek: "1",
-    startTime: "",
-    endTime: "",
-    rules: [
-      {
-        operateType: "percent_decrease",
-        operateValue: 0,
-        limitValue: 0,
-        triggerValue: 0,
-        targetValue: 0,
-      },
-    ],
-  });
-}
-
-/**
- * 删除指定时间段。
- *
- * @param index - 时间段索引
- */
-function removeSegment(index: number): void {
-  form.timeSegments.splice(index, 1);
-}
-
-/**
- * 给指定时间段添加一条规则。
- *
- * @param segIdx - 时间段索引
- */
-function addRule(segIdx: number): void {
-  form.timeSegments[segIdx].rules.push({
-    operateType: "percent_decrease",
-    operateValue: 0,
-    limitValue: 0,
-    triggerValue: 0,
-    targetValue: 0,
-  });
-}
-
-/**
- * 删除指定时间段的某条规则。
- *
- * @param segIdx - 时间段索引
- * @param ruleIdx - 规则索引
- */
-function removeRule(segIdx: number, ruleIdx: number): void {
-  form.timeSegments[segIdx].rules.splice(ruleIdx, 1);
-}
 /**
  * 加载所有下拉选项数据，新建时默认全选。
  * 逐个加载，避免 Promise.all 一个失败全部挂掉。
@@ -1267,7 +1253,7 @@ function buildPayload(): Record<string, unknown> {
       ? { grid: form.grid }
       : {
           segments: form.timeSegments.map((seg) => ({
-            dayOfWeek: seg.dayOfWeek,
+            ...(form.mode === "byWeek" ? { dayOfWeek: seg.dayOfWeek } : {}),
             startTime: seg.startTime,
             endTime: seg.endTime,
             rules: seg.rules,
@@ -1371,7 +1357,7 @@ function fillForm(data: TimePricingApiData): void {
   } else if (ts.segments) {
     // 兼容旧格式（无 rules 字段的扁平数据）和新格式
     form.timeSegments = (ts.segments as any[]).map((s: any) => ({
-      dayOfWeek: s.dayOfWeek || "1",
+      dayOfWeek: form.mode === "byWeek" ? s.dayOfWeek || "1" : "",
       startTime: s.startTime || "",
       endTime: s.endTime || "",
       rules: s.rules || [
@@ -1441,7 +1427,10 @@ function checkTimeOverlap(): string | null {
 }
 
 /** 两个时段是否重叠（含跨夜处理） */
-function _segmentsOverlap(a: { startTime: string; endTime: string }, b: { startTime: string; endTime: string }): boolean {
+function _segmentsOverlap(
+  a: { startTime: string; endTime: string },
+  b: { startTime: string; endTime: string }
+): boolean {
   const a1 = _timeToMinutes(a.startTime);
   const a2 = _timeToMinutes(a.endTime);
   const b1 = _timeToMinutes(b.startTime);
@@ -1454,7 +1443,9 @@ function _segmentsOverlap(a: { startTime: string; endTime: string }, b: { startT
 }
 
 function _fmtSeg(s: { startTime: string; endTime: string; dayOfWeek?: string }): string {
-  const day = s.dayOfWeek ? `周${["一","二","三","四","五","六","日"][Number(s.dayOfWeek)-1]} ` : "";
+  const day = s.dayOfWeek
+    ? `周${["一", "二", "三", "四", "五", "六", "日"][Number(s.dayOfWeek) - 1]} `
+    : "";
   return `${day}${s.startTime}~${s.endTime}`;
 }
 
@@ -1514,7 +1505,7 @@ function resetForm(): void {
     .map(() => Array(24).fill(null));
   form.timeSegments = [
     {
-      dayOfWeek: "1",
+      dayOfWeek: "",
       startTime: "01:00",
       endTime: "06:00",
       rules: [
