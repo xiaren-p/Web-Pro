@@ -122,7 +122,7 @@ def _calc_strategy_times(
 
     # ── time_start_cn / time_end_cn：按站点时区固定 UTC 偏移换算北京时间 ──
     offset_hours = get_fixed_utc_offset(tz_name)
-    # 站点时间 → UTC → 北京时间 (UTC+8)
+    # site_time - offset_hours = UTC, UTC + 8 = BJ time
     start_utc = time_start - timedelta(hours=offset_hours)
     end_utc = time_end - timedelta(hours=offset_hours)
     time_start_cn = start_utc + timedelta(hours=8)
