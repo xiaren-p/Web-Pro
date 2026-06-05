@@ -1,12 +1,17 @@
 """分时策略执行器（time_pricing_service）。
 
 两个阶段合并为一个服务：
-  - 分时开始：is_callback=1（已回调）+ 时段内 → 写 START + is_time_pricing=YES + is_callback=0 + rule_updated_today=0
-  - 分时回调：is_callback=0（未回调）+ 不在时段内 → 写 CALLBACK + is_time_pricing=NO + is_callback=1
+  - 分时开始：is_callback=1（已回调）+ 当前在时段内 → 写 START + is_time_pricing=YES + is_callback=0 + rule_updated_today=0
+  - 分时回调：is_callback=0（未回调）+ 当前不在时段内 → 写 CALLBACK + is_time_pricing=NO + is_callback=1
 
-完整执行链路（顺序不可颠倒）：
-  ① _preload_data()：预加载策略 + 投放项（投放项按 campaign_keys 分批 Q 对象 SQL 查询，SQL 层过滤）
-  ② _process_single_hit()：从内存 item_map 取投放项 → 判断时段 → 分流到 _do_start / _do_callback
+时段判断：
+  直接使用 AdTimePricingHit 的 time_start_cn / time_end_cn 字段（北京时区 naive datetime），
+  与当前北京时间比对，无需重复解析策略 time_settings。
+  上游 ad_time_pricing_service 在写入命中记录时已计算好四个时间值。
+
+完整执行链路：
+  ① _preload_data()：预加载策略 + 投放项（投放项按 campaign_keys 分批 Q 对象 SQL 查询）
+  ② _process_single_hit()：从内存 item_map 取投放项 → 用 hit.time_start_cn / time_end_cn 判断时段 → 分流
   ③ _do_start / _do_callback：纯内存计算竞价 → 收集 SpBidAdjustment + AdTimePricingHit 待写列表
   ④ write_batch()：先 bulk_create(SpBidAdjustment) → 再 bulk_update(AdTimePricingHit 状态)
 
@@ -34,7 +39,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone as dt_timezone
 from typing import Any
 
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
 
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStrategy
 from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
@@ -45,64 +50,63 @@ from api_v2.services.ad_rules.time_pricing_calculator import (
 
 logger = logging.getLogger(__name__)
 
+# 北京时间
+_TZ_CN = ZoneInfo("Asia/Shanghai")
+
 
 # ============================================================
-# 时间判断
+# 时段判断
 # ============================================================
 
-def _get_local_time_str(tz_name: str) -> str | None:
-    """获取指定时区的当前时间 HH:MM。"""
-    if not tz_name:
-        return None
-    try:
-        return datetime.now(ZoneInfo(tz_name)).strftime("%H:%M")
-    except ZoneInfoNotFoundError:
-        logger.warning("[time_pricing] 未知时区: %s", tz_name)
-        return None
+def _in_time_range(hit: AdTimePricingHit) -> bool:
+    """判断当前北京时间是否在命中记录的时段内。
+
+    直接用 ad_time_pricing_hit 表已计算好的 time_start_cn / time_end_cn，
+    与当前北京时间比对，无需重复解析策略 time_settings。
+
+    Args:
+        hit: 分时命中记录（含 time_start_cn / time_end_cn）
+
+    Returns:
+        True 表示当前在时段内
+    """
+    if hit.time_start_cn is None or hit.time_end_cn is None:
+        return False
+    now_cn = datetime.now(_TZ_CN).replace(tzinfo=None)
+    return hit.time_start_cn <= now_cn <= hit.time_end_cn
 
 
-def _find_matching_rules(
-    time_settings: dict, tz_name: str, time_mode: str = "byDay",
-) -> list[dict]:
-    """在策略的 time_settings 中查找当前时间命中的所有规则。"""
-    local_time = _get_local_time_str(tz_name)
-    if local_time is None:
+# ============================================================
+# 规则获取
+# ============================================================
+
+def _get_active_rules(strategy: LxTimePricingStrategy) -> list[dict]:
+    """从策略 time_settings 中提取所有时段的所有规则（不做时间匹配）。
+
+    时间匹配已在写入 AdTimePricingHit 时完成（time_start/time_end），
+    此处只需取出规则列表用于竞价计算。
+
+    Args:
+        strategy: 分时策略
+
+    Returns:
+        规则字典列表 [{"operateType": ..., "operateValue": ..., ...}]
+    """
+    time_settings = strategy.time_settings or {}
+    if not isinstance(time_settings, dict):
+        return []
+    segments = time_settings.get("segments", [])
+    if not isinstance(segments, list):
         return []
 
-    segments = (time_settings or {}).get("segments", []) if isinstance(time_settings, dict) else []
-    if time_mode == "calendar":
-        return []
-
-    matching_rules: list[dict] = []
+    rules: list[dict] = []
     for seg in segments:
         if not isinstance(seg, dict):
             continue
-        start = seg.get("startTime", "")
-        end = seg.get("endTime", "")
-        if not start or not end:
-            continue
-
-        in_range = start <= local_time <= end
-        if not in_range and start > end:
-            in_range = local_time >= start or local_time <= end
-        if not in_range:
-            continue
-
-        if time_mode == "byWeek":
-            day_of_week = seg.get("dayOfWeek", "")
-            if day_of_week:
-                try:
-                    weekday = str(datetime.now(ZoneInfo(tz_name)).isoweekday())
-                    if weekday != str(day_of_week):
-                        continue
-                except ZoneInfoNotFoundError:
-                    continue
-
-        rules = seg.get("rules", [])
-        if isinstance(rules, list):
-            matching_rules.extend(rules)
-
-    return matching_rules
+        seg_rules = seg.get("rules", [])
+        if isinstance(seg_rules, list):
+            rules.extend(seg_rules)
+    return rules
 
 
 # ============================================================
@@ -165,9 +169,7 @@ def _process_single_hit(
         logger.warning("[time_pricing] 无投放项 campaign=%d", hit.campaign_id)
         return 0, 0
 
-    in_period = len(_find_matching_rules(
-        strategy.time_settings or {}, hit.timezone or "", strategy.time_mode,
-    )) > 0
+    in_period = _in_time_range(hit)
 
     # is_callback=1：已回调，需要判断是否重新开启分时
     if hit.is_callback == TimePricingHitStatus.YES and in_period:
@@ -195,9 +197,7 @@ def _do_start(
     for item in items:
         item["bid_before"] = item["bid"]
         bid_after = item["bid"]
-        for rule in _find_matching_rules(
-            strategy.time_settings or {}, hit.timezone or "", strategy.time_mode,
-        ):
+        for rule in _get_active_rules(strategy):
             nb = calc_new_bid(bid_after, rule)
             if nb is not None and nb != bid_after:
                 bid_after = nb

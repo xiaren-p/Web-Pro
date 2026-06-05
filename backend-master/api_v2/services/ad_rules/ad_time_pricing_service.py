@@ -89,14 +89,14 @@ def _calc_strategy_times(
     seg_end: str,
     tz_name: str,
 ) -> tuple[datetime | None, datetime | None, datetime | None, datetime | None]:
-    """根据策略生效月日 + 分时时段（HH:MM），计算四个时间。
+    """根据分时时段（HH:MM）+ 站点时区，计算当天四个时间。
 
-    start = 策略开始月日 + seg_start 时刻，站点时区
-    end   = 策略开始月日 + seg_end 时刻，若 end < start 则日期 +1（跨天）
+    start = 今天 + seg_start 时刻（站点时区）
+    end   = 今天 + seg_end 时刻，若 end < start 则日期 +1（跨天）
     _cn   = 对应北京时间
 
     Args:
-        strategy: 匹配到的分时策略（取其 start_month / start_day）
+        strategy: 匹配到的分时策略（仅用于校验月日字段非空，具体日期用当天）
         seg_start: 时段起始 "HH:MM"
         seg_end: 时段结束 "HH:MM"
         tz_name: 站点时区名
@@ -122,10 +122,10 @@ def _calc_strategy_times(
     sh, sm_val = map(int, seg_start.split(":"))
     eh, em = map(int, seg_end.split(":"))
 
-    # 开始时间：策略开始月日 + 时段起始时刻（站点时区）
-    time_start = datetime(year, sm, sd, sh, sm_val, 0, tzinfo=tz)
-    # 结束时间：同一天 + 时段结束时刻；若结束时刻 < 起始时刻则日期 +1
-    time_end = datetime(year, sm, sd, eh, em, 0, tzinfo=tz)
+    # 开始时间：今天 + 时段起始时刻（站点时区）
+    time_start = datetime(year, today.month, today.day, sh, sm_val, 0, tzinfo=tz)
+    # 结束时间：今天 + 时段结束时刻；若结束时刻 < 起始时刻则跨天（日期 +1）
+    time_end = datetime(year, today.month, today.day, eh, em, 0, tzinfo=tz)
     if (eh, em) < (sh, sm_val):
         time_end += timedelta(days=1)
 
