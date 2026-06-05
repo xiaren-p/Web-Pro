@@ -258,11 +258,15 @@ def process_new_ads() -> dict[str, Any]:
             }
     logger.info("[process_new_ads] 产品信息预加载完成，命中 ASIN=%d", len(asin_to_fields))
 
-    # 1e. 预查所有已存在的命中记录 (campaign_id, profile_id)
+    # 1e. 预查所有已匹配的命中记录（跳过的条件是有规则且已匹配）
     existing_keys: set[tuple[int, int]] = set(
-        AdTimePricingHit.objects.values_list("campaign_id", "profile_id")
+        AdTimePricingHit.objects.filter(hit_time_pricing_rules__gt="").values_list("campaign_id", "profile_id")
     )
-    logger.info("[process_new_ads] 已有命中记录数=%d", len(existing_keys))
+    # 存在但未命中的记录（hit_time_pricing_rules 为空，回调后清空的）——需要重新评估
+    existing_unmatched: set[tuple[int, int]] = set(
+        AdTimePricingHit.objects.filter(hit_time_pricing_rules="").values_list("campaign_id", "profile_id")
+    )
+    logger.info("[process_new_ads] 已有命中=%d 待重新评估=%d", len(existing_keys), len(existing_unmatched))
 
     # 1f. 预加载所有启用的策略（按权重升序，同权重按创建时间倒序）
     strategies: list[LxTimePricingStrategy] = list(
@@ -352,12 +356,11 @@ def process_new_ads() -> dict[str, Any]:
             if not merged_assorts and not merged_labels and not merged_uids:
                 continue
 
-            # campaign 粒度：已存在记录则跳过
+            # 已匹配的规则 → 跳过；回调清空规则的 → 重新评估并更新
             if (cid, pid) in existing_keys:
                 continue
-            thread_processed += 1
 
-            # 匹配分时策略（以 campaign 下所有 ASIN 聚合后的产品字段为准）
+            # 匹配分时策略
             result = match_strategy_against_product(
                 profile_id=pid,
                 product_assorts=merged_assorts,
@@ -366,25 +369,38 @@ def process_new_ads() -> dict[str, Any]:
                 strategies=strategies,
             )
             meta = campaign_meta.get((cid, pid), {})
-            targeting_type = meta.get("targeting_type", "auto")
             tz = meta.get("timezone", "")
+            tt = meta.get("targeting_type", "auto")
+
+            is_re_eval = (cid, pid) in existing_unmatched
+            if is_re_eval:
+                # 回调后重新评估：更新已有记录
+                try:
+                    hit = AdTimePricingHit.objects.get(campaign_id=cid, profile_id=pid)
+                    hit.hit_time_pricing_rules = str(result["strategy_id"]) if result else ""
+                    hit.is_time_pricing = TimePricingHitStatus.NO
+                    hit.save(update_fields=["hit_time_pricing_rules", "is_time_pricing", "updated_at"])
+                    thread_processed += 1
+                    if result:
+                        thread_hit_count += 1
+                except AdTimePricingHit.DoesNotExist:
+                    pass
+                continue
+
+            thread_processed += 1
 
             if result:
                 thread_hits.append(AdTimePricingHit(
-                    campaign_id=cid,
-                    profile_id=pid,
-                    targeting_type=targeting_type,
-                    timezone=tz,
+                    campaign_id=cid, profile_id=pid,
+                    targeting_type=tt, timezone=tz,
                     hit_time_pricing_rules=str(result["strategy_id"]),
                     is_time_pricing=TimePricingHitStatus.NO,
                 ))
                 thread_hit_count += 1
             else:
                 thread_hits.append(AdTimePricingHit(
-                    campaign_id=cid,
-                    profile_id=pid,
-                    targeting_type=targeting_type,
-                    timezone=tz,
+                    campaign_id=cid, profile_id=pid,
+                    targeting_type=tt, timezone=tz,
                     is_time_pricing=TimePricingHitStatus.NO,
                 ))
 

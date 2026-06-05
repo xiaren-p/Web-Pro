@@ -11,10 +11,11 @@ import json
 import logging
 import time
 from collections import defaultdict
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime
 from typing import Any
 
 import requests
+from django.utils import timezone
 
 from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
 from api_v2.models.lx_api_err import LxApiErr
@@ -284,6 +285,7 @@ def execute_bid_adjustment() -> dict[str, Any]:
     """
     records = list(SpBidAdjustment.objects.filter(
         adjustment_status=AdjustmentStatusChoices.PENDING,
+        created_at__gte=timezone.now() - timezone.timedelta(hours=2),
     ).order_by("profile_id"))
     if not records:
         logger.info("[bid_adjustment] 无待执行记录")
@@ -294,7 +296,7 @@ def execute_bid_adjustment() -> dict[str, Any]:
     for rec in records:
         profile_groups[rec.profile_id].append(rec)
 
-    now_utc = datetime.now(dt_timezone.utc)
+    now_local = timezone.now()
     processed = 0
     success = 0
     failed = 0
@@ -302,7 +304,7 @@ def execute_bid_adjustment() -> dict[str, Any]:
 
     for profile_id, group in profile_groups.items():
         try:
-            result = _process_profile_group(profile_id, group, now_utc)
+            result = _process_profile_group(profile_id, group, now_local)
             processed += result["total"]
             success += result["success"]
             failed += result["failed"]

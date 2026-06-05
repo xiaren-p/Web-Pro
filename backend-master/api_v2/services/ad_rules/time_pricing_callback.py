@@ -102,7 +102,7 @@ def _process_callback_for_hit(
 
     for item in items:
         callback_bid = _calc_callback_bid(item["bid"], callback)
-        if callback_bid is None:
+        if callback_bid is None or callback_bid == item["bid"]:
             continue
         is_target = item["item_type"] == "target"
         adjustments.append(SpBidAdjustment(
@@ -291,7 +291,7 @@ def _process_callback_chunk(
         try:
             strategy = strategy_map.get(int(hit.hit_time_pricing_rules))
             if not strategy:
-                # 策略已删：强制回调（按当前竞价写记录），再重新命中
+                # 策略已删：强制回调，再重新命中
                 items = _get_ad_items(hit.campaign_id, hit.profile_id, hit.targeting_type, item_map)
                 for item in items:
                     is_target = item["item_type"] == "target"
@@ -308,12 +308,14 @@ def _process_callback_chunk(
                         execution_status=ExecutionStatusChoices.PENDING,
                     ))
                 hit.is_time_pricing = TimePricingHitStatus.NO
+                hit.hit_time_pricing_rules = ""
                 hits_to_update.append(hit)
                 processed += 1
                 continue
             if not _process_callback_for_hit(hit, strategy, item_map, now_utc, adjustments):
                 continue
             hit.is_time_pricing = TimePricingHitStatus.NO
+            hit.hit_time_pricing_rules = ""
             hits_to_update.append(hit)
             called_back += 1
             processed += 1
@@ -365,8 +367,6 @@ def execute_time_pricing_callback() -> dict[str, Any]:
 
     _write_batch(adjustments, hits_to_update)
 
-    _re_match_batch(hits_to_update)
-
     logger.info("[time_pricing_callback] 完成 processed=%d called_back=%d errors=%d", processed, called_back, len(errors))
     return {"processed": processed, "called_back": called_back, "errors": errors}
 
@@ -384,4 +384,4 @@ def _write_batch(
     if adjustments:
         SpBidAdjustment.objects.bulk_create(adjustments, batch_size=500)
     if hits_to_update:
-        AdTimePricingHit.objects.bulk_update(hits_to_update, ["is_time_pricing", "updated_at"], batch_size=500)
+        AdTimePricingHit.objects.bulk_update(hits_to_update, ["is_time_pricing", "hit_time_pricing_rules", "updated_at"], batch_size=500)
