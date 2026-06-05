@@ -105,11 +105,14 @@ def _calc_strategy_times(
     """
     sm = strategy.start_month
     sd = strategy.start_day
-    if sm is None or sd is None:
-        return None, None, None, None
 
     today = datetime.now().date()
     year = today.year
+
+    # start_month/start_day 为 null 时不限时间，使用当天日期
+    if sm is None or sd is None:
+        sm = today.month
+        sd = today.day
 
     sh, sm_val = map(int, seg_start.split(":"))
     eh, em = map(int, seg_end.split(":"))
