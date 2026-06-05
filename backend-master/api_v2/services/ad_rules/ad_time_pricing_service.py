@@ -90,19 +90,18 @@ def _calc_strategy_times(
 ) -> tuple[datetime | None, datetime | None, datetime | None, datetime | None]:
     """根据分时时段（HH:MM）+ 站点时区偏移，计算四个时间。
 
-    time_start / time_end：规则原始时间（站点 local time naive datetime）。
-      规则写 06:00 就是 06:00，写 01:00 就是 01:00，日期用今天，如果 end < start 则跨天。
-      注意：站点 local time 与 UTC 关系为固定偏移（如 Europe/London=UTC+0），不分冬夏令时。
-    time_start_cn / time_end_cn：根据站点固定 UTC 偏移换算出的北京时间（naive datetime）。
+    time_start / time_end：规则原始时间（站点 local time），带站点固定偏移 tzinfo。
+    time_start_cn / time_end_cn：北京时间（固定偏移 +8），带北京 tzinfo。
+    两者指向同一 UTC 时刻，Django 据此正确存储。
 
-    例如规则 06:00～01:00，站点 Europe/London（UTC+0）：
-      time_start     = 2026-06-05 06:00（站点时间）
-      time_end       = 2026-06-06 01:00（站点时间，跨天）
-      time_start_cn  = 2026-06-05 14:00（站点 06:00 = UTC 06:00 → BJ 14:00）
-      time_end_cn    = 2026-06-06 09:00（站点 01:00 = UTC 01:00 → BJ 09:00）
-      _in_time_range: 北京时间 14:00～09:00 之间 < 09:00 = 不在时段
-                       （正确：站点 06:00-01:00 对应 BJ 14:00-09:00）
+    例如规则 06:00～01:00，站点 Europe/Rome（固定偏移 +1）：
+      time_start     = 2026-06-05 06:00+01:00 → DB UTC 05:00
+      time_end       = 2026-06-06 01:00+01:00 → DB UTC 00:00
+      time_start_cn  = 2026-06-05 13:00+08:00 → DB UTC 05:00（同一时刻）
+      time_end_cn    = 2026-06-06 08:00+08:00 → DB UTC 00:00（同一时刻）
     """
+    from datetime import timezone as dt_timezone
+
     sm = strategy.start_month
     sd = strategy.start_day
 
@@ -117,19 +116,24 @@ def _calc_strategy_times(
     sh, sm_val = map(int, seg_start.split(":"))
     eh, em = map(int, seg_end.split(":"))
 
-    # ── time_start / time_end：规则原始时间，不分冬夏令时，直接写 ──
-    time_start = datetime(year, today.month, today.day, sh, sm_val, 0)
-    time_end = datetime(year, today.month, today.day, eh, em, 0)
+    # ── 站点本地时间 naive 结构 ──
+    time_start_naive = datetime(year, today.month, today.day, sh, sm_val, 0)
+    time_end_naive = datetime(year, today.month, today.day, eh, em, 0)
     if (eh, em) < (sh, sm_val):
-        time_end += timedelta(days=1)  # 跨天
+        time_end_naive += timedelta(days=1)  # 跨天
 
-    # ── time_start_cn / time_end_cn：按站点时区固定 UTC 偏移换算北京时间 ──
+    # ── 固定偏移（项目铁律，不分夏冬令时）──
     offset_hours = get_fixed_utc_offset(tz_name)
-    # site_time - offset_hours = UTC, UTC + 8 = BJ time
-    start_utc = time_start - timedelta(hours=offset_hours)
-    end_utc = time_end - timedelta(hours=offset_hours)
-    time_start_cn = start_utc + timedelta(hours=8)
-    time_end_cn = end_utc + timedelta(hours=8)
+    site_tz = dt_timezone(timedelta(hours=offset_hours))
+    cn_tz = dt_timezone(timedelta(hours=8))
+
+    # time_start / time_end：站点当地时间 + 站点固定偏移
+    time_start = time_start_naive.replace(tzinfo=site_tz)
+    time_end = time_end_naive.replace(tzinfo=site_tz)
+
+    # time_start_cn / time_end_cn：同一时刻，转为北京时间固定偏移
+    time_start_cn = time_start.astimezone(cn_tz)
+    time_end_cn = time_end.astimezone(cn_tz)
 
     return time_start, time_end, time_start_cn, time_end_cn
 

@@ -5,7 +5,7 @@
   - 分时回调：is_callback=0（未回调）+ 当前不在时段内 → 写 CALLBACK + is_time_pricing=NO + is_callback=1
 
 时段判断：
-  直接使用 AdTimePricingHit 的 time_start_cn / time_end_cn 字段（北京时间 naive datetime），
+  直接使用 AdTimePricingHit 的 time_start_cn / time_end_cn 字段（北京时间 aware datetime，固定偏移 +8），
   与当前北京时间比对，无需重复解析策略 time_settings。
   上游 ad_time_pricing_service 在写入命中记录时已根据规则时段 + 站点 UTC 偏移算好四个时间值。
   多时段时取所有时段的最小 start 和最大 end 合并为一个覆盖窗口。
@@ -37,10 +37,8 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any
-
-from zoneinfo import ZoneInfo
 
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStrategy
 from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
@@ -51,9 +49,6 @@ from api_v2.services.ad_rules.time_pricing_calculator import (
 
 logger = logging.getLogger(__name__)
 
-# 北京时间
-_TZ_CN = ZoneInfo("Asia/Shanghai")
-
 
 # ============================================================
 # 时段判断
@@ -62,8 +57,8 @@ _TZ_CN = ZoneInfo("Asia/Shanghai")
 def _in_time_range(hit: AdTimePricingHit) -> bool:
     """判断当前北京时间是否在命中记录的时段内。
 
-    用 ad_time_pricing_hit 表已计算好的 time_start_cn / time_end_cn（北京时间），
-    与当前北京时间 datetime.now(Asia/Shanghai) 比对。
+    用 ad_time_pricing_hit 表已计算好的 time_start_cn / time_end_cn（北京时间 aware datetime），
+    与当前北京时间 datetime.now(固定偏移 +8) 比对。
 
     Args:
         hit: 分时命中记录（含 time_start_cn / time_end_cn）
@@ -73,7 +68,8 @@ def _in_time_range(hit: AdTimePricingHit) -> bool:
     """
     if hit.time_start_cn is None or hit.time_end_cn is None:
         return False
-    now_cn = datetime.now(_TZ_CN).replace(tzinfo=None)
+    cn_tz = dt_timezone(timedelta(hours=8))
+    now_cn = datetime.now(cn_tz)
     return hit.time_start_cn <= now_cn <= hit.time_end_cn
 
 
@@ -106,7 +102,7 @@ def _get_active_rules(strategy: LxTimePricingStrategy) -> list[dict]:
 
     # byWeek：按 dayOfWeek 过滤
     if time_mode == "byWeek":
-        today_weekday = str(datetime.now(_TZ_CN).isoweekday())  # "1"=周一 … "7"=周日
+        today_weekday = str(datetime.now(dt_timezone(timedelta(hours=8))).isoweekday())  # 北京时间周几
         segments = [
             seg for seg in segments
             if isinstance(seg, dict) and str(seg.get("dayOfWeek", "")) == today_weekday
