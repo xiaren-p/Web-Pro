@@ -217,7 +217,13 @@ def _do_callback(
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
 ) -> tuple[int, int]:
-    """分时回调：按回调策略收集调整记录。"""
+    """分时回调：按回调策略计算恢复竞价并收集调整记录。
+
+    注意：item["bid"] 是当前 DB 竞价（已被 _do_start 降价过），
+    item["bid_before"] 在 _do_start 阶段已保存为原始竞价。
+    calc_callback_bid 使用原始竞价 bid_before（而非当前 bid）作为计算基数，
+    确保 previous 类型能正确恢复到分时前的竞价。
+    """
     from api_v2.services.ad_rules.time_pricing_calculator import append_callback_adjustment
 
     callback = strategy.callback_settings or {}
@@ -228,7 +234,9 @@ def _do_callback(
         return 1, 0
 
     for item in items:
-        callback_bid = calc_callback_bid(item["bid"], callback)
+        # 以 _do_start 保存的原始竞价为基数计算回调目标，而非当前已被降价的 DB 竞价
+        base_bid = item.get("bid_before", item["bid"])
+        callback_bid = calc_callback_bid(base_bid, callback)
         if callback_bid is None:
             continue
         append_callback_adjustment(
