@@ -65,7 +65,6 @@ def calc_new_bid(current_bid: float, rule: dict) -> float | None:
 def calc_reverse_bid(adjusted_bid: float, rule: dict) -> float | None:
     """根据单条降/涨规则反推调整前竞价（calc_new_bid 的逆运算）。
 
-    回调时用于从已被降价的 DB 竞价逆推出分时前的原始竞价。
     注意：反推未考虑 limitValue 截断，结果仅作近似参考。
 
     Args:
@@ -73,7 +72,7 @@ def calc_reverse_bid(adjusted_bid: float, rule: dict) -> float | None:
         rule: {"operateType", "operateValue", ...}
 
     Returns:
-        调整前竞价；除零上游或不可反推规则返回 None
+        调整前竞价；除零或不可反推规则返回 None
     """
     op = rule.get("operateType", "")
     val = float(rule.get("operateValue", 0) or 0)
@@ -111,7 +110,7 @@ def calc_callback_bid(current_bid: float, callback_settings: dict) -> float | No
     """根据回调策略计算恢复后的竞价。
 
     Args:
-        current_bid: 投放项的基础竞价（应为反推后的原始竞价）
+        current_bid: 投放项的基础竞价
         callback_settings: strategy.callback_settings
 
     Returns:
@@ -397,7 +396,6 @@ def write_batch(
             [
                 "awaiting_start",
                 "is_time_pricing",
-                "is_callback",
                 "rule_updated_today",
                 "hit_time_pricing_rules",
                 "error_count",

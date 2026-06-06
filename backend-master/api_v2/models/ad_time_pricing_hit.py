@@ -95,18 +95,6 @@ class AdTimePricingHit(models.Model):
         help_text="本次分时结束的回调时间（Asia/Shanghai）",
     )
 
-    # ── 子时段明细（修复多时段规则合并丢失粒度 #5）────────────────────────
-
-    segment_times = models.JSONField(
-        default=list,
-        verbose_name="子时段明细",
-        help_text=(
-            "每个子时段的独立时间边界与规则列表。"
-            "格式：[{\"index\": 0, \"start_cn\": \"...\", \"end_cn\": \"...\", \"rules\": [...]}]。"
-            "空列表时降级为合并窗口逻辑（兼容旧数据）。"
-        ),
-    )
-
     # ── 用户手动规则 ──────────────────────────────────────────────────────
 
     is_manual_rules = models.IntegerField(
@@ -130,13 +118,28 @@ class AdTimePricingHit(models.Model):
         help_text="当日是否已重新匹配过规则",
     )
 
-    # ── 等待分时开始标记（原 is_callback，重命名以消除歧义 #12）───────────
+    # ── 等待分时开始标记（原 is_callback，已重命名为 awaiting_start）──────
+    # 注意：0015 migration 已将 is_callback 数据迁移到 awaiting_start；
+    #       0017 migration 已删除 is_callback 字段。
+    #       YES = 等待分时开始，NO = 分时生效中
 
     awaiting_start = models.IntegerField(
         choices=TimePricingHitStatus.choices,
         default=TimePricingHitStatus.YES,
         verbose_name="是否等待分时开始",
-        help_text="YES=等待分时开始（已回调/新命中）；NO=分时生效中（正在降价，等待回调）",
+        help_text="YES(1)=等待分时开始（已回调/新命中）；NO(0)=分时生效中（正在降价，等待回调）",
+    )
+
+    # ── 多时段子段明细（#5）───────────────────────────────────────────────
+
+    segment_times = models.JSONField(
+        default=list,
+        verbose_name="子时段明细",
+        help_text=(
+            "每个子时段的独立时间边界与规则列表。"
+            "格式：[{\"index\": 0, \"start_cn\": \"...\", \"end_cn\": \"...\", \"rules\": [...]}]。"
+            "空列表时降级为合并窗口逻辑（兼容旧数据）。"
+        ),
     )
 
     # ── 失败退避计数器（#10）───────────────────────────────────────────────

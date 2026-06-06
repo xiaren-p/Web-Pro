@@ -29,7 +29,6 @@ from api_v2.utils.timezone_utils import country_to_timezone, get_fixed_utc_offse
 
 logger = logging.getLogger(__name__)
 
-# 北京时区常量
 CN_TZ = dt_timezone(timedelta(hours=8))
 
 
@@ -99,14 +98,8 @@ def _calc_strategy_times(
     time_start_cn / time_end_cn：北京时间（固定偏移 +8），带北京 tzinfo。
     两者指向同一 UTC 时刻，Django 据此正确存储。
 
-    例如规则 06:00～01:00，站点 Europe/Rome（固定偏移 +1）：
-      time_start     = 2026-06-05 06:00+01:00 → DB UTC 05:00
-      time_end       = 2026-06-06 01:00+01:00 → DB UTC 00:00
-      time_start_cn  = 2026-06-05 13:00+08:00 → DB UTC 05:00（同一时刻）
-      time_end_cn    = 2026-06-06 08:00+08:00 → DB UTC 00:00（同一时刻）
-
     #11：移除死代码（strategy.start_month / start_day 从未参与 datetime 构造，
-    始终使用 today，已移除不可达的 null 兜底逻辑）。
+    始终使用 today）。
 
     Args:
         seg_start: 时段开始时间，格式 "HH:MM"
@@ -122,7 +115,7 @@ def _calc_strategy_times(
     sh, sm_val = map(int, seg_start.split(":"))
     eh, em = map(int, seg_end.split(":"))
 
-    # ── 站点本地时间 naive 结构（#11：始终使用 today，移除死代码 sm/sd）──
+    # ── 站点本地时间 naive 结构（#11：始终使用 today）──
     time_start_naive = datetime(year, today.month, today.day, sh, sm_val, 0)
     time_end_naive = datetime(year, today.month, today.day, eh, em, 0)
     if (eh, em) < (sh, sm_val):
@@ -500,7 +493,7 @@ def process_new_ads() -> dict[str, Any]:
             result = match_strategy_against_product(pid, assorts, labels, uids, strategies)
             existing.hit_time_pricing_rules = str(result["strategy_id"]) if result else ""
             existing.rule_updated_today = True
-            # 新一天重新命中，初始化 waiting_start 状态为 YES，等待 execute_time_pricing 触发 _do_start
+            # 新一天重新命中，初始化状态为等待分时开始
             existing.awaiting_start = TimePricingHitStatus.YES
             existing.is_time_pricing = TimePricingHitStatus.NO
             existing.segment_times = []  # 降级为合并窗口逻辑（兼容旧数据）
@@ -573,7 +566,6 @@ def process_new_ads() -> dict[str, Any]:
                 "segment_times",
                 "awaiting_start",
                 "is_time_pricing",
-                "is_callback",
                 "updated_at",
             ],
             batch_size=500,

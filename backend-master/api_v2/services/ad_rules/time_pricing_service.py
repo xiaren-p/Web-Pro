@@ -1,8 +1,8 @@
 """分时策略执行器（time_pricing_service）。
 
 两个阶段合并为一个服务：
-  - 分时开始：awaiting_start=YES（等待分时开始）+ 当前在时段内 → 写 START + is_time_pricing=YES + awaiting_start=NO + rule_updated_today=False
-  - 分时回调：awaiting_start=NO（分时生效中）+ 当前不在时段内 → 写 CALLBACK + is_time_pricing=NO + awaiting_start=YES
+  - 分时开始：awaiting_start=YES + 当前在时段内 → 写 START + is_time_pricing=YES + awaiting_start=NO + rule_updated_today=False
+  - 分时回调：awaiting_start=NO + 当前不在时段内 → 写 CALLBACK + is_time_pricing=NO + awaiting_start=YES + rule_updated_today=False
 
   - 兜底重置：awaiting_start=YES + 不在时段内 + rule_updated_today=True → 仅 reset rule_updated_today（防止永久卡死 #1）
 
@@ -15,26 +15,26 @@
   若 segment_times 非空，则按子时段精确匹配规则（#5：多时段规则粒度修复）。
 
 完整执行链路：
-  ① _preload_data()：预加载策略 + 投放项（投放项按 campaign_keys 分批 Q 对象 SQL 查询）
+  ① 预加载策略 + 投放项（投放项按 campaign_keys 分批 Q 对象 SQL 查询）
   ② _process_single_hit()：从内存 item_map 取投放项 → 用 hit.time_start_cn / time_end_cn 判断时段 → 分流
   ③ _do_start / _do_callback：纯内存计算竞价 → 收集 SpBidAdjustment + AdTimePricingHit 待写列表
   ④ write_batch()：事务保护 → 先 bulk_create(SpBidAdjustment) → 再 bulk_update(AdTimePricingHit 状态)（#3）
 
 处理流程：
-  ├─ awaiting_start=YES（等待分时开始）+ 在时段内 → _do_start()
+  ├─ awaiting_start=YES + 在时段内 → _do_start()
   │   ├─ 取原始竞价(bid_before=当前实时竞价)
-  │   ├─ 规则链式计算 bid_after（按 segment_times 子时段精确匹配规则）
+  │   ├─ 规则链式计算 bid_after（按 segment_times 子时段精确匹配规则，降级为全局合并）
   │   ├─ append_start_adjustment()
   │   │   ├─ bid_before==bid_after → 标 SUCCESS，msg="竞价相等无需调整"
   │   │   └─ 不等 → 标 PENDING，待 bid_adjustment 调 API
   │   └─ UPDATE hit: is_time_pricing=YES, awaiting_start=NO, rule_updated_today=False
   │
-  ├─ awaiting_start=NO（分时生效中）+ 不在时段内 → _do_callback()
+  ├─ awaiting_start=NO + 不在时段内 → _do_callback()
   │   ├─ callback.type=none → 只改状态
   │   ├─ 检查是否有成功执行的 START 记录（#7：替代反推估算）
   │   ├─ 每条 item 计算回调竞价
   │   ├─ append_callback_adjustment()
-  │   │   ├─ 回调竞价==原始竞价(bid_before) → 跳过不写
+  │   │   ├─ 回调竞价==数据库竞价 → 跳过不写
   │   │   └─ 不等 → 写 PENDING CALLBACK 记录
   │   └─ UPDATE hit: awaiting_start=YES, is_time_pricing=NO, rule_updated_today=False
   │
@@ -244,11 +244,10 @@ def _process_single_hit(
         return 0, 0
 
     in_period = _in_time_range(hit)
-
-    is_awaiting_start = (hit.awaiting_start == TimePricingHitStatus.YES)
+    is_awaiting = (hit.awaiting_start == TimePricingHitStatus.YES)
 
     # ── 路径 A：分时开始 ──
-    if is_awaiting_start and in_period:
+    if is_awaiting and in_period:
         # #4 乐观锁：若 rule_updated_today=True，说明 process_new_ads 刚刷新，跳过
         if hit.rule_updated_today:
             logger.info(
@@ -259,12 +258,12 @@ def _process_single_hit(
         return _do_start(hit, strategy, items, now_utc, adjustments, hits_to_update)
 
     # ── 路径 B：分时回调 ──
-    need_callback = (not is_awaiting_start) and (not in_period)
+    need_callback = (not is_awaiting) and (not in_period)
     if need_callback:
         return _do_callback(hit, strategy, items, now_utc, adjustments, hits_to_update)
 
     # ── 路径 C：兜底重置（#1 防止 rule_updated_today 永久卡 True）──
-    if is_awaiting_start and (not in_period) and hit.rule_updated_today:
+    if is_awaiting and (not in_period) and hit.rule_updated_today:
         logger.info(
             "[time_pricing] campaign=%d profile=%d 时段已过且从未触发 _do_start，兜底重置 rule_updated_today",
             hit.campaign_id, hit.profile_id,
@@ -369,10 +368,11 @@ def execute_time_pricing() -> dict[str, Any]:
     """并行处理所有 AdTimePricingHit 记录，执行分时开始、回调或兜底重置。
 
     优化策略：
-      1. 先按 error_count < MAX_ERROR_COUNT 过滤 + 时段匹配筛选（纯内存，无 DB 查询）
-      2. 仅对需要处理的 hits 构建 item_map（减少 DB 查询范围）
-      3. 32 线程并行处理
-      4. 事务保护批量写入（#3）
+      1. 先拦截需要兜底重置的记录（#1）、无效策略的记录（#9）和失败过多的记录（#10）
+      2. 对 awaiting_start + _in_time_range 快速筛选需要处理的 hits
+      3. 仅对需要处理的 hits 构建 item_map（减少 DB 查询范围）
+      4. 32 线程并行处理
+      5. 事务保护批量写入（#3）
 
     Returns:
         {"processed": int, "adjusted": int, "errors": list[str]}
@@ -385,7 +385,7 @@ def execute_time_pricing() -> dict[str, Any]:
 
     logger.info("[time_pricing] 全量记录数=%d 开始筛选需要处理的 hits", len(all_hits))
 
-    # ── 第一步：快速筛选需要处理的记录（纯内存，无 DB）──
+    # ── 第一步：加载策略 + 快速筛选 + 拦截清理（纯内存，无 DB）──
     strategy_ids = {int(h.hit_time_pricing_rules) for h in all_hits if h.hit_time_pricing_rules}
     strategy_map = {
         s.id: s for s in LxTimePricingStrategy.objects.filter(pk__in=strategy_ids)
@@ -393,12 +393,11 @@ def execute_time_pricing() -> dict[str, Any]:
     logger.info("[time_pricing] 策略加载=%d 耗时=%.1fs", len(strategy_map), (datetime.now() - t0).total_seconds())
 
     need_process: list[AdTimePricingHit] = []
-    stale_cleanup: list[AdTimePricingHit] = []  # 策略不存在的记录，需清空规则
+    stale_cleanup: list[AdTimePricingHit] = []  # 兜底重置 + 策略失效，需批量写入
 
     for hit in all_hits:
         # #10：跳过连续失败过多的记录
         if hit.error_count and hit.error_count >= MAX_ERROR_COUNT:
-            # 每 10 次忽略打印一次告警，防止告警风暴
             if hit.error_count % MAX_ERROR_COUNT == 0:
                 logger.error(
                     "[time_pricing] campaign=%d profile=%d error_count=%d 已达到阈值，跳过处理",
@@ -419,13 +418,13 @@ def execute_time_pricing() -> dict[str, Any]:
             continue
 
         in_period = _in_time_range(hit)
-        is_awaiting_start = (hit.awaiting_start == TimePricingHitStatus.YES)
+        is_awaiting = (hit.awaiting_start == TimePricingHitStatus.YES)
 
-        if is_awaiting_start and in_period:
+        if is_awaiting and in_period:
             need_process.append(hit)
-        elif not is_awaiting_start and not in_period:
+        elif not is_awaiting and not in_period:
             need_process.append(hit)
-        elif is_awaiting_start and not in_period and hit.rule_updated_today:
+        elif is_awaiting and not in_period and hit.rule_updated_today:
             # #1 兜底路径：时段已过且从未触发 _do_start，重置标记防止永久卡死
             logger.info(
                 "[time_pricing] campaign=%d profile=%d 时段已过 + 兜底重置 rule_updated_today",
@@ -440,8 +439,12 @@ def execute_time_pricing() -> dict[str, Any]:
         AdTimePricingHit.objects.bulk_update(
             stale_cleanup,
             [
-                "awaiting_start", "is_time_pricing", "is_callback",
-                "hit_time_pricing_rules", "rule_updated_today", "error_count", "updated_at",
+                "awaiting_start",
+                "is_time_pricing",
+                "hit_time_pricing_rules",
+                "rule_updated_today",
+                "error_count",
+                "updated_at",
             ],
             batch_size=500,
         )
