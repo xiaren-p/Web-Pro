@@ -1,8 +1,10 @@
 """分时策略执行器（time_pricing_service）。
 
 两个阶段合并为一个服务：
-  - 分时开始：is_callback=1（已回调）+ 当前在时段内 → 写 START + is_time_pricing=YES + is_callback=0 + rule_updated_today=0
-  - 分时回调：is_callback=0（未回调）+ 当前不在时段内 → 写 CALLBACK + is_time_pricing=NO + is_callback=1
+  - 分时开始：awaiting_start=YES（等待分时开始）+ 当前在时段内 → 写 START + is_time_pricing=YES + awaiting_start=NO + rule_updated_today=False
+  - 分时回调：awaiting_start=NO（分时生效中）+ 当前不在时段内 → 写 CALLBACK + is_time_pricing=NO + awaiting_start=YES
+
+  - 兜底重置：awaiting_start=YES + 不在时段内 + rule_updated_today=True → 仅 reset rule_updated_today（防止永久卡死 #1）
 
 时段判断：
   直接使用 AdTimePricingHit 的 time_start_cn / time_end_cn 字段（北京时间 aware datetime，固定偏移 +8），
@@ -10,28 +12,34 @@
   上游 ad_time_pricing_service 在写入命中记录时已根据规则时段 + 站点 UTC 偏移算好四个时间值。
   多时段时取所有时段的最小 start 和最大 end 合并为一个覆盖窗口。
 
+  若 segment_times 非空，则按子时段精确匹配规则（#5：多时段规则粒度修复）。
+
 完整执行链路：
   ① _preload_data()：预加载策略 + 投放项（投放项按 campaign_keys 分批 Q 对象 SQL 查询）
   ② _process_single_hit()：从内存 item_map 取投放项 → 用 hit.time_start_cn / time_end_cn 判断时段 → 分流
   ③ _do_start / _do_callback：纯内存计算竞价 → 收集 SpBidAdjustment + AdTimePricingHit 待写列表
-  ④ write_batch()：先 bulk_create(SpBidAdjustment) → 再 bulk_update(AdTimePricingHit 状态)
+  ④ write_batch()：事务保护 → 先 bulk_create(SpBidAdjustment) → 再 bulk_update(AdTimePricingHit 状态)（#3）
 
 处理流程：
-  ├─ is_callback=1（已回调）+ 在时段内 → _do_start()
+  ├─ awaiting_start=YES（等待分时开始）+ 在时段内 → _do_start()
   │   ├─ 取原始竞价(bid_before=当前实时竞价)
-  │   ├─ 规则链式计算 bid_after
+  │   ├─ 规则链式计算 bid_after（按 segment_times 子时段精确匹配规则）
   │   ├─ append_start_adjustment()
   │   │   ├─ bid_before==bid_after → 标 SUCCESS，msg="竞价相等无需调整"
   │   │   └─ 不等 → 标 PENDING，待 bid_adjustment 调 API
-  │   └─ UPDATE hit: is_time_pricing=YES, is_callback=NO, rule_updated_today=False
+  │   └─ UPDATE hit: is_time_pricing=YES, awaiting_start=NO, rule_updated_today=False
   │
-  └─ is_callback=0（未回调）+ 不在时段内 → _do_callback()
-      ├─ callback.type=none → 只改状态
-      ├─ 每条 item 计算回调竞价
-      ├─ append_callback_adjustment()
-      │   ├─ 回调竞价==原始竞价(bid_before) → 跳过不写
-      │   └─ 不等 → 写 PENDING CALLBACK 记录
-      └─ UPDATE hit: is_callback=YES, is_time_pricing=NO
+  ├─ awaiting_start=NO（分时生效中）+ 不在时段内 → _do_callback()
+  │   ├─ callback.type=none → 只改状态
+  │   ├─ 检查是否有成功执行的 START 记录（#7：替代反推估算）
+  │   ├─ 每条 item 计算回调竞价
+  │   ├─ append_callback_adjustment()
+  │   │   ├─ 回调竞价==原始竞价(bid_before) → 跳过不写
+  │   │   └─ 不等 → 写 PENDING CALLBACK 记录
+  │   └─ UPDATE hit: awaiting_start=YES, is_time_pricing=NO, rule_updated_today=False
+  │
+  └─ awaiting_start=YES + 不在时段内 + rule_updated_today=True → 兜底重置
+      └─ UPDATE hit: rule_updated_today=False（防止永久卡死 #1）
 """
 from __future__ import annotations
 
@@ -44,10 +52,22 @@ from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStr
 from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
 from api_v2.models.sp_bid_adjustment import SpBidAdjustment
 from api_v2.services.ad_rules.time_pricing_calculator import (
-    build_item_map, calc_callback_bid, calc_new_bid, get_ad_items, write_batch,
+    MAX_ERROR_COUNT,
+    build_item_map,
+    calc_callback_bid,
+    calc_new_bid,
+    get_ad_items,
+    has_successful_start_adjustment,
+    write_batch,
+)
+from api_v2.services.ad_rules.time_pricing_shared import (
+    get_rules_for_segments,
 )
 
 logger = logging.getLogger(__name__)
+
+# 北京时区常量
+CN_TZ = dt_timezone(timedelta(hours=8))
 
 
 # ============================================================
@@ -57,33 +77,85 @@ logger = logging.getLogger(__name__)
 def _in_time_range(hit: AdTimePricingHit) -> bool:
     """判断当前北京时间是否在命中记录的时段内。
 
-    用 ad_time_pricing_hit 表已计算好的 time_start_cn / time_end_cn（北京时间 aware datetime），
-    与当前北京时间 datetime.now(固定偏移 +8) 比对。
+    优先使用 segment_times 子时段精确匹配（#5），
+    若 segment_times 为空则降级为合并窗口逻辑（兼容旧数据）。
 
     Args:
-        hit: 分时命中记录（含 time_start_cn / time_end_cn）
+        hit: 分时命中记录（含 time_start_cn / time_end_cn 及可选的 segment_times）
 
     Returns:
         True 表示当前在时段内
     """
+    now_cn = datetime.now(CN_TZ)
+
+    # #5：子时段精确匹配
+    segments = hit.segment_times or []
+    if segments and isinstance(segments, list):
+        for seg in segments:
+            if not isinstance(seg, dict):
+                continue
+            start_str = seg.get("start_cn")
+            end_str = seg.get("end_cn")
+            if not start_str or not end_str:
+                continue
+            try:
+                seg_start = datetime.fromisoformat(start_str)
+                seg_end = datetime.fromisoformat(end_str)
+            except (ValueError, TypeError):
+                continue
+            if seg_start <= now_cn <= seg_end:
+                return True
+        return False
+
+    # 兼容旧数据：合并窗口逻辑
     if hit.time_start_cn is None or hit.time_end_cn is None:
         return False
-    cn_tz = dt_timezone(timedelta(hours=8))
-    now_cn = datetime.now(cn_tz)
     return hit.time_start_cn <= now_cn <= hit.time_end_cn
 
 
+def _get_matched_segment_rules(hit: AdTimePricingHit) -> list[dict] | None:
+    """若 segment_times 非空，返回当前时刻匹配的子时段的独立规则列表。
+
+    用于 _do_start 中按子时段精确选取规则，而非扁平合并所有时段规则（#5）。
+
+    Args:
+        hit: 分时命中记录
+
+    Returns:
+        匹配子时段的 rules 列表；未匹配或无 segment_times 时返回 None（降级为合并逻辑）
+    """
+    segments = hit.segment_times or []
+    if not segments or not isinstance(segments, list):
+        return None
+
+    now_cn = datetime.now(CN_TZ)
+    for seg in segments:
+        if not isinstance(seg, dict):
+            continue
+        start_str = seg.get("start_cn")
+        end_str = seg.get("end_cn")
+        if not start_str or not end_str:
+            continue
+        try:
+            seg_start = datetime.fromisoformat(start_str)
+            seg_end = datetime.fromisoformat(end_str)
+        except (ValueError, TypeError):
+            continue
+        if seg_start <= now_cn <= seg_end:
+            rules = seg.get("rules", [])
+            return rules if isinstance(rules, list) else None
+    return None
+
+
 # ============================================================
-# 规则获取
+# 规则获取（统一使用 time_pricing_shared #6 #13）
 # ============================================================
 
 def _get_active_rules(strategy: LxTimePricingStrategy) -> list[dict]:
     """从策略 time_settings 中提取今天适用的规则（按 dayOfWeek 过滤）。
 
-    三种模式：
-      - byDay：所有时段全部适用
-      - byWeek：只取 dayOfWeek 等于今天周几的时段
-      - calendar：所有时段全适用（暂不支持 grid 格式）
+    统一使用 time_pricing_shared.get_rules_for_segments（#6 #13），
+    确保与 ad_time_pricing_service 中的过滤逻辑完全一致。
 
     Args:
         strategy: 分时策略
@@ -95,33 +167,13 @@ def _get_active_rules(strategy: LxTimePricingStrategy) -> list[dict]:
     if not isinstance(time_settings, dict):
         return []
     segments = time_settings.get("segments", [])
-    if not isinstance(segments, list):
-        return []
-
     time_mode = strategy.time_mode or "byDay"
-
-    # byWeek：按 dayOfWeek 过滤
-    if time_mode == "byWeek":
-        today_weekday = str(datetime.now(dt_timezone(timedelta(hours=8))).isoweekday())  # 北京时间周几
-        segments = [
-            seg for seg in segments
-            if isinstance(seg, dict) and str(seg.get("dayOfWeek", "")) == today_weekday
-        ]
-
-    rules: list[dict] = []
-    for seg in segments:
-        if not isinstance(seg, dict):
-            continue
-        seg_rules = seg.get("rules", [])
-        if isinstance(seg_rules, list):
-            rules.extend(seg_rules)
-    return rules
+    return get_rules_for_segments(segments, time_mode)
 
 
 # ============================================================
 # 主流程
 # ============================================================
-
 
 
 def _process_chunk(
@@ -130,7 +182,10 @@ def _process_chunk(
     item_map: dict,
     now_utc: datetime,
 ) -> tuple[list[SpBidAdjustment], list[AdTimePricingHit], int, int, list[str]]:
-    """线程入口：处理一批命中记录（纯内存计算）。"""
+    """线程入口：处理一批命中记录（纯内存计算）。
+
+    #10：异常时递增 error_count，达到 MAX_ERROR_COUNT 后在 execute_time_pricing 中被跳过。
+    """
     adjustments: list[SpBidAdjustment] = []
     hits_to_update: list[AdTimePricingHit] = []
     processed = 0
@@ -140,9 +195,18 @@ def _process_chunk(
     for hit in hit_chunk:
         try:
             p, a = _process_single_hit(hit, strategy_map, item_map, now_utc, adjustments, hits_to_update)
-            processed += p; adjusted += a
+            processed += p
+            adjusted += a
+            # 处理成功时重置 error_count（#10）
+            if hit.error_count > 0:
+                hit.error_count = 0
+                hits_to_update.append(hit)
         except Exception:
-            logger.exception("[time_pricing] campaign=%d", hit.campaign_id)
+            logger.exception("[time_pricing] campaign=%d profile=%d", hit.campaign_id, hit.profile_id)
+            # #10：递增错误计数，追加到 update 列表
+            hit.error_count = (hit.error_count or 0) + 1
+            hit.updated_at = datetime.now(dt_timezone.utc)
+            hits_to_update.append(hit)
             errors.append(f"campaign={hit.campaign_id} profile={hit.profile_id}")
 
     return adjustments, hits_to_update, processed, adjusted, errors
@@ -156,27 +220,59 @@ def _process_single_hit(
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
 ) -> tuple[int, int]:
-    """处理单条命中记录，判断是否需要分时开始或回调。"""
+    """处理单条命中记录，判断是否需要分时开始、回调或兜底重置。
+
+    #4 乐观锁：若 awaiting_start=YES + rule_updated_today=True + 在时段内，
+    说明 process_new_ads 刚刷新了这条记录，跳过本轮等待下次。
+    """
     strategy = strategy_map.get(int(hit.hit_time_pricing_rules))
     if not strategy:
-        logger.warning("[time_pricing] 策略不存在 campaign=%d", hit.campaign_id)
+        # #9：策略不存在时清空 hit_time_pricing_rules，避免无限告警循环
+        logger.warning("[time_pricing] 策略不存在 campaign=%d profile=%d rule_id=%s，清空规则等待重新匹配",
+                       hit.campaign_id, hit.profile_id, hit.hit_time_pricing_rules)
+        hit.hit_time_pricing_rules = ""
+        hit.awaiting_start = TimePricingHitStatus.YES
+        hit.is_time_pricing = TimePricingHitStatus.NO
+        hit.rule_updated_today = False
+        hit.updated_at = datetime.now(dt_timezone.utc)
+        hits_to_update.append(hit)
         return 0, 0
 
     items = get_ad_items(hit.campaign_id, hit.profile_id, hit.targeting_type, item_map)
     if not items:
-        logger.warning("[time_pricing] 无投放项 campaign=%d", hit.campaign_id)
+        logger.warning("[time_pricing] 无投放项 campaign=%d profile=%d", hit.campaign_id, hit.profile_id)
         return 0, 0
 
     in_period = _in_time_range(hit)
 
-    # is_callback=1：已回调，需要判断是否重新开启分时
-    if hit.is_callback == TimePricingHitStatus.YES and in_period:
+    is_awaiting_start = (hit.awaiting_start == TimePricingHitStatus.YES)
+
+    # ── 路径 A：分时开始 ──
+    if is_awaiting_start and in_period:
+        # #4 乐观锁：若 rule_updated_today=True，说明 process_new_ads 刚刷新，跳过
+        if hit.rule_updated_today:
+            logger.info(
+                "[time_pricing] campaign=%d profile=%d 刚被 process_new_ads 刷新，跳过本轮等待下次轮询",
+                hit.campaign_id, hit.profile_id,
+            )
+            return 0, 0
         return _do_start(hit, strategy, items, now_utc, adjustments, hits_to_update)
 
-    # is_callback=0：未回调，需要判断是否需要回调
-    need_callback = (hit.is_callback == TimePricingHitStatus.NO) and (not in_period)
+    # ── 路径 B：分时回调 ──
+    need_callback = (not is_awaiting_start) and (not in_period)
     if need_callback:
         return _do_callback(hit, strategy, items, now_utc, adjustments, hits_to_update)
+
+    # ── 路径 C：兜底重置（#1 防止 rule_updated_today 永久卡 True）──
+    if is_awaiting_start and (not in_period) and hit.rule_updated_today:
+        logger.info(
+            "[time_pricing] campaign=%d profile=%d 时段已过且从未触发 _do_start，兜底重置 rule_updated_today",
+            hit.campaign_id, hit.profile_id,
+        )
+        hit.rule_updated_today = False
+        hit.updated_at = datetime.now(dt_timezone.utc)
+        hits_to_update.append(hit)
+        return 0, 0
 
     return 0, 0
 
@@ -189,13 +285,20 @@ def _do_start(
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
 ) -> tuple[int, int]:
-    """分时开始：计算降价并收集调整记录。"""
+    """分时开始：计算降价并收集调整记录。
+
+    #5：优先使用 seg 子时段精确匹配的规则，降级为全局合并规则。
+    """
     from api_v2.services.ad_rules.time_pricing_calculator import append_start_adjustment
+
+    # #5：按子时段精确匹配规则
+    seg_rules = _get_matched_segment_rules(hit)
+    rules = seg_rules if seg_rules is not None else _get_active_rules(strategy)
 
     for item in items:
         item["bid_before"] = item["bid"]
         bid_after = item["bid"]
-        for rule in _get_active_rules(strategy):
+        for rule in rules:
             nb = calc_new_bid(bid_after, rule)
             if nb is not None and nb != bid_after:
                 bid_after = nb
@@ -203,8 +306,10 @@ def _do_start(
         append_start_adjustment(item, hit.campaign_id, hit.profile_id, strategy.id, now_utc, adjustments)
 
     hit.is_time_pricing = TimePricingHitStatus.YES
-    hit.is_callback = TimePricingHitStatus.NO
+    hit.awaiting_start = TimePricingHitStatus.NO
     hit.rule_updated_today = False
+    hit.error_count = 0  # #10：成功时重置错误计数
+    hit.updated_at = datetime.now(dt_timezone.utc)  # #2：bulk_update 不触发 auto_now
     hits_to_update.append(hit)
     return 1, len(items)
 
@@ -217,45 +322,57 @@ def _do_callback(
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
 ) -> tuple[int, int]:
-    """分时回调：按回调策略计算恢复竞价并收集调整记录。
+    """分时回调：检查降价是否真正生效过，是则恢复原价。
 
-    注意：item["bid"] 是当前 DB 竞价（已被 _do_start 降价过），
-    item["bid_before"] 在 _do_start 阶段已保存为原始竞价。
-    calc_callback_bid 使用原始竞价 bid_before（而非当前 bid）作为计算基数，
-    确保 previous 类型能正确恢复到分时前的竞价。
+    #7：改为检查是否有成功执行的 START 记录，替代 calc_reverse_bid 反推。
+    若有成功 START 记录 → 说明降价生效过 → 需要写回调记录。
+    若无成功 START 记录 → 降价从未生效 → 跳过不写回调，直接更新状态。
     """
     from api_v2.services.ad_rules.time_pricing_calculator import append_callback_adjustment
 
     callback = strategy.callback_settings or {}
     if callback.get("type", "none") == "none":
-        hit.is_callback = TimePricingHitStatus.YES
+        hit.awaiting_start = TimePricingHitStatus.YES
         hit.is_time_pricing = TimePricingHitStatus.NO
+        hit.rule_updated_today = False  # #1：_do_callback 也重置标记
+        hit.updated_at = datetime.now(dt_timezone.utc)  # #2
         hits_to_update.append(hit)
         return 1, 0
 
-    for item in items:
-        # 以 _do_start 保存的原始竞价为基数计算回调目标，而非当前已被降价的 DB 竞价
-        base_bid = item.get("bid_before", item["bid"])
-        callback_bid = calc_callback_bid(base_bid, callback)
-        if callback_bid is None:
-            continue
-        append_callback_adjustment(
-            item, callback_bid, hit.campaign_id, hit.profile_id, strategy.id, now_utc, adjustments,
+    # #7：检查是否有成功执行的 START 记录，替代反推判断
+    should_callback = has_successful_start_adjustment(hit.campaign_id, hit.profile_id)
+
+    if should_callback:
+        for item in items:
+            callback_bid = calc_callback_bid(item["bid"], callback)
+            if callback_bid is None:
+                continue
+            append_callback_adjustment(
+                item, callback_bid, hit.campaign_id, hit.profile_id, strategy.id, now_utc, adjustments,
+            )
+    else:
+        logger.info(
+            "[time_pricing] campaign=%d profile=%d 无成功 START 记录，跳过回调",
+            hit.campaign_id, hit.profile_id,
         )
 
-    hit.is_callback = TimePricingHitStatus.YES
+    hit.awaiting_start = TimePricingHitStatus.YES
     hit.is_time_pricing = TimePricingHitStatus.NO
+    hit.rule_updated_today = False  # #1：_do_callback 也重置标记
+    hit.error_count = 0  # #10：成功时重置错误计数
+    hit.updated_at = datetime.now(dt_timezone.utc)  # #2
     hits_to_update.append(hit)
-    return 1, len(items)
+    return 1, len(items) if should_callback else 0
 
 
 def execute_time_pricing() -> dict[str, Any]:
-    """并行处理所有 AdTimePricingHit 记录，执行分时开始或回调。
+    """并行处理所有 AdTimePricingHit 记录，执行分时开始、回调或兜底重置。
 
     优化策略：
-      1. 先按 is_callback + _in_time_range 快速筛选需要处理的 hits（无 DB 查询）
+      1. 先按 error_count < MAX_ERROR_COUNT 过滤 + 时段匹配筛选（纯内存，无 DB 查询）
       2. 仅对需要处理的 hits 构建 item_map（减少 DB 查询范围）
       3. 32 线程并行处理
+      4. 事务保护批量写入（#3）
 
     Returns:
         {"processed": int, "adjusted": int, "errors": list[str]}
@@ -276,17 +393,62 @@ def execute_time_pricing() -> dict[str, Any]:
     logger.info("[time_pricing] 策略加载=%d 耗时=%.1fs", len(strategy_map), (datetime.now() - t0).total_seconds())
 
     need_process: list[AdTimePricingHit] = []
-    for hit in all_hits:
-        if int(hit.hit_time_pricing_rules) not in strategy_map:
-            continue
-        in_period = _in_time_range(hit)
-        if hit.is_callback == TimePricingHitStatus.YES and in_period:
-            need_process.append(hit)
-        elif hit.is_callback == TimePricingHitStatus.NO and not in_period:
-            need_process.append(hit)
+    stale_cleanup: list[AdTimePricingHit] = []  # 策略不存在的记录，需清空规则
 
-    logger.info("[time_pricing] 筛选完成 需处理=%d/%d 耗时=%.1fs",
-                len(need_process), len(all_hits), (datetime.now() - t0).total_seconds())
+    for hit in all_hits:
+        # #10：跳过连续失败过多的记录
+        if hit.error_count and hit.error_count >= MAX_ERROR_COUNT:
+            # 每 10 次忽略打印一次告警，防止告警风暴
+            if hit.error_count % MAX_ERROR_COUNT == 0:
+                logger.error(
+                    "[time_pricing] campaign=%d profile=%d error_count=%d 已达到阈值，跳过处理",
+                    hit.campaign_id, hit.profile_id, hit.error_count,
+                )
+            continue
+
+        if int(hit.hit_time_pricing_rules) not in strategy_map:
+            # #9：策略 ID 无效 → 清空规则，等待重新匹配
+            logger.warning("[time_pricing] 策略不存在 campaign=%d profile=%d rule_id=%s",
+                           hit.campaign_id, hit.profile_id, hit.hit_time_pricing_rules)
+            hit.hit_time_pricing_rules = ""
+            hit.awaiting_start = TimePricingHitStatus.YES
+            hit.is_time_pricing = TimePricingHitStatus.NO
+            hit.rule_updated_today = False
+            hit.updated_at = datetime.now(dt_timezone.utc)
+            stale_cleanup.append(hit)
+            continue
+
+        in_period = _in_time_range(hit)
+        is_awaiting_start = (hit.awaiting_start == TimePricingHitStatus.YES)
+
+        if is_awaiting_start and in_period:
+            need_process.append(hit)
+        elif not is_awaiting_start and not in_period:
+            need_process.append(hit)
+        elif is_awaiting_start and not in_period and hit.rule_updated_today:
+            # #1 兜底路径：时段已过且从未触发 _do_start，重置标记防止永久卡死
+            logger.info(
+                "[time_pricing] campaign=%d profile=%d 时段已过 + 兜底重置 rule_updated_today",
+                hit.campaign_id, hit.profile_id,
+            )
+            hit.rule_updated_today = False
+            hit.updated_at = datetime.now(dt_timezone.utc)
+            stale_cleanup.append(hit)
+
+    # 先批量写入清理记录（策略不存在 + 兜底重置）
+    if stale_cleanup:
+        AdTimePricingHit.objects.bulk_update(
+            stale_cleanup,
+            [
+                "awaiting_start", "is_time_pricing", "is_callback",
+                "hit_time_pricing_rules", "rule_updated_today", "error_count", "updated_at",
+            ],
+            batch_size=500,
+        )
+
+    logger.info("[time_pricing] 筛选完成 需处理=%d 清理=%d/%d 耗时=%.1fs",
+                len(need_process), len(stale_cleanup), len(all_hits),
+                (datetime.now() - t0).total_seconds())
 
     if not need_process:
         logger.info("[time_pricing] 无需处理的记录")
@@ -310,12 +472,15 @@ def execute_time_pricing() -> dict[str, Any]:
         futures = [executor.submit(_process_chunk, c, strategy_map, item_map, now_utc) for c in chunks]
         for f in as_completed(futures):
             adjs, htus, pr, adj, errs = f.result()
-            adjustments.extend(adjs); hits_to_update.extend(htus)
-            processed += pr; adjusted += adj
+            adjustments.extend(adjs)
+            hits_to_update.extend(htus)
+            processed += pr
+            adjusted += adj
             errors.extend(errs)
 
     logger.info("[time_pricing] 线程处理完成 耗时=%.1fs", (datetime.now() - t0).total_seconds())
 
+    # #3：事务保护写入
     write_batch(adjustments, hits_to_update)
     logger.info("[time_pricing] 完成 processed=%d adjusted=%d errors=%d 总耗时=%.1fs",
                 processed, adjusted, len(errors), (datetime.now() - t0).total_seconds())

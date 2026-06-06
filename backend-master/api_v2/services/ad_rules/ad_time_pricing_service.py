@@ -8,7 +8,7 @@ import json as _json
 import logging
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any
 
 from django.db import connections
@@ -22,9 +22,15 @@ from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStr
 from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
 from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, ManualRulesStatus, TimePricingHitStatus
 from api_v2.services.ad_rules.strategy_matcher import match_strategy_against_product
+from api_v2.services.ad_rules.time_pricing_shared import (
+    filter_segments_for_today,
+)
 from api_v2.utils.timezone_utils import country_to_timezone, get_fixed_utc_offset
 
 logger = logging.getLogger(__name__)
+
+# 北京时区常量
+CN_TZ = dt_timezone(timedelta(hours=8))
 
 
 # ============================================================
@@ -83,7 +89,6 @@ def _extract_principal_uids(principal_list: Any) -> list[int]:
 # ============================================================
 
 def _calc_strategy_times(
-    strategy: LxTimePricingStrategy,
     seg_start: str,
     seg_end: str,
     tz_name: str,
@@ -99,30 +104,31 @@ def _calc_strategy_times(
       time_end       = 2026-06-06 01:00+01:00 → DB UTC 00:00
       time_start_cn  = 2026-06-05 13:00+08:00 → DB UTC 05:00（同一时刻）
       time_end_cn    = 2026-06-06 08:00+08:00 → DB UTC 00:00（同一时刻）
+
+    #11：移除死代码（strategy.start_month / start_day 从未参与 datetime 构造，
+    始终使用 today，已移除不可达的 null 兜底逻辑）。
+
+    Args:
+        seg_start: 时段开始时间，格式 "HH:MM"
+        seg_end: 时段结束时间，格式 "HH:MM"
+        tz_name: 站点时区名，用于获取固定 UTC 偏移
+
+    Returns:
+        (time_start, time_end, time_start_cn, time_end_cn)，解析失败返回全 None
     """
-    from datetime import timezone as dt_timezone
-
-    sm = strategy.start_month
-    sd = strategy.start_day
-
     today = datetime.now().date()
     year = today.year
-
-    # start_month/start_day 为 null 时不限时间，使用当天日期
-    if sm is None or sd is None:
-        sm = today.month
-        sd = today.day
 
     sh, sm_val = map(int, seg_start.split(":"))
     eh, em = map(int, seg_end.split(":"))
 
-    # ── 站点本地时间 naive 结构 ──
+    # ── 站点本地时间 naive 结构（#11：始终使用 today，移除死代码 sm/sd）──
     time_start_naive = datetime(year, today.month, today.day, sh, sm_val, 0)
     time_end_naive = datetime(year, today.month, today.day, eh, em, 0)
     if (eh, em) < (sh, sm_val):
         time_end_naive += timedelta(days=1)  # 跨天
 
-    # ── 固定偏移（项目铁律，不分夏冬令时）──
+    # ── 固定偏移（项目铁律，不分冬夏令时）──
     offset_hours = get_fixed_utc_offset(tz_name)
     site_tz = dt_timezone(timedelta(hours=offset_hours))
     cn_tz = dt_timezone(timedelta(hours=8))
@@ -138,41 +144,37 @@ def _calc_strategy_times(
     return time_start, time_end, time_start_cn, time_end_cn
 
 
-def _filter_segments_for_today(
+def _build_segment_times(
     segments: list[dict],
-    time_mode: str,
+    tz_name: str,
 ) -> list[dict]:
-    """按当前日期过滤 segments，仅返回今天适用的时段。
+    """为每个 segment 构建子时段明细（#5：多时段规则粒度修复）。
 
-    三种模式过滤规则：
-      - byDay：全部返回（每天适用）
-      - byWeek：仅返回 dayOfWeek 等于今天周几的 seg（1=周一…7=周日）
-      - calendar：返回全部（日历模式不分 segments）
+    每个 seg 独立存储其时间边界和规则列表，执行器可按时段精确匹配。
 
     Args:
-        segments: 策略 time_settings 中的 segments 列表
-        time_mode: 策略 time_mode（byDay / byWeek / calendar）
+        segments: 过滤后的今天适用 segments 列表
+        tz_name: 站点时区名
 
     Returns:
-        过滤后的 segments 列表
+        [{"index": 0, "start_cn": "iso_str", "end_cn": "iso_str", "rules": [...]}, ...]
     """
-    if not segments or not isinstance(segments, list):
-        return []
-
-    if time_mode == "byDay":
-        return [seg for seg in segments if isinstance(seg, dict)]
-
-    if time_mode == "byWeek":
-        today_weekday = str(datetime.now().isoweekday())  # "1" 周一 … "7" 周日
-        return [
-            seg for seg in segments
-            if isinstance(seg, dict) and str(seg.get("dayOfWeek", "")) == today_weekday
-        ]
-
-    if time_mode == "calendar":
-        return [seg for seg in segments if isinstance(seg, dict)]
-
-    return []
+    result: list[dict] = []
+    for idx, seg in enumerate(segments):
+        if not isinstance(seg, dict):
+            continue
+        start = seg.get("startTime", "00:00")
+        end = seg.get("endTime", "00:00")
+        times = _calc_strategy_times(start, end, tz_name)
+        if times[2] is None or times[3] is None:
+            continue
+        result.append({
+            "index": idx,
+            "start_cn": times[2].isoformat(),
+            "end_cn": times[3].isoformat(),
+            "rules": seg.get("rules", []) if isinstance(seg.get("rules"), list) else [],
+        })
+    return result
 
 
 # ============================================================
@@ -223,6 +225,8 @@ def process_new_ads() -> dict[str, Any]:
     - 已有记录 → 正在分时（is_time_pricing=YES）→ 跳过
     - 已有记录 → 当日已更新（rule_updated_today=True）→ 跳过
     - 已有记录 → 未分时 + 未更新 → 重新命中并 UPDATE
+
+    #9：已有记录若 hit_time_pricing_rules 为空（策略被删除后清理），允许重新匹配。
 
     Returns:
         {
@@ -395,17 +399,19 @@ def process_new_ads() -> dict[str, Any]:
                     continue
 
                 # 计算时间：先按 dayOfWeek/calendar 过滤，再取所有时段合并
+                # #6 #13：使用统一的 filter_segments_for_today（北京时间）
                 matched_strategy = next(
                     (s for s in strategies if s.id == result["strategy_id"]), None,
                 )
                 ts = te = ts_cn = te_cn = None
+                segment_times: list[dict] = []
                 if matched_strategy:
                     segments = (matched_strategy.time_settings or {}).get("segments", [])
-                    filtered = _filter_segments_for_today(segments, matched_strategy.time_mode)
+                    filtered = filter_segments_for_today(segments, matched_strategy.time_mode)
                     if filtered:
+                        # 合并窗口（兼容旧逻辑）
                         seg_times = [
                             _calc_strategy_times(
-                                matched_strategy,
                                 seg.get("startTime", "00:00"),
                                 seg.get("endTime", "00:00"),
                                 tz,
@@ -418,6 +424,8 @@ def process_new_ads() -> dict[str, Any]:
                             te = max(t[1] for t in valid_times)
                             ts_cn = min(t[2] for t in valid_times)
                             te_cn = max(t[3] for t in valid_times)
+                        # #5：构建子时段明细
+                        segment_times = _build_segment_times(filtered, tz)
 
                 new_records.append(AdTimePricingHit(
                     campaign_id=cid,
@@ -430,7 +438,8 @@ def process_new_ads() -> dict[str, Any]:
                     time_end=te,
                     time_start_cn=ts_cn,
                     time_end_cn=te_cn,
-                    is_callback=TimePricingHitStatus.YES,
+                    segment_times=segment_times,
+                    awaiting_start=TimePricingHitStatus.YES,
                     is_manual_rules=ManualRulesStatus.NO,
                     manual_rule_id="",
                     rule_updated_today=True,
@@ -444,26 +453,28 @@ def process_new_ads() -> dict[str, Any]:
             # 情况 B：已有记录
             if existing.is_time_pricing == TimePricingHitStatus.YES:
                 continue  # 正在分时，不更新
+
             if existing.rule_updated_today:
-                continue  # 当天已更新，不重复
+                # 命中规则不为空且 rule_updated_today=True → 确实已更新，跳过
+                # 命中规则为空（策略被清空）→ 允许重新匹配（#9）
+                if existing.hit_time_pricing_rules:
+                    continue
 
             # 优先级最高：用户手动设置的规则
             if existing.is_manual_rules == ManualRulesStatus.YES and existing.manual_rule_id:
                 user_strategy = next(
                     (s for s in strategies if str(s.id) == str(existing.manual_rule_id)), None,
                 )
-                # 用户手动规则也支持多时段合并
                 if user_strategy:
                     existing.hit_time_pricing_rules = existing.manual_rule_id
                     existing.rule_updated_today = True
-                    existing.is_callback = TimePricingHitStatus.YES
+                    existing.awaiting_start = TimePricingHitStatus.YES
                     existing.is_time_pricing = TimePricingHitStatus.NO
                     segments = (user_strategy.time_settings or {}).get("segments", [])
-                    filtered = _filter_segments_for_today(segments, user_strategy.time_mode)
+                    filtered = filter_segments_for_today(segments, user_strategy.time_mode)
                     if filtered:
                         seg_times = [
                             _calc_strategy_times(
-                                user_strategy,
                                 seg.get("startTime", "00:00"),
                                 seg.get("endTime", "00:00"),
                                 tz,
@@ -476,6 +487,9 @@ def process_new_ads() -> dict[str, Any]:
                             existing.time_end = max(t[1] for t in valid_times)
                             existing.time_start_cn = min(t[2] for t in valid_times)
                             existing.time_end_cn = max(t[3] for t in valid_times)
+                        # #5：子时段明细
+                        existing.segment_times = _build_segment_times(filtered, tz)
+                    existing.updated_at = now  # #2：bulk_update 不触发 auto_now
                     update_records.append(existing)
                     processed += 1
                     hit_count += 1
@@ -486,20 +500,20 @@ def process_new_ads() -> dict[str, Any]:
             result = match_strategy_against_product(pid, assorts, labels, uids, strategies)
             existing.hit_time_pricing_rules = str(result["strategy_id"]) if result else ""
             existing.rule_updated_today = True
-            # 新一天重新命中，初始化回调状态为 YES，等待 execute_time_pricing 触发 _do_start
-            existing.is_callback = TimePricingHitStatus.YES
+            # 新一天重新命中，初始化 waiting_start 状态为 YES，等待 execute_time_pricing 触发 _do_start
+            existing.awaiting_start = TimePricingHitStatus.YES
             existing.is_time_pricing = TimePricingHitStatus.NO
+            existing.segment_times = []  # 降级为合并窗口逻辑（兼容旧数据）
             if result:
                 matched_strategy = next(
                     (s for s in strategies if s.id == result["strategy_id"]), None,
                 )
                 if matched_strategy:
                     segments = (matched_strategy.time_settings or {}).get("segments", [])
-                    filtered = _filter_segments_for_today(segments, matched_strategy.time_mode)
+                    filtered = filter_segments_for_today(segments, matched_strategy.time_mode)
                     if filtered:
                         seg_times = [
                             _calc_strategy_times(
-                                matched_strategy,
                                 seg.get("startTime", "00:00"),
                                 seg.get("endTime", "00:00"),
                                 tz,
@@ -512,6 +526,9 @@ def process_new_ads() -> dict[str, Any]:
                             existing.time_end = max(t[1] for t in valid_times)
                             existing.time_start_cn = min(t[2] for t in valid_times)
                             existing.time_end_cn = max(t[3] for t in valid_times)
+                        # #5：子时段明细
+                        existing.segment_times = _build_segment_times(filtered, tz)
+            existing.updated_at = now  # #2：bulk_update 不触发 auto_now
             update_records.append(existing)
             processed += 1
             if result:
@@ -547,9 +564,16 @@ def process_new_ads() -> dict[str, Any]:
         AdTimePricingHit.objects.bulk_update(
             all_updates,
             [
-                "hit_time_pricing_rules", "rule_updated_today",
-                "time_start", "time_end", "time_start_cn", "time_end_cn",
-                "is_callback", "is_time_pricing",
+                "hit_time_pricing_rules",
+                "rule_updated_today",
+                "time_start",
+                "time_end",
+                "time_start_cn",
+                "time_end_cn",
+                "segment_times",
+                "awaiting_start",
+                "is_time_pricing",
+                "is_callback",
                 "updated_at",
             ],
             batch_size=500,

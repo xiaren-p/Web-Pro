@@ -9,10 +9,14 @@ from api_v1.models.lingxing.ads.basic.lx_sp_campaign import SpCampaignTargetingT
 
 
 class TimePricingHitStatus(models.IntegerChoices):
-    """是否正在分时。"""
+    """分时状态枚举。
 
-    YES = 1, "是"
-    NO = 0, "否"
+    YES = 1：等待分时开始（已回调或新命中，尚未开始分时降价）。
+    NO  = 0：分时生效中（正在降价，等待回调恢复原价）。
+    """
+
+    YES = 1, "等待分时开始"
+    NO = 0, "分时生效中"
 
 
 class ManualRulesStatus(models.IntegerChoices):
@@ -91,6 +95,18 @@ class AdTimePricingHit(models.Model):
         help_text="本次分时结束的回调时间（Asia/Shanghai）",
     )
 
+    # ── 子时段明细（修复多时段规则合并丢失粒度 #5）────────────────────────
+
+    segment_times = models.JSONField(
+        default=list,
+        verbose_name="子时段明细",
+        help_text=(
+            "每个子时段的独立时间边界与规则列表。"
+            "格式：[{\"index\": 0, \"start_cn\": \"...\", \"end_cn\": \"...\", \"rules\": [...]}]。"
+            "空列表时降级为合并窗口逻辑（兼容旧数据）。"
+        ),
+    )
+
     # ── 用户手动规则 ──────────────────────────────────────────────────────
 
     is_manual_rules = models.IntegerField(
@@ -114,13 +130,21 @@ class AdTimePricingHit(models.Model):
         help_text="当日是否已重新匹配过规则",
     )
 
-    # ── 回调状态 ──────────────────────────────────────────────────────────
+    # ── 等待分时开始标记（原 is_callback，重命名以消除歧义 #12）───────────
 
-    is_callback = models.IntegerField(
+    awaiting_start = models.IntegerField(
         choices=TimePricingHitStatus.choices,
-        default=TimePricingHitStatus.NO,
-        verbose_name="是否回调",
-        help_text="该条记录是否已执行回调",
+        default=TimePricingHitStatus.YES,
+        verbose_name="是否等待分时开始",
+        help_text="YES=等待分时开始（已回调/新命中）；NO=分时生效中（正在降价，等待回调）",
+    )
+
+    # ── 失败退避计数器（#10）───────────────────────────────────────────────
+
+    error_count = models.IntegerField(
+        default=0,
+        verbose_name="连续失败次数",
+        help_text="连续处理失败的次数，达到阈值后跳过该记录以防止无限重试",
     )
 
     # ── 时间戳 ────────────────────────────────────────────────────────────

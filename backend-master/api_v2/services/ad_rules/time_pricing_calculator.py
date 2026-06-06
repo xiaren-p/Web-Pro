@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from django.db import transaction
 
 from api_v1.models.lingxing.ads.basic.lx_sp_keyword import LxSpKeyword
 from api_v1.models.lingxing.ads.basic.lx_sp_target import LxSpTarget
@@ -20,6 +20,9 @@ from api_v2.models.sp_bid_adjustment import (
 )
 
 logger = logging.getLogger(__name__)
+
+# 分时服务最大连续失败次数阈值（#10：退避机制）
+MAX_ERROR_COUNT = 10
 
 
 # ============================================================
@@ -59,11 +62,56 @@ def calc_new_bid(current_bid: float, rule: dict) -> float | None:
     return None
 
 
+def calc_reverse_bid(adjusted_bid: float, rule: dict) -> float | None:
+    """根据单条降/涨规则反推调整前竞价（calc_new_bid 的逆运算）。
+
+    回调时用于从已被降价的 DB 竞价逆推出分时前的原始竞价。
+    注意：反推未考虑 limitValue 截断，结果仅作近似参考。
+
+    Args:
+        adjusted_bid: 规则调整后的竞价
+        rule: {"operateType", "operateValue", ...}
+
+    Returns:
+        调整前竞价；除零上游或不可反推规则返回 None
+    """
+    op = rule.get("operateType", "")
+    val = float(rule.get("operateValue", 0) or 0)
+
+    if op == "percent_decrease":
+        # forward: bid × (1 - val/100)，不低于 lim
+        # reverse: bid ÷ (1 - val/100)
+        # #8 除零保护：val >= 100 无法反推
+        if val >= 100:
+            return None
+        if not val:
+            return adjusted_bid
+        return adjusted_bid / (1 - val / 100)
+    if op == "percent_increase":
+        # forward: bid × (1 + val/100)，不高于 lim
+        # reverse: bid ÷ (1 + val/100)
+        if not val:
+            return adjusted_bid
+        return adjusted_bid / (1 + val / 100)
+    if op == "fixed_decrease":
+        # forward: bid - val，不低于 lim
+        # reverse: bid + val
+        return adjusted_bid + val
+    if op == "fixed_increase":
+        # forward: bid + val，不高于 lim
+        # reverse: bid - val
+        return adjusted_bid - val
+    if op in ("fixed", "bid_above_fixed", "bid_below_fixed"):
+        # fixed 无条件替换；条件型无条件历史，均不可逆推
+        return None
+    return None
+
+
 def calc_callback_bid(current_bid: float, callback_settings: dict) -> float | None:
     """根据回调策略计算恢复后的竞价。
 
     Args:
-        current_bid: 投放项的当前竞价
+        current_bid: 投放项的基础竞价（应为反推后的原始竞价）
         callback_settings: strategy.callback_settings
 
     Returns:
@@ -203,6 +251,7 @@ def append_start_adjustment(
             adjustment_time=now_utc,
             execution_status=ExecutionStatusChoices.SUCCESS,
             msg="分时竞价前与竞价后竞价相等，无需调整",
+            updated_at=now_utc,
         ))
         return False
 
@@ -220,6 +269,7 @@ def append_start_adjustment(
         adjustment_status=AdjustmentStatusChoices.PENDING,
         adjustment_time=now_utc,
         execution_status=ExecutionStatusChoices.PENDING,
+        updated_at=now_utc,
     ))
     return True
 
@@ -235,12 +285,12 @@ def append_callback_adjustment(
 ) -> bool:
     """将单条投放项的回调竞价调整添加到收集列表。
 
-    回调竞价 == 原始竞价（bid_before）时跳过不写。
-    原始竞价在 _do_start 中保存为 item["bid_before"]。
+    回调竞价 == item["bid"]（数据库竞价）时直接标 SUCCESS，不调 API。
+    不等时写 PENDING CALLBACK 记录。
 
     Args:
-        item: {"item_type", "item_id", "bid", "bid_before"} 投放项数据
-        callback_bid: 回调策略计算出的目标竞价
+        item: {"item_type", "item_id", "bid"} 投放项数据
+        callback_bid: 回调目标竞价
         campaign_id: 广告活动 ID
         profile_id: 店铺 Profile ID
         strategy_id: 命中策略 ID
@@ -248,13 +298,31 @@ def append_callback_adjustment(
         adjustments: 待批量写入的列表（引用传递）
 
     Returns:
-        True 表示写了记录，False 表示竞价相等跳过
+        True 表示写了 PENDING 记录（需调 API），False 表示竞价不变标 SUCCESS
     """
-    original_bid = item.get("bid_before", item["bid"])
-    if round(callback_bid, 4) == round(original_bid, 4):
+    current_bid = item["bid"]
+    is_target = item["item_type"] == "target"
+
+    if round(callback_bid, 4) == round(current_bid, 4):
+        adjustments.append(SpBidAdjustment(
+            target_id=item["item_id"] if is_target else None,
+            keyword_id=item["item_id"] if not is_target else None,
+            campaign_id=campaign_id,
+            profile_id=profile_id,
+            execution_type=ExecutionTypeChoices.TIME_PRICING_CALLBACK,
+            time_pricing_rule_id=strategy_id,
+            auto_rule_id=None,
+            is_time_pricing=TimePricingHitStatus.NO,
+            bid_before=None,
+            bid_after=callback_bid,
+            adjustment_status=AdjustmentStatusChoices.SUCCESS,
+            adjustment_time=now_utc,
+            execution_status=ExecutionStatusChoices.SUCCESS,
+            msg="回调竞价与数据库竞价相等，无需调整",
+            updated_at=now_utc,
+        ))
         return False
 
-    is_target = item["item_type"] == "target"
     adjustments.append(SpBidAdjustment(
         target_id=item["item_id"] if is_target else None,
         keyword_id=item["item_id"] if not is_target else None,
@@ -269,25 +337,71 @@ def append_callback_adjustment(
         adjustment_status=AdjustmentStatusChoices.PENDING,
         adjustment_time=now_utc,
         execution_status=ExecutionStatusChoices.PENDING,
+        updated_at=now_utc,
     ))
     return True
 
 
+# ============================================================
+# 回调必要性判断（#7：用实际 START 记录替代反推估算）
+# ============================================================
+
+def has_successful_start_adjustment(
+    campaign_id: int,
+    profile_id: int,
+) -> bool:
+    """检查该 campaign 是否有成功执行的分时开始（START）调整记录。
+
+    用于 _do_callback 中判断降价是否真正生效过——如果从未成功降价，
+    则无需写回调记录。这比 calc_reverse_bid 反推更准确，因为反推不考虑
+    limitValue 截断和 API 实际执行结果。
+
+    Args:
+        campaign_id: 广告活动 ID
+        profile_id: 店铺 Profile ID
+
+    Returns:
+        True 表示该 campaign 至少有一条降价成功执行的记录
+    """
+    return SpBidAdjustment.objects.filter(
+        campaign_id=campaign_id,
+        profile_id=profile_id,
+        execution_type=ExecutionTypeChoices.TIME_PRICING_START,
+        execution_status=ExecutionStatusChoices.SUCCESS,
+    ).exists()
+
+
+# ============================================================
+# 批量写入（#3：事务保护）
+# ============================================================
+
+@transaction.atomic
 def write_batch(
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
 ) -> None:
-    """批量写入调整记录和命中状态。
+    """批量写入调整记录和命中状态（事务保护）。
+
+    两步操作在同一事务中：全部成功或全部回滚，防止 SpBidAdjustment
+    写入后崩溃导致 AdTimePricingHit 状态不一致。
 
     Args:
         adjustments: 待写入的 SpBidAdjustment 列表
-        hits_to_update: 待更新 is_time_pricing/is_callback 的记录列表
+        hits_to_update: 待更新 awaiting_start/is_time_pricing 的记录列表
     """
     if adjustments:
         SpBidAdjustment.objects.bulk_create(adjustments, batch_size=500)
     if hits_to_update:
         AdTimePricingHit.objects.bulk_update(
             hits_to_update,
-            ["is_time_pricing", "is_callback", "rule_updated_today", "updated_at"],
+            [
+                "awaiting_start",
+                "is_time_pricing",
+                "is_callback",
+                "rule_updated_today",
+                "hit_time_pricing_rules",
+                "error_count",
+                "updated_at",
+            ],
             batch_size=500,
         )
