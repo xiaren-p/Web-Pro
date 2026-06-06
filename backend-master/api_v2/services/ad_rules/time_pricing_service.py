@@ -220,11 +220,7 @@ def _process_single_hit(
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
 ) -> tuple[int, int]:
-    """处理单条命中记录，判断是否需要分时开始、回调或兜底重置。
-
-    #4 乐观锁：若 awaiting_start=YES + rule_updated_today=True + 在时段内，
-    说明 process_new_ads 刚刷新了这条记录，跳过本轮等待下次。
-    """
+    """处理单条命中记录，判断是否需要分时开始、回调或兜底重置。"""
     strategy = strategy_map.get(int(hit.hit_time_pricing_rules))
     if not strategy:
         # #9：策略不存在时清空 hit_time_pricing_rules，避免无限告警循环
@@ -248,13 +244,6 @@ def _process_single_hit(
 
     # ── 路径 A：分时开始 ──
     if is_awaiting and in_period:
-        # #4 乐观锁：若 rule_updated_today=True，说明 process_new_ads 刚刷新，跳过
-        if hit.rule_updated_today:
-            logger.info(
-                "[time_pricing] campaign=%d profile=%d 刚被 process_new_ads 刷新，跳过本轮等待下次轮询",
-                hit.campaign_id, hit.profile_id,
-            )
-            return 0, 0
         return _do_start(hit, strategy, items, now_utc, adjustments, hits_to_update)
 
     # ── 路径 B：分时回调 ──
