@@ -48,6 +48,15 @@ def trigger_time_pricing(request: Request) -> Response:
 @authentication_classes(_AUTH)
 @permission_classes(_PERM)
 def unlock_ad_time_pricing(request: Request) -> Response:
-    """强制清除分时策略任务锁。"""
+    """强制清除分时策略命中任务锁。"""
     cache.delete(_AD_TIME_PRICING_LOCK_KEY)
-    return Response({"code": "00000", "data": None, "msg": "锁已清除"})
+    return Response({"code": "00000", "data": None, "msg": "分时策略命中锁已清除"})
+
+
+@api_view(["DELETE"])
+@authentication_classes(_AUTH)
+@permission_classes(_PERM)
+def unlock_time_pricing(request: Request) -> Response:
+    """强制清除分时执行任务锁。"""
+    cache.delete(_TIME_PRICING_LOCK_KEY)
+    return Response({"code": "00000", "data": None, "msg": "分时执行锁已清除"})
