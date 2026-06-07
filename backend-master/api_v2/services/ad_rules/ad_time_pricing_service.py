@@ -37,14 +37,7 @@ CN_TZ = dt_timezone(timedelta(hours=8))
 # ============================================================
 
 def _parse_str_or_json_field(raw_val: Any) -> list[str]:
-    """解析字段值（JSON 数组字符串或纯文本），返回扁平化值列表。
-
-    Args:
-        raw_val: 可能是 JSON 字符串、纯文本字符串或 None/空
-
-    Returns:
-        解析后的字符串列表（已去空去重）
-    """
+    """解析字段值（JSON 数组字符串或纯文本），返回扁平化值列表。"""
     if not raw_val:
         return []
     try:
@@ -59,14 +52,7 @@ def _parse_str_or_json_field(raw_val: Any) -> list[str]:
 
 
 def _extract_principal_uids(principal_list: Any) -> list[int]:
-    """从 principal_list JSON 字段提取所有 uid。
-
-    Args:
-        principal_list: JSON 字符串或已解析的 list[dict]
-
-    Returns:
-        uid 整数列表（去重）
-    """
+    """从 principal_list JSON 字段提取所有 uid。"""
     if not principal_list:
         return []
     if isinstance(principal_list, str):
@@ -92,86 +78,33 @@ def _calc_strategy_times(
     seg_end: str,
     tz_name: str,
 ) -> tuple[datetime | None, datetime | None, datetime | None, datetime | None]:
-    """根据分时时段（HH:MM）+ 站点时区偏移，计算四个时间。
-
-    time_start / time_end：规则原始时间（站点 local time），带站点固定偏移 tzinfo。
-    time_start_cn / time_end_cn：北京时间（固定偏移 +8），带北京 tzinfo。
-    两者指向同一 UTC 时刻，Django 据此正确存储。
-
-    #11：移除死代码（strategy.start_month / start_day 从未参与 datetime 构造，
-    始终使用 today）。
-
-    Args:
-        seg_start: 时段开始时间，格式 "HH:MM"
-        seg_end: 时段结束时间，格式 "HH:MM"
-        tz_name: 站点时区名，用于获取固定 UTC 偏移
-
-    Returns:
-        (time_start, time_end, time_start_cn, time_end_cn)，解析失败返回全 None
-    """
+    """根据分时时段（HH:MM）+ 站点时区偏移，计算四个时间。"""
     today = datetime.now().date()
     year = today.year
 
     sh, sm_val = map(int, seg_start.split(":"))
     eh, em = map(int, seg_end.split(":"))
 
-    # ── 站点本地时间 naive 结构（#11：始终使用 today）──
     time_start_naive = datetime(year, today.month, today.day, sh, sm_val, 0)
     time_end_naive = datetime(year, today.month, today.day, eh, em, 0)
     if (eh, em) < (sh, sm_val):
-        time_end_naive += timedelta(days=1)  # 跨天
+        time_end_naive += timedelta(days=1)
 
-    # ── 固定偏移（项目铁律，不分冬夏令时）──
     offset_hours = get_fixed_utc_offset(tz_name)
     site_tz = dt_timezone(timedelta(hours=offset_hours))
     cn_tz = dt_timezone(timedelta(hours=8))
 
-    # time_start / time_end：站点当地时间 + 站点固定偏移
     time_start = time_start_naive.replace(tzinfo=site_tz)
     time_end = time_end_naive.replace(tzinfo=site_tz)
 
-    # time_start_cn / time_end_cn：同一时刻，转为北京时间固定偏移
     time_start_cn = time_start.astimezone(cn_tz)
     time_end_cn = time_end.astimezone(cn_tz)
 
     return time_start, time_end, time_start_cn, time_end_cn
 
 
-def _build_segment_times(
-    segments: list[dict],
-    tz_name: str,
-) -> list[dict]:
-    """为每个 segment 构建子时段明细（#5：多时段规则粒度修复）。
-
-    每个 seg 独立存储其时间边界和规则列表，执行器可按时段精确匹配。
-
-    Args:
-        segments: 过滤后的今天适用 segments 列表
-        tz_name: 站点时区名
-
-    Returns:
-        [{"index": 0, "start_cn": "iso_str", "end_cn": "iso_str", "rules": [...]}, ...]
-    """
-    result: list[dict] = []
-    for idx, seg in enumerate(segments):
-        if not isinstance(seg, dict):
-            continue
-        start = seg.get("startTime", "00:00")
-        end = seg.get("endTime", "00:00")
-        times = _calc_strategy_times(start, end, tz_name)
-        if times[2] is None or times[3] is None:
-            continue
-        result.append({
-            "index": idx,
-            "start_cn": times[2].isoformat(),
-            "end_cn": times[3].isoformat(),
-            "rules": seg.get("rules", []) if isinstance(seg.get("rules"), list) else [],
-        })
-    return result
-
-
 # ============================================================
-# 策略匹配（便捷封装）
+# 策略匹配
 # ============================================================
 
 def match_strategy(
@@ -180,17 +113,7 @@ def match_strategy(
     product_labels: list[str],
     product_uids: list[int],
 ) -> dict[str, Any] | None:
-    """匹配分时调价策略：查库加载开启策略，委托 strategy_matcher 匹配。
-
-    Args:
-        profile_id: 店铺 Profile ID
-        product_assorts: 产品归类列表
-        product_labels: 产品标签列表
-        product_uids: 产品负责人 uid 列表
-
-    Returns:
-        {"strategy_id": int, "strategy_name": str} 或 None
-    """
+    """匹配分时调价策略。"""
     strategies = list(
         LxTimePricingStrategy.objects
         .filter(status=StrategyStatus.ACTIVE)
@@ -202,40 +125,15 @@ def match_strategy(
 
 
 # ============================================================
-# 主流程：扫描新广告并命中策略
+# 主流程
 # ============================================================
 
 def process_new_ads() -> dict[str, Any]:
-    """批量预加载 + 多线程并行命中，写入 AdTimePricingHit 记录。
-
-    三步走：
-    - Phase 1：批量预加载 campaigns / ads / products / 已有记录 / 策略
-    - Phase 2：多线程并行，纯内存匹配
-    - Phase 3：批量写入新记录 + 批量更新已有记录
-
-    匹配规则：
-    - 新 campaign → 必须有 ASIN 能匹配到产品信息 → 必须命中策略 → 创建记录
-    - 已有记录 → 正在分时（is_time_pricing=YES）→ 跳过
-    - 已有记录 → 当日已更新（rule_updated_today=True）→ 跳过
-    - 已有记录 → 未分时 + 未更新 → 重新命中并 UPDATE
-
-    #9：已有记录若 hit_time_pricing_rules 为空（策略被删除后清理），允许重新匹配。
-
-    Returns:
-        {
-            "total_campaigns": int,
-            "new_ads_processed": int,
-            "hits": int,
-            "written": int,
-            "errors": list[str],
-        }
-    """
-    MAX_WORKERS = min(4, max(1, len(campaign_list)))
+    """批量预加载 + 多线程并行命中，写入 AdTimePricingHit 记录。"""
+    MAX_WORKERS = 4
     BATCH_Q_SIZE = 500
 
-    # ── Phase 1：批量预加载 ──────────────────────────────────────────────
-
-    # 1a. 获取所有 enabled 状态的 campaign
+    # Phase 1：批量预加载
     campaigns_raw = list(
         LxSpCampaign.objects.filter(state="enabled")
         .values_list("campaign_id", "profile_id", "targeting_type")
@@ -248,14 +146,12 @@ def process_new_ads() -> dict[str, Any]:
     total_campaigns = len(campaign_pairs)
     logger.info("[process_new_ads] campaign 总数=%d", total_campaigns)
 
-    # 1b. 时区映射：profile_id → 国家 → 时区 → campaign_meta
     profile_ids = list({pid for _, pid in campaign_pairs})
     profile_timezones: dict[int, str] = {}
     for p in LxAdsProfile.objects.filter(
         profile_id__in=profile_ids, status=1,
     ).values("profile_id", "country_code"):
         profile_timezones[p["profile_id"]] = country_to_timezone(p["country_code"] or "")
-    # 只保留店铺状态正常的 campaign
     valid_pairs = {(cid, pid) for cid, pid in campaign_pairs if pid in profile_timezones}
     campaign_pairs = [(cid, pid) for cid, pid in campaign_pairs if (cid, pid) in valid_pairs]
     campaign_meta = {k: v for k, v in campaign_meta.items() if k in valid_pairs}
@@ -266,7 +162,6 @@ def process_new_ads() -> dict[str, Any]:
     if not campaign_pairs:
         return {"total_campaigns": 0, "new_ads_processed": 0, "hits": 0, "written": 0, "errors": []}
 
-    # 1c. 批量查广告
     all_ads_raw: list[LxSpAd] = []
     for i in range(0, len(campaign_pairs), BATCH_Q_SIZE):
         q_filter = Q()
@@ -278,7 +173,6 @@ def process_new_ads() -> dict[str, Any]:
         )
     logger.info("[process_new_ads] 广告查询完成=%d", len(all_ads_raw))
 
-    # 1d. 构建 campaign → ads 映射 + 收集唯一 ASIN
     campaign_to_ads: dict[tuple[int, int], list[dict]] = defaultdict(list)
     all_asins: set[str] = set()
     for ad in all_ads_raw:
@@ -289,7 +183,6 @@ def process_new_ads() -> dict[str, Any]:
     logger.info("[process_new_ads] 有广告的 campaign=%d，唯一 ASIN=%d",
                 len(campaign_to_ads), len(all_asins))
 
-    # 1e. 批量查产品信息，构建 asin → 字段映射
     asin_to_fields: dict[str, dict[str, list[Any]]] = {}
     if all_asins:
         products = LxProductInfo.objects.filter(asin__in=list(all_asins)).only(
@@ -303,14 +196,12 @@ def process_new_ads() -> dict[str, Any]:
             }
     logger.info("[process_new_ads] 产品信息命中 ASIN=%d", len(asin_to_fields))
 
-    # 1f. 预查已有记录，构建 (cid, pid) → AdTimePricingHit 映射
     existing_map: dict[tuple[int, int], AdTimePricingHit] = {
         (h.campaign_id, h.profile_id): h
         for h in AdTimePricingHit.objects.all()
     }
     logger.info("[process_new_ads] 已有记录=%d", len(existing_map))
 
-    # 1g. 预加载所有开启的策略（按 weight 升序）
     strategies: list[LxTimePricingStrategy] = list(
         LxTimePricingStrategy.objects
         .filter(status=StrategyStatus.ACTIVE)
@@ -318,8 +209,7 @@ def process_new_ads() -> dict[str, Any]:
     )
     logger.info("[process_new_ads] 启用策略数=%d", len(strategies))
 
-    # ── Phase 2：多线程并行匹配 ──────────────────────────────────────────
-
+    # Phase 2：多线程并行匹配
     campaign_list = [k for k in campaign_pairs if k in campaign_to_ads]
     if not campaign_list:
         return {"total_campaigns": total_campaigns, "new_ads_processed": 0,
@@ -331,19 +221,14 @@ def process_new_ads() -> dict[str, Any]:
     now = dj_timezone.now()
 
     def _worker(campaign_keys: list[tuple[int, int]]) -> dict[str, Any]:
-        """线程入口：处理分配给自己的 campaign 分片。
-
-        本线程内不访问数据库，所有数据由主线程预加载到内存中。
-        """
         connections.close_all()
 
-        new_records: list[AdTimePricingHit] = []      # 批量创建
-        update_records: list[AdTimePricingHit] = []   # 批量更新
+        new_records: list[AdTimePricingHit] = []
+        update_records: list[AdTimePricingHit] = []
         processed = 0
         hit_count = 0
 
         for cid, pid in campaign_keys:
-            # ── 步骤 1：聚合该 campaign 下所有 ASIN 的产品字段 ──
             ads = campaign_to_ads.get((cid, pid), [])
             if not ads:
                 continue
@@ -380,29 +265,23 @@ def process_new_ads() -> dict[str, Any]:
             if not has_sku:
                 continue
 
-            # ── 步骤 2：拿产品字段去匹配策略 ──
             tz = campaign_meta.get((cid, pid), {}).get("timezone", "")
             targeting_type = campaign_meta.get((cid, pid), {}).get("targeting_type", "auto")
             existing = existing_map.get((cid, pid))
 
             if existing is None:
-                # 情况 A：新 campaign → 必须命中策略才创建记录
                 result = match_strategy_against_product(pid, assorts, labels, uids, strategies)
                 if not result:
                     continue
 
-                # 计算时间：先按 dayOfWeek/calendar 过滤，再取所有时段合并
-                # #6 #13：使用统一的 filter_segments_for_today（北京时间）
                 matched_strategy = next(
                     (s for s in strategies if s.id == result["strategy_id"]), None,
                 )
                 ts = te = ts_cn = te_cn = None
-                segment_times: list[dict] = []
                 if matched_strategy:
                     segments = (matched_strategy.time_settings or {}).get("segments", [])
                     filtered = filter_segments_for_today(segments, matched_strategy.time_mode)
                     if filtered:
-                        # 合并窗口（兼容旧逻辑）
                         seg_times = [
                             _calc_strategy_times(
                                 seg.get("startTime", "00:00"),
@@ -417,8 +296,6 @@ def process_new_ads() -> dict[str, Any]:
                             te = max(t[1] for t in valid_times)
                             ts_cn = min(t[2] for t in valid_times)
                             te_cn = max(t[3] for t in valid_times)
-                        # #5：构建子时段明细
-                        segment_times = _build_segment_times(filtered, tz)
 
                 new_records.append(AdTimePricingHit(
                     campaign_id=cid,
@@ -431,7 +308,6 @@ def process_new_ads() -> dict[str, Any]:
                     time_end=te,
                     time_start_cn=ts_cn,
                     time_end_cn=te_cn,
-                    segment_times=segment_times,
                     awaiting_start=TimePricingHitStatus.YES,
                     is_manual_rules=ManualRulesStatus.NO,
                     manual_rule_id="",
@@ -443,17 +319,12 @@ def process_new_ads() -> dict[str, Any]:
                 hit_count += 1
                 continue
 
-            # 情况 B：已有记录
             if existing.is_time_pricing == TimePricingHitStatus.YES:
-                continue  # 正在分时，不更新
+                continue
 
-            if existing.rule_updated_today:
-                # 命中规则不为空且 rule_updated_today=True → 确实已更新，跳过
-                # 命中规则为空（策略被清空）→ 允许重新匹配（#9）
-                if existing.hit_time_pricing_rules:
-                    continue
+            if existing.rule_updated_today and existing.hit_time_pricing_rules:
+                continue
 
-            # 优先级最高：用户手动设置的规则
             if existing.is_manual_rules == ManualRulesStatus.YES and existing.manual_rule_id:
                 user_strategy = next(
                     (s for s in strategies if str(s.id) == str(existing.manual_rule_id)), None,
@@ -480,23 +351,17 @@ def process_new_ads() -> dict[str, Any]:
                             existing.time_end = max(t[1] for t in valid_times)
                             existing.time_start_cn = min(t[2] for t in valid_times)
                             existing.time_end_cn = max(t[3] for t in valid_times)
-                        # #5：子时段明细
-                        existing.segment_times = _build_segment_times(filtered, tz)
-                    existing.updated_at = now  # #2：bulk_update 不触发 auto_now
+                    existing.updated_at = now
                     update_records.append(existing)
                     processed += 1
                     hit_count += 1
                     continue
-                # 手动规则的 ID 无效（不存在或已暂停）→ 降级为自动匹配，继续往下
 
-            # 情况 C：自动重新命中并更新已有记录
             result = match_strategy_against_product(pid, assorts, labels, uids, strategies)
             existing.hit_time_pricing_rules = str(result["strategy_id"]) if result else ""
             existing.rule_updated_today = True
-            # 新一天重新命中，初始化状态为等待分时开始
             existing.awaiting_start = TimePricingHitStatus.YES
             existing.is_time_pricing = TimePricingHitStatus.NO
-            existing.segment_times = []  # 降级为合并窗口逻辑（兼容旧数据）
             if result:
                 matched_strategy = next(
                     (s for s in strategies if s.id == result["strategy_id"]), None,
@@ -519,9 +384,7 @@ def process_new_ads() -> dict[str, Any]:
                             existing.time_end = max(t[1] for t in valid_times)
                             existing.time_start_cn = min(t[2] for t in valid_times)
                             existing.time_end_cn = max(t[3] for t in valid_times)
-                        # #5：子时段明细
-                        existing.segment_times = _build_segment_times(filtered, tz)
-            existing.updated_at = now  # #2：bulk_update 不触发 auto_now
+            existing.updated_at = now
             update_records.append(existing)
             processed += 1
             if result:
@@ -534,8 +397,7 @@ def process_new_ads() -> dict[str, Any]:
             "hit_count": hit_count,
         }
 
-    # ── Phase 3：执行线程 + 批量写入 ─────────────────────────────────────
-
+    # Phase 3：写入
     errors: list[str] = []
     all_hits: list[AdTimePricingHit] = []
     all_updates: list[AdTimePricingHit] = []
