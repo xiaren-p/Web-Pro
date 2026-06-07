@@ -162,7 +162,12 @@ def _process_chunk(
 
     for hit in hit_chunk:
         try:
-            p, a = _process_single_hit(hit, strategy_map, item_map, now_utc, adjustments, hits_to_update)
+            strategy = strategy_map.get(int(hit.hit_time_pricing_rules))
+            if not strategy:
+                p, a = _process_single_hit(hit, None, item_map, now_utc, adjustments, hits_to_update, in_period=False)
+            else:
+                in_period = _in_time_range(hit, strategy)
+                p, a = _process_single_hit(hit, strategy, item_map, now_utc, adjustments, hits_to_update, in_period)
             processed += p
             adjusted += a
             # 处理成功时重置 error_count（#10）
@@ -170,7 +175,8 @@ def _process_chunk(
                 hit.error_count = 0
                 hits_to_update.append(hit)
         except Exception:
-            logger.exception("[time_pricing] campaign=%d profile=%d", hit.campaign_id, hit.profile_id)
+            logger.exception("[time_pricing] campaign=%d profile=%d",
+                           hit.campaign_id, hit.profile_id)
             # #10：递增错误计数，追加到 update 列表
             hit.error_count = (hit.error_count or 0) + 1
             hit.updated_at = datetime.now(dt_timezone.utc)
@@ -182,15 +188,25 @@ def _process_chunk(
 
 def _process_single_hit(
     hit: AdTimePricingHit,
-    strategy_map: dict[int, LxTimePricingStrategy],
+    strategy: LxTimePricingStrategy | None,
     item_map: dict,
     now_utc: datetime,
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
+    in_period: bool,
 ) -> tuple[int, int]:
-    """处理单条命中记录，判断是否需要分时开始、回调或兜底重置。"""
-    strategy = strategy_map.get(int(hit.hit_time_pricing_rules))
-    if not strategy:
+    """处理单条命中记录，判断是否需要分时开始、回调或兜底重置。
+
+    Args:
+        hit: 分时命中记录
+        strategy: 命中策略实例，None 表示策略已不存在
+        item_map: 预加载的投放项映射
+        now_utc: 当前 UTC 时间
+        adjustments: 待写入的 SpBidAdjustment 列表（引用传递）
+        hits_to_update: 待更新的 AdTimePricingHit 列表（引用传递）
+        in_period: 当前是否在时段内（由调用方 _in_time_range 预先计算）
+    """
+    if strategy is None:
         # #9：策略不存在时清空 hit_time_pricing_rules，避免无限告警循环
         logger.warning("[time_pricing] 策略不存在 campaign=%d profile=%d rule_id=%s，清空规则等待重新匹配",
                        hit.campaign_id, hit.profile_id, hit.hit_time_pricing_rules)
@@ -207,7 +223,6 @@ def _process_single_hit(
         logger.warning("[time_pricing] 无投放项 campaign=%d profile=%d", hit.campaign_id, hit.profile_id)
         return 0, 0
 
-    in_period = _in_time_range(hit, strategy)
     is_awaiting = (hit.awaiting_start == TimePricingHitStatus.YES)
 
     # ── 路径 A：分时开始 ──
