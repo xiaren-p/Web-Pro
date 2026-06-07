@@ -310,16 +310,14 @@ def _do_callback(
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
 ) -> tuple[int, int]:
-    """分时回调：用分时规则正算降价结果，与数据库竞价比对判断是否需回调。
+    """分时回调：反推原始竞价判断降价是否生效过，是则恢复原价。
 
-    核心逻辑：
-      对每条投放项的当前竞价，用分时规则重新正向计算一遍降价结果。
-      若 计算出的分时竞价 == 数据库当前竞价 → 降价生效过 → 需要回调恢复原价。
-      若 计算出的分时竞价 != 数据库当前竞价 → 分时从未生效 → 跳过，不写回调记录。
-
-    这比查 SpBidAdjustment 表更可靠，因为不依赖 bid_adjustment API 是否被调用过。
+    核心逻辑（降价规则）：
+      对每条投放项的当前竞价，用 calc_reverse_bid 反推出规则链之前的原始竞价。
+      若 反推值 > 数据库竞价（差值 > 0.0001）→ 数据库已是降价值 → 需要回调。
+      若 反推值 ≈ 数据库竞价 → 降价从未生效 → 跳过。
     """
-    from api_v2.services.ad_rules.time_pricing_calculator import append_callback_adjustment
+    from api_v2.services.ad_rules.time_pricing_calculator import append_callback_adjustment, calc_reverse_bid
 
     callback = strategy.callback_settings or {}
     if callback.get("type", "none") == "none":
@@ -334,17 +332,19 @@ def _do_callback(
     adjusted_items = 0
 
     for item in items:
-        # 正算分时竞价：对当前竞价应用所有规则
-        bid_after = item["bid"]
-        for rule in rules:
-            nb = calc_new_bid(bid_after, rule)
-            if nb is not None and nb != bid_after:
-                bid_after = nb
+        db_bid = item["bid"]
 
-        # 核心判断：算出来的分时竞价是否 == 数据库当前竞价
-        if round(bid_after, 4) == round(item["bid"], 4):
-            # 相等 → 降价确实生效了，数据库里已经是降价后的值，需要回调
-            callback_bid = calc_callback_bid(item["bid"], callback)
+        # 反推原始竞价：逆序应用反函数链
+        original_bid = db_bid
+        for rule in reversed(rules):
+            rev = calc_reverse_bid(original_bid, rule)
+            if rev is not None:
+                original_bid = rev
+
+        # 判断：反推出的原始竞价是否 > 数据库竞价（说明数据库已被降过）
+        if round(original_bid, 4) > round(db_bid, 4):
+            # 降价生效过 → 需要回调
+            callback_bid = calc_callback_bid(db_bid, callback)
             if callback_bid is None:
                 continue
             append_callback_adjustment(
@@ -352,11 +352,11 @@ def _do_callback(
             )
             adjusted_items += 1
         else:
-            # 不等 → 分时从未生效，数据库还是原始竞价，跳过
+            # 降价从未生效 → 跳过
             logger.info(
-                "[time_pricing] campaign=%d profile=%d item=%d 分时从未生效（计算=%s, DB=%s），跳过回调",
+                "[time_pricing] campaign=%d profile=%d item=%d 分时从未生效（反推=%s, DB=%s），跳过回调",
                 hit.campaign_id, hit.profile_id, item["item_id"],
-                round(bid_after, 4), round(item["bid"], 4),
+                round(original_bid, 4), round(db_bid, 4),
             )
 
     hit.awaiting_start = TimePricingHitStatus.YES
