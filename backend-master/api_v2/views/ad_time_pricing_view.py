@@ -36,13 +36,16 @@ def trigger_time_pricing(request: Request) -> Response:
     if not cache.add(_TIME_PRICING_LOCK_KEY, "1", timeout=1800):
         return Response({"code": "B0001", "data": None, "msg": "分时任务正在执行中"}, status=409)
 
-    result1 = run_ad_time_pricing_task.delay()
-    result2 = run_time_pricing_task.apply_async(countdown=5)
-    return Response({
-        "code": "00000",
-        "data": {
-            "ad_time_pricing_task_id": str(result1.id),
-            "time_pricing_task_id": str(result2.id),
-        },
-        "msg": "分时任务已入队，将由 Celery 异步执行",
-    })
+    try:
+        result1 = run_ad_time_pricing_task.delay()
+        result2 = run_time_pricing_task.apply_async(countdown=5)
+        return Response({
+            "code": "00000",
+            "data": {
+                "ad_time_pricing_task_id": str(result1.id),
+                "time_pricing_task_id": str(result2.id),
+            },
+            "msg": "分时任务已入队，将由 Celery 异步执行",
+        })
+    finally:
+        cache.delete(_TIME_PRICING_LOCK_KEY)
