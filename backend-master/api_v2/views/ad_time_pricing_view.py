@@ -1,6 +1,6 @@
 """广告分时策略——手动触发接口。
 
-注意：此接口仅负责入队 Celery 任务并立即返回 202，避免在 gunicorn worker
+注意：此接口仅负责入队 Celery 任务并立即返回，避免在 gunicorn worker
       进程中同步执行重 DB / 重内存操作导致超时被 kill。
 """
 from django.core.cache import cache
@@ -32,6 +32,9 @@ def trigger_time_pricing(request: Request) -> Response:
 
     使用 Redis 分布式锁保证同一时刻只有一个执行实例。
     Celery single_thread_queue（concurrency=1）保证两个任务顺序执行。
+
+    注意：锁由 Celery 任务的 finally 块释放（见 ad_time_pricing_task.py 和
+          time_pricing_task.py），视图不负责释放锁。
     """
     if not cache.add(_TIME_PRICING_LOCK_KEY, "1", timeout=1800):
         return Response({"code": "B0001", "data": None, "msg": "分时任务正在执行中"}, status=409)
@@ -49,5 +52,6 @@ def trigger_time_pricing(request: Request) -> Response:
             "msg": "分时任务已入队，将由 Celery 异步执行",
         })
     except Exception:
+        # 入队失败时释放锁，允许后续重试
         cache.delete(_TIME_PRICING_LOCK_KEY)
-        return Response({"code": "B0002", "data": None, "msg": "入队失败"}, status=500)
+        raise
