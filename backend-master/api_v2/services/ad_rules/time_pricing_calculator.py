@@ -304,9 +304,12 @@ def append_callback_adjustment(
         True 表示写了 PENDING 记录（需调 API），False 表示竞价不变标 SUCCESS
     """
     current_bid = item["bid"]
+    bid_before = item.get("bid_before")
+    bid_after = base_bid
+
     is_target = item["item_type"] == "target"
 
-    if round(callback_bid, 4) == round(current_bid, 4):
+    if bid_before is not None and round(bid_before, 2) == round(bid_after, 2):
         adjustments.append(SpBidAdjustment(
             target_id=item["item_id"] if is_target else None,
             keyword_id=item["item_id"] if not is_target else None,
@@ -316,12 +319,12 @@ def append_callback_adjustment(
             time_pricing_rule_id=strategy_id,
             auto_rule_id=None,
             is_time_pricing=TimePricingHitStatus.NO,
-            bid_before=None,
-            bid_after=callback_bid,
+            bid_before=bid_before,
+            bid_after=bid_after,
             adjustment_status=AdjustmentStatusChoices.SUCCESS,
             adjustment_time=now_utc,
             execution_status=ExecutionStatusChoices.SUCCESS,
-            msg="回调竞价与数据库竞价相等，无需调整",
+            msg="分时回调：分时竞价与基准值相等，无需调整",
             updated_at=now_utc,
         ))
         return False
@@ -335,8 +338,8 @@ def append_callback_adjustment(
         time_pricing_rule_id=strategy_id,
         auto_rule_id=None,
         is_time_pricing=TimePricingHitStatus.NO,
-        bid_before=None,
-        bid_after=callback_bid,
+        bid_before=bid_before,
+        bid_after=bid_after,
         adjustment_status=AdjustmentStatusChoices.PENDING,
         adjustment_time=now_utc,
         execution_status=ExecutionStatusChoices.PENDING,
