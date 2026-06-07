@@ -452,10 +452,12 @@ def execute_time_pricing() -> dict[str, Any]:
                 len(item_map), (datetime.now() - t0).total_seconds())
 
     # ── 第三步：多线程并行处理 ──
+    # 注意：应用服务器单 worker 内存有限，线程数必须克制，
+    #       数据量大时宁可慢一点也不能 OOM Kill
     now_utc = datetime.now(dt_timezone.utc)
-    MAX_WORKERS = 32
-    chunk_size = max(1, len(need_process) // MAX_WORKERS)
-    chunks = [need_process[i:i + chunk_size] for i in range(0, len(need_process), chunk_size)][:MAX_WORKERS]
+    MAX_WORKERS = min(8, len(need_process))
+    chunk_size = max(1, len(need_process) // MAX_WORKERS) if MAX_WORKERS > 0 else len(need_process)
+    chunks = [need_process[i:i + chunk_size] for i in range(0, len(need_process), chunk_size)][:MAX_WORKERS] if MAX_WORKERS > 0 else [need_process]
     logger.info("[time_pricing] 分 %d 个分片 %d 线程开始处理", len(chunks), MAX_WORKERS)
 
     adjustments, hits_to_update, processed, adjusted, errors = [], [], 0, 0, []

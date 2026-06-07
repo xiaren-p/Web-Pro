@@ -230,7 +230,7 @@ def process_new_ads() -> dict[str, Any]:
             "errors": list[str],
         }
     """
-    MAX_WORKERS = 4
+    MAX_WORKERS = min(4, max(1, len(campaign_list)))
     BATCH_Q_SIZE = 500
 
     # ── Phase 1：批量预加载 ──────────────────────────────────────────────
