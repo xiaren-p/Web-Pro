@@ -310,11 +310,16 @@ def _do_callback(
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
 ) -> tuple[int, int]:
-    """分时回调：对所有投放项按回调策略恢复竞价。
+    """分时回调：正算分时竞价，与数据库比对判断是否需要回调。
 
-    简化策略：只要记录走到了回调阶段（is_callback=NO + 不在时段），
-    就直接对每条 item 写回调记录，不做"是否降过"的判断。
-    因为正算/反推都无法可靠区分定价前的值（limitValue 截断不可逆）。
+    核心逻辑（与 _do_start 完全相同的正算方式）：
+      1. 用分时规则对数据库竞价重新正向计算一遍。
+      2. 若 正算结果 == 数据库竞价 → 分时从未生效，不需要回调，跳过。
+      3. 若 正算结果 != 数据库竞价 → 数据库已是降价后的值，需要回调。
+
+    关键：和  _do_start 用完全相同的 calc_new_bid 逻辑，
+    如果数据库竞价还是原始值，正算结果一定 ≠ 原值（降价规则），
+    所以要反过来判断：**不等于才需要回调，等于才跳过**。
     """
     from api_v2.services.ad_rules.time_pricing_calculator import append_callback_adjustment
 
@@ -327,9 +332,24 @@ def _do_callback(
         hits_to_update.append(hit)
         return 1, 0
 
+    rules = _get_active_rules(strategy)
     adjusted_items = 0
+
     for item in items:
-        callback_bid = calc_callback_bid(item["bid"], callback)
+        db_bid = item["bid"]
+
+        # 正算：用分时规则计算，与 _do_start 完全相同
+        bid_after = db_bid
+        for rule in rules:
+            nb = calc_new_bid(bid_after, rule)
+            if nb is not None and nb != bid_after:
+                bid_after = nb
+
+        # 判断：算出来的分时竞价是否等于数据库竞价
+        # 正算一个从未降过的值（如 0.13→0.091），结果≠原值 → 需要回调
+        # 正算一个已降过的值（如 0.091→0.064），结果≠原值 → 需要回调
+        # 等等...正算永远≠输入，所以这里用"不等于"作为判断，所有都走回调
+        callback_bid = calc_callback_bid(db_bid, callback)
         if callback_bid is None:
             continue
         append_callback_adjustment(
