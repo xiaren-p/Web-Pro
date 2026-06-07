@@ -387,8 +387,11 @@ def execute_time_pricing() -> dict[str, Any]:
             need_process.append(hit)
         elif not is_awaiting and not in_period:
             need_process.append(hit)
-        elif is_awaiting and not in_period and hit.rule_updated_today:
-            # #1 兜底路径：时段已过且从未触发 _do_start，重置标记防止永久卡死
+        elif is_awaiting and not in_period and hit.rule_updated_today and hit.created_at.date() < get_cn_now().date():
+            # #1 兜底路径：时段已过且从未触发 _do_start，仅对非今日创建的
+            # 历史记录重置标记防止永久卡死。今日新创建的记录保留 rule_updated_today，
+            # 以便第二天第一次 process_new_ads 时卫语句 #2 拦截跳过（无需重匹配），
+            # execute 进入时段内后自然触发 do_start。
             logger.info(
                 "[time_pricing] campaign=%d profile=%d 时段已过 + 兜底重置 rule_updated_today",
                 hit.campaign_id, hit.profile_id,
