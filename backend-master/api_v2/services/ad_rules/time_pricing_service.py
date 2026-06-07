@@ -57,7 +57,6 @@ from api_v2.services.ad_rules.time_pricing_calculator import (
     calc_callback_bid,
     calc_new_bid,
     get_ad_items,
-    has_successful_start_adjustment,
     write_batch,
 )
 from api_v2.services.ad_rules.time_pricing_shared import (
