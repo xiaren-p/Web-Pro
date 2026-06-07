@@ -109,8 +109,12 @@ def calc_reverse_bid(adjusted_bid: float, rule: dict) -> float | None:
 def calc_callback_bid(current_bid: float, callback_settings: dict) -> float | None:
     """根据回调策略计算恢复后的竞价。
 
+    回调的目标是恢复到"原始竞价"（分时降价前的值）。
+    对于 previous 类型，回调目标 = 当前竞价（不做变更）；
+    对于 multiplier/fixed 类型，按配置计算。
+
     Args:
-        current_bid: 投放项的基础竞价
+        current_bid: 投放项的当前竞价（基准值）
         callback_settings: strategy.callback_settings
 
     Returns:
@@ -123,7 +127,7 @@ def calc_callback_bid(current_bid: float, callback_settings: dict) -> float | No
     if cb_type == "fixed":
         return float(callback_settings.get("fixed", current_bid) or current_bid)
     if cb_type == "previous":
-        return current_bid
+        return current_bid  # 恢复到分时前的值（即当前值）
     return None
 
 
