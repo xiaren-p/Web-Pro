@@ -54,7 +54,6 @@ from api_v2.models.sp_bid_adjustment import SpBidAdjustment
 from api_v2.services.ad_rules.time_pricing_calculator import (
     MAX_ERROR_COUNT,
     build_item_map,
-    calc_callback_bid,
     calc_new_bid,
     get_ad_items,
     write_batch,
