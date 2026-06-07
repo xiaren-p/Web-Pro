@@ -57,36 +57,66 @@ from api_v2.services.ad_rules.time_pricing_calculator import (
     write_batch,
 )
 from api_v2.services.ad_rules.time_pricing_shared import (
+    CN_TZ,
+    filter_segments_for_today,
+    get_cn_now,
     get_rules_for_segments,
 )
 
 logger = logging.getLogger(__name__)
-
-# 北京时区常量
-CN_TZ = dt_timezone(timedelta(hours=8))
 
 
 # ============================================================
 # 时段判断
 # ============================================================
 
-def _in_time_range(hit: AdTimePricingHit) -> bool:
+def _in_time_range(hit: AdTimePricingHit, strategy: LxTimePricingStrategy) -> bool:
     """判断当前北京时间是否在命中记录的时段内。
 
-    用 ad_time_pricing_hit 表已计算好的 time_start_cn / time_end_cn（北京时间 aware datetime），
-    与当前北京时间 datetime.now(固定偏移 +8) 比对。
+    直接从策略 time_settings 实时解析 segments，
+    逐个时段精确比对（#5 多时段间隙修复），避免 snapshot 过时。
 
     Args:
-        hit: 分时命中记录（含 time_start_cn / time_end_cn）
+        hit: 分时命中记录
+        strategy: 命中策略实例（已从 DB 加载）
 
     Returns:
-        True 表示当前在时段内
+        True 表示当前在某个时段内
     """
-    if hit.time_start_cn is None or hit.time_end_cn is None:
+    now_cn = get_cn_now()
+
+    time_settings = strategy.time_settings or {}
+    segments = (time_settings.get("segments", []) if isinstance(time_settings, dict) else [])
+    filtered = filter_segments_for_today(segments, strategy.time_mode)
+    if not filtered:
         return False
-    cn_tz = dt_timezone(timedelta(hours=8))
-    now_cn = datetime.now(cn_tz)
-    return hit.time_start_cn <= now_cn <= hit.time_end_cn
+
+    for seg in filtered:
+        start_str = (seg or {}).get("startTime", "00:00")
+        end_str = (seg or {}).get("endTime", "00:00")
+        try:
+            from datetime import date
+            today = now_cn.date()
+            year = today.year
+
+            sh, sm_val = map(int, start_str.split(":"))
+            eh, em = map(int, end_str.split(":"))
+
+            seg_start_naive = datetime(year, today.month, today.day, sh, sm_val, 0)
+            seg_end_naive = datetime(year, today.month, today.day, eh, em, 0)
+            if (eh, em) < (sh, sm_val):
+                seg_end_naive = seg_start_naive + timedelta(days=1)
+
+            # 用北京时区包裹（项目固定 +8）
+            seg_start_cn = seg_start_naive.replace(tzinfo=CN_TZ)
+            seg_end_cn = seg_end_naive.replace(tzinfo=CN_TZ)
+
+            if seg_start_cn <= now_cn <= seg_end_cn:
+                return True
+        except (ValueError, TypeError):
+            continue
+
+    return False
 
 
 def _get_active_rules(strategy: LxTimePricingStrategy) -> list[dict]:
@@ -177,7 +207,7 @@ def _process_single_hit(
         logger.warning("[time_pricing] 无投放项 campaign=%d profile=%d", hit.campaign_id, hit.profile_id)
         return 0, 0
 
-    in_period = _in_time_range(hit)
+    in_period = _in_time_range(hit, strategy)
     is_awaiting = (hit.awaiting_start == TimePricingHitStatus.YES)
 
     # ── 路径 A：分时开始 ──
@@ -349,7 +379,8 @@ def execute_time_pricing() -> dict[str, Any]:
             stale_cleanup.append(hit)
             continue
 
-        in_period = _in_time_range(hit)
+        strategy_for_hit = strategy_map[int(hit.hit_time_pricing_rules)]
+        in_period = _in_time_range(hit, strategy_for_hit)
         is_awaiting = (hit.awaiting_start == TimePricingHitStatus.YES)
 
         if is_awaiting and in_period:

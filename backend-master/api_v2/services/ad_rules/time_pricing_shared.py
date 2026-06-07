@@ -12,6 +12,9 @@ from typing import Any
 CN_TZ = dt_timezone(timedelta(hours=8))
 CN_OFFSET_HOURS = 8
 
+# 分时策略触发分布式锁 Key（Redis）；视图层入队前获取，入队后释放
+TIME_PRICING_LOCK_KEY = "time_pricing_lock"
+
 
 def get_cn_now() -> datetime:
     """获取当前北京时间（aware datetime，固定偏移 +8）。

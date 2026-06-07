@@ -132,7 +132,7 @@ class LxTimePricingStrategy(models.Model):
     weight = models.IntegerField(
         default=1,
         verbose_name="权重",
-        help_text="优先级排序，数值越大优先级越高",
+        help_text="优先级排序，数值越小优先级越高",
     )
 
     execution_result = models.IntegerField(
@@ -169,7 +169,7 @@ class LxTimePricingStrategy(models.Model):
         db_table = "lx_time_pricing_strategy"
         verbose_name = "分时调价策略"
         verbose_name_plural = verbose_name
-        ordering = ["-weight", "-created_at"]
+        ordering = ["weight", "-created_at"]
 
     def __str__(self) -> str:
         status_label = "开启" if self.status == StrategyStatus.ACTIVE else "暂停"
