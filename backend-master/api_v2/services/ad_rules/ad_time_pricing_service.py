@@ -549,7 +549,8 @@ def _process_existing_campaign(
         return None
 
     # 今日已更新且有规则，跳过
-    if existing.rule_updated_today and existing.hit_time_pricing_rules:
+    # 例外：命中的策略已被暂停/删除，必须放行重匹配
+    if existing.rule_updated_today and existing.hit_time_pricing_rules and existing.hit_time_pricing_rules in {str(s.id) for s in strategies}:
         return None
 
     tz = campaign_meta.get((cid, pid), {}).get("timezone", "")
