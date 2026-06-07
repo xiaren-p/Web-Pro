@@ -285,11 +285,11 @@ def _do_start(
 
     for item in items:
         item["bid_before"] = item["bid"]
-        bid_after = item["bid"]
+        bid_after = round(item["bid"], 2)
         for rule in rules:
             nb = calc_new_bid(bid_after, rule)
             if nb is not None and nb != bid_after:
-                bid_after = nb
+                bid_after = round(nb, 2)
         item["bid_after"] = bid_after
         append_start_adjustment(item, hit.campaign_id, hit.profile_id, strategy.id, now_utc, adjustments)
 
@@ -310,16 +310,15 @@ def _do_callback(
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
 ) -> tuple[int, int]:
-    """分时回调：正算分时竞价，与数据库比对判断是否需要回调。
+    """分时回调：正算分时竞价，与基准值比对判断是否需要回调。
 
     核心逻辑（与 _do_start 完全相同的正算方式）：
-      1. 用分时规则对数据库竞价重新正向计算一遍。
-      2. 若 正算结果 == 数据库竞价 → 分时从未生效，不需要回调，跳过。
-      3. 若 正算结果 != 数据库竞价 → 数据库已是降价后的值，需要回调。
+      1. 用分时规则对基准值（item["bid"]）正向计算分时竞价。
+      2. 若 分时竞价 == 基准值 → 分时从未生效，跳过不写回调。
+      3. 若 分时竞价 != 基准值 → 基准值已被降价，需要回调到基准值。
 
-    关键：和  _do_start 用完全相同的 calc_new_bid 逻辑，
-    如果数据库竞价还是原始值，正算结果一定 ≠ 原值（降价规则），
-    所以要反过来判断：**不等于才需要回调，等于才跳过**。
+    回调目标始终是 item["bid"]（基准值，即 lx_sp_keyword/lx_sp_target 的原始竞价）。
+    回调记录中 bid_after = 基准值。
     """
     from api_v2.services.ad_rules.time_pricing_calculator import append_callback_adjustment
 
@@ -336,24 +335,28 @@ def _do_callback(
     adjusted_items = 0
 
     for item in items:
-        db_bid = item["bid"]
+        base_bid = item["bid"]  # 基准值（lx_sp_keyword.bid / lx_sp_target.bid）
 
-        # 正算：用分时规则计算，与 _do_start 完全相同
-        bid_after = db_bid
+        # 正算分时竞价：与 _do_start 完全相同，结果保留2位小数
+        bid_after = round(base_bid, 2)
         for rule in rules:
             nb = calc_new_bid(bid_after, rule)
             if nb is not None and nb != bid_after:
-                bid_after = nb
+                bid_after = round(nb, 2)
 
-        # 判断：算出来的分时竞价是否等于数据库竞价
-        # 正算一个从未降过的值（如 0.13→0.091），结果≠原值 → 需要回调
-        # 正算一个已降过的值（如 0.091→0.064），结果≠原值 → 需要回调
-        # 等等...正算永远≠输入，所以这里用"不等于"作为判断，所有都走回调
-        callback_bid = calc_callback_bid(db_bid, callback)
-        if callback_bid is None:
+        # 分时竞价 == 基准值 → 没有降价过，跳过
+        if round(bid_after, 4) == round(base_bid, 4):
+            logger.info(
+                "[time_pricing] campaign=%d profile=%d item=%d 分时竞价==基准值(%s)，跳过回调",
+                hit.campaign_id, hit.profile_id, item["item_id"], round(base_bid, 4),
+            )
             continue
+
+        # 分时竞价 != 基准值 → 需要回调到基准值
+        item["bid_before"] = base_bid  # 当前值就是基准值（因为还没回调过）
         append_callback_adjustment(
-            item, callback_bid, hit.campaign_id, hit.profile_id, strategy.id, now_utc, adjustments,
+            item, base_bid,  # 回调目标 = 基准值
+            hit.campaign_id, hit.profile_id, strategy.id, now_utc, adjustments,
         )
         adjusted_items += 1
 
