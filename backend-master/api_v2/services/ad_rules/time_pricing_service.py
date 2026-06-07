@@ -338,15 +338,15 @@ def _do_callback(
     for item in items:
         base_bid = item["bid"]  # 基准值（lx_sp_keyword.bid / lx_sp_target.bid），不会被修改
 
-        # 正算分时竞价：与 _do_start 完全相同的计算方式
-        priced_bid = base_bid
+        # 正算分时竞价：与 _do_start 完全相同的计算方式，保留2位小数
+        priced_bid = round(base_bid, 2)
         for rule in rules:
             nb = calc_new_bid(priced_bid, rule)
             if nb is not None and nb != priced_bid:
-                priced_bid = nb
+                priced_bid = round(nb, 2)
 
         # 分时竞价 == 基准值 → 规则没有改变竞价 → 不需要回调，跳过
-        if round(priced_bid, 4) == round(base_bid, 4):
+        if round(priced_bid, 2) == round(base_bid, 2):
             logger.info(
                 "[time_pricing] campaign=%d profile=%d item=%d 规则不影响基准值，跳过回调",
                 hit.campaign_id, hit.profile_id, item["item_id"],
