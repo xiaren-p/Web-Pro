@@ -224,7 +224,7 @@ def _do_start(
         bid_after = round(item["bid"], 2)
         for rule in rules:
             nb = calc_new_bid(bid_after, rule)
-            if nb is not None:
+            if nb is not None and nb != bid_after:
                 bid_after = round(nb, 2)
         item["bid_after"] = bid_after
         append_start_adjustment(item, hit.campaign_id, hit.profile_id, strategy.id, now_utc, adjustments)
@@ -275,7 +275,7 @@ def _do_callback(
         priced_bid = round(base_bid, 2)
         for rule in rules:
             nb = calc_new_bid(priced_bid, rule)
-            if nb is not None:
+            if nb is not None and nb != priced_bid:
                 priced_bid = round(nb, 2)
 
         item["bid_before"] = priced_bid  # 调整前 = 分时竞价
