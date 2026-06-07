@@ -310,11 +310,14 @@ def _do_callback(
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
 ) -> tuple[int, int]:
-    """分时回调：检查降价是否真正生效过，是则恢复原价。
+    """分时回调：用分时规则正算降价结果，与数据库竞价比对判断是否需回调。
 
-    #7：改为检查是否有成功执行的 START 记录，替代 calc_reverse_bid 反推。
-    若有成功 START 记录 → 说明降价生效过 → 需要写回调记录。
-    若无成功 START 记录 → 降价从未生效 → 跳过不写回调，直接更新状态。
+    核心逻辑：
+      对每条投放项的当前竞价，用分时规则重新正向计算一遍降价结果。
+      若 计算出的分时竞价 == 数据库当前竞价 → 降价生效过 → 需要回调恢复原价。
+      若 计算出的分时竞价 != 数据库当前竞价 → 分时从未生效 → 跳过，不写回调记录。
+
+    这比查 SpBidAdjustment 表更可靠，因为不依赖 bid_adjustment API 是否被调用过。
     """
     from api_v2.services.ad_rules.time_pricing_calculator import append_callback_adjustment
 
@@ -322,35 +325,47 @@ def _do_callback(
     if callback.get("type", "none") == "none":
         hit.awaiting_start = TimePricingHitStatus.YES
         hit.is_time_pricing = TimePricingHitStatus.NO
-        hit.rule_updated_today = False  # #1：_do_callback 也重置标记
-        hit.updated_at = datetime.now(dt_timezone.utc)  # #2
+        hit.rule_updated_today = False
+        hit.updated_at = datetime.now(dt_timezone.utc)
         hits_to_update.append(hit)
         return 1, 0
 
-    # #7：检查是否有成功执行的 START 记录，替代反推判断
-    should_callback = has_successful_start_adjustment(hit.campaign_id, hit.profile_id)
+    rules = _get_active_rules(strategy)
+    adjusted_items = 0
 
-    if should_callback:
-        for item in items:
+    for item in items:
+        # 正算分时竞价：对当前竞价应用所有规则
+        bid_after = item["bid"]
+        for rule in rules:
+            nb = calc_new_bid(bid_after, rule)
+            if nb is not None and nb != bid_after:
+                bid_after = nb
+
+        # 核心判断：算出来的分时竞价是否 == 数据库当前竞价
+        if round(bid_after, 4) == round(item["bid"], 4):
+            # 相等 → 降价确实生效了，数据库里已经是降价后的值，需要回调
             callback_bid = calc_callback_bid(item["bid"], callback)
             if callback_bid is None:
                 continue
             append_callback_adjustment(
                 item, callback_bid, hit.campaign_id, hit.profile_id, strategy.id, now_utc, adjustments,
             )
-    else:
-        logger.info(
-            "[time_pricing] campaign=%d profile=%d 无成功 START 记录，跳过回调",
-            hit.campaign_id, hit.profile_id,
-        )
+            adjusted_items += 1
+        else:
+            # 不等 → 分时从未生效，数据库还是原始竞价，跳过
+            logger.info(
+                "[time_pricing] campaign=%d profile=%d item=%d 分时从未生效（计算=%s, DB=%s），跳过回调",
+                hit.campaign_id, hit.profile_id, item["item_id"],
+                round(bid_after, 4), round(item["bid"], 4),
+            )
 
     hit.awaiting_start = TimePricingHitStatus.YES
     hit.is_time_pricing = TimePricingHitStatus.NO
-    hit.rule_updated_today = False  # #1：_do_callback 也重置标记
-    hit.error_count = 0  # #10：成功时重置错误计数
-    hit.updated_at = datetime.now(dt_timezone.utc)  # #2
+    hit.rule_updated_today = False
+    hit.error_count = 0
+    hit.updated_at = datetime.now(dt_timezone.utc)
     hits_to_update.append(hit)
-    return 1, len(items) if should_callback else 0
+    return 1, adjusted_items
 
 
 def execute_time_pricing() -> dict[str, Any]:
