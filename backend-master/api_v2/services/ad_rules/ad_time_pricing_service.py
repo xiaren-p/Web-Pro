@@ -23,13 +23,13 @@ from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
 from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, ManualRulesStatus, TimePricingHitStatus
 from api_v2.services.ad_rules.strategy_matcher import match_strategy_against_product
 from api_v2.services.ad_rules.time_pricing_shared import (
+    UTC_TZ,
     filter_segments_for_today,
+    get_utc_now,
 )
 from api_v2.utils.timezone_utils import country_to_timezone, get_fixed_utc_offset
 
 logger = logging.getLogger(__name__)
-
-CN_TZ = dt_timezone(timedelta(hours=8))
 
 
 # ============================================================
@@ -400,10 +400,10 @@ def _collect_campaign_product_fields(
 # ============================================================
 
 def _is_in_any_segment_now(hit: AdTimePricingHit, strategies: list[LxTimePricingStrategy]) -> bool:
-    """判断当前北京时间是否在命中记录的任一时段内。
+    """判断当前 UTC 时间是否在命中记录的任一时段内。
 
-    直接从策略 time_settings 实时解析 segments（不依赖 snapshot），
-    逐个时段精确比对。供 _process_existing_campaign 时段外跳过重匹配使用。
+    将 segment 中的站点当地时刻通过偏移量转为 UTC 后，与当前 UTC 时间比对。
+    供 _process_existing_campaign 时段外跳过重匹配使用。
 
     Args:
         hit: 分时命中记录
@@ -421,7 +421,9 @@ def _is_in_any_segment_now(hit: AdTimePricingHit, strategies: list[LxTimePricing
     if strategy is None:
         return False
 
-    now_cn = CN_TZ.fromutc(datetime.now(dt_timezone.utc))
+    now_utc = get_utc_now()
+    site_offset = get_fixed_utc_offset(hit.timezone)
+
     time_settings = strategy.time_settings or {}
     segments = (time_settings.get("segments", []) if isinstance(time_settings, dict) else [])
     filtered = filter_segments_for_today(segments, strategy.time_mode)
@@ -432,21 +434,23 @@ def _is_in_any_segment_now(hit: AdTimePricingHit, strategies: list[LxTimePricing
         start_str = (seg or {}).get("startTime", "00:00")
         end_str = (seg or {}).get("endTime", "00:00")
         try:
-            today_date = datetime.now(CN_TZ).date()
-            y = today_date.year
+            today = now_utc.date()
+            y = today.year
 
             sh, sm = map(int, start_str.split(":"))
             eh, em = map(int, end_str.split(":"))
 
-            seg_start_naive = datetime(y, today_date.month, today_date.day, sh, sm, 0)
-            seg_end_naive = datetime(y, today_date.month, today_date.day, eh, em, 0)
+            seg_start_naive = datetime(y, today.month, today.day, sh, sm, 0)
+            seg_end_naive = datetime(y, today.month, today.day, eh, em, 0)
             if (eh, em) < (sh, sm):
                 seg_end_naive = seg_start_naive + timedelta(days=1)
 
-            seg_start_cn = seg_start_naive.replace(tzinfo=CN_TZ)
-            seg_end_cn = seg_end_naive.replace(tzinfo=CN_TZ)
+            # segment 时间是站点当地时区 → 转 UTC
+            site_tz = dt_timezone(timedelta(hours=site_offset))
+            seg_start_utc = seg_start_naive.replace(tzinfo=site_tz).astimezone(UTC_TZ)
+            seg_end_utc = seg_end_naive.replace(tzinfo=site_tz).astimezone(UTC_TZ)
 
-            if seg_start_cn <= now_cn <= seg_end_cn:
+            if seg_start_utc <= now_utc <= seg_end_utc:
                 return True
         except (ValueError, TypeError):
             continue

@@ -1,14 +1,17 @@
 """分时策略共享工具（time_pricing_shared）。
 
 提取 ad_time_pricing_service 和 time_pricing_service 共用的 segment 过滤与规则提取逻辑，
-统一使用北京时间（固定偏移 +8），消除两个服务的时区不一致与代码重复风险。
+统一使用 UTC 标准时间，所有时段通过站点偏移量转 UTC 后比对。
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any
 
-# 北京时间固定偏移（项目铁律：不分冬夏令时）
+# UTC 标准时区（项目统一基准）
+UTC_TZ = dt_timezone.utc
+
+# 北京时间固定偏移（兼容旧接口，新代码请用 get_utc_now）
 CN_TZ = dt_timezone(timedelta(hours=8))
 CN_OFFSET_HOURS = 8
 
@@ -16,10 +19,19 @@ CN_OFFSET_HOURS = 8
 TIME_PRICING_LOCK_KEY = "time_pricing_lock"
 
 
-def get_cn_now() -> datetime:
-    """获取当前北京时间（aware datetime，固定偏移 +8）。
+def get_utc_now() -> datetime:
+    """获取当前 UTC 时间（aware datetime）。
 
-    用于所有 segment 过滤与规则提取逻辑，保证两个服务在跨天临界点判断一致。
+    用于所有 segment 过滤与规则提取逻辑，统一时间基准。
+
+    Returns:
+        当前 UTC aware datetime
+    """
+    return datetime.now(UTC_TZ)
+
+
+def get_cn_now() -> datetime:
+    """获取当前北京时间（aware datetime，兼容旧接口）。
 
     Returns:
         当前北京时间 aware datetime
@@ -31,7 +43,7 @@ def filter_segments_for_today(
     segments: list[dict],
     time_mode: str,
 ) -> list[dict]:
-    """按当前北京时间过滤 segments，仅返回今天适用的时段。
+    """按当前 UTC 日期过滤 segments，仅返回今天适用的时段。
 
     三种模式过滤规则：
       - byDay：全部返回（每天适用）
@@ -52,7 +64,7 @@ def filter_segments_for_today(
         return [seg for seg in segments if isinstance(seg, dict)]
 
     if time_mode == "byWeek":
-        today_weekday = str(get_cn_now().isoweekday())  # "1" 周一 … "7" 周日
+        today_weekday = str(get_utc_now().isoweekday())  # "1" 周一 … "7" 周日
         return [
             seg for seg in segments
             if isinstance(seg, dict) and str(seg.get("dayOfWeek", "")) == today_weekday

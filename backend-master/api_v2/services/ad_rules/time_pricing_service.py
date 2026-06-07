@@ -57,11 +57,12 @@ from api_v2.services.ad_rules.time_pricing_calculator import (
     write_batch,
 )
 from api_v2.services.ad_rules.time_pricing_shared import (
-    CN_TZ,
+    UTC_TZ,
     filter_segments_for_today,
-    get_cn_now,
+    get_utc_now,
     get_rules_for_segments,
 )
+from api_v2.utils.timezone_utils import get_fixed_utc_offset
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +72,9 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 def _in_time_range(hit: AdTimePricingHit, strategy: LxTimePricingStrategy) -> bool:
-    """判断当前北京时间是否在命中记录的时段内。
+    """判断当前 UTC 时间是否在命中记录的时段内。
 
-    直接从策略 time_settings 实时解析 segments，
-    逐个时段精确比对（#5 多时段间隙修复），避免 snapshot 过时。
+    将 segment 中的站点当地时刻通过偏移量转为 UTC 后，与当前 UTC 时间比对。
 
     Args:
         hit: 分时命中记录
@@ -83,7 +83,8 @@ def _in_time_range(hit: AdTimePricingHit, strategy: LxTimePricingStrategy) -> bo
     Returns:
         True 表示当前在某个时段内
     """
-    now_cn = get_cn_now()
+    now_utc = get_utc_now()
+    site_offset = get_fixed_utc_offset(hit.timezone)
 
     time_settings = strategy.time_settings or {}
     segments = (time_settings.get("segments", []) if isinstance(time_settings, dict) else [])
@@ -95,8 +96,7 @@ def _in_time_range(hit: AdTimePricingHit, strategy: LxTimePricingStrategy) -> bo
         start_str = (seg or {}).get("startTime", "00:00")
         end_str = (seg or {}).get("endTime", "00:00")
         try:
-            from datetime import date
-            today = now_cn.date()
+            today = now_utc.date()
             year = today.year
 
             sh, sm_val = map(int, start_str.split(":"))
@@ -107,11 +107,12 @@ def _in_time_range(hit: AdTimePricingHit, strategy: LxTimePricingStrategy) -> bo
             if (eh, em) < (sh, sm_val):
                 seg_end_naive = seg_start_naive + timedelta(days=1)
 
-            # 用北京时区包裹（项目固定 +8）
-            seg_start_cn = seg_start_naive.replace(tzinfo=CN_TZ)
-            seg_end_cn = seg_end_naive.replace(tzinfo=CN_TZ)
+            # segment 时间是站点当地时区 → 转 UTC
+            site_tz = dt_timezone(timedelta(hours=site_offset))
+            seg_start_utc = seg_start_naive.replace(tzinfo=site_tz).astimezone(UTC_TZ)
+            seg_end_utc = seg_end_naive.replace(tzinfo=site_tz).astimezone(UTC_TZ)
 
-            if seg_start_cn <= now_cn <= seg_end_cn:
+            if seg_start_utc <= now_utc <= seg_end_utc:
                 return True
         except (ValueError, TypeError):
             continue
@@ -402,7 +403,7 @@ def execute_time_pricing() -> dict[str, Any]:
             need_process.append(hit)
         elif not is_awaiting and not in_period:
             need_process.append(hit)
-        elif is_awaiting and not in_period and hit.rule_updated_today and hit.created_at.date() < get_cn_now().date():
+        elif is_awaiting and not in_period and hit.rule_updated_today and hit.created_at.date() < get_utc_now().date():
             # #1 兜底路径：时段已过且从未触发 _do_start，仅对非今日创建的
             # 历史记录重置标记防止永久卡死。今日新创建的记录保留 rule_updated_today，
             # 以便第二天第一次 process_new_ads 时卫语句 #2 拦截跳过（无需重匹配），
