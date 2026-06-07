@@ -310,14 +310,13 @@ def _do_callback(
     adjustments: list[SpBidAdjustment],
     hits_to_update: list[AdTimePricingHit],
 ) -> tuple[int, int]:
-    """分时回调：反推原始竞价判断降价是否生效过，是则恢复原价。
+    """分时回调：对所有投放项按回调策略恢复竞价。
 
-    核心逻辑（降价规则）：
-      对每条投放项的当前竞价，用 calc_reverse_bid 反推出规则链之前的原始竞价。
-      若 反推值 > 数据库竞价（差值 > 0.0001）→ 数据库已是降价值 → 需要回调。
-      若 反推值 ≈ 数据库竞价 → 降价从未生效 → 跳过。
+    简化策略：只要记录走到了回调阶段（is_callback=NO + 不在时段），
+    就直接对每条 item 写回调记录，不做"是否降过"的判断。
+    因为正算/反推都无法可靠区分定价前的值（limitValue 截断不可逆）。
     """
-    from api_v2.services.ad_rules.time_pricing_calculator import append_callback_adjustment, calc_reverse_bid
+    from api_v2.services.ad_rules.time_pricing_calculator import append_callback_adjustment
 
     callback = strategy.callback_settings or {}
     if callback.get("type", "none") == "none":
@@ -328,36 +327,15 @@ def _do_callback(
         hits_to_update.append(hit)
         return 1, 0
 
-    rules = _get_active_rules(strategy)
     adjusted_items = 0
-
     for item in items:
-        db_bid = item["bid"]
-
-        # 反推原始竞价：逆序应用反函数链
-        original_bid = db_bid
-        for rule in reversed(rules):
-            rev = calc_reverse_bid(original_bid, rule)
-            if rev is not None:
-                original_bid = rev
-
-        # 判断：反推出的原始竞价是否 > 数据库竞价（说明数据库已被降过）
-        if round(original_bid, 4) > round(db_bid, 4):
-            # 降价生效过 → 需要回调
-            callback_bid = calc_callback_bid(db_bid, callback)
-            if callback_bid is None:
-                continue
-            append_callback_adjustment(
-                item, callback_bid, hit.campaign_id, hit.profile_id, strategy.id, now_utc, adjustments,
-            )
-            adjusted_items += 1
-        else:
-            # 降价从未生效 → 跳过
-            logger.info(
-                "[time_pricing] campaign=%d profile=%d item=%d 分时从未生效（反推=%s, DB=%s），跳过回调",
-                hit.campaign_id, hit.profile_id, item["item_id"],
-                round(original_bid, 4), round(db_bid, 4),
-            )
+        callback_bid = calc_callback_bid(item["bid"], callback)
+        if callback_bid is None:
+            continue
+        append_callback_adjustment(
+            item, callback_bid, hit.campaign_id, hit.profile_id, strategy.id, now_utc, adjustments,
+        )
+        adjusted_items += 1
 
     hit.awaiting_start = TimePricingHitStatus.YES
     hit.is_time_pricing = TimePricingHitStatus.NO
