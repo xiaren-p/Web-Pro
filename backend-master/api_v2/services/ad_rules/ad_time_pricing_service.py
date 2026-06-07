@@ -89,7 +89,7 @@ def _calc_strategy_times(
         (time_start, time_end, time_start_cn, time_end_cn)：
         四个 aware datetime，站点时区与北京时区各一对
     """
-    today = datetime.now().date()
+    today = get_utc_now().date()
     year = today.year
 
     sh, sm_val = map(int, seg_start.split(":"))
