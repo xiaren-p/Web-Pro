@@ -563,7 +563,6 @@ def process_new_ads() -> dict[str, Any]:
                 "time_end",
                 "time_start_cn",
                 "time_end_cn",
-                "segment_times",
                 "awaiting_start",
                 "is_time_pricing",
                 "updated_at",
