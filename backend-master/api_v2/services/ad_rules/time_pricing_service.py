@@ -314,11 +314,13 @@ def _do_callback(
 
     核心逻辑（与 _do_start 完全相同的正算方式）：
       1. 用分时规则对基准值（item["bid"]）正向计算分时竞价。
-      2. 若 分时竞价 == 基准值 → 分时从未生效，跳过不写回调。
-      3. 若 分时竞价 != 基准值 → 基准值已被降价，需要回调到基准值。
+      2. 若 分时竞价 == 基准值 → 规则没有改变竞价，跳过不写回调。
+      3. 若 分时竞价 != 基准值 → 规则有降价效果，需要回调到基准值。
 
-    回调目标始终是 item["bid"]（基准值，即 lx_sp_keyword/lx_sp_target 的原始竞价）。
-    回调记录中 bid_after = 基准值。
+    回调记录中 bid_after = 基准值（item["bid"]）。
+    注意：append_callback_adjustment 内部判断 callback_bid == item["bid"] 时标 SUCCESS，
+    这里 callback_bid = base_bid = item["bid"]，所以全部走 SUCCESS 是正确的——
+    因为回调目标就是基准值，不需要再调一次 API 改回去。
     """
     from api_v2.services.ad_rules.time_pricing_calculator import append_callback_adjustment
 
@@ -332,28 +334,26 @@ def _do_callback(
         return 1, 0
 
     rules = _get_active_rules(strategy)
-    adjusted_items = 0
 
     for item in items:
-        base_bid = item["bid"]  # 基准值（lx_sp_keyword.bid / lx_sp_target.bid）
+        base_bid = item["bid"]  # 基准值（lx_sp_keyword.bid / lx_sp_target.bid），不会被修改
 
-        # 正算分时竞价：与 _do_start 完全相同，结果保留2位小数
-        bid_after = round(base_bid, 2)
+        # 正算分时竞价：与 _do_start 完全相同的计算方式
+        priced_bid = base_bid
         for rule in rules:
-            nb = calc_new_bid(bid_after, rule)
-            if nb is not None and nb != bid_after:
-                bid_after = round(nb, 2)
+            nb = calc_new_bid(priced_bid, rule)
+            if nb is not None and nb != priced_bid:
+                priced_bid = nb
 
-        # 分时竞价 == 基准值 → 没有降价过，跳过
-        if round(bid_after, 4) == round(base_bid, 4):
+        # 分时竞价 == 基准值 → 规则没有改变竞价 → 不需要回调，跳过
+        if round(priced_bid, 4) == round(base_bid, 4):
             logger.info(
-                "[time_pricing] campaign=%d profile=%d item=%d 分时竞价==基准值(%s)，跳过回调",
-                hit.campaign_id, hit.profile_id, item["item_id"], round(base_bid, 4),
+                "[time_pricing] campaign=%d profile=%d item=%d 规则不影响基准值，跳过回调",
+                hit.campaign_id, hit.profile_id, item["item_id"],
             )
             continue
 
-        # 分时竞价 != 基准值 → 需要回调到基准值
-        item["bid_before"] = base_bid  # 当前值就是基准值（因为还没回调过）
+        # 分时竞价 != 基准值 → 规则有降价效果 → 需要回调到基准值
         append_callback_adjustment(
             item, base_bid,  # 回调目标 = 基准值
             hit.campaign_id, hit.profile_id, strategy.id, now_utc, adjustments,
