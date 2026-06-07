@@ -563,7 +563,8 @@ def _process_existing_campaign(
 
     # 已有规则且不在任一时段内：跳过重匹配，避免每小时无意义的
     # process_new_ads() 重匹配 → execute() 兜底 reset 反复翻转
-    if existing.hit_time_pricing_rules:
+    # 例外：rule_updated_today=False 时分时回调刚结束或规则已变更，必须放行重匹配
+    if existing.hit_time_pricing_rules and existing.rule_updated_today:
         if not _is_in_any_segment_now(existing, strategies):
             return None
 
