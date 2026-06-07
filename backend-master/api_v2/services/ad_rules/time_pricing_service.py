@@ -338,7 +338,7 @@ def _do_callback(
     for item in items:
         base_bid = item["bid"]  # 基准值（lx_sp_keyword.bid / lx_sp_target.bid），不会被修改
 
-        # 正算分时竞价：与 _do_start 完全相同的计算方式，保留2位小数
+        # 正算分时竞价：与 _do_start 完全相同的计算方式，每一步都 round 到2位小数
         priced_bid = round(base_bid, 2)
         for rule in rules:
             nb = calc_new_bid(priced_bid, rule)
