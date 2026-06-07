@@ -12,8 +12,6 @@
   上游 ad_time_pricing_service 在写入命中记录时已根据规则时段 + 站点 UTC 偏移算好四个时间值。
   多时段时取所有时段的最小 start 和最大 end 合并为一个覆盖窗口。
 
-  若 segment_times 非空，则按子时段精确匹配规则（#5：多时段规则粒度修复）。
-
 完整执行链路：
   ① 预加载策略 + 投放项（投放项按 campaign_keys 分批 Q 对象 SQL 查询）
   ② _process_single_hit()：从内存 item_map 取投放项 → 用 hit.time_start_cn / time_end_cn 判断时段 → 分流
@@ -23,7 +21,7 @@
 处理流程：
   ├─ awaiting_start=YES + 在时段内 → _do_start()
   │   ├─ 取原始竞价(bid_before=当前实时竞价)
-  │   ├─ 规则链式计算 bid_after（按 segment_times 子时段精确匹配规则，降级为全局合并）
+  │   ├─ 规则链式计算 bid_after
   │   ├─ append_start_adjustment()
   │   │   ├─ bid_before==bid_after → 标 SUCCESS，msg="竞价相等无需调整"
   │   │   └─ 不等 → 标 PENDING，待 bid_adjustment 调 API
@@ -75,11 +73,11 @@ CN_TZ = dt_timezone(timedelta(hours=8))
 def _in_time_range(hit: AdTimePricingHit) -> bool:
     """判断当前北京时间是否在命中记录的时段内。
 
-    优先使用 segment_times 子时段精确匹配（#5），
-    若 segment_times 为空则降级为合并窗口逻辑（兼容旧数据）。
+    用 ad_time_pricing_hit 表已计算好的 time_start_cn / time_end_cn（北京时间 aware datetime），
+    与当前北京时间 datetime.now(固定偏移 +8) 比对。
 
     Args:
-        hit: 分时命中记录（含 time_start_cn / time_end_cn 及可选的 segment_times）
+        hit: 分时命中记录（含 time_start_cn / time_end_cn）
 
     Returns:
         True 表示当前在时段内
