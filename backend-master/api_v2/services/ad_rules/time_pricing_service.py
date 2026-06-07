@@ -84,70 +84,12 @@ def _in_time_range(hit: AdTimePricingHit) -> bool:
     Returns:
         True 表示当前在时段内
     """
-    now_cn = datetime.now(CN_TZ)
-
-    # #5：子时段精确匹配
-    segments = hit.segment_times or []
-    if segments and isinstance(segments, list):
-        for seg in segments:
-            if not isinstance(seg, dict):
-                continue
-            start_str = seg.get("start_cn")
-            end_str = seg.get("end_cn")
-            if not start_str or not end_str:
-                continue
-            try:
-                seg_start = datetime.fromisoformat(start_str)
-                seg_end = datetime.fromisoformat(end_str)
-            except (ValueError, TypeError):
-                continue
-            if seg_start <= now_cn <= seg_end:
-                return True
-        return False
-
-    # 兼容旧数据：合并窗口逻辑
     if hit.time_start_cn is None or hit.time_end_cn is None:
         return False
+    cn_tz = dt_timezone(timedelta(hours=8))
+    now_cn = datetime.now(cn_tz)
     return hit.time_start_cn <= now_cn <= hit.time_end_cn
 
-
-def _get_matched_segment_rules(hit: AdTimePricingHit) -> list[dict] | None:
-    """若 segment_times 非空，返回当前时刻匹配的子时段的独立规则列表。
-
-    用于 _do_start 中按子时段精确选取规则，而非扁平合并所有时段规则（#5）。
-
-    Args:
-        hit: 分时命中记录
-
-    Returns:
-        匹配子时段的 rules 列表；未匹配或无 segment_times 时返回 None（降级为合并逻辑）
-    """
-    segments = hit.segment_times or []
-    if not segments or not isinstance(segments, list):
-        return None
-
-    now_cn = datetime.now(CN_TZ)
-    for seg in segments:
-        if not isinstance(seg, dict):
-            continue
-        start_str = seg.get("start_cn")
-        end_str = seg.get("end_cn")
-        if not start_str or not end_str:
-            continue
-        try:
-            seg_start = datetime.fromisoformat(start_str)
-            seg_end = datetime.fromisoformat(end_str)
-        except (ValueError, TypeError):
-            continue
-        if seg_start <= now_cn <= seg_end:
-            rules = seg.get("rules", [])
-            return rules if isinstance(rules, list) else None
-    return None
-
-
-# ============================================================
-# 规则获取（统一使用 time_pricing_shared #6 #13）
-# ============================================================
 
 def _get_active_rules(strategy: LxTimePricingStrategy) -> list[dict]:
     """从策略 time_settings 中提取今天适用的规则（按 dayOfWeek 过滤）。
@@ -277,9 +219,7 @@ def _do_start(
     """
     from api_v2.services.ad_rules.time_pricing_calculator import append_start_adjustment
 
-    # #5：按子时段精确匹配规则
-    seg_rules = _get_matched_segment_rules(hit)
-    rules = seg_rules if seg_rules is not None else _get_active_rules(strategy)
+    rules = _get_active_rules(strategy)
 
     for item in items:
         item["bid_before"] = item["bid"]
