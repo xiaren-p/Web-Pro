@@ -288,28 +288,15 @@ def append_callback_adjustment(
 ) -> bool:
     """将单条投放项的回调竞价调整添加到收集列表。
 
-    回调竞价 == item["bid"]（数据库竞价）时直接标 SUCCESS，不调 API。
-    不等时写 PENDING CALLBACK 记录。
-
-    Args:
-        item: {"item_type", "item_id", "bid"} 投放项数据
-        callback_bid: 回调目标竞价
-        campaign_id: 广告活动 ID
-        profile_id: 店铺 Profile ID
-        strategy_id: 命中策略 ID
-        now_utc: 调整时间
-        adjustments: 待批量写入的列表（引用传递）
-
-    Returns:
-        True 表示写了 PENDING 记录（需调 API），False 表示竞价不变标 SUCCESS
+    比较 item["bid_before"]（分时竞价）与 item["bid_after"]（基准值）：
+    - 相等 → 标 SUCCESS，无需调 API
+    - 不等 → 标 PENDING，待 API 回调
     """
-    current_bid = item["bid"]
-    bid_before = item.get("bid_before")
-    bid_after = base_bid
-
+    bid_before = item.get("bid_before")  # 分时竞价，由 _do_callback 正算得出
+    bid_after = item.get("bid_after")    # 基准值，由 _do_callback 设置
     is_target = item["item_type"] == "target"
 
-    if bid_before is not None and round(bid_before, 2) == round(bid_after, 2):
+    if bid_before is not None and bid_after is not None and round(bid_before, 2) == round(bid_after, 2):
         adjustments.append(SpBidAdjustment(
             target_id=item["item_id"] if is_target else None,
             keyword_id=item["item_id"] if not is_target else None,
