@@ -336,35 +336,6 @@ def append_callback_adjustment(
 
 
 # ============================================================
-# 回调必要性判断（#7：用实际 START 记录替代反推估算）
-# ============================================================
-
-def has_successful_start_adjustment(
-    campaign_id: int,
-    profile_id: int,
-) -> bool:
-    """检查该 campaign 是否有成功执行的分时开始（START）调整记录。
-
-    用于 _do_callback 中判断降价是否真正生效过——如果从未成功降价，
-    则无需写回调记录。这比 calc_reverse_bid 反推更准确，因为反推不考虑
-    limitValue 截断和 API 实际执行结果。
-
-    Args:
-        campaign_id: 广告活动 ID
-        profile_id: 店铺 Profile ID
-
-    Returns:
-        True 表示该 campaign 至少有一条降价成功执行的记录
-    """
-    return SpBidAdjustment.objects.filter(
-        campaign_id=campaign_id,
-        profile_id=profile_id,
-        execution_type=ExecutionTypeChoices.TIME_PRICING_START,
-        execution_status=ExecutionStatusChoices.SUCCESS,
-    ).exists()
-
-
-# ============================================================
 # 批量写入（#3：事务保护）
 # ============================================================
 
