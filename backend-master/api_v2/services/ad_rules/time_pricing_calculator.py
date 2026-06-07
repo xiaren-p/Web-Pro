@@ -289,11 +289,11 @@ def append_callback_adjustment(
     """将单条投放项的回调竞价调整添加到收集列表。
 
     比较 item["bid_before"]（分时竞价）与 item["bid_after"]（基准值）：
-    - 相等 → 标 SUCCESS，无需调 API
-    - 不等 → 标 PENDING，待 API 回调
+    - 相等 → 标 SUCCESS msg="分时回调：分时竞价与基准值相等，无需调整"
+    - 不等 → 标 PENDING，回调目标 bid_after = 基准值
     """
-    bid_before = item.get("bid_before")  # 分时竞价，由 _do_callback 正算得出
-    bid_after = item.get("bid_after")    # 基准值，由 _do_callback 设置
+    bid_before = item.get("bid_before")
+    bid_after = item.get("bid_after")
     is_target = item["item_type"] == "target"
 
     if bid_before is not None and bid_after is not None and round(bid_before, 2) == round(bid_after, 2):
