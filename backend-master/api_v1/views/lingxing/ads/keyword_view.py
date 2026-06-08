@@ -54,11 +54,11 @@ class KeywordViewSet(viewsets.ViewSet):
         """
         profile = LxAdsProfile.objects.filter(profile_id=profile_id).first()
         if not profile or not profile.currency_code:
-            return "$"
+            return "?"
         rate = LxExchangeRate.objects.filter(
             code=profile.currency_code
         ).order_by("-date").first()
-        return rate.icon if rate and rate.icon else "$"
+        return rate.icon if rate and rate.icon else "?"
 
     @action(detail=False, methods=["post"], url_path="list")
     def list_keywords(self, request: Request) -> Response:

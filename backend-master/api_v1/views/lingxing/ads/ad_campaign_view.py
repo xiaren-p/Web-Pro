@@ -168,7 +168,12 @@ class AdCampaignViewSet(viewsets.ViewSet):
         all_currency_codes = {p.currency_code for p in all_profiles_in_qs if p.currency_code}
 
         # 一次查询获取所有相关汇率，每个币种取最新日期记录
-        all_rates = list(LxExchangeRate.objects.filter(code__in=all_currency_codes).order_by("-date"))
+        # 生产环境 lx_exchange_rate 表可能尚未建好，查询异常时安全兜底为 _default_ccy
+        all_rates: list = []
+        try:
+            all_rates = list(LxExchangeRate.objects.filter(code__in=all_currency_codes).order_by("-date"))
+        except Exception:
+            pass
         seen_codes: set[str] = set()
         rate_map_all: dict[str, dict[str, Any]] = {}
         for r in all_rates:

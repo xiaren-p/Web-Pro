@@ -82,7 +82,7 @@ SERVICE_STATUS_LABEL: dict[str, str] = {
 }
 
 # 货币查询失败时的安全 fallback
-FALLBACK_CCY: dict[str, Any] = {"icon": "$", "code": "USD", "rate": 1.0}
+FALLBACK_CCY: dict[str, Any] = {"icon": "?", "code": "???", "rate": 1.0}
 
 
 def build_campaign_profile_key(campaign_id: Any, profile_id: Any) -> str:
