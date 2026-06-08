@@ -19,8 +19,10 @@ class NcGroup(TimeStampedModel):
     双群组设计：每个部门对应两条记录——
       - group_type=DEPT       → 普通成员群组（仅读权限，permissions=1）
       - group_type=DEPT_ADMIN → 管理员群组（全权限，permissions=31）
-    NC 对同一用户所属的多个群组权限取并集（最高优先），
-    故 DEPT_ADMIN 用户实际拥有完整访问权限。
+    NC Group Folders 的实际行为是：当同一用户属于多个群组且这些群组在
+    同一个 Team Folder 上的权限不一致时，NC 不会取最高权限或并集，而是进入
+    "权限收敛/冲突规避"状态，保守退化为只读（READ）。
+    因此 DEPT_ADMIN 用户只应加入 DEPT_ADMIN 群组，不得同时加入 DEPT 群组。
     """
 
     code = models.CharField(

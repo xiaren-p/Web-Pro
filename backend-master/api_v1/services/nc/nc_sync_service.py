@@ -420,8 +420,10 @@ class NcSyncService:
     def on_user_created(cls, profile) -> None:
         """用户新建后调用：入队 create_user + 群组同步任务。
 
-        根据 admin_level 决定是否同时入队 set_admin；
-        根据 dept 的 NcGroup 入队 add_to_group。
+        根据 admin_level 决定 NC 群组归属（互斥设计）：
+          - MEMBER → 仅加入 DEPT 群组
+          - DEPT_ADMIN → 仅加入 DEPT_ADMIN 群组（不加入 DEPT，避免双群组冲突导致权限退化为只读）
+          - COMPANY_ADMIN → 仅入队 set_admin，不加入任何部门群组
 
         Args:
             profile: UserProfile 实例（已 save）。
@@ -435,8 +437,13 @@ class NcSyncService:
         )
         if profile.admin_level == AdminLevel.COMPANY_ADMIN:
             cls.enqueue_set_admin(user.username)
-        cls._enqueue_dept_group(user.username, profile)
-        cls._enqueue_dept_admin_group(user.username, profile)  # 仅 DEPT_ADMIN 级别触发
+        if profile.admin_level == AdminLevel.DEPT_ADMIN:
+            # DEPT_ADMIN：只加入 DEPT_ADMIN 群组，不加入 DEPT 群组（避免双群组冲突）
+            cls._enqueue_dept_admin_group(user.username, profile)
+        elif profile.admin_level == AdminLevel.MEMBER:
+            # MEMBER：仅加入 DEPT 群组
+            cls._enqueue_dept_group(user.username, profile)
+        # COMPANY_ADMIN 不加入任何部门群组
         cls._enqueue_extra_groups(user.username, profile)
         cls._flush_tasks_after(_last_id)
         logger.info("[NcSyncService][on_user_created] username=%s 同步任务已入队", user.username)
@@ -452,6 +459,11 @@ class NcSyncService:
         old_extra_group_codes: set[str] | None = None,
     ) -> None:
         """用户信息更新后调用：入队 update_user、admin 变更、部门群组及额外群组变更任务。
+
+        互斥群组设计：DEPT 与 DEPT_ADMIN 群组互斥，用户不得同时属于两组。
+        - MEMBER → 仅 DEPT 群组
+        - DEPT_ADMIN → 仅 DEPT_ADMIN 群组
+        - COMPANY_ADMIN → 仅 NC admin 群组，不加入任何部门群组
 
         Args:
             profile: 更新后的 UserProfile 实例。
@@ -481,38 +493,47 @@ class NcSyncService:
 
             if new_level == AdminLevel.COMPANY_ADMIN:
                 cls.enqueue_set_admin(user.username)
-                # 公司管理员通过 NC admin 权限控制，无需活跃在部门管理员群组。
+                # 公司管理员通过 NC admin 权限控制，需移出所有部门群组。
                 # 使用 old_dept_id 而非 profile.dept_id：当部门同时变更时，
                 # profile.dept_id 已是新部门；部门变更块会处理旧部门群组的移出，
                 # 此处只需处理「部门未变更」场景，避免向错误群组发出无效删除请求。
-                if old_level == AdminLevel.DEPT_ADMIN and old_dept_id and old_dept_id == profile.dept_id:
-                    admin_ng = NcGroup.objects.filter(
-                        dept_id=old_dept_id, group_type=NcGroupType.DEPT_ADMIN,
-                    ).first()
-                    if admin_ng:
-                        cls.enqueue_remove_from_group(user.username, admin_ng.code)
+                if old_dept_id and old_dept_id == profile.dept_id:
+                    for old_ng in NcGroup.objects.filter(
+                        dept_id=old_dept_id,
+                        group_type__in=[NcGroupType.DEPT, NcGroupType.DEPT_ADMIN],
+                    ):
+                        cls.enqueue_remove_from_group(user.username, old_ng.code)
             elif old_level == AdminLevel.COMPANY_ADMIN:
                 cls.enqueue_revoke_admin(user.username)
-                # 从公司管理员降为部门管理员时，需加入部门管理员群组
+                # 从公司管理员降级时，根据新级别启用互斥入组
                 if new_level == AdminLevel.DEPT_ADMIN and profile.dept_id:
+                    # DEPT_ADMIN：仅加入 DEPT_ADMIN 群组，不加入 DEPT（避免冲突）
                     cls._enqueue_dept_admin_group(user.username, profile)
+                elif new_level == AdminLevel.MEMBER and profile.dept_id:
+                    # MEMBER：仅加入 DEPT 群组
+                    cls._enqueue_dept_group(user.username, profile)
             elif new_level == AdminLevel.DEPT_ADMIN and old_level == AdminLevel.MEMBER:
-                # 普通成员 → 部门管理员：加入部门管理员群组。
-                # 当部门同时变更时，部门变更块已调用 _enqueue_dept_admin_group，此处跳过避免重复入队。
+                # 普通成员 → 部门管理员：加入 DEPT_ADMIN 群组，同时移出 DEPT 群组（互斥）
                 if old_dept_id == profile.dept_id:
                     cls._enqueue_dept_admin_group(user.username, profile)
+                    # 移出 DEPT 群组，消除双群组冲突
+                    dept_ng = NcGroup.objects.filter(
+                        dept_id=profile.dept_id, group_type=NcGroupType.DEPT,
+                    ).first()
+                    if dept_ng:
+                        cls.enqueue_remove_from_group(user.username, dept_ng.code)
             elif new_level == AdminLevel.MEMBER and old_level == AdminLevel.DEPT_ADMIN:
-                # 部门管理员 → 普通成员：移出部门管理员群组。
-                # 使用 old_dept_id：当部门同时变更时，profile.dept_id 已是新部门（用户从未加入），
-                # 此处应移出旧部门的 DEPT_ADMIN 群组；若部门同时变更，该移出已由部门变更块处理，跳过。
+                # 部门管理员 → 普通成员：移出 DEPT_ADMIN 群组，加入 DEPT 群组（互斥）
                 if old_dept_id and old_dept_id == profile.dept_id:
                     admin_ng = NcGroup.objects.filter(
                         dept_id=old_dept_id, group_type=NcGroupType.DEPT_ADMIN,
                     ).first()
                     if admin_ng:
                         cls.enqueue_remove_from_group(user.username, admin_ng.code)
+                    # 加入 DEPT 群组（普通成员应有只读权限）
+                    cls._enqueue_dept_group(user.username, profile)
 
-        # 部门变更：退出旧部门的 DEPT + DEPT_ADMIN 群组，加入新部门群组
+        # 部门变更：退出旧部门的 DEPT + DEPT_ADMIN 群组，按新部门 + 当前级别互斥入组
         if old_dept_id != profile.dept_id:
             if old_dept_id:
                 for old_ng in NcGroup.objects.filter(
@@ -520,8 +541,13 @@ class NcSyncService:
                     group_type__in=[NcGroupType.DEPT, NcGroupType.DEPT_ADMIN],
                 ):
                     cls.enqueue_remove_from_group(user.username, old_ng.code)
-            cls._enqueue_dept_group(user.username, profile)
-            cls._enqueue_dept_admin_group(user.username, profile)
+            # 按当前 admin_level 互斥入组新部门
+            if profile.dept_id:
+                if profile.admin_level == AdminLevel.DEPT_ADMIN:
+                    cls._enqueue_dept_admin_group(user.username, profile)
+                elif profile.admin_level == AdminLevel.MEMBER:
+                    cls._enqueue_dept_group(user.username, profile)
+                # COMPANY_ADMIN 不加入任何部门群组
         # 额外群组变更：仅当调用方显式传入 old_extra_group_codes 时对比差集
         if old_extra_group_codes is not None:
             try:
@@ -909,6 +935,7 @@ class NcSyncService:
     def _enqueue_dept_group(cls, username: str, profile) -> None:
         """根据用户部门入队 add_to_group（部门 DEPT 群组）。
 
+        互斥约束：若当前用户为 DEPT_ADMIN 级别，跳过 DEPT 入队（不应与 DEPT_ADMIN 并存）。
         若目标部门尚无 NcGroup 记录（如部门在 NC 集成上线前创建），
         则自动调用 on_dept_created 补建 NcGroup 及 create_group /
         create_group_folder 任务，之后再入队 add_to_group，
@@ -919,6 +946,17 @@ class NcSyncService:
             profile: UserProfile 实例。
         """
         if not profile.dept_id:
+            return
+        # 互斥守卫：DEPT_ADMIN 级别用户只应属于 DEPT_ADMIN 群组
+        if profile.admin_level == AdminLevel.DEPT_ADMIN:
+            logger.info(
+                "[NcSyncService][_enqueue_dept_group] username=%s 为 DEPT_ADMIN，"
+                "跳过 DEPT 群入队（互斥设计）",
+                username,
+            )
+            return
+        # COMPANY_ADMIN 不加入任何部门群组
+        if profile.admin_level == AdminLevel.COMPANY_ADMIN:
             return
         try:
             nc_group = NcGroup.objects.filter(

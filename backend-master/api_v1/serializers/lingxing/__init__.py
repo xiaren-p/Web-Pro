@@ -1,3 +1,3 @@
-from api_v1.serializers.lingxing.ads import LxCampaignInfoSerializer
+from api_v1.serializers.lingxing.ads import LxSpCampaignSerializer
 
-__all__ = ["LxCampaignInfoSerializer"]
+__all__ = ["LxSpCampaignSerializer"]

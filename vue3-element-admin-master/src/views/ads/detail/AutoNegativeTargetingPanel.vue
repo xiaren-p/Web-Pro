@@ -31,8 +31,8 @@
         placeholder="全部否定类型"
         clearable
       >
-        <el-option label="否定ASIN" value="asin" />
-        <el-option label="否定品牌" value="brand" />
+        <el-option label="否定ASIN" value="negativeAsin" />
+        <el-option label="否定品牌" value="negativeBrand" />
       </el-select>
       <el-input
         v-model="filters.keyword"

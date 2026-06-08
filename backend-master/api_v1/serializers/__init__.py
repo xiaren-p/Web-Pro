@@ -42,7 +42,6 @@ from api_v1.serializers.finance.monthly_loss_first20_serializer import MonthlyLo
 from api_v1.serializers.work import WorkReportSerializer
 
 # ads 板块
-from api_v1.serializers.lingxing.ads import LxCampaignInfoSerializer
 from api_v1.serializers.lingxing.ads_time_pricing_strategy_serializer import LxTimePricingStrategySerializer
 
 __all__ = [
@@ -57,7 +56,6 @@ __all__ = [
     "ImageUploadSerializer",
     "MonthlyLossSerializer", "MonthlyLossFirst20Serializer",
     "WorkReportSerializer",
-    "LxCampaignInfoSerializer",
     "LxTimePricingStrategySerializer",
 ]
 

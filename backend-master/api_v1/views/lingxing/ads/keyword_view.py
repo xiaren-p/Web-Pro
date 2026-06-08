@@ -1,11 +1,11 @@
-"""SP 否定定向（否定商品）列表及指标聚合视图（否定投放 Tab）。
+"""SP 自动广告关键词列表及指标聚合视图（详情页 Tab：投放 - 关键词）。
 
 接受 ``campaign_id`` + ``profile_id`` 为必填参数，
-可选日期范围、状态、否定类型（negative_type）与关键词搜索，
-返回带指标的否定定向列表、汇总行及分页信息。
+可选日期范围、状态、匹配方式（match_type）与关键词筛选，
+返回带指标的关键词投放列表、汇总行及分页信息。
 
-否定定向来自 lx_sp_negative_target（negative_type=negativeAsin/negativeBrand），
-指标来自 lx_sp_keyword_report（decimal / int 类型，DB 端 Sum 聚合）。
+关键词来源于 lx_sp_keyword 表，指标来源于 lx_sp_keyword_report 表。
+结构镜像 auto_targeting_view.py，字段适配 LxSpKeyword / LxSpKeywordReport。
 """
 from __future__ import annotations
 
@@ -23,22 +23,22 @@ from api_v1.models import (
     LxExchangeRate,
     LxSpAdGroup,
     LxSpCampaign,
+    LxSpKeyword,
     LxSpKeywordReport,
-    LxSpNegativeTarget,
 )
 from api_v1.services.lingxing.ads_metrics_service import (
-    _build_negative_summary_row,
-    _compute_negative_row,
-    empty_negative_metrics,
+    _build_summary_row,
+    _compute_metrics_row,
+    empty_adgroup_metrics,
 )
 from api_v1.utils.ad_status import resolve_service_status
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_ok
-from api_v1.views.lingxing.ads._helpers import NEGATIVE_TYPE_LABEL
+from api_v1.views.lingxing.ads._helpers import KEYWORD_MATCH_TYPE_LABEL
 
 
-class AutoNegativeTargetingViewSet(viewsets.ViewSet):
-    """SP 否定定向（否定商品）列表及指标聚合视图。"""
+class KeywordViewSet(viewsets.ViewSet):
+    """SP 自动广告关键词列表及指标聚合视图。"""
 
     def _resolve_currency_icon(self, profile_id: int) -> str:
         """根据 profile_id 查询货币符号（一步查表）。
@@ -61,8 +61,8 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
         return rate.icon if rate and rate.icon else "$"
 
     @action(detail=False, methods=["post"], url_path="list")
-    def list_auto_negative_targeting(self, request: Request) -> Response:
-        """分页获取 SP 否定定向列表及聚合指标。
+    def list_keywords(self, request: Request) -> Response:
+        """分页获取关键词投放列表及聚合指标。
 
         Args:
             request (Request): DRF 请求对象，body 字段：
@@ -71,14 +71,14 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
             - profile_id (str): 必填，店铺 Profile ID。
             - date_start (str): 可选，起始日期 YYYY-MM-DD。
             - date_end (str): 可选，截止日期 YYYY-MM-DD。
-            - state (str): 可选，状态过滤（enabled / archived）。
-            - exp_type (str): 可选，否定类型过滤。
-            - keyword (str): 可选，按 negative_text 模糊搜索。
+            - state (str): 可选，状态过滤（enabled / paused / archived）。
+            - match_type (str): 可选，匹配方式过滤（exact / broad / phrase）。
+            - keyword (str): 可选，按 keyword_text 模糊搜索。
             - pageNum (int): 可选，页码，默认 1。
             - pageSize (int): 可选，每页条数，默认 25。
 
         Returns:
-            Response: 标准分页响应，含 total / list / summary / pageNum / pageSize。
+            Response: 标准分页响应，含 ``total / list / summary / currency_icon / pageNum / pageSize``。
         """
         data = request.data
 
@@ -94,28 +94,29 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
         except (ValueError, TypeError):
             return drf_ok({}, msg="campaign_id 与 profile_id 必须为有效数字")
 
-        # 基础查询集：否定 ASIN + 否定品牌（排除 negativeKeyword），按 campaign_id + profile_id 隔离
-        qs = LxSpNegativeTarget.objects.filter(
+        # 基础查询集：按 campaign_id + profile_id 隔离，按 id 排序（保持稳定分页）
+        qs = LxSpKeyword.objects.filter(
             campaign_id=campaign_id,
             profile_id=profile_id,
-            negative_type__in=["negativeAsin", "negativeBrand"],
         ).order_by("id")
 
-        # 全量 target_id：状态过滤前提取，保证指标聚合分母完整
-        all_target_ids = [str(tid) for tid in qs.values_list("target_id", flat=True)]
+        # 全量 keyword_id：必须在状态过滤前提取，保证指标汇总分母始终覆盖完整广告活动
+        all_keyword_ids = [str(kid) for kid in qs.values_list("keyword_id", flat=True)]
 
-        # 可选过滤
+        # 可选状态过滤（仅影响分页展示，不影响指标聚合分母）
         state = str(data.get("state") or "").strip()
         if state:
             qs = qs.filter(state=state)
 
-        exp_type = str(data.get("exp_type") or "").strip()
-        if exp_type:
-            qs = qs.filter(negative_type=exp_type)
+        # 可选匹配方式过滤
+        match_type = str(data.get("match_type") or "").strip()
+        if match_type:
+            qs = qs.filter(match_type=match_type)
 
+        # 可选关键词文本模糊搜索
         keyword = str(data.get("keyword") or "").strip()
         if keyword:
-            qs = qs.filter(negative_text__icontains=keyword)
+            qs = qs.filter(keyword_text__icontains=keyword)
 
         # 分页
         total, items, p_num, p_size = paginate_queryset(request, qs)
@@ -127,17 +128,25 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
         campaign_name = ""
         campaign_state = ""
         campaign_portfolio_name = ""
+        bidding_strategy = ""
         try:
             c_obj = LxSpCampaign.objects.get(
                 campaign_id=campaign_id, profile_id=profile_id
             )
             campaign_name = c_obj.name or ""
             campaign_state = c_obj.state or ""
+            # portfolio_name：LxSpKeyword 无 portfolio_id，通过 Campaign 间接获取
             if c_obj.portfolio_id:
                 pf = LxAdsPortfolio.objects.filter(
                     portfolio_id=c_obj.portfolio_id, profile_id=profile_id
                 ).first()
                 campaign_portfolio_name = pf.name or str(c_obj.portfolio_id) if pf else ""
+            # bidding_strategy：从 LxSpCampaign.bidding JSON 中提取 strategy 字段
+            if c_obj.bidding:
+                bidding_strategy = (
+                    c_obj.bidding.get("strategy", "")
+                    if isinstance(c_obj.bidding, dict) else ""
+                )
         except LxSpCampaign.DoesNotExist:
             pass
 
@@ -157,11 +166,11 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
                 adgroup_map[gid] = g["name"] or ""
                 adgroup_state_map[gid] = g["state"] or ""
 
-        # ── 指标聚合（LxSpKeywordReport + DB Sum()，否定定向 target_id 关联 keyword_id）──
+        # ── 指标聚合（LxSpKeywordReport + DB Sum()）──
         date_start = str(data.get("date_start") or "").strip() or None
         date_end = str(data.get("date_end") or "").strip() or None
-        metrics_map, summary = self._build_negative_metrics(
-            all_target_ids, campaign_id, profile_id,
+        metrics_map, summary = self._build_metrics(
+            all_keyword_ids, campaign_id, profile_id,
             date_start, date_end, currency_icon,
         )
 
@@ -169,33 +178,31 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
         res_list: list[dict[str, Any]] = []
         for item in items:
             gid_val = item.ad_group_id
-            exp_type_val = str(item.negative_type or "")
+            match_type_val = str(item.match_type or "")
 
             row: dict[str, Any] = {
-                "target_id": item.target_id,
+                "keyword_id": item.keyword_id,
+                "keyword_text": item.keyword_text or "",
+                "match_type": match_type_val,
+                "match_type_label": KEYWORD_MATCH_TYPE_LABEL.get(match_type_val, match_type_val),
+                "bid": float(item.bid) if item.bid is not None else "-",
                 "state": item.state or "",
                 "service_status": item.serving_status or "",
                 **{
                     f"service_status_{k}": v
                     for k, v in resolve_service_status(item.serving_status).items()
                 },
-                "exp_type": exp_type_val,
-                "exp_type_label": NEGATIVE_TYPE_LABEL.get(exp_type_val, exp_type_val),
-                "exp_value": item.negative_text or "",
-                # 新模型无商品详情字段，返回占位值
-                "asin_price": "-",
-                "asin_stars": "-",
-                "asin_review_count": "-",
-                "asin_title": "",
+                "bidding_strategy": bidding_strategy,
                 "portfolio_name": campaign_portfolio_name,
                 "campaign_name": campaign_name,
                 "campaign_state": campaign_state,
                 "adgroup_name": adgroup_map.get(gid_val, "") if gid_val else "",
                 "adgroup_state": adgroup_state_map.get(gid_val, "") if gid_val else "",
                 "created_at": str(item.creation_date) if item.creation_date else "",
+                "tag": "-",
             }
             row.update(
-                metrics_map.get(str(item.target_id), empty_negative_metrics())
+                metrics_map.get(str(item.keyword_id), empty_adgroup_metrics())
             )
             res_list.append(row)
 
@@ -209,20 +216,20 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
         })
 
     @staticmethod
-    def _build_negative_metrics(
-        target_ids: list[str],
+    def _build_metrics(
+        keyword_ids: list[str],
         campaign_id: int,
         profile_id: int,
         date_start: str | None,
         date_end: str | None,
         currency_icon: str,
     ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
-        """按 target_id 聚合 SP 关键词报表指标（否定定向用）。
+        """按 keyword_id 聚合 SP 关键词报表指标。
 
-        使用 DB 端 GROUP BY + Sum() 聚合，匹配规则：target_id → keyword_id。
+        使用 DB 端 GROUP BY + Sum() 聚合（LxSpKeywordReport 为原生数值类型）。
 
         Args:
-            target_ids (list[str]): 全量 target_id 列表。
+            keyword_ids (list[str]): 全量 keyword_id 列表（字符串形式）。
             campaign_id (int): 广告活动 ID。
             profile_id (int): 店铺 Profile ID。
             date_start (str | None): 起始日期。
@@ -232,11 +239,11 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
         Returns:
             tuple[dict, dict]: (metrics_map, summary)。
         """
-        if not target_ids:
-            return {}, _build_negative_summary_row(0.0, 0, 0.0, currency_icon)
+        if not keyword_ids:
+            return {}, _build_summary_row(0.0, 0.0, 0, 0, 0, 0.0, 0, 0, currency_icon)
 
         qs = LxSpKeywordReport.objects.filter(
-            keyword_id__in=target_ids,
+            keyword_id__in=keyword_ids,
             campaign_id=campaign_id,
             profile_id=profile_id,
         )
@@ -248,29 +255,56 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
         agg_rows = list(
             qs.values("keyword_id").annotate(
                 total_sales=Sum("sales"),
+                total_same_sales=Sum("same_sales"),
                 total_orders=Sum("orders"),
+                total_same_orders=Sum("same_orders"),
+                total_units=Sum("units"),
                 total_cost=Sum("cost"),
+                total_clicks=Sum("clicks"),
+                total_impressions=Sum("impressions"),
             )
         )
 
         if not agg_rows:
-            return {}, _build_negative_summary_row(0.0, 0, 0.0, currency_icon)
+            return {}, _build_summary_row(0.0, 0.0, 0, 0, 0, 0.0, 0, 0, currency_icon)
 
-        tot_sales = tot_cost = 0.0
-        tot_orders = 0
+        # 第一轮：累加全量合计
+        tot_sales = tot_same_sales = tot_cost = 0.0
+        tot_orders = tot_same_orders = tot_units = tot_clicks = tot_impressions = 0
+
         for row in agg_rows:
             tot_sales += float(row["total_sales"] or 0)
+            tot_same_sales += float(row["total_same_sales"] or 0)
             tot_cost += float(row["total_cost"] or 0)
             tot_orders += int(row["total_orders"] or 0)
+            tot_same_orders += int(row["total_same_orders"] or 0)
+            tot_units += int(row["total_units"] or 0)
+            tot_clicks += int(row["total_clicks"] or 0)
+            tot_impressions += int(row["total_impressions"] or 0)
 
-        metrics_map: dict[str, dict[str, Any]] = {
-            str(row["keyword_id"]): _compute_negative_row(
+        # 第二轮：基于全量合计计算每行衍生指标
+        metrics_map: dict[str, dict[str, Any]] = {}
+        for row in agg_rows:
+            row_key = str(row["keyword_id"])
+            metrics_map[row_key] = _compute_metrics_row(
                 float(row["total_sales"] or 0),
+                float(row["total_same_sales"] or 0),
                 int(row["total_orders"] or 0),
+                int(row["total_same_orders"] or 0),
+                int(row["total_units"] or 0),
                 float(row["total_cost"] or 0),
+                int(row["total_clicks"] or 0),
+                int(row["total_impressions"] or 0),
                 currency_icon,
+                tot_sales=tot_sales,
+                tot_spends=tot_cost,
+                tot_clicks=tot_clicks,
+                tot_impressions=tot_impressions,
             )
-            for row in agg_rows
-        }
-        summary = _build_negative_summary_row(tot_sales, tot_orders, tot_cost, currency_icon)
+
+        summary = _build_summary_row(
+            tot_sales, tot_same_sales, tot_orders, tot_same_orders,
+            tot_units, tot_cost, tot_clicks, tot_impressions,
+            currency_icon,
+        )
         return metrics_map, summary

@@ -239,13 +239,6 @@ const defaultColumns = [
   { label: "竞价策略", prop: "bidding_type", visible: true, category: "设置" },
   { label: "广告组合", prop: "portfolio_name", visible: true, category: "设置" },
   { label: "预算", prop: "budget", visible: true, category: "设置" },
-  {
-    label: "超预算时间",
-    prop: "overBudgetTime",
-    visible: true,
-    category: "设置",
-    sortable: "custom",
-  },
   { label: "开始日期", prop: "startDate", visible: true, category: "设置" },
   { label: "标签", prop: "tags", visible: true, category: "设置" },
   // 转化

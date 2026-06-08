@@ -1,11 +1,12 @@
-"""领星广告活动信息序列化器。"""
+"""领星 SP 广告活动信息序列化器。"""
 from rest_framework import serializers
-from api_v1.models import LxCampaignInfo
+
+from api_v1.models import LxSpCampaign
 
 
-class LxCampaignInfoSerializer(serializers.ModelSerializer):
-    """领星广告活动信息全字段序列化器。"""
+class LxSpCampaignSerializer(serializers.ModelSerializer):
+    """SP 广告活动信息全字段序列化器。"""
 
     class Meta:
-        model = LxCampaignInfo
+        model = LxSpCampaign
         fields = "__all__"

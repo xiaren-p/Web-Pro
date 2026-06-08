@@ -31,20 +31,23 @@ from api_v1.models.finance.order_profit_cache import OrderProfitCache
 from api_v1.models.finance.monthly_loss_order import MonthlyLossOrder
 from api_v1.models.finance.monthly_loss_order_first20 import MonthlyLossOrderFirst20
 from api_v1.models.work import WorkReport
-from api_v1.models.currency.currency_icon import CurrencyIcon
-from api_v1.models.currency.lx_currency_rates import LxCurrencyRates
+from api_v1.models.lingxing.ads.report.lx_sp_campaign_report import LxSpCampaignReport
+from api_v1.models.lingxing.basic.lx_exchange_rate import LxExchangeRate
 from api_v1.models.lingxing.ads.basic.lx_ads_profile import AdsProfileStatus, AdsProfileType, LxAdsProfile
-from api_v1.models.lingxing.ads.lx_ad_portfolios import LxAdPortfolios
-from api_v1.models.lingxing.ads.lx_campaign_info import LxCampaignInfo
-from api_v1.models.lingxing.ads.lx_campaign_metrics import LxCampaignMetrics
-from api_v1.models.lingxing.ads.lx_ad_group_info import LxAdGroupInfo
-from api_v1.models.lingxing.ads.lx_ad_group_metrics import LxAdGroupMetrics
-from api_v1.models.lingxing.ads.lx_ad_info import LxAdInfo
-from api_v1.models.lingxing.ads.lx_ad_metrics import LxAdMetrics
-from api_v1.models.shop.lx_shop_profile import LxShopProfile
+from api_v1.models.lingxing.ads.basic.lx_ads_portfolio import LxAdsPortfolio
+from api_v1.models.lingxing.ads.basic.lx_sp_campaign import LxSpCampaign, SpCampaignTargetingType
+from api_v1.models.lingxing.ads.basic.lx_sp_ad_group import LxSpAdGroup
+from api_v1.models.lingxing.ads.basic.lx_sp_ad import LxSpAd
+from api_v1.models.lingxing.ads.basic.lx_sp_keyword import LxSpKeyword, SpKeywordMatchType
+from api_v1.models.lingxing.ads.report.lx_sp_ad_group_report import LxSpAdGroupReport
+from api_v1.models.lingxing.ads.basic.lx_sp_target import LxSpTarget, SpTargetExpressionType
+from api_v1.models.lingxing.ads.report.lx_sp_target_report import LxSpTargetReport
+from api_v1.models.lingxing.ads.basic.lx_sp_negative_target import LxSpNegativeTarget, NegativeTargetType
+from api_v1.models.lingxing.ads.report.lx_sp_keyword_report import LxSpKeywordReport
 from api_v1.models.shop.lx_sellers import LxSellers
 from api_v1.models.shop.lx_user_list import LxUserList
 from api_v1.models.lingxing.basic.lx_shops import HasAdsSetting, LxShops, ShopStatus
+from api_v1.models.lingxing.sales.listing.lx_listing_data import LxListingData, ListingStatus, ListingDeleteFlag, ListingStoreType
 from api_v1.models.lingxing.sales.listing.lx_listing_info import LxListingInfo
 from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
 from api_v1.models.lingxing.sales.listing.lx_listing_remark import LxListingRemark
@@ -65,13 +68,17 @@ __all__ = [
     'FileFolder', 'FileAsset', 'FileChunk', 'ImageUpload',
     'CrawlerLog', 'CrawlerConf', 'CrawlerSellerAccount', 'CrawlerCategory',
     'OrderProfitCache', 'MonthlyLossOrder', 'MonthlyLossOrderFirst20',
-    'WorkReport', 'CurrencyIcon', 'LxCurrencyRates',
+    'WorkReport',
     'LxAdsProfile', 'AdsProfileStatus', 'AdsProfileType',
-    'LxAdPortfolios', 'LxCampaignInfo', 'LxCampaignMetrics',
-    'LxAdGroupInfo', 'LxAdGroupMetrics', 'LxAdInfo', 'LxAdMetrics',
-    'LxShopProfile', 'LxSellers', 'LxUserList',
+    'LxAdsPortfolio', 'LxSpCampaign', 'SpCampaignTargetingType', 'LxSpAdGroup',
+    'LxSpCampaignReport', 'LxSpAdGroupReport', 'LxSpAd',
+    'LxSpTarget', 'SpTargetExpressionType', 'LxSpTargetReport',
+    'LxSpKeyword', 'SpKeywordMatchType', 'LxSpKeywordReport',
+    'LxSpNegativeTarget', 'NegativeTargetType', 'LxSpKeywordReport',
+    'LxExchangeRate',
+    'LxSellers', 'LxUserList',
     'LxShops', 'ShopStatus', 'HasAdsSetting',
-    'LxListingInfo', 'LxProductInfo', 'LxListingRemark', 'LxOrderProfit', 'LxListingMetrics',
+    'LxListingInfo', 'LxListingData', 'ListingStatus', 'ListingDeleteFlag', 'ListingStoreType', 'LxProductInfo', 'LxListingRemark', 'LxOrderProfit', 'LxListingMetrics',
     # 分时调价策略
     'LxTimePricingStrategy', 'StrategyStatus', 'BaseValueType', 'ExecutionResultType',
 ]

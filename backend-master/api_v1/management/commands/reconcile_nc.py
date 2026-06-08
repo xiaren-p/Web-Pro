@@ -265,23 +265,26 @@ class Command(BaseCommand):
                         NcSyncService.enqueue_enable_user(username)
                         enqueued += 1
 
-                # 对账群组成员关系
+                # 对账群组成员关系（互斥设计：DEPT 与 DEPT_ADMIN 不可并存）
                 expected_groups: set = set()
                 if profile.dept_id:
-                    dept_nc_group = NcGroup.objects.filter(
-                        dept_id=profile.dept_id,
-                        group_type=NcGroupType.DEPT,
-                    ).first()
-                    if dept_nc_group:
-                        expected_groups.add(dept_nc_group.code)
-                    # DEPT_ADMIN 级别的用户需同时在部门管理员群组
                     if profile.admin_level == AdminLevel.DEPT_ADMIN:
+                        # DEPT_ADMIN：仅加入 DEPT_ADMIN 群组，不加入 DEPT 群组（避免双群组冲突）
                         admin_nc_group = NcGroup.objects.filter(
                             dept_id=profile.dept_id,
                             group_type=NcGroupType.DEPT_ADMIN,
                         ).first()
                         if admin_nc_group:
                             expected_groups.add(admin_nc_group.code)
+                    elif profile.admin_level == AdminLevel.MEMBER:
+                        # MEMBER：仅加入 DEPT 群组
+                        dept_nc_group = NcGroup.objects.filter(
+                            dept_id=profile.dept_id,
+                            group_type=NcGroupType.DEPT,
+                        ).first()
+                        if dept_nc_group:
+                            expected_groups.add(dept_nc_group.code)
+                    # COMPANY_ADMIN 不加入任何部门群组
                 for extra_g in profile.extra_nc_groups.all():
                     expected_groups.add(extra_g.code)
                 if profile.admin_level == AdminLevel.COMPANY_ADMIN:
@@ -298,6 +301,20 @@ class Command(BaseCommand):
                 known_codes: set = set(NcGroup.objects.values_list("code", flat=True))
                 extra_groups = (nc_groups - expected_groups) & known_codes
                 extra_groups.discard("admin")
+
+                # 双群组冲突检测：DEPT_ADMIN 用户不应同时存在于同部门 DEPT 群组
+                if profile.admin_level == AdminLevel.DEPT_ADMIN and profile.dept_id:
+                    dept_ng = NcGroup.objects.filter(
+                        dept_id=profile.dept_id,
+                        group_type=NcGroupType.DEPT,
+                    ).first()
+                    if dept_ng and dept_ng.code in nc_groups:
+                        extra_groups.add(dept_ng.code)
+                        self.stdout.write(
+                            f"  → 双群组冲突：DEPT_ADMIN 用户 {username} "
+                            f"同时属于 DEPT 群 {dept_ng.code}，需移出（互斥修复）"
+                        )
+
                 for stale_group in extra_groups:
                     self.stdout.write(f"  → 用户 {username} 多余群组 {stale_group}，需移除")
                     if not dry_run:

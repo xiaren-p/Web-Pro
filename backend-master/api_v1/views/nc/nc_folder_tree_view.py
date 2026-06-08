@@ -871,8 +871,11 @@ def _enqueue_acl_for_rule(rule: NcFileAccessRule, nc_group: NcGroup) -> None:
     """为规则入队 ADD_TO_GROUP + ENABLE_FOLDER_ACL + SET_PATH_ACL 同步任务。
 
     NC Group Folder 要求用户必须属于某个已被授权的群组，才能在 Files 中看到该文件夹。
-    因此在设置路径 ACL 前，先将用户加入对应 DEPT 群组（幂等），赋予文件夹可见性，
+    因此在设置路径 ACL 前，先将用户加入对应群组（幂等），赋予文件夹可见性，
     再下发细粒度路径 ACL 规则。任务入队完毕后立即通过后台线程刷新执行。
+
+    互斥约束：当规则含写权限时，加入 DEPT_ADMIN 群后同时移出 DEPT 群，
+    避免 DEPT（read=1）与 DEPT_ADMIN（full=31）在同一文件夹上产生权限冲突。
 
     通过 nc_group（DEPT_ADMIN 群组）的 dept_id 定位 DEPT 群组，而非 dept__name，
     避免部门重命名后查找失败。
@@ -899,6 +902,8 @@ def _enqueue_acl_for_rule(rule: NcFileAccessRule, nc_group: NcGroup) -> None:
         if rule.permission_bits & NcFileAccessRule.PERM_WRITE:
             # nc_group 本身就是该部门的 DEPT_ADMIN 群组（已由 _resolve_dept_admin_group 的 group_type 过滤保证）
             group_to_join = nc_group
+            # 互斥约束：加入 DEPT_ADMIN 后移出 DEPT 群组，避免双群组权限冲突退化为只读
+            NcSyncService.enqueue_remove_from_group(rule.user.username, dept_ng.code)
             mount_point = rule.nc_path.split("/")[0]
             if mount_point != rule.nc_path:
                 # NC Group Folder Advanced Permissions 规则不级联（not cascading）：
@@ -910,6 +915,17 @@ def _enqueue_acl_for_rule(rule: NcFileAccessRule, nc_group: NcGroup) -> None:
                 NcSyncService.enqueue_restrict_folder_root(mount_point, rule.user.username)
         else:
             group_to_join = dept_ng
+            # 互斥约束：READ-only 规则加入 DEPT 群组，需确保不在 DEPT_ADMIN 群组中。
+            # 仅当用户非自然 DEPT_ADMIN 时才移出（自然 DEPT_ADMIN 应走写权限分支，不会被送入此分支）。
+            # 此处处理的是「MEMBER 被 ACL 临时加入 DEPT_ADMIN 后又改回 READ-only」的场景。
+            _profile = getattr(rule.user, "profile", None)
+            _is_natural_admin = (
+                _profile is not None
+                and getattr(_profile, "admin_level", None) == AdminLevel.DEPT_ADMIN
+                and getattr(_profile, "dept_id", None) == nc_group.dept_id
+            )
+            if not _is_natural_admin:
+                NcSyncService.enqueue_remove_from_group(rule.user.username, nc_group.code)
         NcSyncService.enqueue_add_to_group(rule.user.username, group_to_join.code)
 
     NcSyncService.enqueue_set_path_acl(rule)

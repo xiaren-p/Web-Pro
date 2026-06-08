@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from api_v1.models import (
-    CurrencyIcon,
+    LxExchangeRate,
     LxListingInfo,
     LxListingRemark,
     LxOrderProfit,
@@ -186,8 +186,17 @@ class SalesProductListingViewSet(ViewSet):
                     "gross_margin": float(p.gross_margin) if p.gross_margin else 0.0,
                 }
 
-        # 货币符号映射：国家代码 → 符号
-        icon_map = {o.country: o.icon for o in CurrencyIcon.objects.all()}
+        # 货币符号映射：国家代码 → 符号（改用 LxExchangeRate 最新记录）
+        rates_by_code: dict[str, str] = {}
+        for r in LxExchangeRate.objects.filter(icon__isnull=False).order_by("-date"):
+            if r.code not in rates_by_code and r.icon:
+                rates_by_code[r.code] = r.icon
+        # LxListingData.marketplace 存储的是国家代码，LxExchangeRate.code 存的是币种代码
+        # 需要国家→币种→符号的间接映射
+        icon_map: dict[str, str] = {}
+        for lp in listings_page:
+            if lp.currency_code and lp.currency_code not in icon_map:
+                icon_map[lp.currency_code] = rates_by_code.get(lp.currency_code, "$")
 
         def _money_display(icon: str, value) -> str:
             """金额定型字符串：``"$ 12.34"`` 形式，None/空返回空串。"""

@@ -4,6 +4,7 @@ from api_v1.views.lingxing.ads.ad_campaign_view import AdCampaignViewSet
 from api_v1.views.lingxing.ads.ad_group_view import AdGroupViewSet
 from api_v1.views.lingxing.ads.ad_view import AdViewSet
 from api_v1.views.lingxing.ads.auto_targeting_view import AutoTargetingViewSet
+from api_v1.views.lingxing.ads.keyword_view import KeywordViewSet
 from api_v1.views.lingxing.ads.auto_negative_targeting_view import AutoNegativeTargetingViewSet
 from api_v1.views.lingxing.ads.negative_keyword_view import NegativeKeywordViewSet
 from api_v1.views.lingxing.ads.time_pricing_strategy_view import TimePricingStrategyViewSet
@@ -11,6 +12,6 @@ from api_v1.views.lingxing.ads.time_pricing_strategy_view import TimePricingStra
 __all__ = [
     "ShopProfileViewSet", "AdPortfolioViewSet", "AdCampaignViewSet",
     "AdGroupViewSet", "AdViewSet", "AutoTargetingViewSet",
-    "AutoNegativeTargetingViewSet", "NegativeKeywordViewSet",
+    "KeywordViewSet", "AutoNegativeTargetingViewSet", "NegativeKeywordViewSet",
     "TimePricingStrategyViewSet",
 ]

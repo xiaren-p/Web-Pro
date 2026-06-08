@@ -353,30 +353,31 @@ def build_ad_metrics_map(
             - metrics_map: 以 ad_id（str）为键，各行指标字典为值的映射。
             - summary: 全量合计汇总行字典，供前端表格底部汇总行展示。
     """
-    from api_v1.models.lingxing.ads.lx_ad_metrics import LxAdMetrics
+    from api_v1.models.lingxing.ads.report.lx_sp_ad_report import LxSpAdReport
 
     if not ad_ids:
         return {}, _build_summary_row(0.0, 0.0, 0, 0, 0, 0.0, 0, 0, currency_icon)
 
-    qs = LxAdMetrics.objects.filter(
+    qs = LxSpAdReport.objects.filter(
         ad_id__in=ad_ids,
         campaign_id=campaign_id,
         profile_id=profile_id,
     )
     if date_start:
-        qs = qs.filter(timestamp__gte=date_start)
+        qs = qs.filter(report_date__gte=date_start)
     if date_end:
-        qs = qs.filter(timestamp__lte=date_end)
+        qs = qs.filter(report_date__lte=date_end)
 
     # 单次 GROUP BY 聚合，DB 端完成所有 SUM
+    # 字段名映射：spends→cost, direct_sales→same_sales, direct_orders→same_orders, ad_units→units
     agg_rows = list(
         qs.values("ad_id").annotate(
             total_sales=Sum("sales"),
-            total_direct_sales=Sum("direct_sales"),
+            total_same_sales=Sum("same_sales"),
             total_orders=Sum("orders"),
-            total_direct_orders=Sum("direct_orders"),
-            total_ad_units=Sum("ad_units"),
-            total_spends=Sum("spends"),
+            total_same_orders=Sum("same_orders"),
+            total_units=Sum("units"),
+            total_cost=Sum("cost"),
             total_clicks=Sum("clicks"),
             total_impressions=Sum("impressions"),
         )
@@ -386,16 +387,16 @@ def build_ad_metrics_map(
         return {}, _build_summary_row(0.0, 0.0, 0, 0, 0, 0.0, 0, 0, currency_icon)
 
     # 第一轮遍历：累加全量合计，作为各 % 字段的分母基准
-    tot_sales = tot_direct_sales = tot_spends = 0.0
-    tot_orders = tot_direct_orders = tot_ad_units = tot_clicks = tot_impressions = 0
+    tot_sales = tot_same_sales = tot_cost = 0.0
+    tot_orders = tot_same_orders = tot_units = tot_clicks = tot_impressions = 0
 
     for row in agg_rows:
         tot_sales += float(row["total_sales"] or 0)
-        tot_direct_sales += float(row["total_direct_sales"] or 0)
-        tot_spends += float(row["total_spends"] or 0)
+        tot_same_sales += float(row["total_same_sales"] or 0)
+        tot_cost += float(row["total_cost"] or 0)
         tot_orders += int(row["total_orders"] or 0)
-        tot_direct_orders += int(row["total_direct_orders"] or 0)
-        tot_ad_units += int(row["total_ad_units"] or 0)
+        tot_same_orders += int(row["total_same_orders"] or 0)
+        tot_units += int(row["total_units"] or 0)
         tot_clicks += int(row["total_clicks"] or 0)
         tot_impressions += int(row["total_impressions"] or 0)
 
@@ -404,23 +405,23 @@ def build_ad_metrics_map(
     for row in agg_rows:
         metrics_map[str(row["ad_id"])] = _compute_metrics_row(
             float(row["total_sales"] or 0),
-            float(row["total_direct_sales"] or 0),
+            float(row["total_same_sales"] or 0),
             int(row["total_orders"] or 0),
-            int(row["total_direct_orders"] or 0),
-            int(row["total_ad_units"] or 0),
-            float(row["total_spends"] or 0),
+            int(row["total_same_orders"] or 0),
+            int(row["total_units"] or 0),
+            float(row["total_cost"] or 0),
             int(row["total_clicks"] or 0),
             int(row["total_impressions"] or 0),
             currency_icon,
             tot_sales=tot_sales,
-            tot_spends=tot_spends,
+            tot_spends=tot_cost,
             tot_clicks=tot_clicks,
             tot_impressions=tot_impressions,
         )
 
     summary = _build_summary_row(
-        tot_sales, tot_direct_sales, tot_orders, tot_direct_orders,
-        tot_ad_units, tot_spends, tot_clicks, tot_impressions,
+        tot_sales, tot_same_sales, tot_orders, tot_same_orders,
+        tot_units, tot_cost, tot_clicks, tot_impressions,
         currency_icon,
     )
     return metrics_map, summary
@@ -511,33 +512,33 @@ def build_auto_targeting_metrics_map(
             - metrics_map: target_id → 完整指标展示字典（含 IS 字段）。
             - summary: 全量合计汇总行字典（IS 字段固定为 "-"）。
     """
-    from api_v1.models.lingxing.ads.lx_auto_targeting_metrics import LxAutoTargetingMetrics
+    from api_v1.models.lingxing.ads.report.lx_sp_target_report import LxSpTargetReport
 
     if not target_ids:
         summary = _build_summary_row(0.0, 0.0, 0, 0, 0, 0.0, 0, 0, currency_icon)
         summary["is"] = "-"
         return {}, summary
 
-    qs = LxAutoTargetingMetrics.objects.filter(
+    qs = LxSpTargetReport.objects.filter(
         target_id__in=target_ids,
         campaign_id=campaign_id,
         profile_id=profile_id,
     )
     if date_start:
-        qs = qs.filter(timestamp__gte=date_start)
+        qs = qs.filter(report_date__gte=date_start)
     if date_end:
-        qs = qs.filter(timestamp__lte=date_end)
+        qs = qs.filter(report_date__lte=date_end)
 
     rows = qs.values(
         "target_id",
         "sales",
-        "direct_sales",
+        "same_sales",
         "orders",
-        "direct_orders",
-        "ad_units",
+        "same_orders",
+        "units",
         "impressions",
         "clicks",
-        "spends",
+        "cost",
         "top_of_search_impression_share",
     )
 
@@ -551,25 +552,25 @@ def build_auto_targeting_metrics_map(
         if tid not in agg:
             agg[tid] = {
                 "sales": 0.0,
-                "direct_sales": 0.0,
+                "same_sales": 0.0,
                 "orders": 0,
-                "direct_orders": 0,
-                "ad_units": 0,
+                "same_orders": 0,
+                "units": 0,
                 "impressions": 0,
                 "clicks": 0,
-                "spends": 0.0,
+                "cost": 0.0,
             }
             is_bucket[tid] = []
 
         a = agg[tid]
         a["sales"] += _safe_float(row["sales"])
-        a["direct_sales"] += _safe_float(row["direct_sales"])
+        a["same_sales"] += _safe_float(row["same_sales"])
         a["orders"] += _safe_int(row["orders"])
-        a["direct_orders"] += _safe_int(row["direct_orders"])
-        a["ad_units"] += _safe_int(row["ad_units"])
+        a["same_orders"] += _safe_int(row["same_orders"])
+        a["units"] += _safe_int(row["units"])
         a["impressions"] += _safe_int(row["impressions"])
         a["clicks"] += _safe_int(row["clicks"])
-        a["spends"] += _safe_float(row["spends"])
+        a["cost"] += _safe_float(row["cost"])
 
         # 只收集格式合法的 IS 值，跳过空值与非数值字符串，避免拉低均值
         is_raw = row["top_of_search_impression_share"]
@@ -580,16 +581,16 @@ def build_auto_targeting_metrics_map(
                 pass
 
     # 全量合计（用于 % 分母，与 build_adgroup_metrics_map 第一轮逻辑一致）
-    tot_sales = tot_direct_sales = tot_spends = 0.0
-    tot_orders = tot_direct_orders = tot_ad_units = tot_clicks = tot_impressions = 0
+    tot_sales = tot_same_sales = tot_cost = 0.0
+    tot_orders = tot_same_orders = tot_units = tot_clicks = tot_impressions = 0
 
     for a in agg.values():
         tot_sales += a["sales"]
-        tot_direct_sales += a["direct_sales"]
-        tot_spends += a["spends"]
+        tot_same_sales += a["same_sales"]
+        tot_cost += a["cost"]
         tot_orders += a["orders"]
-        tot_direct_orders += a["direct_orders"]
-        tot_ad_units += a["ad_units"]
+        tot_same_orders += a["same_orders"]
+        tot_units += a["units"]
         tot_clicks += a["clicks"]
         tot_impressions += a["impressions"]
 
@@ -603,16 +604,16 @@ def build_auto_targeting_metrics_map(
 
         row_metrics = _compute_metrics_row(
             a["sales"],
-            a["direct_sales"],
+            a["same_sales"],
             a["orders"],
-            a["direct_orders"],
-            a["ad_units"],
-            a["spends"],
+            a["same_orders"],
+            a["units"],
+            a["cost"],
             a["clicks"],
             a["impressions"],
             currency_icon,
             tot_sales=tot_sales,
-            tot_spends=tot_spends,
+            tot_spends=tot_cost,
             tot_clicks=tot_clicks,
             tot_impressions=tot_impressions,
         )
@@ -620,8 +621,8 @@ def build_auto_targeting_metrics_map(
         metrics_map[tid] = row_metrics
 
     summary = _build_summary_row(
-        tot_sales, tot_direct_sales, tot_orders, tot_direct_orders,
-        tot_ad_units, tot_spends, tot_clicks, tot_impressions,
+        tot_sales, tot_same_sales, tot_orders, tot_same_orders,
+        tot_units, tot_cost, tot_clicks, tot_impressions,
         currency_icon,
     )
     summary["is"] = "-"
@@ -733,48 +734,46 @@ def build_auto_negative_targeting_metrics_map(
             - metrics_map: target_id → 指标展示字典。
             - summary: 全量合计汇总行字典。
     """
-    from api_v1.models.lingxing.ads.lx_auto_negative_targeting_metrics import (
-        LxAutoNegativeTargetingMetrics,
-    )
+    from api_v1.models.lingxing.ads.report.lx_sp_keyword_report import LxSpKeywordReport
 
     if not target_ids:
         return {}, _build_negative_summary_row(0.0, 0, 0.0, currency_icon)
 
-    qs = LxAutoNegativeTargetingMetrics.objects.filter(
-        target_id__in=target_ids,
+    qs = LxSpKeywordReport.objects.filter(
+        keyword_id__in=target_ids,
         campaign_id=campaign_id,
         profile_id=profile_id,
     )
     if date_start:
-        qs = qs.filter(timestamp__gte=date_start)
+        qs = qs.filter(report_date__gte=date_start)
     if date_end:
-        qs = qs.filter(timestamp__lte=date_end)
+        qs = qs.filter(report_date__lte=date_end)
 
-    rows = qs.values("target_id", "sales", "orders", "spends")
+    rows = qs.values("keyword_id", "sales", "orders", "cost")
 
-    # 按 target_id 在 Python 侧累加（VARCHAR 字段无法走 DB Sum）
+    # 按 target_id 在 Python 侧累加
     agg: dict[str, dict[str, Any]] = {}
     for row in rows:
-        tid = str(row["target_id"])
+        tid = str(row["keyword_id"])
         if tid not in agg:
-            agg[tid] = {"sales": 0.0, "orders": 0, "spends": 0.0}
+            agg[tid] = {"sales": 0.0, "orders": 0, "cost": 0.0}
         agg[tid]["sales"] += _safe_float(row["sales"])
         agg[tid]["orders"] += _safe_int(row["orders"])
-        agg[tid]["spends"] += _safe_float(row["spends"])
+        agg[tid]["cost"] += _safe_float(row["cost"])
 
     # 全量合计
-    tot_sales = tot_spends = 0.0
+    tot_sales = tot_cost = 0.0
     tot_orders = 0
     for a in agg.values():
         tot_sales += a["sales"]
-        tot_spends += a["spends"]
+        tot_cost += a["cost"]
         tot_orders += a["orders"]
 
     metrics_map: dict[str, dict[str, Any]] = {
-        tid: _compute_negative_row(a["sales"], a["orders"], a["spends"], currency_icon)
+        tid: _compute_negative_row(a["sales"], a["orders"], a["cost"], currency_icon)
         for tid, a in agg.items()
     }
-    summary = _build_negative_summary_row(tot_sales, tot_orders, tot_spends, currency_icon)
+    summary = _build_negative_summary_row(tot_sales, tot_orders, tot_cost, currency_icon)
     return metrics_map, summary
 
 
@@ -805,48 +804,48 @@ def build_negative_keyword_metrics_map(
             - metrics_map: keyword_id → 指标展示字典。
             - summary: 全量合计汇总行字典。
     """
-    from api_v1.models.lingxing.ads.lx_negative_keyword_metrics import LxNegativeKeywordMetrics
+    from api_v1.models.lingxing.ads.report.lx_sp_keyword_report import LxSpKeywordReport
 
     if not keyword_ids:
         return {}, _build_negative_summary_row(0.0, 0, 0.0, currency_icon)
 
-    qs = LxNegativeKeywordMetrics.objects.filter(
+    qs = LxSpKeywordReport.objects.filter(
         keyword_id__in=keyword_ids,
         campaign_id=campaign_id,
         profile_id=profile_id,
     )
     if date_start:
-        qs = qs.filter(timestamp__gte=date_start)
+        qs = qs.filter(report_date__gte=date_start)
     if date_end:
-        qs = qs.filter(timestamp__lte=date_end)
+        qs = qs.filter(report_date__lte=date_end)
 
     agg_rows = list(
         qs.values("keyword_id").annotate(
             total_sales=Sum("sales"),
             total_orders=Sum("orders"),
-            total_spends=Sum("spends"),
+            total_cost=Sum("cost"),
         )
     )
 
     if not agg_rows:
         return {}, _build_negative_summary_row(0.0, 0, 0.0, currency_icon)
 
-    tot_sales = tot_spends = 0.0
+    tot_sales = tot_cost = 0.0
     tot_orders = 0
     for row in agg_rows:
         tot_sales += float(row["total_sales"] or 0)
-        tot_spends += float(row["total_spends"] or 0)
+        tot_cost += float(row["total_cost"] or 0)
         tot_orders += int(row["total_orders"] or 0)
 
     metrics_map: dict[str, dict[str, Any]] = {
         str(row["keyword_id"]): _compute_negative_row(
             float(row["total_sales"] or 0),
             int(row["total_orders"] or 0),
-            float(row["total_spends"] or 0),
+            float(row["total_cost"] or 0),
             currency_icon,
         )
         for row in agg_rows
     }
-    summary = _build_negative_summary_row(tot_sales, tot_orders, tot_spends, currency_icon)
+    summary = _build_negative_summary_row(tot_sales, tot_orders, tot_cost, currency_icon)
     return metrics_map, summary
 

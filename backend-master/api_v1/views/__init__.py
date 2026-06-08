@@ -29,7 +29,7 @@ def root_index(request):
 from api_v1.views.lingxing.ads import (
     AdCampaignViewSet, AdPortfolioViewSet, ShopProfileViewSet,
     AdGroupViewSet, AdViewSet, AutoTargetingViewSet,
-    AutoNegativeTargetingViewSet, NegativeKeywordViewSet,
+    KeywordViewSet, AutoNegativeTargetingViewSet, NegativeKeywordViewSet,
     TimePricingStrategyViewSet,
 )
 

@@ -237,7 +237,7 @@
         class="filter-tag"
         @close="clearField('biddingType')"
       >
-        竞价策略：{{ dicts.biddingType[local.biddingType] }}
+        竞价策略：{{ biddingTypeLabel[local.biddingType] || local.biddingType }}
       </el-tag>
       <el-tag
         v-if="local.campaignName"
@@ -327,13 +327,17 @@ watch(
 );
 
 const dicts: Record<string, Record<string, string>> = {
-  biddingType: {
-    legacyForSales: "动态竞价-只降低",
-    autoForSales: "动态竞价-提高和降低",
-    manual: "固定竞价",
-    ruleBased: "基于规则的竞价",
-  },
+  biddingType: {},
 };
+
+// 竞价策略 label 由后端 shop_profile_view options 接口统一返回，前端仅做展示回显
+const biddingTypeLabel = computed(() => {
+  const map: Record<string, string> = {};
+  for (const bt of props.biddingTypes || []) {
+    map[bt.value] = bt.label;
+  }
+  return map;
+});
 
 const getOptionLabel = (val: any, options: any[]) => {
   if (!options) return val;
