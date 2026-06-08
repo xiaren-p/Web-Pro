@@ -111,9 +111,15 @@ def build_campaign_profile_query(campaign_pairs: list[tuple[str, str]]) -> Q:
     Returns:
         Q: 可直接用于 Django ORM ``filter`` 的复合 OR 条件。
     """
-    pair_query = Q()
+    from django.db.models import Q as _Q
+    pair_query = _Q()
     for campaign_id, profile_id in campaign_pairs:
-        pair_query |= Q(campaign_id=campaign_id, profile_id=profile_id)
+        # 数据库 campaign_id / profile_id 均为 BigIntegerField 类型，
+        # 而 campaign_pairs 传入的是 str，显式 int() 转换以确保 DB 索引命中
+        try:
+            pair_query |= _Q(campaign_id=int(campaign_id), profile_id=int(profile_id))
+        except (ValueError, TypeError):
+            continue
     return pair_query
 
 
