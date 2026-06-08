@@ -15,7 +15,9 @@
         size="small"
         class="filter-item w-160"
         :options="profiles"
+        :show-select-all="false"
         multiple
+        filterable
         placeholder="选择店铺"
       />
       <el-date-picker
@@ -325,10 +327,6 @@ watch(
   },
   { deep: true }
 );
-
-const dicts: Record<string, Record<string, string>> = {
-  biddingType: {},
-};
 
 // 竞价策略 label 由后端 shop_profile_view options 接口统一返回，前端仅做展示回显
 const biddingTypeLabel = computed(() => {
