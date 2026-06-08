@@ -321,9 +321,7 @@ watch(
 
 watch(
   local,
-  (newVal, oldVal) => {
-    // 内容相同时跳过 emit，阻断无效的父子同步
-    if (JSON.stringify(oldVal) === JSON.stringify(newVal)) return;
+  (newVal) => {
     isUpdating = true;
     emit("update:filters", JSON.parse(JSON.stringify(newVal)));
   },
