@@ -127,12 +127,19 @@ const internalValue = ref(
 watch(
   () => props.modelValue,
   (v) => {
-    internalValue.value = props.multiple ? (Array.isArray(v) ? v.slice() : []) : v;
+    const newVal: any = props.multiple ? (Array.isArray(v) ? v.slice() : []) : v;
+    // 内容相同时跳过，避免因引用变化触发下游 watch 形成死循环
+    const oldVal = internalValue.value;
+    if (JSON.stringify(oldVal) === JSON.stringify(newVal)) return;
+    internalValue.value = newVal;
   },
   { deep: true }
 );
 
 watch(internalValue, (newV, oldV) => {
+  // 内容相同时跳过，避免因引用变化形成 emit→接收→emit 死循环
+  if (JSON.stringify(oldV) === JSON.stringify(newV)) return;
+
   // Handle select all
   if (props.multiple && Array.isArray(newV) && newV.includes(ALL_OPTION)) {
     const all = props.options.map((o: any) => o.value);
