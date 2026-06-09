@@ -64,21 +64,29 @@
             <el-option value="date_range" label="日期范围" />
           </el-select>
           <template v-if="form.effectiveType !== 'date_range'">
+            <span class="effective-range-label">最近</span>
             <el-select
-              :model-value="form.effectiveDays ? form.effectiveDays + '天' : ''"
-              style="width: 150px"
-              placeholder="选择或输入天数"
+              :model-value="form.effectiveDaysStart ? form.effectiveDaysStart + '天' : ''"
+              style="width: 120px"
+              placeholder="起始天"
               filterable
               allow-create
               default-first-option
-              @update:model-value="handleEffectiveDaysChange"
+              @update:model-value="(v: string | number) => handleDaysChange(v, 'start')"
             >
-              <el-option
-                v-for="d in [7, 15, 30, 60, 90, 180, 365]"
-                :key="d"
-                :label="d + '天'"
-                :value="d"
-              />
+              <el-option v-for="d in DAY_PRESETS" :key="d" :label="d + '天'" :value="d" />
+            </el-select>
+            <span class="effective-range-sep">至</span>
+            <el-select
+              :model-value="form.effectiveDaysEnd ? form.effectiveDaysEnd + '天' : ''"
+              style="width: 120px"
+              placeholder="结束天"
+              filterable
+              allow-create
+              default-first-option
+              @update:model-value="(v: string | number) => handleDaysChange(v, 'end')"
+            >
+              <el-option v-for="d in DAY_PRESETS" :key="d" :label="d + '天'" :value="d" />
             </el-select>
             <span class="effective-suffix">
               {{ form.effectiveType === "beyond_days" ? "之外的广告实体" : "内的广告实体" }}
@@ -714,7 +722,8 @@ function createEmptyForm(): RuleFormData {
     shops: [],
     status: "active",
     effectiveType: "within_days",
-    effectiveDays: 30,
+    effectiveDaysStart: 8,
+    effectiveDaysEnd: 30,
     effectiveStart: "",
     effectiveStartDay: "",
     effectiveEnd: "",
@@ -930,10 +939,15 @@ function toggleConditionRange(cSet: { conditions: ConditionWithRange[] }, condId
     c.value2 = 0;
   }
 }
-function handleEffectiveDaysChange(val: string | number): void {
+const DAY_PRESETS = [7, 15, 30, 60, 90, 180, 365];
+
+function handleDaysChange(val: string | number, which: "start" | "end"): void {
   const str = String(val).replace(/天$/, "");
   const num = Number(str);
-  if (!isNaN(num) && num > 0) form.effectiveDays = num;
+  if (!isNaN(num) && num > 0) {
+    if (which === "start") form.effectiveDaysStart = num;
+    else form.effectiveDaysEnd = num;
+  }
 }
 
 function handleCondDaysChange(cSet: { days: number }, val: string | number): void {
@@ -1037,8 +1051,19 @@ defineExpose({ open });
 .effective-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+}
+
+.effective-range-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #606266;
+}
+
+.effective-range-sep {
+  font-size: 13px;
+  color: #909399;
 }
 
 .effective-suffix {

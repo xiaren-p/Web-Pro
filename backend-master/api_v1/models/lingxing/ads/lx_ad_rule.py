@@ -74,11 +74,18 @@ class LxAdRule(models.Model):
         verbose_name="生效周期类型",
     )
 
-    effective_days = models.IntegerField(
+    effective_days_start = models.IntegerField(
         null=True,
         blank=True,
-        verbose_name="生效天数",
-        help_text="effective_type 为 within_days/beyond_days 时使用",
+        verbose_name="生效天数起始",
+        help_text="effective_type 为 within_days/beyond_days 时使用，范围起点",
+    )
+
+    effective_days_end = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="生效天数结束",
+        help_text="effective_type 为 within_days/beyond_days 时使用，范围终点",
     )
 
     effective_start_month = models.IntegerField(

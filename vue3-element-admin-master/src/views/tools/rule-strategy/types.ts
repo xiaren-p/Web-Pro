@@ -24,7 +24,8 @@ export interface RuleFormData {
   shops: (number | string)[];
   status: "active" | "inactive";
   effectiveType: "date_range" | "within_days" | "beyond_days";
-  effectiveDays: number;
+  effectiveDaysStart: number;
+  effectiveDaysEnd: number;
   effectiveStart: string;
   effectiveStartDay: string;
   effectiveEnd: string;
