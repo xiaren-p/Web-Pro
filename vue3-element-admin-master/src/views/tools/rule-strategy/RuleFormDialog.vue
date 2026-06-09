@@ -118,105 +118,105 @@
 
       <!-- 字段设置 -->
       <el-divider content-position="left">字段设置</el-divider>
-      <el-row :gutter="20">
+      <el-row :gutter="16">
         <el-col :span="8">
-          <!-- 归类 -->
-          <el-col :span="8">
-            <el-form-item label="归类" class="field-setting-item">
-              <div class="field-setting-row">
-                <el-checkbox v-model="form.unlimitedCategories">不限</el-checkbox>
-                <el-select
-                  v-model="form.categories"
-                  multiple
-                  filterable
-                  collapse-tags
-                  collapse-tags-tooltip
-                  :max-collapse-tags="1"
-                  style="flex: 1"
-                  placeholder="选择归类"
-                  :disabled="form.unlimitedCategories"
-                  popper-class="rule-select-popper"
-                  @change="(vals: any[]) => onSelectChange(vals, assortOptions, 'categories')"
-                >
-                  <el-option
-                    :key="SELECT_ALL_MARKER"
-                    label="全选 / 取消全选"
-                    :value="SELECT_ALL_MARKER"
-                  />
-                  <el-option
-                    v-for="opt in assortOptions"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
-                </el-select>
-              </div>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="负责人" class="field-setting-item">
-              <div class="field-setting-row">
-                <el-checkbox v-model="form.unlimitedManagers">不限</el-checkbox>
-                <el-select
-                  v-model="form.managers"
-                  multiple
-                  filterable
-                  collapse-tags
-                  collapse-tags-tooltip
-                  :max-collapse-tags="1"
-                  style="flex: 1"
-                  placeholder="选择负责人"
-                  :disabled="form.unlimitedManagers"
-                  popper-class="rule-select-popper"
-                  @change="(vals: any[]) => onSelectChange(vals, managerOptions, 'managers')"
-                >
-                  <el-option
-                    :key="SELECT_ALL_MARKER"
-                    label="全选 / 取消全选"
-                    :value="SELECT_ALL_MARKER"
-                  />
-                  <el-option
-                    v-for="opt in managerOptions"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
-                </el-select>
-              </div>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="标签" class="field-setting-item">
-              <div class="field-setting-row">
-                <el-checkbox v-model="form.unlimitedTags">不限</el-checkbox>
-                <el-select
-                  v-model="form.tags"
-                  multiple
-                  filterable
-                  collapse-tags
-                  collapse-tags-tooltip
-                  :max-collapse-tags="1"
-                  style="flex: 1"
-                  placeholder="选择标签"
-                  :disabled="form.unlimitedTags"
-                  popper-class="rule-select-popper"
-                  @change="(vals: any[]) => onSelectChange(vals, labelOptions, 'tags')"
-                >
-                  <el-option
-                    :key="SELECT_ALL_MARKER"
-                    label="全选 / 取消全选"
-                    :value="SELECT_ALL_MARKER"
-                  />
-                  <el-option
-                    v-for="opt in labelOptions"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
-                </el-select>
-              </div>
-            </el-form-item>
-          </el-col>
+          <el-form-item label="归类">
+            <div class="field-setting-row">
+              <el-checkbox v-model="form.unlimitedCategories">不限</el-checkbox>
+              <el-select
+                v-model="form.categories"
+                multiple
+                filterable
+                collapse-tags
+                collapse-tags-tooltip
+                :max-collapse-tags="1"
+                tag-effect="dark"
+                style="flex: 1"
+                placeholder="选择归类"
+                :disabled="form.unlimitedCategories"
+                popper-class="rule-select-popper"
+                @change="(vals: any[]) => onSelectChange(vals, assortOptions, 'categories')"
+              >
+                <el-option
+                  :key="SELECT_ALL_MARKER"
+                  label="全选 / 取消全选"
+                  :value="SELECT_ALL_MARKER"
+                />
+                <el-option
+                  v-for="opt in assortOptions"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+            </div>
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="负责人">
+            <div class="field-setting-row">
+              <el-checkbox v-model="form.unlimitedManagers">不限</el-checkbox>
+              <el-select
+                v-model="form.managers"
+                multiple
+                filterable
+                collapse-tags
+                collapse-tags-tooltip
+                :max-collapse-tags="1"
+                tag-effect="dark"
+                style="flex: 1"
+                placeholder="选择负责人"
+                :disabled="form.unlimitedManagers"
+                popper-class="rule-select-popper"
+                @change="(vals: any[]) => onSelectChange(vals, managerOptions, 'managers')"
+              >
+                <el-option
+                  :key="SELECT_ALL_MARKER"
+                  label="全选 / 取消全选"
+                  :value="SELECT_ALL_MARKER"
+                />
+                <el-option
+                  v-for="opt in managerOptions"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+            </div>
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="标签">
+            <div class="field-setting-row">
+              <el-checkbox v-model="form.unlimitedTags">不限</el-checkbox>
+              <el-select
+                v-model="form.tags"
+                multiple
+                filterable
+                collapse-tags
+                collapse-tags-tooltip
+                :max-collapse-tags="1"
+                tag-effect="dark"
+                style="flex: 1"
+                placeholder="选择标签"
+                :disabled="form.unlimitedTags"
+                popper-class="rule-select-popper"
+                @change="(vals: any[]) => onSelectChange(vals, labelOptions, 'tags')"
+              >
+                <el-option
+                  :key="SELECT_ALL_MARKER"
+                  label="全选 / 取消全选"
+                  :value="SELECT_ALL_MARKER"
+                />
+                <el-option
+                  v-for="opt in labelOptions"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+            </div>
+          </el-form-item>
         </el-col>
       </el-row>
 
