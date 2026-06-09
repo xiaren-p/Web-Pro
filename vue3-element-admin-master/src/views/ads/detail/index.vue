@@ -62,7 +62,11 @@
           />
         </template>
         <template v-else>
-          <div class="tab-placeholder">手动投放（占位）</div>
+          <KeywordPanel
+            :campaign-id="campaignId"
+            :profile-id="profileId"
+            :initial-date-range="inheritedDateRange"
+          />
         </template>
       </el-tab-pane>
       <el-tab-pane label="否定投放" name="negative">
@@ -74,7 +78,11 @@
           />
         </template>
         <template v-else>
-          <div class="tab-placeholder">手动 · 否定投放（占位）</div>
+          <NegativeKeywordPanel
+            :campaign-id="campaignId"
+            :profile-id="profileId"
+            :initial-date-range="inheritedDateRange"
+          />
         </template>
       </el-tab-pane>
       <el-tab-pane label="用户搜索词" name="search-terms">
@@ -99,6 +107,8 @@ import AdGroupsPanel from "@/views/ads/detail/AdGroupsPanel.vue";
 import AdsPanel from "@/views/ads/detail/AdsPanel.vue";
 import AutoTargetingPanel from "@/views/ads/detail/AutoTargetingPanel.vue";
 import AutoNegativePanel from "@/views/ads/detail/AutoNegativePanel.vue";
+import KeywordPanel from "@/views/ads/detail/KeywordPanel.vue";
+import NegativeKeywordPanel from "@/views/ads/detail/NegativeKeywordPanel.vue";
 
 defineOptions({ name: "AdCampaignDetail" });
 

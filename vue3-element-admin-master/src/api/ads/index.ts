@@ -242,6 +242,45 @@ export function getNegativeKeywords(data: NegativeKeywordParams): Promise<Negati
   });
 }
 
+// ── 关键词投放（手动/自动通用）───────────────────────────────
+
+/** 关键词列表请求参数 */
+export interface KeywordParams {
+  campaign_id: string;
+  profile_id: string;
+  date_start?: string;
+  date_end?: string;
+  state?: string;
+  match_type?: string;
+  keyword?: string;
+  pageNum?: number;
+  pageSize?: number;
+}
+
+/** 关键词列表分页响应结构 */
+export interface KeywordResponse {
+  list: any[];
+  total: number;
+  summary?: Record<string, unknown>;
+  currency_icon?: string;
+  pageNum: number;
+  pageSize: number;
+}
+
+/**
+ * 获取关键词投放列表及聚合指标。
+ *
+ * @param {KeywordParams} data - 查询参数，campaign_id 和 profile_id 为必填
+ * @returns {Promise<KeywordResponse>} 关键词投放分页列表
+ */
+export function getKeywords(data: KeywordParams): Promise<KeywordResponse> {
+  return request({
+    url: "/ads/keywords",
+    method: "post",
+    data,
+  });
+}
+
 // ── 广告上传队列 ─────────────────────────────────────────────────────────────
 
 import { requestV2 } from "@/utils/request";

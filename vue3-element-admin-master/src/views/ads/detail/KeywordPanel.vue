@@ -1,5 +1,5 @@
 <template>
-  <div class="negative-keyword-panel ads-detail-panel">
+  <div class="keyword-panel ads-detail-panel">
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <el-date-picker
@@ -22,6 +22,7 @@
         clearable
       >
         <el-option label="已启用" value="enabled" />
+        <el-option label="已暂停" value="paused" />
         <el-option label="已归档" value="archived" />
       </el-select>
       <el-select
@@ -31,15 +32,16 @@
         placeholder="全部匹配方式"
         clearable
       >
-        <el-option label="否定词组" value="negativePhrase" />
-        <el-option label="否定精准" value="negativeExact" />
+        <el-option label="广泛匹配" value="broad" />
+        <el-option label="词组匹配" value="phrase" />
+        <el-option label="精准匹配" value="exact" />
       </el-select>
       <el-input
         v-model="filters.keyword"
         size="small"
         class="filter-item"
         style="width: 180px"
-        placeholder="请输入否定关键词"
+        placeholder="请输入关键词"
         clearable
         @keyup.enter="onSearch"
       />
@@ -82,14 +84,14 @@
             <el-switch
               v-model="row.state"
               active-value="enabled"
-              inactive-value="archived"
+              inactive-value="paused"
               disabled
             />
           </template>
         </el-table-column>
 
-        <!-- 固定左：否定关键词 -->
-        <el-table-column label="有效 否定关键词" min-width="220" fixed="left" align="left">
+        <!-- 固定左：关键词 -->
+        <el-table-column label="关键词" min-width="220" fixed="left" align="left">
           <template #default="{ row }">
             <div class="keyword-cell">
               <span class="msku-text msku-text--dark">{{ row.keyword_text || "-" }}</span>
@@ -175,14 +177,14 @@
     <!-- 分析抽屉 -->
     <el-drawer
       v-model="drawerVisible"
-      :title="activeRow?.keyword_text || '否定关键词详情'"
+      :title="activeRow?.keyword_text || '关键词详情'"
       size="680px"
       direction="rtl"
     >
       <div v-if="activeRow" class="analysis-drawer">
-        <!-- 左侧：有效否定关键词信息 -->
+        <!-- 左侧：关键词信息 -->
         <div class="drawer-left">
-          <div class="drawer-section-title">有效 否定关键词</div>
+          <div class="drawer-section-title">关键词</div>
           <div class="keyword-info-card">
             <div class="keyword-text">{{ activeRow.keyword_text }}</div>
             <div class="keyword-meta">
@@ -190,12 +192,20 @@
                 {{ activeRow.match_type_label || activeRow.match_type }}
               </span>
               <span class="keyword-state" :class="`state-tag-${activeRow.state}`">
-                {{ activeRow.state === "enabled" ? "已启用" : "已归档" }}
+                {{ formatState(activeRow.state) }}
               </span>
+            </div>
+            <div class="keyword-detail-row">
+              <span class="detail-label">竞价</span>
+              <span class="detail-value">{{ activeRow.bid ?? "-" }}</span>
             </div>
             <div class="keyword-detail-row">
               <span class="detail-label">广告活动</span>
               <span class="detail-value">{{ activeRow.campaign_name || "-" }}</span>
+            </div>
+            <div class="keyword-detail-row">
+              <span class="detail-label">广告组</span>
+              <span class="detail-value">{{ activeRow.adgroup_name || "-" }}</span>
             </div>
             <div class="keyword-detail-row">
               <span class="detail-label">创建时间</span>
@@ -204,7 +214,7 @@
           </div>
         </div>
 
-        <!-- 右侧：分析 -->
+        <!-- 右侧：分析指标 -->
         <div class="drawer-right">
           <div class="drawer-section-title">分析</div>
           <div class="metrics-grid">
@@ -233,16 +243,16 @@
 
 <script setup lang="ts">
 /**
- * 否定关键词面板：展示当前广告活动下所有否定关键词及其指标。
- * 所属板块：ads / 否定投放。
+ * 关键词投放面板：展示手动广告活动下所有关键词投放及其指标。
+ * 所属板块：ads / 投放（手动）。
  */
-import type { NegativeKeywordParams } from "@/api/ads";
+import type { KeywordParams } from "@/api/ads";
 
 import { onMounted, reactive, ref } from "vue";
 import { Operation, VideoPause, CircleClose } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 
-import { getNegativeKeywords } from "@/api/ads";
+import { getKeywords } from "@/api/ads";
 
 const props = defineProps<{
   campaignId: string;
@@ -271,7 +281,8 @@ const columnConfigVisible = ref(false);
 
 const visibleColumns = [
   { prop: "service_status", label: "服务状态", minWidth: 160 },
-  { prop: "match_type_label", label: "否定类型", minWidth: 110 },
+  { prop: "match_type_label", label: "匹配方式", minWidth: 110 },
+  { prop: "bid", label: "竞价", minWidth: 100 },
   { prop: "portfolio_name", label: "广告组合", minWidth: 140 },
   { prop: "campaign_name", label: "广告活动", minWidth: 200 },
   { prop: "adgroup_name", label: "广告组", minWidth: 140 },
@@ -287,6 +298,21 @@ const drawerVisible = ref(false);
 const activeRow = ref<any | null>(null);
 
 /**
+ * 将状态字段值格式化为中文显示。
+ *
+ * @param {string} val - state 原始值
+ * @returns {string} 中文显示文字
+ */
+function formatState(val: string): string {
+  const map: Record<string, string> = {
+    enabled: "已启用",
+    paused: "已暂停",
+    archived: "已归档",
+  };
+  return map[val] ?? val ?? "-";
+}
+
+/**
  * 打开分析抽屉，展示选中行的详情与指标。
  *
  * @param {any} row - 点击的行数据
@@ -298,13 +324,13 @@ function openDrawer(row: any): void {
 
 // ── 查询 ──────────────────────────────────────────────
 /**
- * 加载否定关键词列表数据，调用后端 /ads/negative-keywords 接口。
+ * 加载关键词投放列表数据，调用后端 /ads/keywords 接口。
  */
 function fetchData(): void {
   if (!props.campaignId || !props.profileId) return;
   loading.value = true;
 
-  const params: NegativeKeywordParams = {
+  const params: KeywordParams = {
     campaign_id: props.campaignId,
     profile_id: props.profileId,
     date_start: filters.range?.[0] || undefined,
@@ -316,14 +342,14 @@ function fetchData(): void {
     pageSize: pagination.pageSize,
   };
 
-  getNegativeKeywords(params)
+  getKeywords(params)
     .then((res) => {
       rows.value = res.list ?? [];
       pagination.total = res.total ?? 0;
       currencyIcon.value = res.currency_icon ?? "$";
     })
     .catch(() => {
-      ElMessage.error("加载否定关键词失败");
+      ElMessage.error("加载关键词投放失败");
     })
     .finally(() => {
       loading.value = false;
@@ -348,7 +374,7 @@ onMounted(fetchData);
 </script>
 
 <style scoped lang="scss">
-.negative-keyword-panel {
+.keyword-panel {
   .filter-bar {
     display: flex;
     flex-wrap: wrap;
@@ -382,16 +408,22 @@ onMounted(fetchData);
     white-space: nowrap;
     border-radius: 3px;
 
-    &.match-negativeExact {
-      color: #f56c6c;
-      background: #fef0f0;
-      border: 1px solid #fbc4c4;
+    &.match-exact {
+      color: #67c23a;
+      background: #f0f9eb;
+      border: 1px solid #c2e7b0;
     }
 
-    &.match-negativePhrase {
+    &.match-phrase {
       color: #e6a23c;
       background: #fdf6ec;
       border: 1px solid #f5dab1;
+    }
+
+    &.match-broad {
+      color: #409eff;
+      background: #ecf5ff;
+      border: 1px solid #b3d8ff;
     }
   }
 
@@ -489,6 +521,12 @@ onMounted(fetchData);
           color: #67c23a;
           background: #f0f9eb;
           border: 1px solid #c2e7b0;
+        }
+
+        &.state-tag-paused {
+          color: #e6a23c;
+          background: #fdf6ec;
+          border: 1px solid #f5dab1;
         }
 
         &.state-tag-archived {

@@ -60,6 +60,7 @@ urlpatterns = [
     path('ads/ads', views.AdViewSet.as_view({'post': 'list_ads', }), name='ads-ads-list'),
     path('ads/auto-targeting', views.AutoTargetingViewSet.as_view({'post': 'list_auto_targeting', }), name='ads-auto-targeting-list'),
     path('ads/auto-negative-targeting', views.AutoNegativeTargetingViewSet.as_view({'post': 'list_auto_negative_targeting', }), name='ads-auto-negative-targeting-list'),
+    path('ads/keywords', views.KeywordViewSet.as_view({'post': 'list_keywords', }), name='ads-keywords-list'),
     path('ads/negative-keywords', views.NegativeKeywordViewSet.as_view({'post': 'list_negative_keywords', }), name='ads-negative-keywords-list'),
     # 分时调价策略 CRUD
     path('ads/time-pricing-strategy', views.TimePricingStrategyViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='ads-time-pricing-strategy-list-create'),
