@@ -85,6 +85,40 @@ SERVICE_STATUS_LABEL: dict[str, str] = {
 FALLBACK_CCY: dict[str, Any] = {"icon": "?", "code": "???", "rate": 1.0}
 
 
+def parse_exchange_rate(my_rate_str: str | None, rate_org_str: str | None) -> float:
+    """解析汇率值，优先使用用户自定义汇率（my_rate），回退到官方汇率（rate_org）。
+
+    数据库中 ``my_rate`` 的默认值为 ``"1.0000"``（非空），不能简单地用 ``or``
+    回退（因为字符串 ``"1.0000"`` 永远为 truthy）。此处通过解析为浮点数后判断：
+    值 > 0 则使用，否则回退到 rate_org，再否则回退到 1.0。
+
+    Args:
+        my_rate_str: 用户自定义汇率，默认值 ``"1.0000"``，可能为空。
+        rate_org_str: 中行官方汇率，可能为空。
+
+    Returns:
+        float: 有效的汇率值，始终 > 0。
+    """
+    # 优先尝试解析 my_rate
+    try:
+        v = float((my_rate_str or "").strip())
+        if v > 0:
+            return v
+    except (ValueError, TypeError):
+        pass
+
+    # 回退到 rate_org
+    try:
+        v = float((rate_org_str or "").strip())
+        if v > 0:
+            return v
+    except (ValueError, TypeError):
+        pass
+
+    # 最终兜底
+    return 1.0
+
+
 def build_campaign_profile_key(campaign_id: Any, profile_id: Any) -> str:
     """构建广告活动复合键字符串。
 

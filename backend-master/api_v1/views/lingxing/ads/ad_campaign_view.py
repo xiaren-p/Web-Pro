@@ -25,6 +25,7 @@ from api_v1.views.lingxing.ads._helpers import (
     build_campaign_profile_key,
     build_campaign_profile_query,
     fmt_money,
+    parse_exchange_rate,
 )
 
 
@@ -167,6 +168,11 @@ class AdCampaignViewSet(viewsets.ViewSet):
         all_profiles_in_qs = list(LxAdsProfile.objects.filter(profile_id__in=all_profile_ids_in_qs))
         all_currency_codes = {p.currency_code for p in all_profiles_in_qs if p.currency_code}
 
+        # 多货币场景下必须获取 USD 汇率作为统一换算基准；若筛选集中不含美国站点，
+        # rate_map_all 中缺少 USD 会导致第 203 行 fallback 到硬编码 7.2，使金额偏差 ~5%。
+        if len(all_currency_codes) > 1:
+            all_currency_codes.add("USD")
+
         # 一次查询获取所有相关汇率，每个币种取最新日期记录
         # 生产环境 lx_exchange_rate 表可能尚未建好，查询异常时安全兜底为 _default_ccy
         all_rates: list = []
@@ -182,7 +188,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 rate_map_all[r.code] = {
                     "icon": r.icon or "￥",
                     "code": r.code,
-                    "rate": float(r.my_rate or r.rate_org or "1.0"),
+                    "rate": parse_exchange_rate(r.my_rate, r.rate_org),
                 }
 
         # profile_id → 汇率信息的统一映射（全量 + 分页通用）
