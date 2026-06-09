@@ -70,7 +70,7 @@
 
           <div class="draft-action-box">
             <span class="draft-action-label">执行操作</span>
-            <span class="draft-action-value">{{ formatAction(rule) }}</span>
+            <span class="draft-action-value">{{ formatActions(rule) }}</span>
           </div>
         </div>
 
@@ -157,12 +157,31 @@ function formatShops(rule: AdRule): string {
   return `${rule.shops.length} 个店铺`;
 }
 
-function formatAction(rule: AdRule): string {
-  const label = ACTION_LABEL[rule.actionType] || rule.actionType;
-  if (NO_VALUE_ACTIONS.has(rule.actionType)) return label;
-  const suffix = rule.actionType.includes("decrease") ? "↓" : "↑";
-  const val = rule.actionType.includes("percent") ? `${rule.actionValue}%` : `€${rule.actionValue}`;
-  return `${label} ${val} ${suffix}`;
+function formatActions(rule: AdRule): string {
+  const parts: string[] = [];
+  // 竞价操作
+  for (const act of rule.bidActions ?? []) {
+    const label = ACTION_LABEL[act.type] || act.type;
+    if (NO_VALUE_ACTIONS.has(act.type)) {
+      parts.push(label);
+      continue;
+    }
+    const suffix = act.type.includes("decrease") ? "↓" : "↑";
+    const val = act.type.includes("percent") ? `${act.value}%` : `€${act.value}`;
+    parts.push(`${label} ${val} ${suffix}`);
+  }
+  // 预算操作
+  for (const act of rule.budgetActions ?? []) {
+    const label = ACTION_LABEL[act.type] || act.type;
+    if (act.type === "no_adjust" || !act.type) continue;
+    const suffix = act.type.includes("increase") ? "↑" : "↓";
+    parts.push(`${label} €${act.value}/天 ${suffix}`);
+  }
+  // 搜索词操作
+  if (rule.negativeAction) parts.push(ACTION_LABEL[rule.negativeAction] || rule.negativeAction);
+  if (rule.addKeywordAction)
+    parts.push(ACTION_LABEL[rule.addKeywordAction] || rule.addKeywordAction);
+  return parts.length > 0 ? parts.join(" · ") : "-";
 }
 
 const NO_VALUE_ACTIONS = new Set([
