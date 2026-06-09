@@ -59,5 +59,6 @@ export interface AdRuleGroup {
   id: string;
   name: string;
   rules: AdRule[];
+  executionCycle: number;
   createdAt: string;
 }

@@ -31,6 +31,7 @@ from api_v1.views.lingxing.ads import (
     AdGroupViewSet, AdViewSet, AutoTargetingViewSet,
     KeywordViewSet, AutoNegativeTargetingViewSet, NegativeKeywordViewSet,
     TimePricingStrategyViewSet,
+    RuleStrategyViewSet, RuleStrategyGroupViewSet,
 )
 
 from api_v1.views.work_report import WorkReportViewSet

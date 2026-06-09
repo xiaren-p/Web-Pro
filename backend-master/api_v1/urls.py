@@ -70,6 +70,17 @@ urlpatterns = [
     path('ads/time-pricing-strategy/labels', views.TimePricingStrategyViewSet.as_view({'get': 'labels'}), name='ads-time-pricing-strategy-labels'),
     path('ads/time-pricing-strategy/<str:id>/form', views.TimePricingStrategyViewSet.as_view({'get': 'form'}), name='ads-time-pricing-strategy-form'),
     path('ads/time-pricing-strategy/<str:ids>', views.TimePricingStrategyViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='ads-time-pricing-strategy-update-delete'),
+    # 广告规则策略 CRUD
+    path('ads/rule-strategy/rules', views.RuleStrategyViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='ads-rule-strategy-rules-list-create'),
+    path('ads/rule-strategy/rules/<str:id>/update', views.RuleStrategyViewSet.as_view({'put': 'update'}), name='ads-rule-strategy-rules-update'),
+    path('ads/rule-strategy/rules/<str:id>/delete', views.RuleStrategyViewSet.as_view({'delete': 'destroy'}), name='ads-rule-strategy-rules-delete'),
+    path('ads/rule-strategy/rules/<str:id>', views.RuleStrategyViewSet.as_view({'get': 'retrieve'}), name='ads-rule-strategy-rules-detail'),
+    path('ads/rule-strategy/groups', views.RuleStrategyGroupViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='ads-rule-strategy-groups-list-create'),
+    path('ads/rule-strategy/groups/<str:id>/update', views.RuleStrategyGroupViewSet.as_view({'put': 'update'}), name='ads-rule-strategy-groups-update'),
+    path('ads/rule-strategy/groups/<str:id>/delete', views.RuleStrategyGroupViewSet.as_view({'delete': 'destroy'}), name='ads-rule-strategy-groups-delete'),
+    path('ads/rule-strategy/groups/<str:id>/add-rules', views.RuleStrategyGroupViewSet.as_view({'post': 'add_rules'}), name='ads-rule-strategy-groups-add-rules'),
+    path('ads/rule-strategy/groups/<str:id>/remove-rule', views.RuleStrategyGroupViewSet.as_view({'post': 'remove_rule'}), name='ads-rule-strategy-groups-remove-rule'),
+    path('ads/rule-strategy/groups/<str:id>', views.RuleStrategyGroupViewSet.as_view({'get': 'retrieve'}), name='ads-rule-strategy-groups-detail'),
 
     path('users/email', views.ProfileViewSet.as_view({'put': 'bind_email'}), name='user-bind-email'),
     # moved above

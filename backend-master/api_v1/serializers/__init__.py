@@ -43,6 +43,7 @@ from api_v1.serializers.work import WorkReportSerializer
 
 # ads 板块
 from api_v1.serializers.lingxing.ads_time_pricing_strategy_serializer import LxTimePricingStrategySerializer
+from api_v1.serializers.lingxing.rule_strategy_serializer import LxAdRuleSerializer, LxAdRuleGroupSerializer
 
 __all__ = [
     "PositionSerializer", "PositionWriteSerializer", "PositionOptionSerializer",
@@ -57,5 +58,6 @@ __all__ = [
     "MonthlyLossSerializer", "MonthlyLossFirst20Serializer",
     "WorkReportSerializer",
     "LxTimePricingStrategySerializer",
+    "LxAdRuleSerializer", "LxAdRuleGroupSerializer",
 ]
 

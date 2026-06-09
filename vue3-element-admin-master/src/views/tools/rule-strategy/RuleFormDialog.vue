@@ -58,11 +58,7 @@
       <el-divider content-position="left">生效时间</el-divider>
       <el-form-item label="生效周期">
         <div class="effective-row">
-          <el-select
-            v-model="form.effectiveType"
-            style="width: 180px"
-            placeholder="选择生效周期"
-          >
+          <el-select v-model="form.effectiveType" style="width: 180px" placeholder="选择生效周期">
             <el-option value="within_days" label="指定天数内" />
             <el-option value="beyond_days" label="指定天数之外" />
             <el-option value="date_range" label="日期范围" />
@@ -85,12 +81,17 @@
               />
             </el-select>
             <span class="effective-suffix">
-              {{ form.effectiveType === 'beyond_days' ? '之外的广告实体' : '内的广告实体' }}
+              {{ form.effectiveType === "beyond_days" ? "之外的广告实体" : "内的广告实体" }}
             </span>
           </template>
           <template v-else>
             <div class="effective-date-row">
-              <el-select v-model="form.effectiveStart" placeholder="月" style="width: 72px" clearable>
+              <el-select
+                v-model="form.effectiveStart"
+                placeholder="月"
+                style="width: 72px"
+                clearable
+              >
                 <el-option v-for="m in 12" :key="m" :label="m + '月'" :value="String(m)" />
               </el-select>
               <el-select
@@ -999,8 +1000,8 @@ defineExpose({ open });
       font-size: 13px;
       font-weight: 700;
       color: #303133;
-      background: #fff;
       letter-spacing: 0.02em;
+      background: #fff;
     }
   }
 
@@ -1011,14 +1012,16 @@ defineExpose({ open });
   :deep(.el-form-item__label) {
     font-size: 13px;
     font-weight: 500;
-    color: #374151;
     line-height: 32px;
+    color: #374151;
   }
 
   // 统一输入框圆角与聚焦光晕
   :deep(.el-input__wrapper) {
     border-radius: 6px;
-    transition: box-shadow 0.2s, border-color 0.2s;
+    transition:
+      box-shadow 0.2s,
+      border-color 0.2s;
   }
 
   :deep(.el-select .el-input__wrapper.is-focus) {
@@ -1127,7 +1130,9 @@ defineExpose({ open });
   background: #fafbfc;
   border: 1px solid #ebeef5;
   border-radius: 10px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 
   &:hover {
     border-color: #c6ddfc;

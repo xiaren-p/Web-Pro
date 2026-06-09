@@ -1,22 +1,16 @@
 <template>
-  <el-drawer
-    v-model="visible"
-    title="草稿箱"
-    size="780px"
-    direction="rtl"
-    destroy-on-close
-    @closed="handleClose"
-  >
+  <div class="draft-panel">
     <!-- 工具栏 -->
     <div class="draft-toolbar">
       <el-input
         v-model="searchKeyword"
         placeholder="搜索规则名称"
         :prefix-icon="Search"
-        style="width: 240px"
+        style="width: 220px"
+        size="default"
         clearable
       />
-      <span style="flex: 1" />
+      <span class="toolbar-spacer" />
       <el-button type="primary" @click="handleCreate">
         <el-icon><Plus /></el-icon>
         新建规则
@@ -29,7 +23,7 @@
         :description="
           props.rules.length === 0 ? '暂无草稿规则，点击「新建规则」创建第一条' : '未找到匹配的规则'
         "
-        :image-size="120"
+        :image-size="100"
       />
     </div>
 
@@ -64,8 +58,8 @@
           </div>
 
           <div class="draft-condition-box">
-            <div class="draft-condition-label">条件规则</div>
-            <div class="draft-condition-text">{{ getRuleSummary(rule) }}</div>
+            <span class="draft-condition-label">条件规则</span>
+            <span class="draft-condition-text">{{ getRuleSummary(rule) }}</span>
           </div>
 
           <div class="draft-action-box">
@@ -89,12 +83,13 @@
 
     <!-- 规则表单弹窗 -->
     <RuleFormDialog ref="formRef" @saved="onFormSaved as any" />
-  </el-drawer>
+  </div>
 </template>
 
 <script setup lang="ts">
 /**
- * SP 广告规则草稿箱抽屉：规则的 CRUD 列表。
+ * SP 广告规则草稿箱面板：规则的 CRUD 列表，直接内嵌展示。
+ *
  * 所属板块：tools / 广告规则策略。
  */
 import type { AdRule } from "@/views/tools/rule-strategy/types";
@@ -105,7 +100,7 @@ import { Plus, Edit, Delete, Search } from "@element-plus/icons-vue";
 
 import RuleFormDialog from "@/views/tools/rule-strategy/RuleFormDialog.vue";
 
-defineOptions({ name: "DraftBoxDrawer" });
+defineOptions({ name: "DraftBoxPanel" });
 
 // ── Props / Emits ──
 const props = defineProps<{
@@ -116,7 +111,6 @@ const emit = defineEmits<{
   (e: "update:rules", rules: AdRule[]): void;
 }>();
 
-const visible = ref(false);
 const formRef = ref<any>(null);
 const editingRule = ref<AdRule | null>(null);
 const searchKeyword = ref("");
@@ -159,7 +153,6 @@ function formatShops(rule: AdRule): string {
 
 function formatActions(rule: AdRule): string {
   const parts: string[] = [];
-  // 竞价操作
   const ba = rule.bidAction;
   if (ba?.type) {
     const label = ACTION_LABEL[ba.type] || ba.type;
@@ -171,14 +164,12 @@ function formatActions(rule: AdRule): string {
       parts.push(`${label} ${val} ${suffix}`);
     }
   }
-  // 预算操作
   const bg = rule.budgetAction;
   if (bg?.type && bg.type !== "no_adjust") {
     const label = ACTION_LABEL[bg.type] || bg.type;
     const suffix = bg.type.includes("increase") ? "↑" : "↓";
     parts.push(`${label} €${bg.value}/天 ${suffix}`);
   }
-  // 搜索词操作
   if (rule.negativeAction) parts.push(ACTION_LABEL[rule.negativeAction] || rule.negativeAction);
   if (rule.addKeywordAction)
     parts.push(ACTION_LABEL[rule.addKeywordAction] || rule.addKeywordAction);
@@ -201,15 +192,6 @@ function getRuleSummary(rule: AdRule): string {
         `≤${cs.days}天, ${cs.conditions.map((c) => `${c.metric}${c.operator}${c.value}`).join(" / ")}`
     )
     .join("\n");
-}
-
-function open(): void {
-  searchKeyword.value = "";
-  visible.value = true;
-}
-
-function handleClose(): void {
-  visible.value = false;
 }
 
 function handleCreate(): void {
@@ -253,8 +235,6 @@ function onFormSaved(data: AdRule): void {
   emit("update:rules", rules);
   editingRule.value = null;
 }
-
-defineExpose({ open });
 </script>
 
 <style scoped lang="scss">
@@ -262,104 +242,98 @@ defineExpose({ open });
   display: flex;
   gap: 12px;
   align-items: center;
-  padding-bottom: 16px;
-  margin-bottom: 22px;
-  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 16px;
+}
+
+.toolbar-spacer {
+  flex: 1;
 }
 
 .draft-empty {
-  padding: 60px 0;
+  padding: 40px 0;
 }
 
 .draft-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .draft-card {
-  padding: 20px 22px;
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 12px;
-  transition:
-    box-shadow 0.25s,
-    border-color 0.25s;
+  padding: 16px 20px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--el-border-radius-base);
+  transition: box-shadow 0.25s;
 
   &:hover {
-    border-color: #c6ddfc;
-    box-shadow: 0 4px 20px rgba(64, 158, 255, 0.07);
+    box-shadow: var(--el-box-shadow-light);
   }
 }
 
+// ── 卡片头部 ──
 .draft-card-header {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .draft-card-title-row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
 .draft-card-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1f2937;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
 
-// ── 元信息网格 ──
+.draft-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// ── 元信息 ──
 .draft-meta-grid {
   display: flex;
-  gap: 28px;
-  margin-bottom: 14px;
+  gap: 20px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
 }
 
 .draft-meta-item {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  font-size: 13px;
 }
 
 .draft-meta-label {
-  font-weight: 500;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .draft-meta-value {
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
-.target-tag {
-  padding: 2px 10px !important;
-  font-size: 12px !important;
-  border-radius: 100px !important;
-}
-
-// ── 条件规则区块 ──
+// ── 条件规则 ──
 .draft-condition-box {
-  padding: 12px 16px;
-  margin-bottom: 12px;
-  background: #f8fafd;
-  border: 1px solid #e8edf2;
-  border-radius: 8px;
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--el-fill-color-light);
+  border-radius: var(--el-border-radius-base);
 }
 
 .draft-condition-label {
-  margin-bottom: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #909399;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .draft-condition-text {
-  font-family: "SF Mono", "Menlo", monospace;
   font-size: 13px;
-  line-height: 1.6;
-  color: #409eff;
+  color: var(--el-color-primary);
   word-break: break-all;
   white-space: pre-line;
 }
@@ -367,32 +341,28 @@ defineExpose({ open });
 // ── 执行操作 ──
 .draft-action-box {
   display: flex;
-  gap: 10px;
+  gap: 6px;
   align-items: center;
 }
 
 .draft-action-label {
+  flex-shrink: 0;
   font-size: 13px;
-  font-weight: 500;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .draft-action-value {
-  display: inline-block;
-  padding: 3px 14px;
   font-size: 13px;
-  font-weight: 600;
-  color: #e6a23c;
-  background: linear-gradient(135deg, #fef5e7 0%, #fdf0dc 100%);
-  border: 1px solid #fce4bf;
-  border-radius: 6px;
+  font-weight: 500;
+  color: var(--el-color-warning);
 }
 
+// ── 尾部 ──
 .draft-card-footer {
   display: flex;
   gap: 8px;
-  padding-top: 14px;
-  margin-top: 16px;
-  border-top: 1px solid #f2f3f5;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid var(--el-border-color-lighter);
 }
 </style>
