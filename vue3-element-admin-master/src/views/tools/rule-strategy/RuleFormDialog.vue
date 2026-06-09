@@ -52,58 +52,67 @@
       <!-- 生效时间 -->
       <el-divider content-position="left">生效时间</el-divider>
       <el-form-item label="生效周期">
-        <el-radio-group v-model="form.effectiveType" class="mb-2">
-          <el-radio-button value="within_days">指定天数内</el-radio-button>
-          <el-radio-button value="beyond_days">指定天数之外</el-radio-button>
-          <el-radio-button value="date_range">日期范围</el-radio-button>
-        </el-radio-group>
-        <div v-if="form.effectiveType !== 'date_range'" class="effective-days-row">
+        <div class="effective-row">
           <el-select
-            v-model="form.effectiveDays"
-            style="width: 150px"
-            placeholder="选择或输入天数"
-            filterable
-            allow-create
-            default-first-option
+            v-model="form.effectiveType"
+            style="width: 180px"
+            placeholder="选择生效周期"
           >
-            <el-option
-              v-for="d in [7, 15, 30, 60, 90, 180, 365]"
-              :key="d"
-              :label="d + ' 天'"
-              :value="d"
-            />
+            <el-option value="within_days" label="指定天数内" />
+            <el-option value="beyond_days" label="指定天数之外" />
+            <el-option value="date_range" label="日期范围" />
           </el-select>
-          <span class="effective-suffix">
-            {{ form.effectiveType === "beyond_days" ? "之外的广告实体" : "内的广告实体" }}
-          </span>
-        </div>
-        <div v-else class="effective-date-row">
-          <el-select v-model="form.effectiveStart" placeholder="月" style="width: 80px" clearable>
-            <el-option v-for="m in 12" :key="m" :label="m + '月'" :value="String(m)" />
-          </el-select>
-          <el-select
-            v-model="form.effectiveStartDay"
-            placeholder="日"
-            style="width: 80px"
-            :disabled="!form.effectiveStart"
-            clearable
-          >
-            <el-option v-for="d in 31" :key="d" :label="d + '日'" :value="String(d)" />
-          </el-select>
-          <span class="date-sep">至</span>
-          <el-select v-model="form.effectiveEnd" placeholder="月" style="width: 80px" clearable>
-            <el-option v-for="m in 12" :key="m" :label="m + '月'" :value="String(m)" />
-          </el-select>
-          <el-select
-            v-model="form.effectiveEndDay"
-            placeholder="日"
-            style="width: 80px"
-            :disabled="!form.effectiveEnd"
-            clearable
-          >
-            <el-option v-for="d in 31" :key="d" :label="d + '日'" :value="String(d)" />
-          </el-select>
-          <span class="effective-date-hint">每年此时段生效</span>
+          <template v-if="form.effectiveType !== 'date_range'">
+            <el-select
+              :model-value="form.effectiveDays ? form.effectiveDays + '天' : ''"
+              style="width: 150px"
+              placeholder="选择或输入天数"
+              filterable
+              allow-create
+              default-first-option
+              @update:model-value="handleEffectiveDaysChange"
+            >
+              <el-option
+                v-for="d in [7, 15, 30, 60, 90, 180, 365]"
+                :key="d"
+                :label="d + '天'"
+                :value="d"
+              />
+            </el-select>
+            <span class="effective-suffix">
+              {{ form.effectiveType === 'beyond_days' ? '之外的广告实体' : '内的广告实体' }}
+            </span>
+          </template>
+          <template v-else>
+            <div class="effective-date-row">
+              <el-select v-model="form.effectiveStart" placeholder="月" style="width: 72px" clearable>
+                <el-option v-for="m in 12" :key="m" :label="m + '月'" :value="String(m)" />
+              </el-select>
+              <el-select
+                v-model="form.effectiveStartDay"
+                placeholder="日"
+                style="width: 72px"
+                :disabled="!form.effectiveStart"
+                clearable
+              >
+                <el-option v-for="d in 31" :key="d" :label="d + '日'" :value="String(d)" />
+              </el-select>
+              <span class="date-sep">至</span>
+              <el-select v-model="form.effectiveEnd" placeholder="月" style="width: 72px" clearable>
+                <el-option v-for="m in 12" :key="m" :label="m + '月'" :value="String(m)" />
+              </el-select>
+              <el-select
+                v-model="form.effectiveEndDay"
+                placeholder="日"
+                style="width: 72px"
+                :disabled="!form.effectiveEnd"
+                clearable
+              >
+                <el-option v-for="d in 31" :key="d" :label="d + '日'" :value="String(d)" />
+              </el-select>
+              <span class="effective-date-hint">每年此时段生效</span>
+            </div>
+          </template>
         </div>
       </el-form-item>
 
@@ -322,27 +331,24 @@
             </el-button>
           </div>
           <div class="condition-set-days">
-            <span class="days-label">天数</span>
             <el-select
-              v-model="cSet.days"
+              :model-value="cSet.days ? cSet.days + '天' : ''"
               style="width: 140px"
               size="small"
               placeholder="选择或输入天数"
               filterable
               allow-create
               default-first-option
+              @update:model-value="(v: string | number) => handleCondDaysChange(cSet, v)"
             >
               <el-option
                 v-for="d in [7, 15, 30, 60, 90, 180, 365]"
                 :key="d"
-                :label="d + ' 天'"
+                :label="d + '天'"
                 :value="d"
               />
             </el-select>
-            <span class="days-suffix">内</span>
-            <el-tag size="small" type="primary" effect="plain" style="margin-left: 8px">
-              全部满足才触发
-            </el-tag>
+            <span class="days-suffix">内全部满足才触发</span>
           </div>
           <div class="conditions-list">
             <div v-for="(cond, condIdx) in cSet.conditions" :key="condIdx" class="condition-row">
@@ -918,6 +924,18 @@ function toggleConditionRange(cSet: { conditions: ConditionWithRange[] }, condId
     c.value2 = 0;
   }
 }
+function handleEffectiveDaysChange(val: string | number): void {
+  const str = String(val).replace(/天$/, "");
+  const num = Number(str);
+  if (!isNaN(num) && num > 0) form.effectiveDays = num;
+}
+
+function handleCondDaysChange(cSet: { days: number }, val: string | number): void {
+  const str = String(val).replace(/天$/, "");
+  const num = Number(str);
+  if (!isNaN(num) && num > 0) cSet.days = num;
+}
+
 function isPercentMetric(m: string): boolean {
   return ["acos", "ctr", "cvr", "spendsPercent", "adsSalesPercent"].includes(m);
 }
@@ -968,239 +986,298 @@ defineExpose({ open });
   max-height: 65vh;
   padding-right: 8px;
   overflow-y: auto;
+
   :deep(.el-divider) {
-    margin: 20px 0 16px;
+    margin: 24px 0 18px;
+
+    .el-divider__text {
+      font-size: 13px;
+      font-weight: 700;
+      color: #303133;
+      background: #fff;
+      letter-spacing: 0.02em;
+    }
   }
-  :deep(.el-divider__text) {
-    font-size: 13px;
-    font-weight: 700;
-    color: #374151;
-    background: #fff;
-  }
+
   :deep(.el-form-item) {
-    margin-bottom: 16px;
+    margin-bottom: 18px;
   }
+
   :deep(.el-form-item__label) {
     font-size: 13px;
     font-weight: 500;
     color: #374151;
+    line-height: 32px;
   }
-  :deep(.el-select .el-input__wrapper) {
-    border-radius: 6px;
-    transition: box-shadow 0.15s;
-    &.is-focus {
-      box-shadow: 0 0 0 1px #409eff inset;
-    }
-  }
+
+  // 统一输入框圆角与聚焦光晕
   :deep(.el-input__wrapper) {
     border-radius: 6px;
+    transition: box-shadow 0.2s, border-color 0.2s;
+  }
+
+  :deep(.el-select .el-input__wrapper.is-focus) {
+    box-shadow: 0 0 0 1px #409eff inset;
+  }
+
+  :deep(.el-input-number .el-input__wrapper.is-focus) {
+    box-shadow: 0 0 0 1px #409eff inset;
   }
 }
-:deep(.el-radio-button__inner) {
-  padding: 6px 16px;
-  font-size: 13px;
-  border-radius: 6px !important;
-}
-.mb-2 {
-  margin-bottom: 10px;
-}
-.mb-4 {
-  margin-bottom: 16px;
-}
-.rule-relation-alert {
-  margin: 8px 0 4px;
-  :deep(.el-alert__title) {
-    font-size: 13px;
-  }
-  p {
-    margin: 2px 0;
-    font-size: 12px;
-    line-height: 1.5;
-  }
-}
-.effective-days-row {
+
+// ===== 生效周期 =====
+.effective-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
 }
-.effective-prefix {
-  font-size: 14px;
-  font-weight: 600;
-  color: #606266;
-}
+
 .effective-suffix {
   font-size: 13px;
   color: #909399;
+  white-space: nowrap;
 }
+
 .effective-date-row {
   display: flex;
   gap: 8px;
   align-items: center;
 }
+
 .date-sep {
   font-size: 13px;
   color: #909399;
 }
+
 .effective-date-hint {
   margin-left: 4px;
   font-size: 12px;
   color: #909399;
+  white-space: nowrap;
 }
+
+// ===== 通用提示文字 =====
 .form-hint {
   margin-left: 10px;
   font-size: 12px;
   color: #909399;
+  white-space: nowrap;
 }
+
+// ===== 比对对象 =====
 .comparison-radios {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
 }
+
 .targeting-sub-row {
   display: flex;
   gap: 16px;
   align-items: center;
-  padding: 10px 14px;
-  margin-top: 10px;
-  background: #fafbfc;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-}
-.comparison-checkboxes {
-  display: flex;
-  gap: 12px;
-}
-.condition-sets {
-  margin-top: 10px;
-}
-.condition-set-card {
-  padding: 16px 18px;
-  margin-bottom: 10px;
-  background: #fafbfc;
-  border: 1px solid #ebeef5;
-  border-radius: 10px;
-  transition: border-color 0.15s;
-  &:hover {
-    border-color: #c6ddfc;
-  }
-}
-.condition-set-header {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.condition-set-label {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 700;
-  color: #303133;
-}
-.condition-set-days {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 8px 12px;
-  margin-bottom: 12px;
-  background: #f0f2f5;
-  border-radius: 6px;
-}
-.days-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #606266;
-}
-.days-suffix {
-  font-size: 12px;
-  color: #909399;
-}
-.conditions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.condition-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-.range-placeholder {
-  min-width: 20px;
-  font-size: 12px;
-  color: #909399;
-}
-.range-var {
-  display: inline-block;
-  padding: 1px 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #409eff;
-  background: #ecf5ff;
-  border-radius: 4px;
-}
-.conflict-alert {
-  margin-top: 4px;
-  :deep(.el-alert__title) {
-    font-size: 12px;
-  }
-}
-.add-set-btn {
-  margin-top: 4px;
-}
-.input-suffix {
-  font-size: 12px;
-  color: #909399;
-}
-.action-single-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-}
-.action-unit {
-  font-size: 13px;
-  font-weight: 500;
-  color: #606266;
-}
-.action-limit-label {
-  margin-left: 4px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #606266;
-}
-.keyword-add-panel {
   padding: 12px 16px;
   margin-top: 10px;
   background: #fafbfc;
   border: 1px solid #ebeef5;
   border-radius: 8px;
 }
+
+.comparison-checkboxes {
+  display: flex;
+  gap: 16px;
+}
+
+// ===== 规则关系提示 =====
+.rule-relation-alert {
+  margin: 8px 0 4px;
+
+  :deep(.el-alert__title) {
+    font-size: 13px;
+  }
+
+  p {
+    margin: 2px 0;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+}
+
+// ===== 条件组卡片 =====
+.condition-sets {
+  margin-top: 10px;
+}
+
+.condition-set-card {
+  padding: 18px 20px;
+  margin-bottom: 12px;
+  background: #fafbfc;
+  border: 1px solid #ebeef5;
+  border-radius: 10px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:hover {
+    border-color: #c6ddfc;
+    box-shadow: 0 2px 12px rgba(64, 158, 255, 0.06);
+  }
+}
+
+.condition-set-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.condition-set-label {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+// ===== 条件组天数行 =====
+.condition-set-days {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background: #f0f5ff;
+  border: 1px solid #d6e4ff;
+  border-radius: 8px;
+}
+
+.days-suffix {
+  font-size: 13px;
+  font-weight: 500;
+  color: #409eff;
+  white-space: nowrap;
+}
+
+// ===== 条件列表 =====
+.conditions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.condition-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  transition: border-color 0.15s;
+
+  &:hover {
+    border-color: #d6e4ff;
+  }
+}
+
+.range-placeholder {
+  min-width: 20px;
+  font-size: 12px;
+  color: #909399;
+  text-align: center;
+}
+
+.range-var {
+  display: inline-block;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+}
+
+.conflict-alert {
+  margin-top: 6px;
+
+  :deep(.el-alert__title) {
+    font-size: 12px;
+  }
+}
+
+.add-set-btn {
+  margin-top: 4px;
+}
+
+.input-suffix {
+  font-size: 12px;
+  color: #909399;
+}
+
+// ===== 执行操作 =====
+.action-single-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.action-unit {
+  font-size: 13px;
+  font-weight: 500;
+  color: #606266;
+}
+
+.action-limit-label {
+  margin-left: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #606266;
+  white-space: nowrap;
+}
+
+// ===== 关键词添加面板 =====
+.keyword-add-panel {
+  padding: 14px 18px;
+  margin-top: 10px;
+  background: #fafbfc;
+  border: 1px solid #ebeef5;
+  border-radius: 10px;
+}
+
 .kadd-row {
   display: flex;
   gap: 10px;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+
   &:last-child {
     margin-bottom: 0;
   }
 }
+
 .kadd-label {
   flex-shrink: 0;
-  width: 70px;
+  width: 72px;
   font-size: 13px;
   color: #606266;
 }
+
 .keyword-add-note {
   margin-top: 10px;
+
   :deep(.el-alert__title) {
     font-size: 12px;
   }
+
   p {
     margin: 2px 0;
     font-size: 12px;
-    line-height: 1.5;
+    line-height: 1.6;
   }
+}
+
+// ===== 工具类 =====
+.mb-4 {
+  margin-bottom: 16px;
 }
 </style>
