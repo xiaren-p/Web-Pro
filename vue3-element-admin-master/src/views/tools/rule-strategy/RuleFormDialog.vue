@@ -8,7 +8,7 @@
     @closed="handleClose"
   >
     <el-form ref="formRef" :model="form" :rules="formRules" label-width="110px" class="rule-form">
-      <!-- ═══════════ 基础信息 ═══════════ -->
+      <!-- 基础信息 -->
       <el-divider content-position="left">基础信息</el-divider>
       <el-row :gutter="24">
         <el-col :span="12">
@@ -29,7 +29,6 @@
           </el-form-item>
         </el-col>
       </el-row>
-
       <el-form-item label="适用店铺" prop="shops">
         <el-select
           v-model="form.shops"
@@ -37,7 +36,6 @@
           filterable
           style="width: 100%"
           placeholder="请选择适用店铺"
-          popper-class="rule-select-popper"
           :filter-method="(v: string) => (shopSearch = v)"
           @change="(vals: any[]) => onSelectChange(vals, shopOptions, 'shops')"
         >
@@ -51,7 +49,7 @@
         </el-select>
       </el-form-item>
 
-      <!-- ═══════════ 生效时间 ═══════════ -->
+      <!-- 生效时间 -->
       <el-divider content-position="left">生效时间</el-divider>
       <el-form-item label="生效周期">
         <el-radio-group v-model="form.effectiveType" class="mb-2">
@@ -59,180 +57,190 @@
           <el-radio-button value="beyond_days">指定天数之外</el-radio-button>
           <el-radio-button value="date_range">日期范围</el-radio-button>
         </el-radio-group>
-
         <div v-if="form.effectiveType !== 'date_range'" class="effective-days-row">
-          <span class="effective-prefix">≤</span>
           <el-select
             v-model="form.effectiveDays"
-            style="width: 140px"
+            style="width: 150px"
             placeholder="选择或输入天数"
             filterable
             allow-create
             default-first-option
           >
-            <el-option v-for="d in PRESET_DAYS" :key="d" :label="d + ' 天'" :value="d" />
+            <el-option
+              v-for="d in [7, 15, 30, 60, 90, 180, 365]"
+              :key="d"
+              :label="d + ' 天'"
+              :value="d"
+            />
           </el-select>
           <span class="effective-suffix">
             {{ form.effectiveType === "beyond_days" ? "之外的广告实体" : "内的广告实体" }}
           </span>
         </div>
-
         <div v-else class="effective-date-row">
-          <el-select
-            v-model="form.effectiveStart"
-            placeholder="起始月"
-            style="width: 90px"
-            clearable
-          >
+          <el-select v-model="form.effectiveStart" placeholder="月" style="width: 80px" clearable>
             <el-option v-for="m in 12" :key="m" :label="m + '月'" :value="String(m)" />
           </el-select>
+          <el-select
+            v-model="form.effectiveStartDay"
+            placeholder="日"
+            style="width: 80px"
+            :disabled="!form.effectiveStart"
+            clearable
+          >
+            <el-option v-for="d in 31" :key="d" :label="d + '日'" :value="String(d)" />
+          </el-select>
           <span class="date-sep">至</span>
-          <el-select v-model="form.effectiveEnd" placeholder="结束月" style="width: 90px" clearable>
+          <el-select v-model="form.effectiveEnd" placeholder="月" style="width: 80px" clearable>
             <el-option v-for="m in 12" :key="m" :label="m + '月'" :value="String(m)" />
+          </el-select>
+          <el-select
+            v-model="form.effectiveEndDay"
+            placeholder="日"
+            style="width: 80px"
+            :disabled="!form.effectiveEnd"
+            clearable
+          >
+            <el-option v-for="d in 31" :key="d" :label="d + '日'" :value="String(d)" />
           </el-select>
           <span class="effective-date-hint">每年此时段生效</span>
         </div>
       </el-form-item>
 
-      <!-- ═══════════ 字段设置 ═══════════ -->
+      <!-- 字段设置 -->
       <el-divider content-position="left">字段设置</el-divider>
       <el-row :gutter="20">
         <el-col :span="8">
-          <el-form-item label="归类" class="field-setting-item">
-            <div class="field-setting-row">
-              <el-checkbox v-model="form.unlimitedCategories">不限</el-checkbox>
-              <el-select
-                v-model="form.categories"
-                multiple
-                filterable
-                collapse-tags
-                collapse-tags-tooltip
-                :max-collapse-tags="1"
-                style="flex: 1"
-                placeholder="选择归类"
-                :disabled="form.unlimitedCategories"
-                popper-class="rule-select-popper"
-                @change="(vals: any[]) => onSelectChange(vals, assortOptions, 'categories')"
-              >
-                <el-option
-                  :key="SELECT_ALL_MARKER"
-                  label="全选 / 取消全选"
-                  :value="SELECT_ALL_MARKER"
-                />
-                <el-option
-                  v-for="opt in assortOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-            </div>
-          </el-form-item>
-        </el-col>
-        <el-col :span="8">
-          <el-form-item label="负责人" class="field-setting-item">
-            <div class="field-setting-row">
-              <el-checkbox v-model="form.unlimitedManagers">不限</el-checkbox>
-              <el-select
-                v-model="form.managers"
-                multiple
-                filterable
-                collapse-tags
-                collapse-tags-tooltip
-                :max-collapse-tags="1"
-                style="flex: 1"
-                placeholder="选择负责人"
-                :disabled="form.unlimitedManagers"
-                popper-class="rule-select-popper"
-                @change="(vals: any[]) => onSelectChange(vals, managerOptions, 'managers')"
-              >
-                <el-option
-                  :key="SELECT_ALL_MARKER"
-                  label="全选 / 取消全选"
-                  :value="SELECT_ALL_MARKER"
-                />
-                <el-option
-                  v-for="opt in managerOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-            </div>
-          </el-form-item>
-        </el-col>
-        <el-col :span="8">
-          <el-form-item label="标签" class="field-setting-item">
-            <div class="field-setting-row">
-              <el-checkbox v-model="form.unlimitedTags">不限</el-checkbox>
-              <el-select
-                v-model="form.tags"
-                multiple
-                filterable
-                collapse-tags
-                collapse-tags-tooltip
-                :max-collapse-tags="1"
-                style="flex: 1"
-                placeholder="选择标签"
-                :disabled="form.unlimitedTags"
-                popper-class="rule-select-popper"
-                @change="(vals: any[]) => onSelectChange(vals, labelOptions, 'tags')"
-              >
-                <el-option
-                  :key="SELECT_ALL_MARKER"
-                  label="全选 / 取消全选"
-                  :value="SELECT_ALL_MARKER"
-                />
-                <el-option
-                  v-for="opt in labelOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-            </div>
-          </el-form-item>
+          <!-- 归类 -->
+          <el-col :span="8">
+            <el-form-item label="归类" class="field-setting-item">
+              <div class="field-setting-row">
+                <el-checkbox v-model="form.unlimitedCategories">不限</el-checkbox>
+                <el-select
+                  v-model="form.categories"
+                  multiple
+                  filterable
+                  collapse-tags
+                  collapse-tags-tooltip
+                  :max-collapse-tags="1"
+                  style="flex: 1"
+                  placeholder="选择归类"
+                  :disabled="form.unlimitedCategories"
+                  popper-class="rule-select-popper"
+                  @change="(vals: any[]) => onSelectChange(vals, assortOptions, 'categories')"
+                >
+                  <el-option
+                    :key="SELECT_ALL_MARKER"
+                    label="全选 / 取消全选"
+                    :value="SELECT_ALL_MARKER"
+                  />
+                  <el-option
+                    v-for="opt in assortOptions"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="负责人" class="field-setting-item">
+              <div class="field-setting-row">
+                <el-checkbox v-model="form.unlimitedManagers">不限</el-checkbox>
+                <el-select
+                  v-model="form.managers"
+                  multiple
+                  filterable
+                  collapse-tags
+                  collapse-tags-tooltip
+                  :max-collapse-tags="1"
+                  style="flex: 1"
+                  placeholder="选择负责人"
+                  :disabled="form.unlimitedManagers"
+                  popper-class="rule-select-popper"
+                  @change="(vals: any[]) => onSelectChange(vals, managerOptions, 'managers')"
+                >
+                  <el-option
+                    :key="SELECT_ALL_MARKER"
+                    label="全选 / 取消全选"
+                    :value="SELECT_ALL_MARKER"
+                  />
+                  <el-option
+                    v-for="opt in managerOptions"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="标签" class="field-setting-item">
+              <div class="field-setting-row">
+                <el-checkbox v-model="form.unlimitedTags">不限</el-checkbox>
+                <el-select
+                  v-model="form.tags"
+                  multiple
+                  filterable
+                  collapse-tags
+                  collapse-tags-tooltip
+                  :max-collapse-tags="1"
+                  style="flex: 1"
+                  placeholder="选择标签"
+                  :disabled="form.unlimitedTags"
+                  popper-class="rule-select-popper"
+                  @change="(vals: any[]) => onSelectChange(vals, labelOptions, 'tags')"
+                >
+                  <el-option
+                    :key="SELECT_ALL_MARKER"
+                    label="全选 / 取消全选"
+                    :value="SELECT_ALL_MARKER"
+                  />
+                  <el-option
+                    v-for="opt in labelOptions"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </div>
+            </el-form-item>
+          </el-col>
         </el-col>
       </el-row>
 
-      <!-- ═══════════ 比对对象 ═══════════ -->
+      <!-- 比对对象 -->
       <el-divider content-position="left">比对对象</el-divider>
       <el-form-item label="比对对象">
-        <div class="comparison-target-group">
-          <!-- 多选组：定位组投放 / 关键词投放 / 商品投放 -->
+        <el-radio-group
+          v-model="form.comparisonTarget"
+          class="comparison-radios"
+          @change="onTargetChange"
+        >
+          <el-radio value="campaign" :disabled="true">广告活动（开发中）</el-radio>
+          <el-radio value="ad_group" :disabled="true">广告组（开发中）</el-radio>
+          <el-radio value="search_terms">用户搜索词</el-radio>
+          <el-radio value="targeting">投放</el-radio>
+        </el-radio-group>
+        <div v-if="form.comparisonTarget === 'targeting'" class="targeting-sub-row">
           <el-checkbox-group v-model="form.comparisonMultiTargets" class="comparison-checkboxes">
-            <el-checkbox v-for="opt in multiTargetOptions" :key="opt.value" :label="opt.value">
+            <el-checkbox v-for="opt in multiTargetOptions" :key="opt.value" :value="opt.value">
               {{ opt.label }}
             </el-checkbox>
           </el-checkbox-group>
-          <span class="comparison-sep">|</span>
-          <!-- 单选且禁用：广告活动 / 广告组 -->
-          <el-radio-group
-            v-model="form.comparisonTarget"
-            class="comparison-radios"
-            @change="onTargetChange"
+          <span
+            v-if="form.comparisonMultiTargets.length === 0"
+            class="form-hint"
+            style="color: #e6a23c"
           >
-            <el-radio
-              v-for="opt in singleTargetOptions"
-              :key="opt.value"
-              :label="opt.value"
-              :disabled="opt.disabled"
-            >
-              {{ opt.label }}
-            </el-radio>
-            <el-radio value="search_terms">用户搜索词</el-radio>
-          </el-radio-group>
+            请至少选择一种投放类型
+          </span>
         </div>
-        <span class="form-hint">
-          {{
-            form.comparisonTarget === "search_terms"
-              ? "用户搜索词仅可单选"
-              : "定位组投放、关键词投放、商品投放可多选"
-          }}
-        </span>
       </el-form-item>
 
-      <!-- ═══════════ 规则关系提示 ═══════════ -->
+      <!-- 规则关系 -->
       <el-alert
         title="规则关系说明"
         type="info"
@@ -244,16 +252,15 @@
           <p>
             条件组之间为
             <b>或</b>
-            关系（第一个条件组未命中则比对下一个，最终只匹配一个），组内条件为
+            关系（逐组匹配，命中即停），组内条件为
             <b>并</b>
             关系（全部满足才触发）。
           </p>
         </template>
       </el-alert>
 
-      <!-- ═══════════ 规则设置（条件组）══ -->
+      <!-- 规则设置 -->
       <el-divider content-position="left">规则设置</el-divider>
-
       <el-form-item label="分时规则生效">
         <el-select
           v-model="form.linkedTimeRules"
@@ -263,7 +270,7 @@
           collapse-tags
           collapse-tags-tooltip
           style="width: 100%"
-          placeholder="选择关联的分时规则（多选，非必选）"
+          placeholder="选择关联的分时规则（非必选）"
           popper-class="rule-select-popper"
         >
           <el-option
@@ -273,9 +280,7 @@
             :value="opt.value"
           />
         </el-select>
-        <div class="form-hint">命中的分时规则不执行此广告规则</div>
       </el-form-item>
-
       <el-form-item label="分时规则不生效">
         <el-select
           v-model="form.linkedTimeRulesExclude"
@@ -285,7 +290,7 @@
           collapse-tags
           collapse-tags-tooltip
           style="width: 100%"
-          placeholder="选择排除的分时规则（多选，非必选）"
+          placeholder="选择排除的分时规则（非必选）"
           popper-class="rule-select-popper"
         >
           <el-option
@@ -295,7 +300,6 @@
             :value="opt.value"
           />
         </el-select>
-        <div class="form-hint">命中的分时规则不执行此广告规则</div>
       </el-form-item>
 
       <!-- 条件组 -->
@@ -317,9 +321,8 @@
               删除
             </el-button>
           </div>
-
           <div class="condition-set-days">
-            <span class="days-prefix">≤</span>
+            <span class="days-label">天数</span>
             <el-select
               v-model="cSet.days"
               style="width: 140px"
@@ -329,14 +332,18 @@
               allow-create
               default-first-option
             >
-              <el-option v-for="d in PRESET_DAYS" :key="d" :label="d + ' 天'" :value="d" />
+              <el-option
+                v-for="d in [7, 15, 30, 60, 90, 180, 365]"
+                :key="d"
+                :label="d + ' 天'"
+                :value="d"
+              />
             </el-select>
             <span class="days-suffix">内</span>
             <el-tag size="small" type="primary" effect="plain" style="margin-left: 8px">
               全部满足才触发
             </el-tag>
           </div>
-
           <div class="conditions-list">
             <div v-for="(cond, condIdx) in cSet.conditions" :key="condIdx" class="condition-row">
               <el-select
@@ -344,7 +351,6 @@
                 style="width: 150px"
                 size="small"
                 placeholder="指标"
-                popper-class="rule-select-popper"
                 @change="
                   cond.operator = '>';
                   cond.value2 = undefined;
@@ -357,15 +363,9 @@
                   :value="m.value"
                 />
               </el-select>
-
               <template v-if="cond.isRange">
                 <span class="range-placeholder">值</span>
-                <el-select
-                  v-model="cond.operator"
-                  style="width: 72px"
-                  size="small"
-                  popper-class="rule-select-popper"
-                >
+                <el-select v-model="cond.operator" style="width: 72px" size="small">
                   <el-option
                     v-for="o in operatorOptions"
                     :key="o.value"
@@ -374,12 +374,7 @@
                   />
                 </el-select>
                 <span class="range-var">{{ cond.metric }}</span>
-                <el-select
-                  v-model="cond.operator2"
-                  style="width: 72px"
-                  size="small"
-                  popper-class="rule-select-popper"
-                >
+                <el-select v-model="cond.operator2" style="width: 72px" size="small">
                   <el-option
                     v-for="o in operatorOptions"
                     :key="o.value"
@@ -402,14 +397,8 @@
                   </template>
                 </el-input-number>
               </template>
-
               <template v-else>
-                <el-select
-                  v-model="cond.operator"
-                  style="width: 72px"
-                  size="small"
-                  popper-class="rule-select-popper"
-                >
+                <el-select v-model="cond.operator" style="width: 72px" size="small">
                   <el-option
                     v-for="o in operatorOptions"
                     :key="o.value"
@@ -432,17 +421,15 @@
                   </template>
                 </el-input-number>
               </template>
-
               <el-button
                 text
                 type="primary"
                 size="small"
-                class="cond-toggle-btn"
+                style="flex-shrink: 0; font-size: 11px"
                 @click="toggleConditionRange(cSet, condIdx)"
               >
                 {{ cond.isRange ? "切为两段" : "切为范围" }}
               </el-button>
-
               <el-button
                 v-if="cSet.conditions.length > 1"
                 text
@@ -453,7 +440,6 @@
                 <el-icon><Delete /></el-icon>
               </el-button>
             </div>
-
             <el-alert
               v-if="getConditionConflict(cSet)"
               :title="getConditionConflict(cSet) ?? ''"
@@ -463,23 +449,21 @@
               class="conflict-alert"
             />
           </div>
-
           <el-button text type="primary" size="small" @click="addCondition(csIdx)">
             <el-icon><Plus /></el-icon>
             添加条件
           </el-button>
         </div>
       </div>
-
       <el-button type="primary" plain size="small" class="add-set-btn" @click="addConditionSet">
         <el-icon><Plus /></el-icon>
         新增条件组
       </el-button>
 
-      <!-- ═══════════ 执行操作 ═══════════ -->
+      <!-- 执行操作 -->
       <el-divider content-position="left">执行操作</el-divider>
 
-      <!-- ── 搜索词专属 ── -->
+      <!-- 搜索词专属 -->
       <template v-if="form.comparisonTarget === 'search_terms'">
         <el-form-item label="否定操作">
           <el-select
@@ -495,16 +479,14 @@
               :value="opt.value"
             />
           </el-select>
-          <span class="form-hint">对匹配的用户搜索词添加否定关键词，可不选</span>
+          <span class="form-hint">可选，对匹配的用户搜索词添加否定关键词</span>
         </el-form-item>
-
         <el-form-item label="关键词投放">
           <el-select
             v-model="form.addKeywordAction"
             style="width: 320px"
             placeholder="添加关键词到手动广告活动（可选）"
             clearable
-            popper-class="rule-select-popper"
           >
             <el-option
               v-for="opt in addKeywordActionOptions"
@@ -513,8 +495,7 @@
               :value="opt.value"
             />
           </el-select>
-          <span class="form-hint">可不选，也可和否定操作同时调整</span>
-
+          <span class="form-hint">可选，可与否定操作同时调整</span>
           <div v-if="form.addKeywordAction" class="keyword-add-panel">
             <div class="kadd-row">
               <span class="kadd-label">匹配方式</span>
@@ -558,7 +539,6 @@
               <span class="action-unit">€</span>
             </div>
           </div>
-
           <el-alert
             v-if="form.addKeywordAction"
             title="关键词投放说明"
@@ -569,7 +549,7 @@
           >
             <template #default>
               <p>
-                若广告活动为
+                若为
                 <b>手动广告</b>
                 ，直接在该活动中添加关键词；若为
                 <b>自动广告</b>
@@ -580,153 +560,109 @@
         </el-form-item>
       </template>
 
-      <!-- ── 通用：竞价操作 + 预算操作（可并存）── -->
+      <!-- 通用：竞价/预算各一种 -->
       <template v-else>
         <el-alert
-          title="提示：竞价操作和预算操作可同时添加，互不影响"
-          type="success"
+          title="竞价操作与预算操作各自独立，可同时调整也可仅选其一"
+          type="info"
           :closable="false"
           show-icon
           class="mb-4"
         />
-
-        <!-- 竞价操作列表 -->
         <el-form-item label="竞价操作">
-          <div class="action-list">
-            <div v-for="(act, idx) in form.bidActions" :key="idx" class="action-item">
-              <el-select
-                v-model="act.type"
-                style="width: 200px"
-                placeholder="选择操作"
-                popper-class="rule-select-popper"
-              >
-                <el-option
-                  v-for="opt in bidActionOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-
-              <template v-if="isBidValueAction(act.type)">
-                <el-input-number
-                  v-model="act.value"
-                  style="width: 140px"
-                  :min="0"
-                  :precision="2"
-                  :max="act.type.includes('percent') ? 200 : 999999"
-                  :step="act.type.includes('percent') ? 1 : 0.1"
-                  controls-position="right"
-                />
-                <span class="action-unit">{{ act.type.includes("percent") ? "%" : "€" }}</span>
-              </template>
-
-              <!-- 提高：最高不超过 -->
-              <template v-if="isIncreaseType(act.type)">
-                <span class="action-limit-label">最高不超过</span>
-                <el-input-number
-                  v-model="act.limit"
-                  style="width: 130px"
-                  :min="0"
-                  :precision="2"
-                  :step="0.1"
-                  controls-position="right"
-                />
-                <span class="action-unit">€</span>
-              </template>
-
-              <!-- 降低（固定值）：最低不低于 -->
-              <template v-if="act.type === 'bid_fixed_decrease'">
-                <span class="action-limit-label">最低不低于</span>
-                <el-input-number
-                  v-model="act.limit"
-                  style="width: 130px"
-                  :min="0"
-                  :precision="2"
-                  :step="0.1"
-                  controls-position="right"
-                />
-                <span class="action-unit">€</span>
-              </template>
-
-              <el-button
-                v-if="form.bidActions.length > 1"
-                text
-                type="danger"
-                size="small"
-                @click="form.bidActions.splice(idx, 1)"
-              >
-                <el-icon><Delete /></el-icon>
-              </el-button>
-            </div>
+          <div class="action-single-row">
+            <el-select
+              v-model="form.bidAction.type"
+              style="width: 200px"
+              placeholder="选择竞价操作（可选）"
+              clearable
+              @change="onBidActionClear"
+            >
+              <el-option
+                v-for="opt in bidActionOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+            <template v-if="form.bidAction.type && isBidValueAction(form.bidAction.type)">
+              <el-input-number
+                v-model="form.bidAction.value"
+                style="width: 140px"
+                :min="0"
+                :precision="2"
+                :max="form.bidAction.type.includes('percent') ? 200 : 999999"
+                :step="form.bidAction.type.includes('percent') ? 1 : 0.1"
+                controls-position="right"
+              />
+              <span class="action-unit">
+                {{ form.bidAction.type.includes("percent") ? "%" : "€" }}
+              </span>
+            </template>
+            <template v-if="form.bidAction.type && isIncreaseType(form.bidAction.type)">
+              <span class="action-limit-label">最高不超过</span>
+              <el-input-number
+                v-model="form.bidAction.limit"
+                style="width: 130px"
+                :min="0"
+                :precision="2"
+                :step="0.1"
+                controls-position="right"
+              />
+              <span class="action-unit">€</span>
+            </template>
+            <template v-if="form.bidAction.type === 'bid_fixed_decrease'">
+              <span class="action-limit-label">最低不低于</span>
+              <el-input-number
+                v-model="form.bidAction.limit"
+                style="width: 130px"
+                :min="0"
+                :precision="2"
+                :step="0.1"
+                controls-position="right"
+              />
+              <span class="action-unit">€</span>
+            </template>
           </div>
-          <el-button text type="primary" size="small" class="add-action-btn" @click="addBidAction">
-            <el-icon><Plus /></el-icon>
-            添加竞价操作
-          </el-button>
         </el-form-item>
-
-        <!-- 预算操作列表 -->
         <el-form-item label="预算操作">
-          <div class="action-list">
-            <div v-for="(act, idx) in form.budgetActions" :key="idx" class="action-item">
-              <el-select
-                v-model="act.type"
-                style="width: 200px"
-                placeholder="选择操作"
-                popper-class="rule-select-popper"
-              >
-                <el-option
-                  v-for="opt in budgetActionOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-
-              <template v-if="act.type !== 'no_adjust'">
-                <el-input-number
-                  v-model="act.value"
-                  style="width: 130px"
-                  :min="1"
-                  :step="1"
-                  :precision="0"
-                  controls-position="right"
-                />
-                <span class="action-unit">€/天</span>
-                <span class="action-limit-label">不超过</span>
-                <el-input-number
-                  v-model="act.limit"
-                  style="width: 130px"
-                  :min="0"
-                  :precision="2"
-                  :step="0.1"
-                  controls-position="right"
-                />
-                <span class="action-unit">€/天</span>
-              </template>
-
-              <el-button
-                v-if="form.budgetActions.length > 1"
-                text
-                type="danger"
-                size="small"
-                @click="form.budgetActions.splice(idx, 1)"
-              >
-                <el-icon><Delete /></el-icon>
-              </el-button>
-            </div>
+          <div class="action-single-row">
+            <el-select
+              v-model="form.budgetAction.type"
+              style="width: 200px"
+              placeholder="选择预算操作（可选）"
+              clearable
+              @change="onBudgetActionClear"
+            >
+              <el-option
+                v-for="opt in budgetActionOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+            <template v-if="form.budgetAction.type && form.budgetAction.type !== 'no_adjust'">
+              <el-input-number
+                v-model="form.budgetAction.value"
+                style="width: 130px"
+                :min="1"
+                :step="1"
+                :precision="0"
+                controls-position="right"
+              />
+              <span class="action-unit">€/天</span>
+              <span class="action-limit-label">不超过</span>
+              <el-input-number
+                v-model="form.budgetAction.limit"
+                style="width: 130px"
+                :min="0"
+                :precision="2"
+                :step="0.1"
+                controls-position="right"
+              />
+              <span class="action-unit">€/天</span>
+            </template>
           </div>
-          <el-button
-            text
-            type="primary"
-            size="small"
-            class="add-action-btn"
-            @click="addBudgetAction"
-          >
-            <el-icon><Plus /></el-icon>
-            添加预算操作
-          </el-button>
         </el-form-item>
       </template>
     </el-form>
@@ -741,16 +677,10 @@
 </template>
 
 <script setup lang="ts">
-/**
- * SP 广告规则草稿箱规则表单弹窗。
- * 所属板块：tools / 广告规则策略 / 草稿箱。
- */
-import type { RuleFormData, ConditionWithRange } from "@/views/tools/rule-strategy//types";
-
+import type { RuleFormData, ConditionWithRange } from "@/views/tools/rule-strategy/types";
 import { ref, reactive, computed } from "vue";
 import { ElMessage } from "element-plus";
 import { Plus, Delete } from "@element-plus/icons-vue";
-
 import {
   getShopOptions,
   getManagerOptions,
@@ -760,14 +690,11 @@ import {
 } from "@/api/ads";
 
 defineOptions({ name: "RuleFormDialog" });
-
 const emit = defineEmits<{ (e: "saved", data: RuleFormData): void }>();
 
 const SELECT_ALL_MARKER = "__select_all__";
-const PRESET_DAYS = [7, 14, 15, 21, 30, 45, 60, 90, 180, 365];
 const shopSearch = ref("");
 
-// ── 表单 ──
 function createEmptyForm(): RuleFormData {
   return {
     id: "",
@@ -777,7 +704,9 @@ function createEmptyForm(): RuleFormData {
     effectiveType: "within_days",
     effectiveDays: 30,
     effectiveStart: "",
+    effectiveStartDay: "",
     effectiveEnd: "",
+    effectiveEndDay: "",
     categories: [],
     unlimitedCategories: false,
     managers: [],
@@ -795,43 +724,34 @@ function createEmptyForm(): RuleFormData {
     addKeywordBidType: "actual_cpc",
     addKeywordMaxBid: 0.2,
     addKeywordFixedBid: null,
-    bidActions: [{ type: "bid_percent_decrease", value: 0, limit: null }],
-    budgetActions: [{ type: "budget_increase", value: 0, limit: null }],
+    bidAction: { type: "", value: 0, limit: null },
+    budgetAction: { type: "", value: 0, limit: null },
   };
 }
-
-const visible = ref(false);
-const formRef = ref<any>(null);
-const isEdit = ref(false);
-const saving = ref(false);
+const visible = ref(false),
+  formRef = ref<any>(null),
+  isEdit = ref(false),
+  saving = ref(false);
 const form = reactive<RuleFormData>(createEmptyForm());
 
-// ── 下拉选项 ──
-const shopOptions = ref<{ value: any; label: string }[]>([]);
-const managerOptions = ref<{ value: any; label: string }[]>([]);
-const assortOptions = ref<{ value: string; label: string }[]>([]);
-const labelOptions = ref<{ value: string; label: string }[]>([]);
-const timeRuleOptions = ref<{ value: any; label: string }[]>([]);
+const shopOptions = ref<any[]>([]),
+  managerOptions = ref<any[]>([]),
+  assortOptions = ref<{ value: string; label: string }[]>([]),
+  labelOptions = ref<{ value: string; label: string }[]>([]),
+  timeRuleOptions = ref<any[]>([]);
 const filteredShopOptions = computed(() =>
   !shopSearch.value
     ? shopOptions.value
-    : shopOptions.value.filter((o) =>
+    : shopOptions.value.filter((o: any) =>
         o.label.toLowerCase().includes(shopSearch.value.toLowerCase())
       )
 );
 
-// ── 比对对象选项 ──
 const multiTargetOptions = [
   { value: "targeting", label: "定位组投放" },
   { value: "keyword", label: "关键词投放" },
   { value: "product_targeting", label: "商品投放" },
 ];
-const singleTargetOptions = [
-  { value: "campaign", label: "广告活动", disabled: true },
-  { value: "ad_group", label: "广告组", disabled: true },
-];
-
-// ── 指标 / 操作符 ──
 const metricOptions = [
   { value: "clicks", label: "点击" },
   { value: "orders", label: "订单" },
@@ -854,8 +774,6 @@ const operatorOptions = [
   { value: ">=", label: "≥" },
   { value: "<=", label: "≤" },
 ];
-
-// ── 竞价操作（不含预算）──
 const bidActionOptions = [
   { value: "bid_percent_increase", label: "竞价按百分比提高" },
   { value: "bid_fixed_increase", label: "竞价按固定值增加" },
@@ -882,14 +800,24 @@ function isBidValueAction(t: string): boolean {
 function isIncreaseType(t: string): boolean {
   return t.includes("increase");
 }
-
-// ── 目标切换 ──
 function onTargetChange(): void {
   form.negativeAction = "";
   form.addKeywordAction = "";
+  form.comparisonMultiTargets = [];
+}
+function onBidActionClear(): void {
+  if (!form.bidAction.type) {
+    form.bidAction.value = 0;
+    form.bidAction.limit = null;
+  }
+}
+function onBudgetActionClear(): void {
+  if (!form.budgetAction.type) {
+    form.budgetAction.value = 0;
+    form.budgetAction.limit = null;
+  }
 }
 
-// ── 表单验证 ──
 const formRules = {
   name: [{ required: true, message: "请输入规则名称", trigger: "blur" }],
   shops: [
@@ -903,14 +831,13 @@ const formRules = {
   ],
 };
 
-// ── 冲突检测 ──
 const ORDERED_OPS: Record<string, number> = { ">": 1, ">=": 2, "<=": 3, "<": 4 };
 function getConditionConflict(cSet: { conditions: ConditionWithRange[] }): string | null {
-  const conds = cSet.conditions;
-  for (let i = 0; i < conds.length; i++) {
-    for (let j = i + 1; j < conds.length; j++) {
-      const a = conds[i],
-        b = conds[j];
+  const c = cSet.conditions;
+  for (let i = 0; i < c.length; i++) {
+    for (let j = i + 1; j < c.length; j++) {
+      const a = c[i],
+        b = c[j];
       if (a.metric !== b.metric || a.isRange || b.isRange) continue;
       const ao = ORDERED_OPS[a.operator] ?? 0,
         bo = ORDERED_OPS[b.operator] ?? 0;
@@ -926,7 +853,6 @@ function getConditionConflict(cSet: { conditions: ConditionWithRange[] }): strin
   return null;
 }
 
-// ── 选项加载 ──
 async function loadOptions(): Promise<void> {
   try {
     const [shops, managers, assorts, labels, timeRules] = await Promise.all([
@@ -956,26 +882,22 @@ async function loadOptions(): Promise<void> {
       value: tr.id,
       label: tr.name,
     }));
-    if (!isEdit.value) form.shops = shopOptions.value.map((o) => o.value);
+    if (!isEdit.value) form.shops = shopOptions.value.map((o: any) => o.value);
   } catch {
-    /* noop */
+    /* 选项加载失败不影响表单使用 */
   }
 }
-
-// ── 全选 ──
 function onSelectChange(values: any[], options: any[], field: string): void {
-  const idx = values.indexOf(SELECT_ALL_MARKER);
-  if (idx === -1) return;
+  const i = values.indexOf(SELECT_ALL_MARKER);
+  if (i === -1) return;
   (form as any)[field] =
     values.length - 1 >= options.length ? [] : options.map((o: any) => o.value);
 }
-
-// ── 条件组操作 ──
 function addConditionSet(): void {
   form.conditionSets.push({ days: 30, conditions: [{ metric: "acos", operator: ">", value: 30 }] });
 }
-function removeConditionSet(idx: number): void {
-  if (form.conditionSets.length > 1) form.conditionSets.splice(idx, 1);
+function removeConditionSet(i: number): void {
+  if (form.conditionSets.length > 1) form.conditionSets.splice(i, 1);
 }
 function addCondition(setIdx: number): void {
   form.conditionSets[setIdx].conditions.push({ metric: "clicks", operator: ">", value: 1 });
@@ -1000,15 +922,6 @@ function isPercentMetric(m: string): boolean {
   return ["acos", "ctr", "cvr", "spendsPercent", "adsSalesPercent"].includes(m);
 }
 
-// ── 操作列表 ──
-function addBidAction(): void {
-  form.bidActions.push({ type: "bid_percent_decrease", value: 0, limit: null });
-}
-function addBudgetAction(): void {
-  form.budgetActions.push({ type: "budget_increase", value: 0, limit: null });
-}
-
-// ── 弹窗 ──
 function open(data?: Partial<RuleFormData> | null): void {
   Object.assign(form, createEmptyForm());
   shopSearch.value = "";
@@ -1047,7 +960,6 @@ async function handleSubmit(): Promise<void> {
     saving.value = false;
   }
 }
-
 defineExpose({ open });
 </script>
 
@@ -1073,10 +985,6 @@ defineExpose({ open });
     font-weight: 500;
     color: #374151;
   }
-  :deep(.el-select) {
-    --el-select-border-color-hover: #409eff;
-    --el-select-input-focus-border-color: #409eff;
-  }
   :deep(.el-select .el-input__wrapper) {
     border-radius: 6px;
     transition: box-shadow 0.15s;
@@ -1088,17 +996,16 @@ defineExpose({ open });
     border-radius: 6px;
   }
 }
-
+:deep(.el-radio-button__inner) {
+  padding: 6px 16px;
+  font-size: 13px;
+  border-radius: 6px !important;
+}
 .mb-2 {
   margin-bottom: 10px;
 }
 .mb-4 {
   margin-bottom: 16px;
-}
-:deep(.el-radio-button__inner) {
-  padding: 6px 16px;
-  font-size: 13px;
-  border-radius: 6px !important;
 }
 .rule-relation-alert {
   margin: 8px 0 4px;
@@ -1111,7 +1018,6 @@ defineExpose({ open });
     line-height: 1.5;
   }
 }
-
 .effective-days-row {
   display: flex;
   gap: 10px;
@@ -1140,48 +1046,30 @@ defineExpose({ open });
   font-size: 12px;
   color: #909399;
 }
-
-.field-setting-item :deep(.el-form-item__content) {
-  flex-wrap: nowrap;
-}
-.field-setting-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-  .el-checkbox {
-    flex-shrink: 0;
-    margin-right: 0;
-  }
-}
-
 .form-hint {
   margin-left: 10px;
   font-size: 12px;
   color: #909399;
 }
-
-// ── 比对对象 ──
-.comparison-target-group {
+.comparison-radios {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
+}
+.targeting-sub-row {
+  display: flex;
+  gap: 16px;
   align-items: center;
+  padding: 10px 14px;
+  margin-top: 10px;
+  background: #fafbfc;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
 }
 .comparison-checkboxes {
   display: flex;
-  gap: 8px;
+  gap: 12px;
 }
-.comparison-sep {
-  font-size: 20px;
-  color: #dcdfe6;
-}
-.comparison-radios {
-  display: flex;
-  gap: 8px;
-}
-
-// ── 条件组 ──
 .condition-sets {
   margin-top: 10px;
 }
@@ -1217,9 +1105,9 @@ defineExpose({ open });
   background: #f0f2f5;
   border-radius: 6px;
 }
-.days-prefix {
-  font-size: 14px;
-  font-weight: 600;
+.days-label {
+  font-size: 13px;
+  font-weight: 500;
   color: #606266;
 }
 .days-suffix {
@@ -1258,32 +1146,17 @@ defineExpose({ open });
     font-size: 12px;
   }
 }
-.cond-remove-btn,
-.cond-toggle-btn {
-  flex-shrink: 0;
-}
-.cond-toggle-btn {
-  font-size: 11px;
-}
 .add-set-btn {
   margin-top: 4px;
 }
-
 .input-suffix {
   font-size: 12px;
   color: #909399;
 }
-
-// ── 执行操作 ──
-.action-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.action-item {
+.action-single-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
 }
 .action-unit {
@@ -1297,11 +1170,6 @@ defineExpose({ open });
   font-weight: 500;
   color: #606266;
 }
-.add-action-btn {
-  margin-top: 4px;
-}
-
-// ── 搜索词专属 ──
 .keyword-add-panel {
   padding: 12px 16px;
   margin-top: 10px;
