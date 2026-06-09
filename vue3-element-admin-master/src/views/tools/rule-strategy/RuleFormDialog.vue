@@ -314,7 +314,7 @@
               <el-option v-for="d in PRESET_DAYS" :key="d" :label="d + ' 天'" :value="d" />
             </el-select>
             <span class="days-suffix">内</span>
-            <el-tag size="small" type="" effect="plain" style="margin-left: 8px">
+            <el-tag size="small" type="primary" effect="plain" style="margin-left: 8px">
               全部满足才触发
             </el-tag>
           </div>
@@ -446,7 +446,7 @@
             <!-- 冲突提示 -->
             <el-alert
               v-if="getConditionConflict(cSet)"
-              :title="getConditionConflict(cSet)"
+              :title="getConditionConflict(cSet) ?? ''"
               type="error"
               :closable="false"
               show-icon
