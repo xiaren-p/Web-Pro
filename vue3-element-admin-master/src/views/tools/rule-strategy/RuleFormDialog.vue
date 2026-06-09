@@ -34,10 +34,15 @@
           v-model="form.shops"
           multiple
           filterable
+          collapse-tags
+          collapse-tags-tooltip
+          :max-collapse-tags="1"
+          tag-effect="dark"
           style="width: 100%"
           placeholder="请选择适用店铺"
+          popper-class="rule-select-popper"
           :filter-method="(v: string) => (shopSearch = v)"
-          @change="(vals: any[]) => onSelectChange(vals, shopOptions, 'shops')"
+          @change="(vals: any[]) => onSelectChange(vals, filteredShopOptions, 'shops')"
         >
           <el-option :key="SELECT_ALL_MARKER" label="全选 / 取消全选" :value="SELECT_ALL_MARKER" />
           <el-option
@@ -1063,6 +1068,14 @@ defineExpose({ open });
   font-size: 12px;
   color: #909399;
   white-space: nowrap;
+}
+
+// ===== 字段设置行 =====
+.field-setting-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
 }
 
 // ===== 比对对象 =====
