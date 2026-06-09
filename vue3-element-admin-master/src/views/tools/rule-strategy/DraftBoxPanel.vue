@@ -99,6 +99,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus, Edit, Delete, Search } from "@element-plus/icons-vue";
 
 import RuleFormDialog from "@/views/tools/rule-strategy/RuleFormDialog.vue";
+import { createRule, updateRule, deleteRule } from "@/api/ads/rule-strategy";
 
 defineOptions({ name: "DraftBoxPanel" });
 
@@ -206,34 +207,38 @@ function handleEdit(row: AdRule): void {
 
 async function handleDelete(row: AdRule): Promise<void> {
   try {
-    await ElMessageBox.confirm(`确定要删除规则「${row.name}」吗？此操作不可撤销。`, "删除确认", {
-      type: "warning",
-    });
+    await ElMessageBox.confirm(`确定要删除规则「${row.name}」吗？`, "删除确认", { type: "warning" });
+  } catch {
+    return;
+  }
+  try {
+    await deleteRule(row.id);
     const updated = props.rules.filter((r) => r.id !== row.id);
     emit("update:rules", updated);
     ElMessage.success("已删除");
   } catch {
-    // 取消
+    ElMessage.error("删除失败，请重试");
   }
 }
 
-function onFormSaved(data: AdRule): void {
-  const rules = [...props.rules];
-  if (editingRule.value) {
-    const idx = rules.findIndex((r) => r.id === editingRule.value!.id);
-    if (idx !== -1) {
-      rules[idx] = { ...rules[idx], ...data, updatedAt: new Date().toISOString() };
+async function onFormSaved(data: AdRule): Promise<void> {
+  try {
+    if (editingRule.value) {
+      // 编辑：调 API 更新
+      const updated = await updateRule(editingRule.value.id, data as any);
+      const rules = [...props.rules];
+      const idx = rules.findIndex((r) => r.id === editingRule.value!.id);
+      if (idx !== -1) rules[idx] = updated;
+      emit("update:rules", rules);
+    } else {
+      // 创建：调 API 新增
+      const created = await createRule(data as any);
+      emit("update:rules", [...props.rules, created]);
     }
-  } else {
-    rules.push({
-      ...data,
-      id: `draft_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    editingRule.value = null;
+  } catch {
+    ElMessage.error("保存失败，请重试");
   }
-  emit("update:rules", rules);
-  editingRule.value = null;
 }
 </script>
 

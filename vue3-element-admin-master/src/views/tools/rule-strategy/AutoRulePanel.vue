@@ -31,7 +31,7 @@
               <el-button text size="small" @click.stop="openEditGroup(group)">
                 <el-icon><Edit /></el-icon>
               </el-button>
-              <el-button text size="small" type="danger" @click.stop="deleteGroup(group)">
+              <el-button text size="small" type="danger" @click.stop="deleteGroupHandler(group)">
                 <el-icon><Delete /></el-icon>
               </el-button>
             </div>
@@ -188,6 +188,13 @@ import type { AdRule, AdRuleGroup } from "@/views/tools/rule-strategy/types";
 import { ref, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus, Edit, Delete, FolderAdd, Search, InfoFilled } from "@element-plus/icons-vue";
+import {
+  createGroup,
+  updateGroup,
+  deleteGroup,
+  addRulesToGroup,
+  removeRuleFromGroup as removeRuleFromGroupApi,
+} from "@/api/ads/rule-strategy";
 
 defineOptions({ name: "AutoRulePanel" });
 
@@ -246,42 +253,43 @@ function openEditGroup(group: AdRuleGroup): void {
   groupDialogVisible.value = true;
 }
 
-function confirmGroup(): void {
+async function confirmGroup(): Promise<void> {
   if (!groupForm.value.name.trim()) {
     ElMessage.warning("请输入规则组名称");
     return;
   }
-  const groups = [...props.ruleGroups];
-  if (editingGroup.value) {
-    const idx = groups.findIndex((g) => g.id === editingGroup.value!.id);
-    if (idx !== -1) {
-      groups[idx] = {
-        ...groups[idx],
-        name: groupForm.value.name.trim(),
-        executionCycle: groupForm.value.executionCycle,
-      };
+  const payload = {
+    name: groupForm.value.name.trim(),
+    executionCycle: groupForm.value.executionCycle,
+  };
+  try {
+    if (editingGroup.value) {
+      const updated = await updateGroup(editingGroup.value.id, payload);
+      const groups = [...props.ruleGroups];
+      const idx = groups.findIndex((g) => g.id === editingGroup.value!.id);
+      if (idx !== -1) groups[idx] = updated;
+      emit("update:ruleGroups", groups);
+    } else {
+      const created = await createGroup({ ...payload, ruleOrder: [] });
+      emit("update:ruleGroups", [...props.ruleGroups, created]);
     }
-  } else {
-    groups.push({
-      id: `group_${Date.now()}`,
-      name: groupForm.value.name.trim(),
-      rules: [],
-      executionCycle: groupForm.value.executionCycle,
-      createdAt: new Date().toISOString(),
-    });
+    groupDialogVisible.value = false;
+    editingGroup.value = null;
+  } catch {
+    ElMessage.error("保存失败，请重试");
   }
-  emit("update:ruleGroups", groups);
-  groupDialogVisible.value = false;
-  editingGroup.value = null;
 }
 
-async function deleteGroup(group: AdRuleGroup): Promise<void> {
+async function deleteGroupHandler(group: AdRuleGroup): Promise<void> {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除规则组「${group.name}」吗？组内的规则将移回草稿箱。`,
-      "删除确认",
-      { type: "warning" }
-    );
+    await ElMessageBox.confirm(`确定要删除规则组「${group.name}」吗？`, "删除确认", {
+      type: "warning",
+    });
+  } catch {
+    return;
+  }
+  try {
+    await deleteGroup(group.id);
     const groups = props.ruleGroups.filter((g) => g.id !== group.id);
     emit("update:ruleGroups", groups);
     if (selectedGroupId.value === group.id) {
@@ -289,36 +297,39 @@ async function deleteGroup(group: AdRuleGroup): Promise<void> {
     }
     ElMessage.success("已删除规则组");
   } catch {
-    // 取消
+    ElMessage.error("删除失败，请重试");
   }
 }
 
-function addRuleToGroup(rule: AdRule): void {
+async function addRuleToGroup(rule: AdRule): Promise<void> {
   if (!selectedGroup.value) return;
-  const groups = [...props.ruleGroups];
-  const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
-  if (idx !== -1) {
-    if (groups[idx].rules.some((r) => r.id === rule.id)) {
-      ElMessage.warning("该规则已在当前组中");
-      return;
-    }
-    groups[idx] = { ...groups[idx], rules: [...groups[idx].rules, rule] };
+  if (selectedGroup.value.rules.some((r) => r.id === rule.id)) {
+    ElMessage.warning("该规则已在当前组中");
+    return;
+  }
+  try {
+    const updated = await addRulesToGroup(selectedGroup.value.id, [rule.id]);
+    const groups = [...props.ruleGroups];
+    const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
+    if (idx !== -1) groups[idx] = updated;
     emit("update:ruleGroups", groups);
-    ElMessage.success(`已将「${rule.name}」添加到「${groups[idx].name}」`);
+    ElMessage.success(`已将「${rule.name}」添加到「${updated.name}」`);
+  } catch {
+    ElMessage.error("添加失败，请重试");
   }
 }
 
-function removeRuleFromGroup(rule: AdRule): void {
+async function removeRuleFromGroup(rule: AdRule): Promise<void> {
   if (!selectedGroup.value) return;
-  const groups = [...props.ruleGroups];
-  const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
-  if (idx !== -1) {
-    groups[idx] = {
-      ...groups[idx],
-      rules: groups[idx].rules.filter((r) => r.id !== rule.id),
-    };
+  try {
+    const updated = await removeRuleFromGroupApi(selectedGroup.value.id, rule.id);
+    const groups = [...props.ruleGroups];
+    const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
+    if (idx !== -1) groups[idx] = updated;
     emit("update:ruleGroups", groups);
     ElMessage.success(`已将「${rule.name}」移出规则组`);
+  } catch {
+    ElMessage.error("移除失败，请重试");
   }
 }
 

@@ -60,7 +60,7 @@
         <div class="effective-row">
           <el-select v-model="form.effectiveType" style="width: 180px" placeholder="选择生效周期">
             <el-option value="within_days" label="指定天数内" />
-            <el-option value="beyond_days" label="指定天数之外" />
+            <el-option value="beyond_days" label="指定天数外" />
             <el-option value="date_range" label="日期范围" />
           </el-select>
           <template v-if="form.effectiveType !== 'date_range'">
@@ -939,12 +939,12 @@ function toggleConditionRange(cSet: { conditions: ConditionWithRange[] }, condId
     c.value2 = 0;
   }
 }
-const DAY_PRESETS = [7, 15, 30, 60, 90, 180, 365];
+const DAY_PRESETS = [0, 7, 15, 30, 60, 90, 180, 365];
 
 function handleDaysChange(val: string | number, which: "start" | "end"): void {
   const str = String(val).replace(/天$/, "");
   const num = Number(str);
-  if (!isNaN(num) && num > 0) {
+  if (!isNaN(num) && num >= 0) {
     if (which === "start") form.effectiveDaysStart = num;
     else form.effectiveDaysEnd = num;
   }
