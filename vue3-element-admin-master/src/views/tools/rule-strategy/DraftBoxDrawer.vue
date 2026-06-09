@@ -160,22 +160,23 @@ function formatShops(rule: AdRule): string {
 function formatActions(rule: AdRule): string {
   const parts: string[] = [];
   // 竞价操作
-  for (const act of rule.bidActions ?? []) {
-    const label = ACTION_LABEL[act.type] || act.type;
-    if (NO_VALUE_ACTIONS.has(act.type)) {
+  const ba = rule.bidAction;
+  if (ba?.type) {
+    const label = ACTION_LABEL[ba.type] || ba.type;
+    if (NO_VALUE_ACTIONS.has(ba.type)) {
       parts.push(label);
-      continue;
+    } else {
+      const suffix = ba.type.includes("decrease") ? "↓" : "↑";
+      const val = ba.type.includes("percent") ? `${ba.value}%` : `€${ba.value}`;
+      parts.push(`${label} ${val} ${suffix}`);
     }
-    const suffix = act.type.includes("decrease") ? "↓" : "↑";
-    const val = act.type.includes("percent") ? `${act.value}%` : `€${act.value}`;
-    parts.push(`${label} ${val} ${suffix}`);
   }
   // 预算操作
-  for (const act of rule.budgetActions ?? []) {
-    const label = ACTION_LABEL[act.type] || act.type;
-    if (act.type === "no_adjust" || !act.type) continue;
-    const suffix = act.type.includes("increase") ? "↑" : "↓";
-    parts.push(`${label} €${act.value}/天 ${suffix}`);
+  const bg = rule.budgetAction;
+  if (bg?.type && bg.type !== "no_adjust") {
+    const label = ACTION_LABEL[bg.type] || bg.type;
+    const suffix = bg.type.includes("increase") ? "↑" : "↓";
+    parts.push(`${label} €${bg.value}/天 ${suffix}`);
   }
   // 搜索词操作
   if (rule.negativeAction) parts.push(ACTION_LABEL[rule.negativeAction] || rule.negativeAction);
