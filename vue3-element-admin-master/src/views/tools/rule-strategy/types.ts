@@ -3,26 +3,27 @@
  * 所属板块：tools / 广告规则策略。
  */
 
-/** 单个指标条件（支持两段和范围模式） */
 export interface ConditionWithRange {
   metric: string;
   operator: string;
   value: number;
-  /** 是否为范围模式 (X > metric > Y) */
   isRange?: boolean;
-  /** 范围模式下的第二个运算符 */
   operator2?: string;
-  /** 范围模式下的第二个值 (下界) */
   value2?: number;
 }
 
-/** 一个条件组：时间范围 + N 个指标条件 */
 export interface RuleConditionSet {
   days: number;
   conditions: ConditionWithRange[];
 }
 
-/** 规则表单数据（前端表单结构，也是提交给后端的格式） */
+/** 单个竞价/预算操作 */
+export interface RuleAction {
+  type: string;
+  value: number;
+  limit: number | null;
+}
+
 export interface RuleFormData {
   id: string;
   name: string;
@@ -39,13 +40,18 @@ export interface RuleFormData {
   tags: string[];
   unlimitedTags: boolean;
   comparisonTarget: string;
+  /** 多选比对对象 (定位组投放/关键词投放/商品投放) */
+  comparisonMultiTargets: string[];
   conditionSets: RuleConditionSet[];
   linkedTimeRules: (number | string)[];
   linkedTimeRulesExclude: (number | string)[];
-  actionType: string;
-  actionValue: number;
-  actionLimit: number | null;
-  /** 用户搜索词专属：添加关键词到手动广告 */
+  /** 通用竞价操作列表（可多条） */
+  bidActions: RuleAction[];
+  /** 通用预算操作列表（可多条） */
+  budgetActions: RuleAction[];
+  /** 搜索词专属：否定操作 */
+  negativeAction: string;
+  /** 搜索词专属：关键词投放 */
   addKeywordAction: string;
   addKeywordMatchType: string;
   addKeywordBidType: string;
@@ -53,13 +59,11 @@ export interface RuleFormData {
   addKeywordFixedBid: number | null;
 }
 
-/** 规则列表展示结构 */
 export interface AdRule extends RuleFormData {
   createdAt: string;
   updatedAt: string;
 }
 
-/** 规则组 */
 export interface AdRuleGroup {
   id: string;
   name: string;
