@@ -62,7 +62,7 @@
 
         <div
           v-if="form.effectiveType !== 'date_range'"
-          style="display: flex; align-items: center; gap: 8px"
+          style="display: flex; gap: 8px; align-items: center"
         >
           <span style="font-size: 13px; color: #606266">≤</span>
           <el-select v-model="form.effectiveDays" style="width: 120px" placeholder="选择天数">
@@ -73,7 +73,7 @@
           </span>
         </div>
 
-        <div v-else style="display: flex; align-items: center; gap: 8px">
+        <div v-else style="display: flex; gap: 8px; align-items: center">
           <el-select v-model="form.effectiveStart" placeholder="月" style="width: 80px" clearable>
             <el-option v-for="m in 12" :key="m" :label="m + '月'" :value="String(m)" />
           </el-select>
@@ -88,7 +88,7 @@
       <el-row :gutter="20">
         <el-col :span="8">
           <el-form-item label="归类">
-            <div style="display: flex; align-items: center; gap: 8px">
+            <div style="display: flex; gap: 8px; align-items: center">
               <el-checkbox v-model="form.unlimitedCategories" style="white-space: nowrap">
                 不限
               </el-checkbox>
@@ -119,7 +119,7 @@
         </el-col>
         <el-col :span="8">
           <el-form-item label="负责人">
-            <div style="display: flex; align-items: center; gap: 8px">
+            <div style="display: flex; gap: 8px; align-items: center">
               <el-checkbox v-model="form.unlimitedManagers" style="white-space: nowrap">
                 不限
               </el-checkbox>
@@ -150,7 +150,7 @@
         </el-col>
         <el-col :span="8">
           <el-form-item label="标签">
-            <div style="display: flex; align-items: center; gap: 8px">
+            <div style="display: flex; gap: 8px; align-items: center">
               <el-checkbox v-model="form.unlimitedTags" style="white-space: nowrap">
                 不限
               </el-checkbox>
@@ -257,7 +257,7 @@
           </div>
 
           <div class="condition-set-days">
-            <span style="color: #606266; font-size: 13px">≤</span>
+            <span style="font-size: 13px; color: #606266">≤</span>
             <el-select v-model="cSet.days" style="width: 110px" size="small" placeholder="天数">
               <el-option
                 v-for="d in [7, 15, 30, 60, 90, 180, 365]"
@@ -331,7 +331,7 @@
 
       <el-divider content-position="left">执行操作</el-divider>
       <el-form-item label="操作类型">
-        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
           <el-select v-model="form.actionType" style="width: 200px" placeholder="选择操作">
             <el-option
               v-for="opt in actionTypeOptions"
@@ -352,7 +352,7 @@
             {{ form.actionType.includes("percent") ? "%" : "€" }}
           </span>
           <template v-if="form.actionType.includes('percent')">
-            <span style="font-size: 13px; color: #606266; margin-left: 8px">
+            <span style="margin-left: 8px; font-size: 13px; color: #606266">
               {{ form.actionType.includes("decrease") ? "竞价不低于" : "竞价不高于" }}
             </span>
             <el-input-number
@@ -529,10 +529,22 @@ async function loadOptions(): Promise<void> {
       getLabelOptions(),
       getTimePricingList({ pageNum: 1, pageSize: 200 }),
     ]);
-    shopOptions.value = shops ?? [];
-    managerOptions.value = managers ?? [];
-    assortOptions.value = assorts ?? [];
-    labelOptions.value = labels ?? [];
+    shopOptions.value = (shops ?? []).map((o: any) => ({
+      value: String(o.value ?? o.id),
+      label: String(o.label ?? o.name ?? o.value),
+    }));
+    managerOptions.value = (managers ?? []).map((o: any) => ({
+      value: String(o.value ?? o.id),
+      label: String(o.label ?? o.name ?? o.value),
+    }));
+    assortOptions.value = (assorts ?? []).map((o: any) => ({
+      value: String(o.value ?? o.id ?? o),
+      label: String(o.label ?? o.name ?? o),
+    }));
+    labelOptions.value = (labels ?? []).map((o: any) => ({
+      value: String(o.value ?? o.id ?? o),
+      label: String(o.label ?? o.name ?? o),
+    }));
     timeRuleOptions.value = (timeRules.list ?? []).map((tr: any) => ({
       value: tr.id,
       label: tr.name,
@@ -610,8 +622,8 @@ defineExpose({ open });
 <style scoped lang="scss">
 .rule-form {
   max-height: 65vh;
-  overflow-y: auto;
   padding-right: 8px;
+  overflow-y: auto;
 }
 
 .condition-sets {

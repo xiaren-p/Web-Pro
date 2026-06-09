@@ -306,8 +306,8 @@ defineExpose({ open });
 }
 
 .group-panel {
-  flex: 0 0 240px;
   display: flex;
+  flex: 0 0 240px;
   flex-direction: column;
   padding-right: 16px;
   border-right: 1px solid #e5e7eb;
@@ -380,8 +380,8 @@ defineExpose({ open });
 }
 
 .rule-panel {
-  flex: 1;
   display: flex;
+  flex: 1;
   flex-direction: column;
   padding-left: 16px;
   overflow-y: auto;
@@ -459,9 +459,9 @@ defineExpose({ open });
   }
 
   &.is-added {
-    opacity: 0.6;
     background: #f0fdf4;
     border-color: #bbf7d0;
+    opacity: 0.6;
   }
 }
 

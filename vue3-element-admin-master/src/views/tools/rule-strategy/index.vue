@@ -86,11 +86,8 @@ import AutoRuleDrawer from "@/views/tools/rule-strategy/AutoRuleDrawer.vue";
 
 defineOptions({ name: "RuleStrategy" });
 
-// ── 数据状态（前端暂存，后端就绪后对接 API）──
 const draftRules = ref<AdRule[]>([]);
 const ruleGroups = ref<AdRuleGroup[]>([]);
-
-// ── 子组件引用 ──
 const draftDrawerRef = ref<any>(null);
 const autoRuleDrawerRef = ref<any>(null);
 </script>
@@ -101,18 +98,17 @@ const autoRuleDrawerRef = ref<any>(null);
   padding: 28px 32px;
 }
 
-// ── 标题栏 ──
 .page-title-bar {
   display: flex;
-  align-items: baseline;
   gap: 12px;
+  align-items: baseline;
   margin-bottom: 28px;
 }
 
 .title-left {
   display: flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
 }
 
 .title-icon {
@@ -131,24 +127,33 @@ const autoRuleDrawerRef = ref<any>(null);
   color: #9ca3af;
 }
 
-// ── 入口卡片 ──
 .entry-row {
   display: flex;
-  gap: 20px;
   flex-wrap: wrap;
+  gap: 20px;
+}
+
+.entry-arrow {
+  flex-shrink: 0;
+  color: #c0c4cc;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
 }
 
 .entry-card {
   display: flex;
-  gap: 18px;
   flex: 1 1 400px;
+  gap: 18px;
+  align-items: center;
   min-width: 360px;
   padding: 24px 20px;
   cursor: pointer;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  align-items: center;
   transition:
     box-shadow 0.2s,
     border-color 0.2s,
@@ -207,8 +212,8 @@ const autoRuleDrawerRef = ref<any>(null);
 
 .entry-meta {
   display: flex;
-  align-items: center;
   gap: 6px;
+  align-items: center;
   margin-top: 6px;
   font-size: 12px;
   color: #9ca3af;
@@ -216,21 +221,11 @@ const autoRuleDrawerRef = ref<any>(null);
 
 .entry-meta-item {
   display: flex;
-  align-items: center;
   gap: 3px;
+  align-items: center;
 }
 
 .entry-meta-divider {
   user-select: none;
-}
-
-.entry-arrow {
-  flex-shrink: 0;
-  color: #c0c4cc;
-  opacity: 0;
-  transform: translateX(-8px);
-  transition:
-    opacity 0.2s,
-    transform 0.2s;
 }
 </style>

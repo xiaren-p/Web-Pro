@@ -88,7 +88,7 @@
     </div>
 
     <!-- 规则表单弹窗 -->
-    <RuleFormDialog ref="formRef" @saved="onFormSaved" />
+    <RuleFormDialog ref="formRef" @saved="onFormSaved as any" />
   </el-drawer>
 </template>
 
@@ -258,8 +258,8 @@ defineExpose({ open });
 
 .draft-card-title-row {
   display: flex;
-  align-items: center;
   gap: 10px;
+  align-items: center;
 }
 
 .draft-card-title {
@@ -277,8 +277,8 @@ defineExpose({ open });
 
 .draft-meta-item {
   display: flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
   font-size: 13px;
 }
 
@@ -291,8 +291,8 @@ defineExpose({ open });
 }
 
 .target-tag {
-  font-size: 12px !important;
   padding: 1px 8px !important;
+  font-size: 12px !important;
 }
 
 // ── 条件规则区块 ──
@@ -318,15 +318,15 @@ defineExpose({ open });
   font-size: 13px;
   line-height: 1.6;
   color: #409eff;
-  white-space: pre-line;
   word-break: break-all;
+  white-space: pre-line;
 }
 
 // ── 执行操作 ──
 .draft-action-box {
   display: flex;
-  align-items: center;
   gap: 10px;
+  align-items: center;
 }
 
 .draft-action-label {
@@ -348,8 +348,8 @@ defineExpose({ open });
 .draft-card-footer {
   display: flex;
   gap: 8px;
-  margin-top: 14px;
   padding-top: 12px;
+  margin-top: 14px;
   border-top: 1px solid #f2f3f5;
 }
 </style>

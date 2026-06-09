@@ -389,8 +389,8 @@
                   type="danger"
                   size="small"
                   style="margin-left: 8px"
-                  @click="() => {}"
                   disabled
+                  @click="() => {}"
                 >
                   删除时段
                 </el-button>
