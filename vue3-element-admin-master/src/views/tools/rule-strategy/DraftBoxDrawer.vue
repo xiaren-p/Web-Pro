@@ -141,6 +141,11 @@ const ACTION_LABEL: Record<string, string> = {
   bid_percent_increase: "竞价提高",
   bid_fixed_decrease: "竞价减少",
   bid_fixed_increase: "竞价增加",
+  no_adjust: "不调整",
+  pause: "暂停",
+  archive: "归档",
+  negative_exact: "精准否定",
+  negative_phrase: "否定词组",
 };
 
 function formatShops(rule: AdRule): string {
@@ -151,10 +156,20 @@ function formatShops(rule: AdRule): string {
 
 function formatAction(rule: AdRule): string {
   const label = ACTION_LABEL[rule.actionType] || rule.actionType;
+  // 无值操作：直接返回标签
+  if (NO_VALUE_ACTIONS.has(rule.actionType)) return label;
   const val = rule.actionType.includes("percent") ? `${rule.actionValue}%` : `€${rule.actionValue}`;
   const suffix = rule.actionType.includes("decrease") ? "↓" : "↑";
   return `${label} ${val} ${suffix}`;
 }
+
+const NO_VALUE_ACTIONS = new Set([
+  "no_adjust",
+  "pause",
+  "archive",
+  "negative_exact",
+  "negative_phrase",
+]);
 
 function getRuleSummary(rule: AdRule): string {
   return rule.conditionSets
