@@ -82,6 +82,12 @@ export const constantRoutes: RouteRecordRaw[] = [
         component: () => import("@/views/ads/detail/index.vue"),
         meta: { title: "广告活动详情", hidden: true, keepAlive: false },
       },
+      {
+        path: "/tools/rule-strategy",
+        name: "RuleStrategy",
+        component: () => import("@/views/tools/rule-strategy/index.vue"),
+        meta: { title: "SP 广告规则策略", icon: "setting", hidden: true },
+      },
     ],
   },
 ];
