@@ -10,8 +10,8 @@
     <div class="auto-rule-body">
       <!-- 左侧：规则组列表 -->
       <div class="group-panel">
-        <div class="group-panel-header">
-          <span class="group-panel-title">规则组</span>
+        <div class="group-panel__header">
+          <span class="group-panel__title">规则组</span>
           <el-button text type="primary" size="small" @click="openCreateGroup">
             <el-icon><FolderAdd /></el-icon>
             新建
@@ -27,15 +27,15 @@
             :class="{ 'is-selected': selectedGroupId === group.id }"
             @click="selectedGroupId = group.id"
           >
-            <div class="group-item-info">
-              <span class="group-item-name">{{ group.name }}</span>
-              <div class="group-item-meta">
-                <span class="group-item-count">{{ group.rules.length }} 条规则</span>
-                <span class="group-item-divider">·</span>
-                <span class="group-item-cycle">每 {{ group.executionCycle ?? 1 }} 天执行</span>
+            <div class="group-item__info">
+              <span class="group-item__name">{{ group.name }}</span>
+              <div class="group-item__meta">
+                <span class="group-item__count">{{ group.rules.length }} 条规则</span>
+                <span class="group-item__divider">·</span>
+                <span class="group-item__cycle">每 {{ group.executionCycle ?? 1 }} 天执行</span>
               </div>
             </div>
-            <div class="group-item-actions">
+            <div class="group-item__actions">
               <el-button text size="small" @click.stop="openEditGroup(group)">
                 <el-icon><Edit /></el-icon>
               </el-button>
@@ -49,7 +49,7 @@
 
       <!-- 右侧：选中规则组 → 规则列表 + 草稿池 -->
       <div class="rule-panel">
-        <div class="rule-panel-section">
+        <div class="rule-panel__section">
           <div class="section-header">
             <span class="section-title">
               {{ selectedGroup ? `「${selectedGroup.name}」的规则` : "请先选择规则组" }}
@@ -59,26 +59,22 @@
             </span>
           </div>
           <div v-if="selectedGroup && selectedGroup.rules.length === 0" class="empty-hint">
-            暂无规则，从下方草稿池中点击添加
+            暂无规则，从下方草稿池点击添加
           </div>
           <div
             v-for="(rule, idx) in selectedGroup?.rules ?? []"
             :key="rule.id"
             class="group-rule-card"
           >
-            <div class="group-rule-order">{{ idx + 1 }}</div>
-            <div class="group-rule-info">
-              <div class="group-rule-header">
-                <span class="group-rule-name">{{ rule.name }}</span>
-                <el-tag
-                  :type="rule.status === 'active' ? 'success' : 'info'"
-                  size="small"
-                  effect="plain"
-                >
-                  {{ rule.status === "active" ? "启用" : "暂停" }}
+            <div class="group-rule__order">{{ idx + 1 }}</div>
+            <div class="group-rule__info">
+              <div class="group-rule__header">
+                <span class="group-rule__name">{{ rule.name }}</span>
+                <el-tag :type="getRuleStatusType(rule.status)" size="small" effect="plain">
+                  {{ getRuleStatusText(rule.status) }}
                 </el-tag>
               </div>
-              <span class="group-rule-summary">{{ getRuleSummary(rule) }}</span>
+              <span class="group-rule__summary">{{ getRuleSummary(rule) }}</span>
             </div>
             <el-button text type="danger" size="small" @click="removeRuleFromGroup(rule)">
               <el-icon><Delete /></el-icon>
@@ -88,7 +84,7 @@
         </div>
 
         <!-- 草稿池 -->
-        <div class="rule-panel-section">
+        <div class="rule-panel__section">
           <div class="section-header">
             <span class="section-title">草稿池</span>
             <el-input
@@ -110,12 +106,12 @@
             class="draft-rule-row"
             :class="{ 'is-added': isRuleInCurrentGroup(rule.id) }"
           >
-            <div class="draft-rule-info">
-              <span class="draft-rule-name">{{ rule.name }}</span>
-              <span class="draft-rule-target">
+            <div class="draft-rule__info">
+              <span class="draft-rule__name">{{ rule.name }}</span>
+              <span class="draft-rule__target">
                 {{ COMPARISON_LABEL[rule.comparisonTarget] || rule.comparisonTarget }}
               </span>
-              <span class="draft-rule-summary">{{ getRuleSummary(rule) }}</span>
+              <span class="draft-rule__summary">{{ getRuleSummary(rule) }}</span>
             </div>
             <el-button
               v-if="selectedGroup && !isRuleInCurrentGroup(rule.id)"
@@ -196,7 +192,7 @@ import { Plus, Edit, Delete, FolderAdd, Search, InfoFilled } from "@element-plus
 
 defineOptions({ name: "AutoRuleDrawer" });
 
-// ── Props / Emits ──
+// ─── Props / Emits ───────────────────────────────────────────────────────────
 const props = defineProps<{
   rules: AdRule[];
   ruleGroups: AdRuleGroup[];
@@ -225,12 +221,20 @@ const filteredDraftRules = computed(() =>
 
 const COMPARISON_LABEL: Record<string, string> = {
   campaign: "广告活动",
-  ad_group: "广告组",
+  adGroup: "广告组",
   targeting: "定位组投放",
   keyword: "关键词投放",
-  product_targeting: "商品投放",
-  search_terms: "用户搜索词",
+  productTargeting: "商品投放",
+  searchTerms: "用户搜索词",
 };
+
+function getRuleStatusType(status: string): "success" | "info" {
+  return status === "active" ? "success" : "info";
+}
+
+function getRuleStatusText(status: string): string {
+  return status === "active" ? "启用" : "暂停";
+}
 
 function getRuleSummary(rule: AdRule): string {
   return rule.conditionSets
@@ -355,32 +359,32 @@ defineExpose({ open });
   height: 100%;
 }
 
-// ── 左侧规则组面板 ──
+// ─── 左侧规则组面板 ───────────────────────────────────────────────────────────
 .group-panel {
   display: flex;
-  flex: 0 0 252px;
+  flex: 0 0 260px;
   flex-direction: column;
   padding-right: 20px;
-  border-right: 1px solid #ebeef5;
+  border-right: 1px solid var(--color-gray-200);
 }
 
-.group-panel-header {
+.group-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding-bottom: 14px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--color-gray-100);
 }
 
-.group-panel-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #1f2937;
+.group-panel__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-900);
 }
 
 .group-list {
   flex: 1;
-  padding-top: 10px;
+  padding-top: 12px;
   overflow-y: auto;
 }
 
@@ -388,41 +392,41 @@ defineExpose({ open });
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 14px;
-  margin-bottom: 6px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
   cursor: pointer;
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 10px;
-  transition: all 0.2s;
+  background: var(--bg-card);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-base);
 
   &:hover {
-    background: #fafcff;
-    border-color: #c6ddfc;
-    box-shadow: 0 2px 10px rgba(64, 158, 255, 0.05);
+    background: var(--color-primary-50);
+    border-color: var(--color-primary-200);
+    transform: translateX(2px);
   }
 }
 
-.group-item-name {
+.group-item__name {
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1f2937;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-800);
   white-space: nowrap;
 }
 
 .group-item.is-selected {
-  background: #ecf5ff;
-  border-color: #409eff;
-  box-shadow: 0 2px 12px rgba(64, 158, 255, 0.12);
+  background: var(--color-primary-50);
+  border-color: var(--color-primary-400);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12);
 
-  .group-item-name {
-    color: #1d4ed8;
+  .group-item__name {
+    color: var(--color-primary-700);
   }
 }
 
-.group-item-info {
+.group-item__info {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -431,101 +435,110 @@ defineExpose({ open });
   overflow: hidden;
 }
 
-.group-item-meta {
+.group-item__meta {
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-500);
 }
 
-.group-item-divider {
-  color: #d0d5dd;
+.group-item__divider {
+  color: var(--color-gray-300);
   user-select: none;
 }
 
-.group-item-actions {
+.group-item__actions {
   display: flex;
   flex-shrink: 0;
   gap: 2px;
   margin-left: 6px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+
+  .group-item:hover & {
+    opacity: 1;
+  }
+
+  .group-item.is-selected & {
+    opacity: 1;
+  }
 }
 
-// ── 右侧规则面板 ──
+// ─── 右侧规则面板 ───────────────────────────────────────────────────────────
 .rule-panel {
   display: flex;
   flex: 1;
   flex-direction: column;
-  padding-left: 20px;
+  padding-left: 24px;
   overflow-y: auto;
 }
 
-.rule-panel-section {
-  margin-bottom: 24px;
+.rule-panel__section {
+  margin-bottom: 28px;
 }
 
 .section-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding-bottom: 10px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-gray-100);
 }
 
 .section-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #1f2937;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-900);
 }
 
 .section-sub {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-500);
 }
 
 .empty-hint {
-  padding: 40px 0;
-  font-size: 13px;
-  color: #c0c4cc;
+  padding: 48px 20px;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-400);
   text-align: center;
 }
 
-// ── 组内规则卡片 ──
+// ─── 组内规则卡片 ────────────────────────────────────────────────────────────
 .group-rule-card {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
-  padding: 14px 16px;
-  margin-bottom: 10px;
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 10px;
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-base);
 
   &:hover {
-    border-color: #c6ddfc;
-    box-shadow: 0 2px 12px rgba(64, 158, 255, 0.06);
+    border-color: var(--color-primary-300);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
   }
 }
 
-.group-rule-order {
+.group-rule__order {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #409eff;
-  background: #ecf5ff;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary-600);
+  background: var(--color-primary-50);
+  border-radius: var(--radius-md);
 }
 
-.group-rule-info {
+.group-rule__info {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -534,52 +547,53 @@ defineExpose({ open });
   overflow: hidden;
 }
 
-.group-rule-header {
+.group-rule__header {
   display: flex;
   gap: 10px;
   align-items: center;
 }
 
-.group-rule-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1f2937;
+.group-rule__name {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-800);
 }
 
-.group-rule-summary {
+.group-rule__summary {
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: "SF Mono", "Menlo", monospace;
-  font-size: 12px;
-  color: #909399;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-500);
   white-space: nowrap;
 }
 
-// ── 草稿池规则行 ──
+// ─── 草稿池规则行 ────────────────────────────────────────────────────────────
 .draft-rule-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  margin-bottom: 8px;
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 10px;
-  transition: all 0.2s;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-base);
 
   &:hover {
-    background: #fafcff;
-    border-color: #d6e4ff;
+    background: var(--color-primary-50);
+    border-color: var(--color-primary-200);
+    transform: translateX(2px);
   }
 
   &.is-added {
-    background: #f0fdf4;
-    border-color: #bbf7d0;
-    opacity: 0.65;
+    background: var(--color-success-50);
+    border-color: var(--color-success-200);
+    opacity: 0.7;
   }
 }
 
-.draft-rule-info {
+.draft-rule__info {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -587,33 +601,33 @@ defineExpose({ open });
   overflow: hidden;
 }
 
-.draft-rule-name {
+.draft-rule__name {
   flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #303133;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-700);
 }
 
-.draft-rule-target {
+.draft-rule__target {
   flex-shrink: 0;
-  padding: 2px 10px;
+  padding: 3px 10px;
   font-size: 11px;
-  font-weight: 500;
-  color: #409eff;
-  background: #ecf5ff;
-  border-radius: 100px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary-700);
+  background: var(--color-primary-50);
+  border-radius: var(--radius-full);
 }
 
-.draft-rule-summary {
+.draft-rule__summary {
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: "SF Mono", "Menlo", monospace;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
   font-size: 11px;
-  color: #909399;
+  color: var(--color-gray-500);
   white-space: nowrap;
 }
 
-// ── 规则组表单弹窗 ──
+// ─── 规则组表单弹窗 ──────────────────────────────────────────────────────────
 .cycle-row {
   display: flex;
   gap: 10px;
@@ -622,9 +636,9 @@ defineExpose({ open });
 
 .cycle-prefix,
 .cycle-suffix {
-  font-size: 14px;
-  font-weight: 500;
-  color: #606266;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-gray-600);
   white-space: nowrap;
 }
 
@@ -632,9 +646,13 @@ defineExpose({ open });
   display: flex;
   gap: 6px;
   align-items: center;
-  margin-top: 8px;
-  font-size: 12px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.6;
-  color: #909399;
+  color: var(--color-gray-600);
+  background: var(--color-gray-50);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-gray-100);
 }
 </style>
