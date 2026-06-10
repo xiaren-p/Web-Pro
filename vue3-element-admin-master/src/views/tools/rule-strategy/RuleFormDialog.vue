@@ -754,7 +754,38 @@
                         :value="o.value"
                       />
                     </el-select>
+                    <template v-if="cond.isRange">
+                      <span class="range-placeholder">值</span>
+                      <el-select v-model="cond.operator" style="width: 64px" size="small">
+                        <el-option
+                          v-for="o in operatorOptions"
+                          :key="o.value"
+                          :label="o.label"
+                          :value="o.value"
+                        />
+                      </el-select>
+                      <span class="range-var">{{ cond.metric }}</span>
+                      <el-select v-model="cond.operator2" style="width: 64px" size="small">
+                        <el-option
+                          v-for="o in operatorOptions"
+                          :key="o.value"
+                          :label="o.label"
+                          :value="o.value"
+                        />
+                      </el-select>
+                      <el-input-number
+                        v-model="cond.value2"
+                        size="small"
+                        style="width: 110px"
+                        :min="0"
+                        :max="999999"
+                        :precision="2"
+                        :step="isPercentMetric(cond.metric) ? 1 : 0.01"
+                        controls-position="right"
+                      />
+                    </template>
                     <el-input-number
+                      v-else
                       v-model="cond.value"
                       size="small"
                       style="width: 120px"
@@ -764,6 +795,15 @@
                       :step="isPercentMetric(cond.metric) ? 1 : 0.01"
                       controls-position="right"
                     />
+                    <el-button
+                      text
+                      type="primary"
+                      size="small"
+                      style="flex-shrink: 0; font-size: 11px"
+                      @click="toggleCondRange(cSet, condIdx)"
+                    >
+                      {{ cond.isRange ? "切为单值" : "切为范围" }}
+                    </el-button>
                     <el-button
                       v-if="cSet.conditions.length > 1"
                       text
@@ -1392,6 +1432,10 @@ function removeCondition(setIdx: number, condIdx: number) {
   const c = form.conditionSets[setIdx].conditions;
   if (c.length > 1) c.splice(condIdx, 1);
 }
+function toggleCondRange(cSet: { conditions: ConditionWithRange[] }, condIdx: number) {
+  toggleConditionRange(cSet, condIdx);
+}
+
 function toggleConditionRange(cSet: { conditions: ConditionWithRange[] }, condIdx: number) {
   const c = cSet.conditions[condIdx];
   if (c.isRange) {
