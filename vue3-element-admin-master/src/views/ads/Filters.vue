@@ -418,14 +418,30 @@ function openTemplates() {
   overflow: visible;
 }
 
-.w-90 { width: 90px; }
-.w-100 { width: 100px; }
-.w-110 { width: 110px; }
-.w-120 { width: 120px; }
-.w-130 { width: 130px; }
-.w-80 { width: 80px; }
-.w-160 { width: 160px; }
-.w-150 { width: 150px; }
+.w-90 {
+  width: 90px;
+}
+.w-100 {
+  width: 100px;
+}
+.w-110 {
+  width: 110px;
+}
+.w-120 {
+  width: 120px;
+}
+.w-130 {
+  width: 130px;
+}
+.w-80 {
+  width: 80px;
+}
+.w-160 {
+  width: 160px;
+}
+.w-150 {
+  width: 150px;
+}
 
 /* 筛选框高度 */
 .filter-row :deep(.el-select__wrapper),
@@ -530,10 +546,13 @@ function openTemplates() {
 }
 
 .filter-tag {
-  height: 24px;
-  padding: 0 10px;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px 0 12px;
   font-size: var(--font-size-xs);
-  line-height: 22px;
+  line-height: 24px;
   color: var(--color-primary-700);
   background: var(--color-primary-50);
   border-color: var(--color-primary-200);
@@ -549,12 +568,22 @@ function openTemplates() {
 }
 
 .filter-tag :deep(.el-tag__close) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  font-size: 12px;
   color: var(--color-primary-400);
+  border-radius: var(--radius-full);
+  transition: all var(--transition-fast);
 }
 
 .filter-tag :deep(.el-tag__close:hover) {
   color: #fff;
   background-color: var(--color-primary-500);
+  transform: scale(1.1);
 }
 
 .clear-all-icon {

@@ -56,11 +56,7 @@
             只查看超预算的
           </el-checkbox>
           <el-tooltip content="列配置" placement="top">
-            <el-button
-              text
-              class="column-config-btn"
-              @click="restoreDefaultColumns"
-            >
+            <el-button text class="column-config-btn" @click="restoreDefaultColumns">
               <el-icon><Operation /></el-icon>
             </el-button>
           </el-tooltip>

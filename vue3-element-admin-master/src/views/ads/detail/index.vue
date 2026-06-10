@@ -183,9 +183,10 @@ onMounted(() => {
   .detail-header-card {
     padding: var(--spacing-4) var(--spacing-5) var(--spacing-4);
     margin-bottom: var(--spacing-4);
-    background: var(--bg-card);
+    background: #ffffff;
     border: 1px solid var(--color-gray-200);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
   }
 
   /* 第一行：面包屑 */
@@ -201,13 +202,16 @@ onMounted(() => {
     display: inline-flex;
     gap: var(--spacing-1);
     align-items: center;
-    font-weight: var(--font-weight-normal);
+    padding: 4px 8px;
+    font-weight: var(--font-weight-medium);
     color: var(--color-gray-500);
     cursor: pointer;
-    transition: color var(--transition-fast);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
 
     &:hover {
       color: var(--color-primary-600);
+      background: var(--color-primary-50);
     }
   }
 
@@ -224,7 +228,8 @@ onMounted(() => {
 
   .breadcrumb-current {
     font-size: var(--font-size-sm);
-    color: var(--color-gray-600);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-gray-700);
   }
 
   /* 第二行：标题 + 徽标 */
@@ -235,17 +240,19 @@ onMounted(() => {
   }
 
   .targeting-badge {
-    display: inline-block;
+    display: inline-flex;
     flex-shrink: 0;
-    padding: 2px 10px;
+    gap: 6px;
+    align-items: center;
+    padding: 3px 12px;
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
-    line-height: 20px;
+    line-height: 1.5;
     color: var(--color-primary-700);
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
     background: var(--color-primary-50);
     border: 1px solid var(--color-primary-200);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-full);
   }
 
   /* 状态图标 */
@@ -260,7 +267,7 @@ onMounted(() => {
       color: var(--color-success-500);
 
       .el-icon {
-        font-size: var(--font-size-lg);
+        font-size: 16px;
       }
     }
 
@@ -271,13 +278,14 @@ onMounted(() => {
       height: 10px;
       background-color: currentcolor;
       border-radius: 50%;
+      box-shadow: 0 0 0 3px var(--color-success-100);
     }
 
     &.state-paused {
       color: var(--color-gray-400);
 
       .el-icon {
-        font-size: var(--font-size-lg);
+        font-size: 16px;
       }
     }
 
@@ -285,7 +293,7 @@ onMounted(() => {
       color: var(--color-danger-500);
 
       .el-icon {
-        font-size: var(--font-size-lg);
+        font-size: 16px;
       }
     }
   }
@@ -296,8 +304,8 @@ onMounted(() => {
     text-overflow: ellipsis;
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-semibold);
-    line-height: 1.3;
-    color: var(--color-gray-800);
+    line-height: 1.4;
+    color: var(--color-gray-900);
     white-space: nowrap;
   }
 
@@ -306,8 +314,13 @@ onMounted(() => {
     :deep(.el-tabs__header) {
       padding: 0 var(--spacing-1);
       margin-bottom: 0;
-      background: var(--bg-card);
-      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      background: #ffffff;
+      border: 1px solid var(--color-gray-200);
+      border-bottom: none;
+      border-radius: var(--radius-xl);
+      border-bottom-right-radius: 0;
+      border-bottom-left-radius: 0;
+      box-shadow: var(--shadow-xs);
     }
 
     :deep(.el-tabs__nav-wrap::after) {

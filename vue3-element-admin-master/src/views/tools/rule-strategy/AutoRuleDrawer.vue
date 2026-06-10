@@ -646,13 +646,13 @@ defineExpose({ open });
   display: flex;
   gap: 6px;
   align-items: center;
-  margin-top: 10px;
   padding: 10px 12px;
+  margin-top: 10px;
   font-size: var(--font-size-xs);
   line-height: 1.6;
   color: var(--color-gray-600);
   background: var(--color-gray-50);
-  border-radius: var(--radius-md);
   border: 1px solid var(--color-gray-100);
+  border-radius: var(--radius-md);
 }
 </style>

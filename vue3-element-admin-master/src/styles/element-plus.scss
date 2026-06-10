@@ -42,10 +42,10 @@ $border-light: 1px solid var(--color-gray-100);
   // 右上角关闭按钮优化
   .el-dialog__headerbtn {
     top: 50%;
-    transform: translateY(-50%);
     width: 32px;
     height: 32px;
     border-radius: var(--radius-md);
+    transform: translateY(-50%);
     transition: background-color var(--transition-fast);
 
     &:hover {
@@ -342,6 +342,14 @@ $border-light: 1px solid var(--color-gray-100);
   }
 }
 
+.el-input-number {
+  border-radius: var(--radius-md);
+
+  .el-input__wrapper {
+    border-radius: var(--radius-md);
+  }
+}
+
 // ─── El Input / Select / Autocomplete ────────────────────────────────────────
 .el-input {
   .el-input__wrapper {
@@ -408,14 +416,6 @@ $border-light: 1px solid var(--color-gray-100);
   }
 }
 
-.el-input-number {
-  border-radius: var(--radius-md);
-
-  .el-input__wrapper {
-    border-radius: var(--radius-md);
-  }
-}
-
 // ─── El Form ─────────────────────────────────────────────────────────────────
 .el-form-item {
   margin-bottom: 20px;
@@ -433,19 +433,19 @@ $border-light: 1px solid var(--color-gray-100);
 
   // 错误提示
   .el-form-item__error {
-    font-size: var(--font-size-xs);
     padding-top: 4px;
+    font-size: var(--font-size-xs);
   }
 }
 
 // ─── El Tag ──────────────────────────────────────────────────────────────────
 .el-tag {
-  font-weight: var(--font-weight-medium);
-  border-radius: var(--radius-full);
-  padding: 0 10px;
   height: 24px;
-  line-height: 22px;
+  padding: 0 10px;
   font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: 22px;
+  border-radius: var(--radius-full);
 
   // 深色模式
   &.el-tag--dark {
@@ -507,32 +507,32 @@ $border-light: 1px solid var(--color-gray-100);
   &.el-tag--plain {
     &.el-tag--primary {
       color: var(--color-primary-600);
-      border-color: var(--color-primary-200);
       background-color: var(--color-primary-50);
+      border-color: var(--color-primary-200);
     }
 
     &.el-tag--success {
       color: var(--color-success-600);
-      border-color: var(--color-success-200);
       background-color: var(--color-success-50);
+      border-color: var(--color-success-200);
     }
 
     &.el-tag--warning {
       color: var(--color-warning-600);
-      border-color: var(--color-warning-200);
       background-color: var(--color-warning-50);
+      border-color: var(--color-warning-200);
     }
 
     &.el-tag--danger {
       color: var(--color-danger-600);
-      border-color: var(--color-danger-200);
       background-color: var(--color-danger-50);
+      border-color: var(--color-danger-200);
     }
 
     &.el-tag--info {
       color: var(--color-gray-600);
-      border-color: var(--color-gray-200);
       background-color: var(--color-gray-50);
+      border-color: var(--color-gray-200);
     }
   }
 
@@ -548,10 +548,10 @@ $border-light: 1px solid var(--color-gray-100);
   .el-pager li {
     min-width: 32px;
     height: 32px;
-    line-height: 32px;
-    border-radius: var(--radius-md);
     font-weight: var(--font-weight-medium);
+    line-height: 32px;
     color: var(--color-gray-600);
+    border-radius: var(--radius-md);
     transition: all var(--transition-fast);
 
     &:hover {
@@ -572,9 +572,9 @@ $border-light: 1px solid var(--color-gray-100);
   button {
     min-width: 32px;
     height: 32px;
-    border-radius: var(--radius-md);
     font-weight: var(--font-weight-medium);
     color: var(--color-gray-600);
+    border-radius: var(--radius-md);
 
     &:hover {
       color: var(--color-primary-600);
@@ -605,14 +605,14 @@ $border-light: 1px solid var(--color-gray-100);
 
 // ─── El Popover / Popup ──────────────────────────────────────────────────────
 .el-popover.el-popper {
-  border-radius: var(--radius-lg);
   border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
 }
 
 .el-popper {
-  border-radius: var(--radius-lg);
   border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
 }
 
@@ -642,8 +642,8 @@ $border-light: 1px solid var(--color-gray-100);
 .el-checkbox {
   .el-checkbox__input {
     .el-checkbox__inner {
-      border-radius: var(--radius-sm);
       border-color: var(--color-gray-300);
+      border-radius: var(--radius-sm);
       transition: all var(--transition-fast);
 
       &:hover {
@@ -692,15 +692,15 @@ $border-light: 1px solid var(--color-gray-100);
 // ─── El Dropdown ─────────────────────────────────────────────────────────────
 .el-dropdown-menu {
   padding: 6px 0;
-  border-radius: var(--radius-lg);
   border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
 
   .el-dropdown-menu__item {
     padding: 8px 16px;
     margin: 0 4px;
-    border-radius: var(--radius-md);
     color: var(--color-gray-700);
+    border-radius: var(--radius-md);
     transition: all var(--transition-fast);
 
     &:hover {
@@ -719,9 +719,9 @@ $border-light: 1px solid var(--color-gray-100);
       .el-tabs__nav {
         .el-tabs__item {
           height: 40px;
-          line-height: 40px;
           padding: 0 20px;
           font-weight: var(--font-weight-medium);
+          line-height: 40px;
           color: var(--color-gray-600);
           transition: all var(--transition-fast);
 
@@ -736,8 +736,8 @@ $border-light: 1px solid var(--color-gray-100);
       }
 
       .el-tabs__active-bar {
-        background-color: var(--color-primary-500);
         height: 2px;
+        background-color: var(--color-primary-500);
       }
     }
   }
@@ -747,8 +747,8 @@ $border-light: 1px solid var(--color-gray-100);
 .el-breadcrumb {
   .el-breadcrumb__item {
     .el-breadcrumb__inner {
-      color: var(--color-gray-500);
       font-weight: var(--font-weight-normal);
+      color: var(--color-gray-500);
       transition: color var(--transition-fast);
 
       &:hover {
@@ -763,14 +763,14 @@ $border-light: 1px solid var(--color-gray-100);
     }
 
     .el-breadcrumb__separator {
-      color: var(--color-gray-300);
       margin: 0 8px;
+      color: var(--color-gray-300);
     }
 
     &:last-child {
       .el-breadcrumb__inner {
-        color: var(--color-gray-800);
         font-weight: var(--font-weight-medium);
+        color: var(--color-gray-800);
       }
     }
   }
@@ -899,12 +899,12 @@ $border-light: 1px solid var(--color-gray-100);
 // ─── El Badge ────────────────────────────────────────────────────────────────
 .el-badge {
   .el-badge__content {
-    border-radius: var(--radius-full);
+    height: 18px;
+    padding: 0 6px;
     font-size: 11px;
     font-weight: var(--font-weight-medium);
-    padding: 0 6px;
-    height: 18px;
     line-height: 18px;
+    border-radius: var(--radius-full);
 
     &.is-danger {
       background-color: var(--color-danger-500);
@@ -932,8 +932,8 @@ $border-light: 1px solid var(--color-gray-100);
   }
 
   .el-progress-bar__inner {
-    border-radius: var(--radius-full);
     background-color: var(--color-primary-500);
+    border-radius: var(--radius-full);
 
     &--success {
       background-color: var(--color-success-500);

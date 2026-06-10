@@ -1,25 +1,29 @@
 /**
- * Ads 页面样式 - 统一现代化美学设计
- * 使用全局设计系统变量，保持视觉一致性
+ * Ads 页面样式 — 电商数据看板风格
+ * 统一使用全局设计系统变量
  */
 
 .ads-text-container {
   min-height: calc(100vh - 50px);
-  padding: var(--spacing-5);
+  padding: var(--spacing-4);
   font-family:
     "Inter", "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
     "微软雅黑", Arial, sans-serif;
   color: var(--color-gray-800);
-  background-color: var(--color-gray-50);
+  background-color: #f2f4f7;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   内容卡片 — 白色背景 + 柔和阴影 + 更小的间距
+   ═══════════════════════════════════════════════════════════════ */
+
 .content-block {
-  padding: var(--spacing-5) var(--spacing-6);
-  margin-bottom: var(--spacing-4);
+  padding: var(--spacing-4) var(--spacing-5);
+  margin-bottom: var(--spacing-3);
   background: var(--bg-card);
   border: 1px solid var(--color-gray-200);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xs);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   transition:
     box-shadow var(--transition-base),
     border-color var(--transition-base);
@@ -27,23 +31,26 @@
 
 .content-block:hover {
   border-color: var(--color-gray-300);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* 数据表格区域：去掉自身 padding，由内部子块分别控制 */
+/* 数据表格区域：去掉自身 padding */
 .data-table-block {
   padding: 0 !important;
   overflow: hidden;
 }
 
-/* 工具栏：统一在此处定义，紧贴表格顶部 */
+/* ═══════════════════════════════════════════════════════════════
+   表格工具栏 — 浅灰背景 + 清晰分隔
+   ═══════════════════════════════════════════════════════════════ */
+
 .table-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-3) var(--spacing-5);
-  border-bottom: 1px solid var(--color-gray-100);
+  padding: var(--spacing-2) var(--spacing-4);
   background: var(--color-gray-50);
+  border-bottom: 1px solid var(--color-gray-200);
 }
 
 .table-controls .left-controls {
@@ -54,13 +61,17 @@
 
 .table-controls .right-controls {
   display: flex;
-  gap: var(--spacing-3);
+  gap: var(--spacing-2);
   align-items: center;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   工具类
+   ═══════════════════════════════════════════════════════════════ */
+
 .sku-code {
   margin-left: 6px;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--color-gray-500);
 }
 
@@ -70,14 +81,18 @@
   white-space: nowrap;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   指标面板（暂未启用，预定义样式）
+   ═══════════════════════════════════════════════════════════════ */
+
 .charts-indicators-panel {
-  margin-top: var(--spacing-2);
+  margin-top: var(--spacing-1);
 }
 
 .indicators-list {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-4);
+  gap: var(--spacing-3);
 }
 
 .indicator-card {
@@ -103,14 +118,20 @@
   transform: translateY(-1px);
 }
 
-/* 列配置图标按钮 */
-.column-config-btn {
-  height: 22px;
-  min-height: 22px;
-  padding: 4px;
-  font-size: var(--font-size-xl);
+.indicator-card__label {
+  font-size: var(--font-size-sm);
   color: var(--color-gray-600);
 }
+
+.indicator-card__value {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-gray-900);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   上传结果
+   ═══════════════════════════════════════════════════════════════ */
 
 .upload-result {
   &__summary {
@@ -128,24 +149,37 @@
 
   &__warning-item {
     padding: 3px 0;
-    font-size: 13px;
+    font-size: var(--font-size-sm);
     line-height: 1.6;
     color: var(--color-warning-600);
   }
 }
 
+/* 列配置按钮 */
+.column-config-btn {
+  height: 22px;
+  min-height: 22px;
+  padding: 4px;
+  font-size: var(--font-size-xl);
+  color: var(--color-gray-600);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   响应式
+   ═══════════════════════════════════════════════════════════════ */
+
 @media (max-width: 768px) {
   .ads-text-container {
-    padding: var(--spacing-3);
+    padding: var(--spacing-2);
   }
 
   .content-block {
-    padding: var(--spacing-4);
+    padding: var(--spacing-3);
   }
 
   .table-controls {
     flex-direction: column;
-    gap: var(--spacing-3);
+    gap: var(--spacing-2);
     align-items: stretch;
   }
 }
