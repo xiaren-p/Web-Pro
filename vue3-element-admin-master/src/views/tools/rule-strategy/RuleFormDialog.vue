@@ -580,10 +580,10 @@
         </el-form-item>
       </template>
 
-      <!-- 通用：竞价/预算各一种 -->
+      <!-- 通用：竞价/预算/其他 -->
       <template v-else>
         <el-alert
-          title="竞价操作与预算操作各自独立，可同时调整也可仅选其一"
+          title="竞价操作、预算操作、其他操作各自独立，可同时调整也可仅选其一"
           type="info"
           :closable="false"
           show-icon
@@ -684,6 +684,32 @@
             </template>
           </div>
         </el-form-item>
+        <el-form-item label="其他操作">
+          <div class="action-single-row">
+            <el-select
+              v-model="form.otherAction.type"
+              style="width: 200px"
+              placeholder="选择其他操作（可选）"
+              clearable
+            >
+              <el-option
+                v-for="opt in otherActionOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+            <template v-if="form.otherAction.type && form.otherAction.type !== 'no_other'">
+              <span class="action-limit-label">是否通知</span>
+              <el-switch
+                v-model="form.otherAction.notify"
+                active-text="通知"
+                inactive-text="不通知"
+                inline-prompt
+              />
+            </template>
+          </div>
+        </el-form-item>
       </template>
     </el-form>
 
@@ -747,6 +773,7 @@ function createEmptyForm(): RuleFormData {
     addKeywordFixedBid: null,
     bidAction: { type: "", value: 0, limit: null },
     budgetAction: { type: "", value: 0, limit: null },
+    otherAction: { type: "", notify: true },
   };
 }
 const visible = ref(false),
@@ -801,13 +828,16 @@ const bidActionOptions = [
   { value: "bid_percent_decrease", label: "竞价按百分比降低" },
   { value: "bid_fixed_decrease", label: "竞价按固定值减少" },
   { value: "no_adjust", label: "不调整" },
-  { value: "pause", label: "暂停" },
-  { value: "archive", label: "归档" },
 ];
 const budgetActionOptions = [
   { value: "budget_increase", label: "广告活动预算增加" },
   { value: "budget_decrease", label: "广告活动预算减少" },
   { value: "no_adjust", label: "不调整" },
+];
+const otherActionOptions = [
+  { value: "pause", label: "暂停" },
+  { value: "archive", label: "归档" },
+  { value: "no_other", label: "不操作" },
 ];
 const negativeActionOptions = [
   { value: "negative_exact", label: "添加精准否定关键词" },
@@ -825,6 +855,7 @@ function onTargetChange(): void {
   form.negativeAction = "";
   form.addKeywordAction = "";
   form.comparisonMultiTargets = [];
+  form.otherAction = { type: "", notify: true };
 }
 function onBidActionClear(): void {
   if (!form.bidAction.type) {

@@ -18,6 +18,11 @@ export interface RuleAction {
   limit: number | null;
 }
 
+export interface OtherAction {
+  type: string;
+  notify: boolean;
+}
+
 export interface RuleFormData {
   id: string;
   name: string;
@@ -43,6 +48,7 @@ export interface RuleFormData {
   linkedTimeRulesExclude: (number | string)[];
   bidAction: RuleAction;
   budgetAction: RuleAction;
+  otherAction: OtherAction;
   negativeAction: string;
   addKeywordAction: string;
   addKeywordMatchType: string;

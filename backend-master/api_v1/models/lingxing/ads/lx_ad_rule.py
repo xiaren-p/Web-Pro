@@ -188,6 +188,12 @@ class LxAdRule(models.Model):
         help_text='{"type": "...", "value": 0, "limit": null}',
     )
 
+    other_action = models.JSONField(
+        default=dict,
+        verbose_name="其他操作",
+        help_text='{"type": "pause"|"archive"|"", "notify": true}',
+    )
+
     negative_action = models.CharField(
         max_length=50,
         default="",
