@@ -349,6 +349,14 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   min-height: 560px;
 }
 
+.empty-hint {
+  padding: 40px 20px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-placeholder);
+  text-align: center;
+}
+
 // ── 左侧规则组 ──
 .group-panel {
   display: flex;
@@ -445,16 +453,6 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
     );
     border-color: var(--el-color-primary);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
-
-    .group-item-name {
-      font-weight: 700;
-      color: var(--el-color-primary);
-    }
-
-    .group-item-meta {
-      color: var(--el-color-primary);
-      opacity: 0.8;
-    }
   }
 }
 
@@ -474,6 +472,11 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   font-weight: 600;
   color: var(--el-text-color-primary);
   white-space: nowrap;
+
+  .group-item.is-selected & {
+    font-weight: 700;
+    color: var(--el-color-primary);
+  }
 }
 
 .group-item-meta {
@@ -481,6 +484,11 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   gap: 8px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+
+  .group-item.is-selected & {
+    color: var(--el-color-primary);
+    opacity: 0.8;
+  }
 }
 
 .group-item-sep {
@@ -539,14 +547,6 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
 .section-hint {
   font-size: 13px;
   color: var(--el-text-color-secondary);
-}
-
-.empty-hint {
-  padding: 40px 20px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--el-text-color-placeholder);
-  text-align: center;
 }
 
 // ── 组内规则卡片 ──
@@ -640,10 +640,6 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   &.is-added {
     background: linear-gradient(135deg, rgba(103, 194, 58, 0.06) 0%, rgba(16, 185, 129, 0.06) 100%);
     border-color: var(--el-color-success-light-5);
-
-    .draft-rule-name {
-      color: var(--el-color-success);
-    }
   }
 }
 
@@ -660,6 +656,10 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   font-size: 14px;
   font-weight: 600;
   color: var(--el-text-color-primary);
+
+  .draft-rule-row.is-added & {
+    color: var(--el-color-success);
+  }
 }
 
 .draft-rule-target {
