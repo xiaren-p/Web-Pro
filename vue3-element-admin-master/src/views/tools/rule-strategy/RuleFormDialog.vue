@@ -788,6 +788,7 @@
                   style="margin-top: 4px"
                   @click="
                     tba.conditionSets.push({
+                      target: 'campaign',
                       days: 7,
                       conditions: [{ metric: 'acos', operator: '>', value: 30 }],
                     })
@@ -1122,7 +1123,9 @@ function blankTba(): TargetingBidAction & { _showConds?: boolean } {
   return {
     targetingGroups: [],
     unlimitedTargeting: false,
-    conditionSets: [{ days: 7, conditions: [{ metric: "acos", operator: ">", value: 30 }] }],
+    conditionSets: [
+      { target: "campaign", days: 7, conditions: [{ metric: "acos", operator: ">", value: 30 }] },
+    ],
     bidAction: { type: "", value: 0, limit: null },
     _showConds: false,
   };
@@ -1152,7 +1155,9 @@ function createEmptyForm(): RuleFormData {
     unlimitedTags: true,
     autoTargetingGroups: [],
     unlimitedAutoTargeting: true,
-    conditionSets: [{ days: 30, conditions: [{ metric: "acos", operator: ">", value: 30 }] }],
+    conditionSets: [
+      { target: "campaign", days: 30, conditions: [{ metric: "acos", operator: ">", value: 30 }] },
+    ],
     linkedTimeRules: [],
     linkedTimeRulesExclude: [],
     targetingBidActions: [],
@@ -1371,6 +1376,7 @@ function onSelectChange(values: any[], options: any[], field: string): void {
 
 function addConditionSet() {
   form.conditionSets.push({
+    target: "campaign",
     days: 30,
     conditions: [{ metric: "acos", operator: ">", value: 30 }],
   });
@@ -1408,7 +1414,7 @@ function removeTargetingBidAction(i: number) {
   form.targetingBidActions.splice(i, 1);
 }
 function clearTbaConditions(tba: any) {
-  tba.conditionSets = [{ days: 7, conditions: [] }];
+  tba.conditionSets = [{ target: "campaign", days: 7, conditions: [] }];
 }
 
 function handleDaysChange(val: string | number, which: "start" | "end") {
