@@ -340,74 +340,121 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
 
 <style scoped lang="scss">
 .auto-rule-panel {
-  min-height: 360px;
+  min-height: 600px;
 }
 
 .auto-rule-body {
   display: flex;
+  gap: 20px;
+  min-height: 560px;
 }
 
 // ── 左侧规则组 ──
 .group-panel {
   display: flex;
-  flex: 0 0 230px;
+  flex: 0 0 260px;
   flex-direction: column;
-  padding-right: 20px;
-  border-right: 1px solid var(--el-border-color-lighter);
+  overflow: hidden;
+  background: var(--el-bg-color-page);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
 }
 
 .group-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
-}
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-bottom: none;
 
-.group-panel-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
+  .group-panel-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.3px;
+  }
+
+  .el-button {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.18);
+    border: none;
+    border-radius: 8px;
+    transition: all 0.25s ease;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+    }
+  }
 }
 
 .group-list {
   flex: 1;
+  padding: 10px;
   overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--el-border-color);
+    border-radius: 3px;
+  }
+
+  .empty-hint {
+    padding: 40px 20px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--el-text-color-placeholder);
+    text-align: center;
+  }
 }
 
 .group-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
-  margin-bottom: 4px;
+  padding: 14px 16px;
+  margin-bottom: 6px;
   cursor: pointer;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  transition:
-    border-color 0.2s,
-    background 0.2s;
+  background: var(--el-bg-color);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition: all 0.25s ease;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 
   &:hover {
     background: var(--el-color-primary-light-9);
-    border-color: var(--el-color-primary-light-5);
+    border-color: var(--el-color-primary-light-7);
+    transform: translateX(2px);
   }
-}
 
-.group-item-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  white-space: nowrap;
-}
+  &.is-selected {
+    background: linear-gradient(
+      135deg,
+      rgba(102, 126, 234, 0.08) 0%,
+      rgba(118, 75, 162, 0.08) 100%
+    );
+    border-color: var(--el-color-primary);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
 
-.group-item.is-selected {
-  background: var(--el-color-primary-light-9);
-  border-color: var(--el-color-primary);
+    .group-item-name {
+      font-weight: 700;
+      color: var(--el-color-primary);
+    }
 
-  .group-item-name {
-    color: var(--el-color-primary);
+    .group-item-meta {
+      color: var(--el-color-primary);
+      opacity: 0.8;
+    }
   }
 }
 
@@ -415,19 +462,29 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
   overflow: hidden;
 }
 
+.group-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  white-space: nowrap;
+}
+
 .group-item-meta {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
 
 .group-item-sep {
+  font-weight: 700;
   color: var(--el-border-color);
   user-select: none;
 }
@@ -437,6 +494,13 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   flex-shrink: 0;
   gap: 2px;
   margin-left: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+
+  .group-item:hover &,
+  .group-item.is-selected & {
+    opacity: 1;
+  }
 }
 
 // ── 右侧区域 ──
@@ -444,27 +508,32 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   display: flex;
   flex: 1;
   flex-direction: column;
-  padding-left: 20px;
+  gap: 20px;
   overflow-y: auto;
 }
 
 .rule-panel-section {
-  margin-bottom: 20px;
+  padding: 20px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
 }
 
 .section-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding-bottom: 10px;
-  margin-bottom: 14px;
+  padding-bottom: 16px;
+  margin-bottom: 18px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .section-title {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--el-text-color-primary);
+  letter-spacing: 0.2px;
 }
 
 .section-hint {
@@ -473,8 +542,9 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
 }
 
 .empty-hint {
-  padding: 32px 0;
+  padding: 40px 20px;
   font-size: 13px;
+  line-height: 1.7;
   color: var(--el-text-color-placeholder);
   text-align: center;
 }
@@ -482,17 +552,23 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
 // ── 组内规则卡片 ──
 .group-rule-card {
   display: flex;
-  gap: 10px;
+  gap: 14px;
   align-items: center;
-  padding: 12px 14px;
-  margin-bottom: 6px;
-  background: var(--el-bg-color-overlay);
+  padding: 16px 18px;
+  margin-bottom: 10px;
+  background: var(--el-bg-color-page);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  transition: border-color 0.2s;
+  border-radius: 10px;
+  transition: all 0.25s ease;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 
   &:hover {
-    border-color: var(--el-color-primary-light-5);
+    border-color: var(--el-color-primary-light-6);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+    transform: translateY(-1px);
   }
 }
 
@@ -501,32 +577,33 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 .group-rule-info {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
   min-width: 0;
   overflow: hidden;
 }
 
 .group-rule-top {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
 }
 
 .group-rule-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
@@ -544,27 +621,35 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
-  margin-bottom: 4px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  background: var(--el-bg-color-page);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  transition:
-    background 0.2s,
-    border-color 0.2s;
+  border-radius: 10px;
+  transition: all 0.25s ease;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 
   &:hover {
-    border-color: var(--el-color-primary-light-5);
+    border-color: var(--el-color-primary-light-6);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08);
   }
 
   &.is-added {
-    background: var(--el-color-success-light-9);
+    background: linear-gradient(135deg, rgba(103, 194, 58, 0.06) 0%, rgba(16, 185, 129, 0.06) 100%);
     border-color: var(--el-color-success-light-5);
+
+    .draft-rule-name {
+      color: var(--el-color-success);
+    }
   }
 }
 
 .draft-rule-info {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
   min-width: 0;
   overflow: hidden;
@@ -572,24 +657,25 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
 
 .draft-rule-name {
   flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--el-text-color-primary);
 }
 
 .draft-rule-target {
   flex-shrink: 0;
-  padding: 2px 8px;
+  padding: 4px 12px;
   font-size: 12px;
+  font-weight: 500;
   color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
-  border-radius: 4px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  border-radius: 6px;
 }
 
 // ── 弹窗内 ──
 .cycle-row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
   font-size: 14px;
   color: var(--el-text-color-regular);
@@ -597,10 +683,14 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
 
 .cycle-hint {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
-  margin-top: 8px;
-  font-size: 12px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.6;
   color: var(--el-text-color-secondary);
+  background: var(--el-color-info-light-9);
+  border-radius: 8px;
 }
 </style>

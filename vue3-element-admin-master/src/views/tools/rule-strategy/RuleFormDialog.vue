@@ -1552,34 +1552,45 @@ defineExpose({ open });
 
 <style scoped lang="scss">
 .rule-form {
-  max-height: 65vh;
-  padding-right: 8px;
+  max-height: 68vh;
+  padding-right: 12px;
   overflow-y: auto;
 
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--el-border-color);
+    border-radius: 4px;
+  }
+
   :deep(.el-divider) {
-    margin: 20px 0 16px;
+    margin: 28px 0 20px;
 
     .el-divider__text {
-      font-size: 13px;
+      padding: 0 16px;
+      font-size: 14px;
       font-weight: 700;
       color: #303133;
+      letter-spacing: 0.3px;
       background: #fff;
     }
   }
 
   :deep(.el-form-item) {
-    margin-bottom: 20px;
+    margin-bottom: 22px;
   }
 
   :deep(.el-form-item__label) {
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 32px;
     color: #374151;
   }
 
   :deep(.el-input__wrapper) {
-    border-radius: 6px;
+    border-radius: 8px;
     transition:
       box-shadow 0.2s,
       border-color 0.2s;
@@ -1655,13 +1666,14 @@ defineExpose({ open });
 
 .targeting-sub-row {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 20px;
   align-items: center;
-  padding: 14px 16px;
-  margin-top: 10px;
-  background: var(--el-fill-color-lighter);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  padding: 16px 20px;
+  margin-top: 12px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.04) 0%, rgba(118, 75, 162, 0.04) 100%);
+  border: 1px solid var(--el-color-primary-light-7);
+  border-radius: 10px;
 }
 
 .comparison-checkboxes {
@@ -1693,19 +1705,31 @@ defineExpose({ open });
 }
 
 .condition-set-card {
-  padding: 16px 20px;
-  margin-bottom: 12px;
-  background: var(--el-fill-color-lighter);
+  position: relative;
+  padding: 20px 24px;
+  margin-bottom: 14px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.03) 0%, rgba(118, 75, 162, 0.03) 100%);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
   transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
+    border-color 0.25s,
+    box-shadow 0.25s;
 
   &:hover {
-    border-color: var(--el-color-primary-light-5);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border-color: var(--el-color-primary-light-6);
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.1);
+  }
+
+  &::before {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    content: "";
+    background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px 0 0 12px;
   }
 }
 
@@ -1824,12 +1848,24 @@ defineExpose({ open });
 }
 
 .tba-card {
-  padding: 16px 20px;
-  margin-bottom: 12px;
-  background: var(--el-fill-color-lighter);
+  position: relative;
+  padding: 20px 24px;
+  margin-bottom: 14px;
+  background: linear-gradient(135deg, rgba(103, 194, 58, 0.03) 0%, rgba(16, 185, 129, 0.03) 100%);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+
+  &::before {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    content: "";
+    background: linear-gradient(180deg, #67c23a 0%, #10b981 100%);
+    border-radius: 12px 0 0 12px;
+  }
 }
 
 .tba-card-header {
@@ -1902,11 +1938,11 @@ defineExpose({ open });
 
 // 关键词面板
 .keyword-add-panel {
-  padding: 14px 18px;
-  margin-top: 10px;
-  background: var(--el-fill-color-lighter);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  padding: 18px 22px;
+  margin-top: 12px;
+  background: linear-gradient(135deg, rgba(230, 162, 60, 0.05) 0%, rgba(245, 158, 11, 0.05) 100%);
+  border: 1px solid var(--el-color-warning-light-6);
+  border-radius: 10px;
 }
 
 .kadd-row {

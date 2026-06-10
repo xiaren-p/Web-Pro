@@ -4,14 +4,14 @@
     <div class="draft-toolbar">
       <el-input
         v-model="searchKeyword"
-        placeholder="搜索规则名称"
+        placeholder="搜索规则名称..."
         :prefix-icon="Search"
-        style="width: 220px"
+        style="width: 280px"
         size="default"
         clearable
       />
       <span class="toolbar-spacer" />
-      <el-button type="primary" @click="handleCreate">
+      <el-button type="primary" size="default" @click="handleCreate">
         <el-icon><Plus /></el-icon>
         新建规则
       </el-button>
@@ -58,7 +58,7 @@
           </div>
 
           <div class="draft-condition-box">
-            <span class="draft-condition-label">条件规则</span>
+            <span class="draft-condition-label">触发条件</span>
             <span class="draft-condition-text">{{ getRuleSummary(rule) }}</span>
           </div>
 
@@ -69,11 +69,11 @@
         </div>
 
         <div class="draft-card-footer">
-          <el-button text type="primary" size="small" @click="handleEdit(rule)">
+          <el-button type="primary" size="small" plain @click="handleEdit(rule)">
             <el-icon><Edit /></el-icon>
-            编辑
+            编辑规则
           </el-button>
-          <el-button text type="danger" size="small" @click="handleDelete(rule)">
+          <el-button type="danger" size="small" plain @click="handleDelete(rule)">
             <el-icon><Delete /></el-icon>
             删除
           </el-button>
@@ -247,9 +247,15 @@ async function onFormSaved(data: AdRule): Promise<void> {
 <style scoped lang="scss">
 .draft-toolbar {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
-  margin-bottom: 16px;
+  justify-content: space-between;
+  padding: 18px 22px;
+  margin-bottom: 20px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
 }
 
 .toolbar-spacer {
@@ -257,48 +263,59 @@ async function onFormSaved(data: AdRule): Promise<void> {
 }
 
 .draft-empty {
-  padding: 60px 0;
+  padding: 80px 20px;
 }
 
 .draft-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .draft-card {
-  padding: 20px 20px;
-  background: var(--el-bg-color-overlay);
+  padding: 0;
+  overflow: hidden;
+  background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.2s;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: all 0.25s ease;
 
   &:hover {
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    border-color: var(--el-color-primary-light-6);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    transform: translateY(-2px);
   }
 }
 
 .draft-card-header {
-  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px 12px;
+  margin-bottom: 0;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.04) 0%, rgba(118, 75, 162, 0.04) 100%);
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .draft-card-title-row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
 }
 
 .draft-card-title {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--el-text-color-primary);
+  letter-spacing: -0.2px;
 }
 
 .draft-card-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
+  padding: 18px 22px;
 }
 
 .draft-meta-grid {
@@ -309,50 +326,86 @@ async function onFormSaved(data: AdRule): Promise<void> {
 
 .draft-meta-item {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 
 .draft-meta-label {
+  font-size: 12px;
+  font-weight: 500;
   color: var(--el-text-color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .draft-meta-value {
+  font-size: 14px;
+  font-weight: 500;
   color: var(--el-text-color-regular);
 }
 
+.target-tag {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+}
+
 .draft-condition-box {
-  padding: 10px 14px;
+  padding: 14px 18px;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.7;
   color: var(--el-color-primary);
   word-break: break-all;
   white-space: pre-line;
-  background: var(--el-fill-color-lighter);
-  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.06) 0%, rgba(118, 75, 162, 0.06) 100%);
+  border: 1px solid var(--el-color-primary-light-7);
+  border-radius: 10px;
+}
+
+.draft-condition-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .draft-action-box {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
+  padding: 12px 16px;
   font-size: 13px;
+  background: var(--el-color-warning-light-9);
+  border: 1px solid var(--el-color-warning-light-7);
+  border-radius: 10px;
 }
 
 .draft-action-label {
-  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-color-warning);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .draft-action-value {
   font-weight: 500;
+  line-height: 1.6;
   color: var(--el-color-warning);
 }
 
 .draft-card-footer {
   display: flex;
-  gap: 8px;
-  padding-top: 14px;
-  margin-top: 14px;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 14px 22px 18px;
+  margin-top: 0;
+  background: var(--el-fill-color-lighter);
   border-top: 1px solid var(--el-border-color-lighter);
 }
 </style>
