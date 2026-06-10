@@ -13,7 +13,7 @@
 
         <div class="group-list">
           <div
-            v-for="group in ruleGroups"
+            v-for="group in props.ruleGroups"
             :key="group.id"
             class="group-item"
             :class="{ 'is-selected': selectedGroupId === group.id }"
@@ -22,7 +22,7 @@
             <div class="group-item-info">
               <span class="group-item-name">{{ group.name }}</span>
               <div class="group-item-meta">
-                <span>{{ group.rules.length }} 条规则</span>
+                <span>{{ group.rules?.length || 0 }} 条规则</span>
                 <span class="group-item-sep">·</span>
                 <span>每 {{ group.executionCycle ?? 1 }} 天</span>
               </div>
@@ -36,101 +36,145 @@
               </el-button>
             </div>
           </div>
-          <div v-if="ruleGroups.length === 0" class="empty-hint">暂无规则组，点击「新建」创建</div>
+          <div v-if="props.ruleGroups.length === 0" class="empty-hint">
+            <el-empty :image-size="60" description="暂无规则组，点击「新建」创建" />
+          </div>
         </div>
       </div>
 
-      <!-- 右侧：规则列表 + 草稿池 -->
+      <!-- 右侧：规则列表表格 -->
       <div class="rule-panel">
-        <!-- 选中的规则组详情 -->
-        <div class="rule-panel-section">
-          <div class="section-header">
-            <span class="section-title">
-              {{ selectedGroup ? `「${selectedGroup.name}」` : "请选择规则组" }}
-            </span>
-            <span v-if="selectedGroup" class="section-hint">
-              每 {{ selectedGroup.executionCycle ?? 1 }} 天执行一次，按序匹配，命中即停
-            </span>
-          </div>
-
-          <!-- 组内规则 -->
-          <template v-if="selectedGroup">
-            <div v-if="selectedGroup.rules.length === 0" class="empty-hint">
-              暂无规则，从下方草稿池添加
-            </div>
-            <div v-for="(rule, idx) in selectedGroup.rules" :key="rule.id" class="group-rule-card">
-              <span class="group-rule-order">{{ idx + 1 }}</span>
-              <div class="group-rule-info">
-                <div class="group-rule-top">
-                  <span class="group-rule-name">{{ rule.name }}</span>
-                  <el-tag
-                    :type="rule.status === 'active' ? 'success' : 'info'"
-                    size="small"
-                    effect="plain"
-                  >
-                    {{ rule.status === "active" ? "启用" : "暂停" }}
-                  </el-tag>
-                </div>
-                <span class="group-rule-summary">{{ getRuleSummary(rule) }}</span>
+        <template v-if="selectedGroup">
+          <!-- 工具栏 -->
+          <div class="rule-toolbar">
+            <div class="toolbar-left">
+              <div class="group-info">
+                <el-icon><FolderOpened /></el-icon>
+                <span class="group-name">{{ selectedGroup.name }}</span>
+                <el-tag size="small" type="info" effect="light">
+                  {{ selectedGroup.rules?.length || 0 }} 条规则
+                </el-tag>
               </div>
-              <el-button text type="danger" size="small" @click="removeRuleFromGroup(rule)">
-                <el-icon><Delete /></el-icon>
+            </div>
+            <div class="toolbar-right">
+              <el-input
+                v-model="searchKeyword"
+                placeholder="搜索规则名称..."
+                :prefix-icon="Search"
+                style="width: 240px"
+                size="default"
+                clearable
+              />
+              <el-button type="primary" @click="openSelectRules">
+                <el-icon><Plus /></el-icon>
+                添加规则
               </el-button>
             </div>
-          </template>
-        </div>
+          </div>
 
-        <!-- 草稿池 -->
-        <div class="rule-panel-section">
-          <div class="section-header">
-            <span class="section-title">草稿池</span>
-            <el-input
-              v-model="searchKeyword"
-              placeholder="搜索规则"
-              style="width: 200px"
-              size="small"
-              clearable
+          <!-- 规则表格 -->
+          <div class="rule-table-wrapper">
+            <el-table
+              v-loading="loading"
+              :data="filteredGroupRules"
+              style="width: 100%"
+              row-key="id"
+              class="rule-table"
+              :header-cell-style="{
+                background:
+                  'linear-gradient(135deg, rgba(102, 126, 234, 0.06) 0%, rgba(118, 75, 162, 0.06) 100%)',
+                color: 'var(--el-text-color-primary)',
+                fontWeight: 700,
+                borderBottom: '1px solid var(--el-border-color-lighter)',
+              }"
             >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
+              <el-table-column prop="weight" label="权重" width="100" align="center">
+                <template #default="{ row, $index }">
+                  <div class="weight-cell">
+                    <el-input-number
+                      v-model="row.weight"
+                      :min="0"
+                      :step="1"
+                      size="small"
+                      controls-position="right"
+                      style="width: 90px"
+                      @change="handleWeightChange(row, $index)"
+                    />
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column prop="name" label="规则名称" min-width="200" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <div class="name-cell">
+                    <el-icon><Document /></el-icon>
+                    <span>{{ row.rule.name }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column prop="status" label="状态" width="100" align="center">
+                <template #default="{ row }">
+                  <el-tag
+                    :type="row.rule.status === 'active' ? 'success' : 'info'"
+                    size="small"
+                    effect="light"
+                  >
+                    {{ row.rule.status === "active" ? "启用" : "暂停" }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="比对对象" width="140" align="center">
+                <template #default="{ row }">
+                  <el-tag size="small" type="primary" effect="light">
+                    {{ COMPARISON_LABEL[row.rule.comparisonTarget] || row.rule.comparisonTarget }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="适用店铺" min-width="120">
+                <template #default="{ row }">
+                  {{ formatShops(row.rule) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="触发条件" min-width="220" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <span class="condition-summary">{{ getRuleSummary(row.rule) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="120" align="center" fixed="right">
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="viewRuleDetail(row)">
+                    查看
+                  </el-button>
+                  <el-button link type="danger" size="small" @click="removeRuleHandler(row)">
+                    移除
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <!-- 空状态 -->
+          <div v-if="filteredGroupRules.length === 0 && !loading" class="empty-state">
+            <el-empty :image-size="100" description="暂无规则，点击「添加规则」来添加">
+              <el-button type="primary" @click="openSelectRules">
+                <el-icon><Plus /></el-icon>
+                添加规则
+              </el-button>
+            </el-empty>
+          </div>
+        </template>
+
+        <!-- 未选择规则组 -->
+        <template v-else>
+          <div class="empty-group-state">
+            <el-empty :image-size="120" description="请先选择一个规则组">
+              <template #image>
+                <div class="empty-icon">
+                  <el-icon :size="80"><DocumentCopy /></el-icon>
+                </div>
               </template>
-            </el-input>
+            </el-empty>
           </div>
-          <div v-if="filteredDraftRules.length === 0" class="empty-hint">
-            草稿箱为空，请先在「草稿箱」中创建规则
-          </div>
-          <div
-            v-for="rule in filteredDraftRules"
-            :key="rule.id"
-            class="draft-rule-row"
-            :class="{ 'is-added': isRuleInCurrentGroup(rule.id) }"
-          >
-            <div class="draft-rule-info">
-              <span class="draft-rule-name">{{ rule.name }}</span>
-              <span class="draft-rule-target">
-                {{ COMPARISON_LABEL[rule.comparisonTarget] || rule.comparisonTarget }}
-              </span>
-            </div>
-            <el-button
-              v-if="selectedGroup && !isRuleInCurrentGroup(rule.id)"
-              type="primary"
-              size="small"
-              plain
-              @click="addRuleToGroup(rule)"
-            >
-              <el-icon><Plus /></el-icon>
-              添加
-            </el-button>
-            <el-tag
-              v-else-if="isRuleInCurrentGroup(rule.id)"
-              type="success"
-              size="small"
-              effect="plain"
-            >
-              已添加
-            </el-tag>
-          </div>
-        </div>
+        </template>
       </div>
     </div>
 
@@ -174,27 +218,49 @@
         <el-button type="primary" @click="confirmGroup">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 选择规则弹窗 -->
+    <SelectRuleDialog
+      ref="selectDialogRef"
+      :rules="props.rules"
+      :group="selectedGroup"
+      @confirm="handleAddRules"
+    />
+
+    <!-- 查看规则详情弹窗 -->
+    <RuleFormDialog ref="detailDialogRef" />
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * SP 广告自动规则面板：左侧规则组 + 右侧规则详情及草稿池。
- *
- * 所属板块：tools / 广告规则策略。
+ * SP 广告自动规则面板：左侧规则组 + 右侧规则表格展示
  */
-import type { AdRule, AdRuleGroup } from "@/views/tools/rule-strategy/types";
+import type { AdRule, AdRuleGroup, AdRuleGroupItem } from "./types";
 
 import { ref, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Plus, Edit, Delete, FolderAdd, Search, InfoFilled } from "@element-plus/icons-vue";
+import {
+  Plus,
+  Edit,
+  Delete,
+  FolderAdd,
+  Search,
+  InfoFilled,
+  FolderOpened,
+  Document,
+  DocumentCopy,
+} from "@element-plus/icons-vue";
 import {
   createGroup,
   updateGroup,
   deleteGroup,
   addRulesToGroup,
-  removeRuleFromGroup as removeRuleFromGroupApi,
+  removeRuleFromGroup,
 } from "@/api/ads/rule-strategy";
+
+import SelectRuleDialog from "./SelectRuleDialog.vue";
+import RuleFormDialog from "./RuleFormDialog.vue";
 
 defineOptions({ name: "AutoRulePanel" });
 
@@ -207,26 +273,42 @@ const emit = defineEmits<{
   (e: "update:ruleGroups", groups: AdRuleGroup[]): void;
 }>();
 
+const loading = ref(false);
 const groupDialogVisible = ref(false);
 const editingGroup = ref<AdRuleGroup | null>(null);
 const groupForm = ref({ name: "", executionCycle: 1 });
 const selectedGroupId = ref<string>("");
 const searchKeyword = ref("");
+const selectDialogRef = ref<any>(null);
+const detailDialogRef = ref<any>(null);
 
 const selectedGroup = computed(
-  () => props.ruleGroups.find((g) => g.id === selectedGroupId.value) ?? null
+  () => props.ruleGroups.find((g) => g.id === selectedGroupId.value) || null
 );
 
-const filteredDraftRules = computed(() =>
-  !searchKeyword.value
-    ? props.rules
-    : props.rules.filter((r) => r.name.toLowerCase().includes(searchKeyword.value.toLowerCase()))
-);
+const groupRulesWithWeight = computed(() => {
+  const group = selectedGroup.value;
+  if (!group) return [];
+  return (group.rules || []).map((rule, index) => ({
+    rule,
+    weight:
+      (group as any).ruleItems?.find((item: any) => item.rule.id === rule.id)?.weight ?? index,
+  }));
+});
+
+const filteredGroupRules = computed(() => {
+  const rules = groupRulesWithWeight.value;
+  const keyword = searchKeyword.value.toLowerCase();
+  const filtered = keyword
+    ? rules.filter((item) => item.rule.name.toLowerCase().includes(keyword))
+    : rules;
+  return [...filtered].sort((a, b) => a.weight - b.weight);
+});
 
 const COMPARISON_LABEL: Record<string, string> = {
   campaign: "广告活动",
   ad_group: "广告组",
-  targeting: "投放",
+  targeting: "定位组投放",
   keyword: "关键词投放",
   product_targeting: "商品投放",
   search_terms: "用户搜索词",
@@ -236,9 +318,15 @@ function getRuleSummary(rule: AdRule): string {
   return rule.conditionSets
     .map(
       (cs) =>
-        `≤${cs.days}d, ${cs.conditions.map((c) => `${c.metric}${c.operator}${c.value}`).join(",")}`
+        `≤${cs.days}天, ${cs.conditions.map((c) => `${c.metric}${c.operator}${c.value}`).join(" / ")}`
     )
     .join(" | ");
+}
+
+function formatShops(rule: AdRule): string {
+  if (!rule.shops || rule.shops.length === 0) return "-";
+  if (rule.shops.length === 1) return String(rule.shops[0]);
+  return `${rule.shops.length} 个店铺`;
 }
 
 function openCreateGroup(): void {
@@ -275,6 +363,7 @@ async function confirmGroup(): Promise<void> {
     }
     groupDialogVisible.value = false;
     editingGroup.value = null;
+    ElMessage.success("保存成功");
   } catch {
     ElMessage.error("保存失败，请重试");
   }
@@ -301,40 +390,56 @@ async function deleteGroupHandler(group: AdRuleGroup): Promise<void> {
   }
 }
 
-async function addRuleToGroup(rule: AdRule): Promise<void> {
+function openSelectRules(): void {
+  selectDialogRef.value?.open(selectedGroup.value);
+}
+
+async function handleAddRules(items: { rule: AdRule; weight: number }[]): Promise<void> {
   if (!selectedGroup.value) return;
-  if (selectedGroup.value.rules.some((r) => r.id === rule.id)) {
-    ElMessage.warning("该规则已在当前组中");
-    return;
-  }
   try {
-    const updated = await addRulesToGroup(selectedGroup.value.id, [rule.id]);
+    loading.value = true;
+    const ruleIds = items.map((item) => item.rule.id);
+    const updated = await addRulesToGroup(selectedGroup.value.id, ruleIds);
+
     const groups = [...props.ruleGroups];
     const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
     if (idx !== -1) groups[idx] = updated;
     emit("update:ruleGroups", groups);
-    ElMessage.success(`已将「${rule.name}」添加到「${updated.name}」`);
+    ElMessage.success(`已添加 ${items.length} 条规则到「${updated.name}」`);
   } catch {
     ElMessage.error("添加失败，请重试");
+  } finally {
+    loading.value = false;
   }
 }
 
-async function removeRuleFromGroup(rule: AdRule): Promise<void> {
+async function removeRuleHandler(item: AdRuleGroupItem): Promise<void> {
   if (!selectedGroup.value) return;
   try {
-    const updated = await removeRuleFromGroupApi(selectedGroup.value.id, rule.id);
+    await ElMessageBox.confirm(`确定要从组中移除规则「${item.rule.name}」吗？`, "移除确认", {
+      type: "warning",
+    });
+  } catch {
+    return;
+  }
+  try {
+    const updated = await removeRuleFromGroup(selectedGroup.value.id, item.rule.id);
     const groups = [...props.ruleGroups];
     const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
     if (idx !== -1) groups[idx] = updated;
     emit("update:ruleGroups", groups);
-    ElMessage.success(`已将「${rule.name}」移出规则组`);
+    ElMessage.success("已移除规则");
   } catch {
     ElMessage.error("移除失败，请重试");
   }
 }
 
-function isRuleInCurrentGroup(ruleId: string): boolean {
-  return selectedGroup.value?.rules.some((r) => r.id === ruleId) ?? false;
+function handleWeightChange(item: AdRuleGroupItem, index: number): void {
+  ElMessage.success(`规则「${item.rule.name}」权重已更新为 ${item.weight}`);
+}
+
+function viewRuleDetail(item: AdRuleGroupItem): void {
+  detailDialogRef.value?.open(item.rule, true);
 }
 </script>
 
@@ -349,23 +454,16 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   min-height: 560px;
 }
 
-.empty-hint {
-  padding: 40px 20px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--el-text-color-placeholder);
-  text-align: center;
-}
-
 // ── 左侧规则组 ──
 .group-panel {
   display: flex;
-  flex: 0 0 260px;
+  flex: 0 0 280px;
   flex-direction: column;
   overflow: hidden;
-  background: var(--el-bg-color-page);
+  background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
 }
 
 .group-panel-header {
@@ -377,7 +475,7 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   border-bottom: none;
 
   .group-panel-title {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
     color: #fff;
     letter-spacing: 0.3px;
@@ -402,7 +500,7 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
 
 .group-list {
   flex: 1;
-  padding: 10px;
+  padding: 12px;
   overflow-y: auto;
 
   &::-webkit-scrollbar {
@@ -413,14 +511,6 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
     background: var(--el-border-color);
     border-radius: 3px;
   }
-
-  .empty-hint {
-    padding: 40px 20px;
-    font-size: 13px;
-    line-height: 1.6;
-    color: var(--el-text-color-placeholder);
-    text-align: center;
-  }
 }
 
 .group-item {
@@ -428,10 +518,10 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   cursor: pointer;
-  background: var(--el-bg-color);
-  border: 1px solid transparent;
+  background: var(--el-bg-color-page);
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: 10px;
   transition: all 0.25s ease;
 
@@ -441,7 +531,7 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
 
   &:hover {
     background: var(--el-color-primary-light-9);
-    border-color: var(--el-color-primary-light-7);
+    border-color: var(--el-color-primary-light-6);
     transform: translateX(2px);
   }
 
@@ -452,7 +542,7 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
       rgba(118, 75, 162, 0.08) 100%
     );
     border-color: var(--el-color-primary);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
   }
 }
 
@@ -469,12 +559,11 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--el-text-color-primary);
   white-space: nowrap;
 
   .group-item.is-selected & {
-    font-weight: 700;
     color: var(--el-color-primary);
   }
 }
@@ -511,165 +600,121 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   }
 }
 
+.empty-hint {
+  padding: 40px 20px;
+}
+
 // ── 右侧区域 ──
 .rule-panel {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 20px;
-  overflow-y: auto;
-}
-
-.rule-panel-section {
-  padding: 20px;
+  overflow: hidden;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
 }
 
-.section-header {
+.rule-toolbar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  padding-bottom: 16px;
-  margin-bottom: 18px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.04) 0%, rgba(118, 75, 162, 0.04) 100%);
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
-.section-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-  letter-spacing: 0.2px;
-}
-
-.section-hint {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-
-// ── 组内规则卡片 ──
-.group-rule-card {
+.toolbar-left {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: center;
-  padding: 16px 18px;
-  margin-bottom: 10px;
-  background: var(--el-bg-color-page);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
-  transition: all 0.25s ease;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  &:hover {
-    border-color: var(--el-color-primary-light-6);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
-    transform: translateY(-1px);
-  }
 }
 
-.group-rule-order {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-}
-
-.group-rule-info {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.group-rule-top {
+.group-info {
   display: flex;
   gap: 10px;
   align-items: center;
+
+  .el-icon {
+    font-size: 18px;
+    color: var(--el-color-primary);
+  }
 }
 
-.group-rule-name {
-  font-size: 14px;
-  font-weight: 600;
+.group-name {
+  font-size: 16px;
+  font-weight: 700;
   color: var(--el-text-color-primary);
 }
 
-.group-rule-summary {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  white-space: nowrap;
+.toolbar-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
-// ── 草稿池规则行 ──
-.draft-rule-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  margin-bottom: 8px;
-  background: var(--el-bg-color-page);
+.rule-table-wrapper {
+  flex: 1;
+  padding: 20px;
+  overflow: auto;
+}
+
+.rule-table {
+  overflow: hidden;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 10px;
-  transition: all 0.25s ease;
 
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  &:hover {
-    border-color: var(--el-color-primary-light-6);
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08);
-  }
-
-  &.is-added {
-    background: linear-gradient(135deg, rgba(103, 194, 58, 0.06) 0%, rgba(16, 185, 129, 0.06) 100%);
-    border-color: var(--el-color-success-light-5);
+  :deep(.el-table__row:hover) {
+    background: var(--el-color-primary-light-9);
   }
 }
 
-.draft-rule-info {
+.weight-cell {
   display: flex;
-  gap: 14px;
-  align-items: center;
-  min-width: 0;
-  overflow: hidden;
+  justify-content: center;
 }
 
-.draft-rule-name {
-  flex-shrink: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
+.name-cell {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 500;
 
-  .draft-rule-row.is-added & {
-    color: var(--el-color-success);
+  .el-icon {
+    color: var(--el-color-primary);
   }
 }
 
-.draft-rule-target {
-  flex-shrink: 0;
-  padding: 4px 12px;
+.condition-summary {
   font-size: 12px;
-  font-weight: 500;
+  color: var(--el-text-color-secondary);
+}
+
+.empty-state {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.empty-group-state {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 120px;
   color: var(--el-color-primary);
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
-  border-radius: 6px;
+  opacity: 0.3;
 }
 
 // ── 弹窗内 ──

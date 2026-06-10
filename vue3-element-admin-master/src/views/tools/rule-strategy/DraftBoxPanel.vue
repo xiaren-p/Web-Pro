@@ -2,108 +2,160 @@
   <div class="draft-panel">
     <!-- 工具栏 -->
     <div class="draft-toolbar">
-      <el-input
-        v-model="searchKeyword"
-        placeholder="搜索规则名称..."
-        :prefix-icon="Search"
-        style="width: 280px"
-        size="default"
-        clearable
-      />
+      <div class="toolbar-left">
+        <!-- 状态筛选 -->
+        <el-select v-model="filterStatus" placeholder="状态筛选" clearable style="width: 140px">
+          <el-option label="全部" value="" />
+          <el-option label="启用" value="active" />
+          <el-option label="暂停" value="inactive" />
+        </el-select>
+
+        <!-- 比对对象筛选 -->
+        <el-select v-model="filterTarget" placeholder="比对对象" clearable style="width: 160px">
+          <el-option label="全部" value="" />
+          <el-option
+            v-for="item in targetOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </el-select>
+
+        <!-- 搜索框 -->
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索规则名称..."
+          :prefix-icon="Search"
+          style="width: 280px"
+          clearable
+        />
+      </div>
       <span class="toolbar-spacer" />
-      <el-button type="primary" size="default" @click="handleCreate">
-        <el-icon><Plus /></el-icon>
-        新建规则
-      </el-button>
-    </div>
-
-    <!-- 空状态 -->
-    <div v-if="filteredRules.length === 0" class="draft-empty">
-      <el-empty
-        :description="
-          props.rules.length === 0 ? '暂无草稿规则，点击「新建规则」创建第一条' : '未找到匹配的规则'
-        "
-        :image-size="100"
-      />
-    </div>
-
-    <!-- 规则列表 -->
-    <div v-else class="draft-list">
-      <div v-for="rule in filteredRules" :key="rule.id" class="draft-card">
-        <div class="draft-card-header">
-          <div class="draft-card-title-row">
-            <span class="draft-card-title">{{ rule.name }}</span>
-            <el-tag
-              :type="rule.status === 'active' ? 'success' : 'info'"
-              size="small"
-              effect="plain"
-            >
-              {{ rule.status === "active" ? "启用" : "暂停" }}
-            </el-tag>
-          </div>
-        </div>
-
-        <div class="draft-card-body">
-          <div class="draft-meta-grid">
-            <div class="draft-meta-item">
-              <span class="draft-meta-label">适用店铺</span>
-              <span class="draft-meta-value">{{ formatShops(rule) }}</span>
-            </div>
-            <div class="draft-meta-item">
-              <span class="draft-meta-label">比对对象</span>
-              <el-tag size="small" type="primary" effect="light" class="target-tag">
-                {{ COMPARISON_LABEL[rule.comparisonTarget] || rule.comparisonTarget }}
-              </el-tag>
-            </div>
-          </div>
-
-          <div class="draft-condition-box">
-            <span class="draft-condition-label">触发条件</span>
-            <span class="draft-condition-text">{{ getRuleSummary(rule) }}</span>
-          </div>
-
-          <div class="draft-action-box">
-            <span class="draft-action-label">执行操作</span>
-            <span class="draft-action-value">{{ formatActions(rule) }}</span>
-          </div>
-        </div>
-
-        <div class="draft-card-footer">
-          <el-button type="primary" size="small" plain @click="handleEdit(rule)">
-            <el-icon><Edit /></el-icon>
-            编辑规则
-          </el-button>
-          <el-button type="danger" size="small" plain @click="handleDelete(rule)">
-            <el-icon><Delete /></el-icon>
-            删除
-          </el-button>
-        </div>
+      <div class="toolbar-right">
+        <span class="stat-text">共 {{ filteredRules.length }} 条规则</span>
+        <el-button type="primary" @click="handleCreate">
+          <el-icon><Plus /></el-icon>
+          新建规则
+        </el-button>
       </div>
     </div>
 
+    <!-- 规则表格 -->
+    <div class="draft-table-wrapper">
+      <el-table
+        v-loading="loading"
+        :data="filteredRules"
+        style="width: 100%"
+        row-key="id"
+        class="draft-table"
+        :header-cell-style="{
+          background:
+            'linear-gradient(135deg, rgba(102, 126, 234, 0.06) 0%, rgba(118, 75, 162, 0.06) 100%)',
+          color: 'var(--el-text-color-primary)',
+          fontWeight: 700,
+          borderBottom: '1px solid var(--el-border-color-lighter)',
+        }"
+        stripe
+      >
+        <el-table-column type="index" label="序号" width="70" align="center" />
+        <el-table-column prop="name" label="规则名称" min-width="220" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div class="name-cell">
+              <el-icon color="var(--el-color-primary)"><Document /></el-icon>
+              <span>{{ row.name }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag
+              :type="row.status === 'active' ? 'success' : 'info'"
+              size="small"
+              effect="light"
+            >
+              {{ row.status === "active" ? "启用" : "暂停" }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="comparisonTarget" label="比对对象" width="140" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" type="primary" effect="light">
+              {{ COMPARISON_LABEL[row.comparisonTarget] || row.comparisonTarget }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="适用店铺" min-width="140">
+          <template #default="{ row }">
+            <span>{{ formatShops(row) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="触发条件" min-width="240" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span class="condition-preview">{{ getRuleSummary(row) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="执行操作" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span class="action-preview">{{ formatActions(row) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="updatedAt" label="更新时间" width="170">
+          <template #default="{ row }">
+            <span class="time-text">{{ formatDate(row.updatedAt) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="160" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="handleEdit(row)">
+              <el-icon><Edit /></el-icon>
+              编辑
+            </el-button>
+            <el-button link type="danger" size="small" @click="handleDelete(row)">
+              <el-icon><Delete /></el-icon>
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <!-- 空状态 -->
+    <div v-if="filteredRules.length === 0 && !loading" class="draft-empty">
+      <el-empty
+        :image-size="100"
+        :description="
+          props.rules.length === 0 ? '暂无草稿规则，点击「新建规则」创建第一条' : '未找到匹配的规则'
+        "
+      >
+        <template v-if="props.rules.length === 0">
+          <el-button type="primary" @click="handleCreate">
+            <el-icon><Plus /></el-icon>
+            新建规则
+          </el-button>
+        </template>
+      </el-empty>
+    </div>
+
     <!-- 规则表单弹窗 -->
-    <RuleFormDialog ref="formRef" @saved="onFormSaved as any" />
+    <RuleFormDialog ref="formRef" @saved="onFormSaved" />
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * SP 广告规则草稿箱面板：规则的 CRUD 列表，直接内嵌展示。
- *
- * 所属板块：tools / 广告规则策略。
+ * SP 广告规则草稿箱面板：规则列表表格展示，带分类筛选
  */
-import type { AdRule } from "@/views/tools/rule-strategy/types";
+import type { AdRule } from "./types";
 
 import { ref, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Plus, Edit, Delete, Search } from "@element-plus/icons-vue";
+import { Plus, Edit, Delete, Search, Document } from "@element-plus/icons-vue";
 
-import RuleFormDialog from "@/views/tools/rule-strategy/RuleFormDialog.vue";
+import RuleFormDialog from "./RuleFormDialog.vue";
 import { createRule, updateRule, deleteRule } from "@/api/ads/rule-strategy";
 
 defineOptions({ name: "DraftBoxPanel" });
 
-// ── Props / Emits ──
 const props = defineProps<{
   rules: AdRule[];
 }>();
@@ -113,14 +165,19 @@ const emit = defineEmits<{
 }>();
 
 const formRef = ref<any>(null);
-const editingRule = ref<AdRule | null>(null);
+const loading = ref(false);
 const searchKeyword = ref("");
+const filterStatus = ref<string>("");
+const filterTarget = ref<string>("");
 
-const filteredRules = computed(() =>
-  !searchKeyword.value
-    ? props.rules
-    : props.rules.filter((r) => r.name.toLowerCase().includes(searchKeyword.value.toLowerCase()))
-);
+const targetOptions = [
+  { value: "campaign", label: "广告活动" },
+  { value: "ad_group", label: "广告组" },
+  { value: "targeting", label: "定位组投放" },
+  { value: "keyword", label: "关键词投放" },
+  { value: "product_targeting", label: "商品投放" },
+  { value: "search_terms", label: "用户搜索词" },
+];
 
 const COMPARISON_LABEL: Record<string, string> = {
   campaign: "广告活动",
@@ -145,6 +202,26 @@ const ACTION_LABEL: Record<string, string> = {
   negative_phrase: "否定词组",
   add_keyword: "添加关键词",
 };
+
+const NO_VALUE_ACTIONS = new Set([
+  "no_adjust",
+  "pause",
+  "archive",
+  "negative_exact",
+  "negative_phrase",
+  "add_keyword",
+]);
+
+const filteredRules = computed(() => {
+  return props.rules.filter((rule) => {
+    const matchesSearch = !searchKeyword.value
+      ? true
+      : rule.name.toLowerCase().includes(searchKeyword.value.toLowerCase());
+    const matchesStatus = !filterStatus.value ? true : rule.status === filterStatus.value;
+    const matchesTarget = !filterTarget.value ? true : rule.comparisonTarget === filterTarget.value;
+    return matchesSearch && matchesStatus && matchesTarget;
+  });
+});
 
 function formatShops(rule: AdRule): string {
   if (!rule.shops || rule.shops.length === 0) return "-";
@@ -177,31 +254,32 @@ function formatActions(rule: AdRule): string {
   return parts.length > 0 ? parts.join(" · ") : "-";
 }
 
-const NO_VALUE_ACTIONS = new Set([
-  "no_adjust",
-  "pause",
-  "archive",
-  "negative_exact",
-  "negative_phrase",
-  "add_keyword",
-]);
-
 function getRuleSummary(rule: AdRule): string {
   return rule.conditionSets
     .map(
       (cs) =>
         `≤${cs.days}天, ${cs.conditions.map((c) => `${c.metric}${c.operator}${c.value}`).join(" / ")}`
     )
-    .join("\n");
+    .join(" | ");
+}
+
+function formatDate(dateString: string): string {
+  if (!dateString) return "-";
+  const date = new Date(dateString);
+  return date.toLocaleString("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function handleCreate(): void {
-  editingRule.value = null;
   formRef.value?.open(null);
 }
 
 function handleEdit(row: AdRule): void {
-  editingRule.value = row;
   formRef.value?.open(row);
 }
 
@@ -214,30 +292,33 @@ async function handleDelete(row: AdRule): Promise<void> {
     return;
   }
   try {
+    loading.value = true;
     await deleteRule(row.id);
     const updated = props.rules.filter((r) => r.id !== row.id);
     emit("update:rules", updated);
     ElMessage.success("已删除");
   } catch {
     ElMessage.error("删除失败，请重试");
+  } finally {
+    loading.value = false;
   }
 }
 
 async function onFormSaved(data: AdRule): Promise<void> {
   try {
-    if (editingRule.value) {
-      // 编辑：调 API 更新
-      const updated = await updateRule(editingRule.value.id, data as any);
+    const isEdit = data.id && props.rules.some((r) => r.id === data.id);
+    if (isEdit) {
+      const updated = await updateRule(data.id, data as any);
       const rules = [...props.rules];
-      const idx = rules.findIndex((r) => r.id === editingRule.value!.id);
+      const idx = rules.findIndex((r) => r.id === data.id);
       if (idx !== -1) rules[idx] = updated;
       emit("update:rules", rules);
+      ElMessage.success("规则已更新");
     } else {
-      // 创建：调 API 新增
       const created = await createRule(data as any);
       emit("update:rules", [...props.rules, created]);
+      ElMessage.success("规则已创建");
     }
-    editingRule.value = null;
   } catch {
     ElMessage.error("保存失败，请重试");
   }
@@ -245,6 +326,12 @@ async function onFormSaved(data: AdRule): Promise<void> {
 </script>
 
 <style scoped lang="scss">
+.draft-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 500px;
+}
+
 .draft-toolbar {
   display: flex;
   gap: 14px;
@@ -258,154 +345,78 @@ async function onFormSaved(data: AdRule): Promise<void> {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
 }
 
+.toolbar-left {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
 .toolbar-spacer {
   flex: 1;
 }
 
-.draft-empty {
-  padding: 80px 20px;
-}
-
-.draft-list {
+.toolbar-right {
   display: flex;
-  flex-direction: column;
   gap: 14px;
+  align-items: center;
 }
 
-.draft-card {
-  padding: 0;
-  overflow: hidden;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-  transition: all 0.25s ease;
+.stat-text {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
 
-  &:hover {
-    border-color: var(--el-color-primary-light-6);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-    transform: translateY(-2px);
+.draft-table-wrapper {
+  flex: 1;
+  padding: 0 2px 20px;
+  overflow: auto;
+}
+
+.draft-table {
+  overflow: hidden;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+
+  :deep(.el-table__row:hover) {
+    background: var(--el-color-primary-light-9);
+  }
+
+  :deep(.el-table__row--striped) {
+    background: var(--el-fill-color-lighter);
+
+    &:hover {
+      background: var(--el-color-primary-light-9);
+    }
   }
 }
 
-.draft-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 22px 12px;
-  margin-bottom: 0;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.04) 0%, rgba(118, 75, 162, 0.04) 100%);
-  border-bottom: 1px solid var(--el-border-color-lighter);
-}
-
-.draft-card-title-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.draft-card-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--el-text-color-primary);
-  letter-spacing: -0.2px;
-}
-
-.draft-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 18px 22px;
-}
-
-.draft-meta-grid {
-  display: flex;
-  gap: 24px;
-  font-size: 13px;
-}
-
-.draft-meta-item {
+.name-cell {
   display: flex;
   gap: 8px;
   align-items: center;
+  font-weight: 500;
 }
 
-.draft-meta-label {
+.condition-preview {
   font-size: 12px;
-  font-weight: 500;
   color: var(--el-text-color-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
-.draft-meta-value {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--el-text-color-regular);
-}
-
-.target-tag {
-  padding: 4px 12px;
+.action-preview {
   font-size: 12px;
-  font-weight: 600;
-  border-radius: 6px;
+  color: var(--el-color-warning);
 }
 
-.draft-condition-box {
-  padding: 14px 18px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--el-color-primary);
-  word-break: break-all;
-  white-space: pre-line;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.06) 0%, rgba(118, 75, 162, 0.06) 100%);
-  border: 1px solid var(--el-color-primary-light-7);
-  border-radius: 10px;
-}
-
-.draft-condition-label {
-  display: block;
-  margin-bottom: 4px;
+.time-text {
   font-size: 12px;
-  font-weight: 600;
-  color: var(--el-color-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: var(--el-text-color-secondary);
 }
 
-.draft-action-box {
+.draft-empty {
   display: flex;
-  gap: 10px;
+  flex: 1;
   align-items: center;
-  padding: 12px 16px;
-  font-size: 13px;
-  background: var(--el-color-warning-light-9);
-  border: 1px solid var(--el-color-warning-light-7);
-  border-radius: 10px;
-}
-
-.draft-action-label {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--el-color-warning);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.draft-action-value {
-  font-weight: 500;
-  line-height: 1.6;
-  color: var(--el-color-warning);
-}
-
-.draft-card-footer {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  padding: 14px 22px 18px;
-  margin-top: 0;
-  background: var(--el-fill-color-lighter);
-  border-top: 1px solid var(--el-border-color-lighter);
+  justify-content: center;
+  padding: 60px 20px;
 }
 </style>

@@ -106,10 +106,16 @@ export interface AdRule extends RuleFormData {
   updatedAt: string;
 }
 
+export interface AdRuleGroupItem {
+  rule: AdRule;
+  weight: number;
+}
+
 export interface AdRuleGroup {
   id: string;
   name: string;
   rules: AdRule[];
+  ruleItems?: AdRuleGroupItem[];
   executionCycle: number;
   createdAt: string;
 }

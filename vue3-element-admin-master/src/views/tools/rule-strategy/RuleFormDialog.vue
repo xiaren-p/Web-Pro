@@ -1,13 +1,20 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="isEdit ? '编辑规则' : '创建规则'"
+    :title="isReadonly ? '查看规则' : isEdit ? '编辑规则' : '创建规则'"
     width="1100px"
     destroy-on-close
     :close-on-click-modal="false"
     @closed="handleClose"
   >
-    <el-form ref="formRef" :model="form" :rules="formRules" label-width="110px" class="rule-form">
+    <el-form
+      ref="formRef"
+      :model="form"
+      :rules="formRules"
+      label-width="110px"
+      class="rule-form"
+      :disabled="isReadonly"
+    >
       <!-- ========== 基础信息 ========== -->
       <el-divider content-position="left">基础信息</el-divider>
       <el-row :gutter="24">
@@ -1136,8 +1143,8 @@
     </el-form>
 
     <template #footer>
-      <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="handleSubmit">
+      <el-button @click="visible = false">{{ isReadonly ? "关闭" : "取消" }}</el-button>
+      <el-button v-if="!isReadonly" type="primary" :loading="saving" @click="handleSubmit">
         {{ isEdit ? "保存" : "创建" }}
       </el-button>
     </template>
@@ -1234,6 +1241,7 @@ function createEmptyForm(): RuleFormData {
 const visible = ref(false),
   formRef = ref<any>(null),
   isEdit = ref(false),
+  isReadonly = ref(false),
   saving = ref(false);
 const form = reactive<RuleFormData>(createEmptyForm());
 
@@ -1505,10 +1513,11 @@ function isPercentMetric(m: string) {
   return ["acos", "ctr", "cvr", "spendsPercent", "adsSalesPercent"].includes(m);
 }
 
-function open(data?: Partial<RuleFormData> | null): void {
+function open(data?: Partial<RuleFormData> | null, readonly: boolean = false): void {
   Object.assign(form, createEmptyForm());
   shopSearch.value = "";
   isEdit.value = false;
+  isReadonly.value = readonly;
   if (data) {
     isEdit.value = true;
     const raw = JSON.parse(JSON.stringify(data));
