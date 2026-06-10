@@ -431,9 +431,18 @@
                   :value="m.value"
                 />
               </el-select>
+              <!-- ===== 范围模式：值 X < metric < Y ===== -->
               <template v-if="cond.isRange">
-                <span class="range-placeholder">值</span>
-                <el-select v-model="cond.operator" style="width: 68px" size="small">
+                <el-input-number
+                  v-model="cond.value"
+                  size="small"
+                  style="width: 100px"
+                  :min="0"
+                  :precision="2"
+                  :step="isPercentMetric(cond.metric) ? 1 : 0.01"
+                  controls-position="right"
+                />
+                <el-select v-model="cond.operator2" style="width: 64px" size="small">
                   <el-option
                     v-for="o in operatorOptions"
                     :key="o.value"
@@ -442,7 +451,7 @@
                   />
                 </el-select>
                 <span class="range-var">{{ cond.metric }}</span>
-                <el-select v-model="cond.operator2" style="width: 68px" size="small">
+                <el-select v-model="cond.operator" style="width: 64px" size="small">
                   <el-option
                     v-for="o in operatorOptions"
                     :key="o.value"
@@ -453,20 +462,16 @@
                 <el-input-number
                   v-model="cond.value2"
                   size="small"
-                  style="width: 110px"
+                  style="width: 100px"
                   :min="0"
-                  :max="999999"
                   :precision="2"
                   :step="isPercentMetric(cond.metric) ? 1 : 0.01"
                   controls-position="right"
-                >
-                  <template v-if="isPercentMetric(cond.metric)" #suffix>
-                    <span class="input-suffix">%</span>
-                  </template>
-                </el-input-number>
+                />
               </template>
+              <!-- ===== 单值模式：metric > X ===== -->
               <template v-else>
-                <el-select v-model="cond.operator" style="width: 68px" size="small">
+                <el-select v-model="cond.operator" style="width: 64px" size="small">
                   <el-option
                     v-for="o in operatorOptions"
                     :key="o.value"
@@ -477,17 +482,12 @@
                 <el-input-number
                   v-model="cond.value"
                   size="small"
-                  style="width: 130px"
+                  style="width: 120px"
                   :min="0"
-                  :max="999999"
                   :precision="2"
                   :step="isPercentMetric(cond.metric) ? 1 : 0.01"
                   controls-position="right"
-                >
-                  <template v-if="isPercentMetric(cond.metric)" #suffix>
-                    <span class="input-suffix">%</span>
-                  </template>
-                </el-input-number>
+                />
               </template>
               <el-button
                 text
@@ -496,7 +496,7 @@
                 style="flex-shrink: 0; font-size: 11px"
                 @click="toggleConditionRange(cSet, condIdx)"
               >
-                {{ cond.isRange ? "切为两段" : "切为范围" }}
+                {{ cond.isRange ? "切为单值" : "切为范围" }}
               </el-button>
               <el-button
                 v-if="cSet.conditions.length > 1"
@@ -746,17 +746,18 @@
                         :value="m.value"
                       />
                     </el-select>
-                    <el-select v-model="cond.operator" style="width: 64px" size="small">
-                      <el-option
-                        v-for="o in operatorOptions"
-                        :key="o.value"
-                        :label="o.label"
-                        :value="o.value"
-                      />
-                    </el-select>
+                    <!-- 范围模式：值 X < metric < Y -->
                     <template v-if="cond.isRange">
-                      <span class="range-placeholder">值</span>
-                      <el-select v-model="cond.operator" style="width: 64px" size="small">
+                      <el-input-number
+                        v-model="cond.value"
+                        size="small"
+                        style="width: 100px"
+                        :min="0"
+                        :precision="2"
+                        :step="isPercentMetric(cond.metric) ? 1 : 0.01"
+                        controls-position="right"
+                      />
+                      <el-select v-model="cond.operator2" style="width: 64px" size="small">
                         <el-option
                           v-for="o in operatorOptions"
                           :key="o.value"
@@ -765,7 +766,7 @@
                         />
                       </el-select>
                       <span class="range-var">{{ cond.metric }}</span>
-                      <el-select v-model="cond.operator2" style="width: 64px" size="small">
+                      <el-select v-model="cond.operator" style="width: 64px" size="small">
                         <el-option
                           v-for="o in operatorOptions"
                           :key="o.value"
@@ -776,21 +777,20 @@
                       <el-input-number
                         v-model="cond.value2"
                         size="small"
-                        style="width: 110px"
+                        style="width: 100px"
                         :min="0"
-                        :max="999999"
                         :precision="2"
                         :step="isPercentMetric(cond.metric) ? 1 : 0.01"
                         controls-position="right"
                       />
                     </template>
+                    <!-- 单值模式：metric > X -->
                     <el-input-number
                       v-else
                       v-model="cond.value"
                       size="small"
                       style="width: 120px"
                       :min="0"
-                      :max="999999"
                       :precision="2"
                       :step="isPercentMetric(cond.metric) ? 1 : 0.01"
                       controls-position="right"
