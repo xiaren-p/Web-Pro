@@ -242,8 +242,8 @@
           class="comparison-radios"
           @change="onTargetChange"
         >
-          <el-radio value="campaign" :disabled="true">广告活动（开发中）</el-radio>
-          <el-radio value="ad_group" :disabled="true">广告组（开发中）</el-radio>
+          <el-radio value="campaign">广告活动</el-radio>
+          <el-radio value="ad_group">广告组</el-radio>
           <el-radio value="search_terms">用户搜索词</el-radio>
           <el-radio value="targeting">投放</el-radio>
         </el-radio-group>
