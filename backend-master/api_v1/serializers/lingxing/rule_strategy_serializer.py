@@ -59,8 +59,16 @@ class LxAdRuleSerializer(serializers.ModelSerializer):
         return _to_camel_case(data)
 
     def to_internal_value(self, data):
-        """将前端 camelCase 键名转回 snake_case。"""
+        """将前端 camelCase 键名转回 snake_case，并清理空字符串。"""
         snake_data = {_camel_to_snake(k): v for k, v in data.items()}
+        # IntegerField 不接受空字符串，转为 None
+        for field_name in (
+            "effective_start_month", "effective_start_day",
+            "effective_end_month", "effective_end_day",
+            "add_keyword_max_bid", "add_keyword_fixed_bid",
+        ):
+            if snake_data.get(field_name) in ("", None):
+                snake_data[field_name] = None
         return super().to_internal_value(snake_data)
 
     def create(self, validated_data):
