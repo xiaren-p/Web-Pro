@@ -72,7 +72,7 @@
             </div>
           </div>
 
-          <!-- 规则表格 -->
+          <!-- 规则表格（支持拖拽排序） -->
           <div class="rule-table-wrapper">
             <el-table
               v-loading="loading"
@@ -88,7 +88,28 @@
                 borderBottom: '1px solid var(--el-border-color-lighter)',
               }"
             >
-              <el-table-column label="执行顺序" width="120" align="center">
+              <!-- 拖拽手柄列 -->
+              <el-table-column label="" width="48" align="center" class-name="drag-handle-column">
+                <template #default>
+                  <div class="drag-handle">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="currentColor"
+                      class="drag-handle-icon"
+                    >
+                      <circle cx="9" cy="5" r="1.5" />
+                      <circle cx="15" cy="5" r="1.5" />
+                      <circle cx="9" cy="12" r="1.5" />
+                      <circle cx="15" cy="12" r="1.5" />
+                      <circle cx="9" cy="19" r="1.5" />
+                      <circle cx="15" cy="19" r="1.5" />
+                    </svg>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column label="执行顺序" width="100" align="center">
                 <template #default="{ $index }">
                   <div class="order-cell">
                     <span class="order-number">{{ $index + 1 }}</span>
@@ -131,29 +152,9 @@
                   <span class="condition-summary">{{ getRuleSummary(row) }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="200" align="center" fixed="right">
-                <template #default="{ row, $index }">
+              <el-table-column label="操作" width="160" align="center" fixed="right">
+                <template #default="{ row }">
                   <div class="action-buttons">
-                    <el-button
-                      link
-                      type="primary"
-                      size="small"
-                      :disabled="$index === 0"
-                      @click="moveRuleUp($index)"
-                    >
-                      <el-icon><Top /></el-icon>
-                      上移
-                    </el-button>
-                    <el-button
-                      link
-                      type="primary"
-                      size="small"
-                      :disabled="$index === filteredGroupRules.length - 1"
-                      @click="moveRuleDown($index)"
-                    >
-                      <el-icon><Bottom /></el-icon>
-                      下移
-                    </el-button>
                     <el-button link type="primary" size="small" @click="viewRuleDetail(row)">
                       查看
                     </el-button>
@@ -164,6 +165,9 @@
                 </template>
               </el-table-column>
             </el-table>
+            <div v-if="!loading && filteredGroupRules.length > 0" class="drag-hint">
+              拖拽左侧手柄可调整规则执行顺序
+            </div>
           </div>
 
           <!-- 空状态 -->
@@ -248,11 +252,11 @@
 
 <script setup lang="ts">
 /**
- * SP 广告自动规则面板：左侧规则组 + 右侧规则表格展示
+ * SP 广告自动规则面板：左侧规则组 + 右侧规则表格展示，支持拖拽排序。
  */
 import type { AdRule, AdRuleGroup } from "./types";
 
-import { ref, computed } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
   Plus,
@@ -264,9 +268,8 @@ import {
   FolderOpened,
   Document,
   DocumentCopy,
-  Top,
-  Bottom,
 } from "@element-plus/icons-vue";
+import Sortable from "sortablejs";
 import {
   createGroup,
   updateGroup,
@@ -298,6 +301,8 @@ const selectedGroupId = ref<string>("");
 const searchKeyword = ref("");
 const selectDialogRef = ref<any>(null);
 const detailDialogRef = ref<any>(null);
+const tableWrapperRef = ref<HTMLElement | null>(null);
+let sortableInstance: Sortable | null = null;
 
 const selectedGroup = computed(
   () => props.ruleGroups.find((g) => g.id === selectedGroupId.value) || null
@@ -313,19 +318,15 @@ const groupRulesOrdered = computed(() => {
   const rules = group.rules || [];
   const order = group.ruleOrder || [];
 
-  // 按 ruleOrder 的顺序排序
   return [...rules].sort((a, b) => {
     const indexA = order.indexOf(a.id);
     const indexB = order.indexOf(b.id);
 
-    // 如果都在 order 中，按 order 排序
     if (indexA !== -1 && indexB !== -1) {
       return indexA - indexB;
     }
-    // 如果只有一个在 order 中，排在前面
     if (indexA !== -1) return -1;
     if (indexB !== -1) return 1;
-    // 都不在 order 中，按原顺序
     return 0;
   });
 });
@@ -335,6 +336,104 @@ const filteredGroupRules = computed(() => {
   const keyword = searchKeyword.value.toLowerCase();
   return keyword ? rules.filter((rule) => rule.name.toLowerCase().includes(keyword)) : rules;
 });
+
+/**
+ * 当规则组列表变化时，自动选中第一个（若无已选中项）
+ * 当当前选中的规则组被删除后，自动回退到第一个
+ */
+watch(
+  () => props.ruleGroups,
+  (groups) => {
+    if (groups.length > 0) {
+      const stillExists =
+        selectedGroupId.value && groups.some((g) => g.id === selectedGroupId.value);
+      if (!stillExists) {
+        selectedGroupId.value = groups[0].id;
+      }
+    } else {
+      selectedGroupId.value = "";
+    }
+  },
+  { immediate: true }
+);
+
+/**
+ * 当搜索关键词变化后，重新初始化拖拽实例（因为表格数据变了）
+ */
+watch(filteredGroupRules, () => {
+  nextTick(() => {
+    initSortable();
+  });
+});
+
+/**
+ * 初始化 Sortable 拖拽实例
+ */
+function initSortable(): void {
+  destroySortable();
+
+  const wrapper = document.querySelector(".rule-table-wrapper .el-table__body-wrapper tbody");
+  if (!wrapper) return;
+
+  tableWrapperRef.value = wrapper as HTMLElement;
+
+  sortableInstance = Sortable.create(wrapper as HTMLElement, {
+    handle: ".drag-handle",
+    animation: 200,
+    easing: "cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+    ghostClass: "sortable-ghost",
+    dragClass: "sortable-drag",
+    chosenClass: "sortable-chosen",
+    forceFallback: true,
+    fallbackClass: "sortable-fallback",
+    onEnd: handleDragEnd,
+  });
+}
+
+/**
+ * 销毁 Sortable 实例
+ */
+function destroySortable(): void {
+  if (sortableInstance) {
+    sortableInstance.destroy();
+    sortableInstance = null;
+  }
+}
+
+/**
+ * 拖拽结束回调：保存新顺序
+ */
+async function handleDragEnd(evt: Sortable.SortableEvent): Promise<void> {
+  const { oldIndex, newIndex } = evt;
+  if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return;
+  if (!selectedGroup.value) return;
+
+  const rules = groupRulesOrdered.value;
+  const order = selectedGroup.value.ruleOrder || rules.map((r) => r.id);
+  const newOrder = [...order];
+
+  // 从旧位置移除，插入到新位置
+  const movedId = rules[oldIndex].id;
+  const orderIdx = newOrder.indexOf(movedId);
+  if (orderIdx !== -1) {
+    newOrder.splice(orderIdx, 1);
+    newOrder.splice(newIndex, 0, movedId);
+  }
+
+  try {
+    loading.value = true;
+    const updated = await updateRuleOrder(selectedGroup.value.id, newOrder);
+    const groups = [...props.ruleGroups];
+    const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
+    if (idx !== -1) groups[idx] = updated;
+    emit("update:ruleGroups", groups);
+    ElMessage.success("已更新规则顺序");
+  } catch {
+    ElMessage.error("保存顺序失败，请重试");
+  } finally {
+    loading.value = false;
+  }
+}
 
 const COMPARISON_LABEL: Record<string, string> = {
   campaign: "广告活动",
@@ -412,9 +511,6 @@ async function deleteGroupHandler(group: AdRuleGroup): Promise<void> {
     await deleteGroup(group.id);
     const groups = props.ruleGroups.filter((g) => g.id !== group.id);
     emit("update:ruleGroups", groups);
-    if (selectedGroupId.value === group.id) {
-      selectedGroupId.value = groups[0]?.id ?? "";
-    }
     ElMessage.success("已删除规则组");
   } catch {
     ElMessage.error("删除失败，请重试");
@@ -432,16 +528,12 @@ async function handleAddRules(items: { rule: AdRule; insertIndex: number }[]): P
     const ruleIds = items.map((item) => item.rule.id);
     const updated = await addRulesToGroup(selectedGroup.value.id, ruleIds);
 
-    // 如果有指定插入位置，更新 ruleOrder
     if (items.length > 0 && items[0].insertIndex >= 0) {
       const currentOrder = updated.ruleOrder || [...updated.rules.map((r) => r.id)];
       const newRuleIds = items.map((item) => item.rule.id);
-      // 先移除新添加的规则 ID
       const filteredOrder = currentOrder.filter((id) => !newRuleIds.includes(String(id)));
-      // 在指定位置插入
       const insertIndex = items[0].insertIndex;
       filteredOrder.splice(insertIndex, 0, ...newRuleIds);
-      // 保存新顺序
       const updatedWithOrder = await updateRuleOrder(selectedGroup.value.id, filteredOrder);
       const groups = [...props.ruleGroups];
       const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
@@ -479,80 +571,6 @@ async function removeRuleHandler(rule: AdRule): Promise<void> {
     ElMessage.success("已移除规则");
   } catch {
     ElMessage.error("移除失败，请重试");
-  }
-}
-
-async function moveRuleUp(index: number): Promise<void> {
-  if (index === 0 || !selectedGroup.value) return;
-
-  const rules = groupRulesOrdered.value;
-  const order = selectedGroup.value.ruleOrder || rules.map((r) => r.id);
-  const newOrder = [...order];
-
-  // 交换当前规则和上一个规则的位置
-  const ruleId = rules[index].id;
-  const prevRuleId = rules[index - 1].id;
-
-  const orderIndex = newOrder.indexOf(ruleId);
-  const prevOrderIndex = newOrder.indexOf(prevRuleId);
-
-  if (orderIndex !== -1 && prevOrderIndex !== -1) {
-    newOrder[orderIndex] = prevRuleId;
-    newOrder[prevOrderIndex] = ruleId;
-  } else {
-    // 如果规则不在 order 中，直接交换
-    newOrder.splice(index - 1, 2, ruleId, prevRuleId);
-  }
-
-  try {
-    loading.value = true;
-    const updated = await updateRuleOrder(selectedGroup.value.id, newOrder);
-    const groups = [...props.ruleGroups];
-    const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
-    if (idx !== -1) groups[idx] = updated;
-    emit("update:ruleGroups", groups);
-  } catch {
-    ElMessage.error("移动失败，请重试");
-  } finally {
-    loading.value = false;
-  }
-}
-
-async function moveRuleDown(index: number): Promise<void> {
-  if (!selectedGroup.value) return;
-
-  const rules = groupRulesOrdered.value;
-  if (index === rules.length - 1) return;
-
-  const order = selectedGroup.value.ruleOrder || rules.map((r) => r.id);
-  const newOrder = [...order];
-
-  // 交换当前规则和下一个规则的位置
-  const ruleId = rules[index].id;
-  const nextRuleId = rules[index + 1].id;
-
-  const orderIndex = newOrder.indexOf(ruleId);
-  const nextOrderIndex = newOrder.indexOf(nextRuleId);
-
-  if (orderIndex !== -1 && nextOrderIndex !== -1) {
-    newOrder[orderIndex] = nextRuleId;
-    newOrder[nextOrderIndex] = ruleId;
-  } else {
-    // 如果规则不在 order 中，直接交换
-    newOrder.splice(index, 2, nextRuleId, ruleId);
-  }
-
-  try {
-    loading.value = true;
-    const updated = await updateRuleOrder(selectedGroup.value.id, newOrder);
-    const groups = [...props.ruleGroups];
-    const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
-    if (idx !== -1) groups[idx] = updated;
-    emit("update:ruleGroups", groups);
-  } catch {
-    ElMessage.error("移动失败，请重试");
-  } finally {
-    loading.value = false;
   }
 }
 
@@ -786,6 +804,79 @@ function viewRuleDetail(rule: AdRule): void {
   :deep(.el-table__row:hover) {
     background: var(--el-color-primary-light-9);
   }
+}
+
+// ── 拖拽手柄 ──
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  user-select: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.drag-handle-icon {
+  color: var(--el-text-color-placeholder);
+  transition: color 0.2s ease;
+
+  .el-table__row:hover & {
+    color: var(--el-color-primary);
+  }
+}
+
+// ── 拖拽动画样式（全局注入到 Sortable 的 body） ──
+:deep(.sortable-ghost) {
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.12) 0%,
+    rgba(118, 75, 162, 0.12) 100%
+  ) !important;
+  opacity: 0.4;
+
+  td {
+    border-bottom: 2px dashed var(--el-color-primary) !important;
+  }
+}
+
+:deep(.sortable-chosen) {
+  td {
+    background: var(--el-bg-color-page) !important;
+  }
+}
+
+:deep(.sortable-drag) {
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    0 2px 8px rgba(102, 126, 234, 0.2);
+  opacity: 0.92;
+
+  td {
+    background: var(--el-bg-color) !important;
+    border-bottom: 2px solid var(--el-color-primary) !important;
+  }
+}
+
+// ── fallback 模式下拖拽中的元素样式 ──
+:global(.sortable-fallback) {
+  background: var(--el-bg-color) !important;
+  border-radius: 8px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.2),
+    0 4px 12px rgba(102, 126, 234, 0.25);
+  opacity: 0.92 !important;
+}
+
+.drag-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0 0;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
 }
 
 .order-cell {

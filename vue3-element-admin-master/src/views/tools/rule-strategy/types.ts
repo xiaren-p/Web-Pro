@@ -110,7 +110,7 @@ export interface AdRuleGroup {
   id: string;
   name: string;
   rules: AdRule[];
-  ruleOrder: (number | string)[];
+  ruleOrder?: (number | string)[];
   executionCycle: number;
   createdAt: string;
 }

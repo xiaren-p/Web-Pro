@@ -1,139 +1,246 @@
 <template>
   <div class="draft-panel">
-    <!-- 工具栏 -->
-    <div class="draft-toolbar">
-      <div class="toolbar-left">
-        <!-- 状态筛选 -->
-        <el-select v-model="filterStatus" placeholder="状态筛选" clearable style="width: 140px">
-          <el-option label="全部" value="" />
-          <el-option label="启用" value="active" />
-          <el-option label="暂停" value="inactive" />
-        </el-select>
-
-        <!-- 比对对象筛选 -->
-        <el-select v-model="filterTarget" placeholder="比对对象" clearable style="width: 160px">
-          <el-option label="全部" value="" />
-          <el-option
-            v-for="item in targetOptions"
-            :key="item.value"
-            :label="item.label"
-            :value="item.value"
-          />
-        </el-select>
-
-        <!-- 搜索框 -->
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索规则名称..."
-          :prefix-icon="Search"
-          style="width: 280px"
-          clearable
-        />
-      </div>
-      <span class="toolbar-spacer" />
-      <div class="toolbar-right">
-        <span class="stat-text">共 {{ filteredRules.length }} 条规则</span>
-        <el-button type="primary" @click="handleCreate">
-          <el-icon><Plus /></el-icon>
-          新建规则
-        </el-button>
-      </div>
-    </div>
-
-    <!-- 规则表格 -->
-    <div class="draft-table-wrapper">
-      <el-table
-        v-loading="loading"
-        :data="filteredRules"
-        style="width: 100%"
-        row-key="id"
-        class="draft-table"
-        :header-cell-style="{
-          background:
-            'linear-gradient(135deg, rgba(102, 126, 234, 0.06) 0%, rgba(118, 75, 162, 0.06) 100%)',
-          color: 'var(--el-text-color-primary)',
-          fontWeight: 700,
-          borderBottom: '1px solid var(--el-border-color-lighter)',
-        }"
-        stripe
-      >
-        <el-table-column type="index" label="序号" width="70" align="center" />
-        <el-table-column prop="name" label="规则名称" min-width="220" show-overflow-tooltip>
-          <template #default="{ row }">
-            <div class="name-cell">
-              <el-icon color="var(--el-color-primary)"><Document /></el-icon>
-              <span>{{ row.name }}</span>
+    <div class="draft-body">
+      <!-- 左侧：类目侧边栏 -->
+      <div class="category-sidebar">
+        <div class="category-header">
+          <span class="category-title">规则类目</span>
+        </div>
+        <div class="category-list">
+          <div
+            class="category-item"
+            :class="{ 'is-active': selectedCategory === ALL_CATEGORY }"
+            @click="selectedCategory = ALL_CATEGORY"
+          >
+            <div class="category-item-left">
+              <el-icon><Folder /></el-icon>
+              <span class="category-item-name">全部规则</span>
             </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag
-              :type="row.status === 'active' ? 'success' : 'info'"
+            <el-tag size="small" round>{{ props.rules.length }}</el-tag>
+          </div>
+          <div
+            v-for="cat in categoryList"
+            :key="cat.name"
+            class="category-item"
+            :class="{ 'is-active': selectedCategory === cat.name }"
+            @click="selectedCategory = cat.name"
+          >
+            <div class="category-item-left">
+              <el-icon><Folder /></el-icon>
+              <span class="category-item-name">{{ cat.name }}</span>
+              <span class="category-item-count">({{ cat.count }})</span>
+            </div>
+            <div class="category-item-actions">
+              <el-button
+                v-if="editingCategoryName === cat.name"
+                link
+                size="small"
+                @click.stop="finishRenameCategory(cat.name)"
+              >
+                <el-icon><Check /></el-icon>
+              </el-button>
+              <el-button
+                v-if="editingCategoryName !== cat.name"
+                link
+                size="small"
+                @click.stop="startRenameCategory(cat.name)"
+              >
+                <el-icon><EditPen /></el-icon>
+              </el-button>
+              <el-button link size="small" type="danger" @click.stop="deleteCategory(cat.name)">
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </div>
+          </div>
+          <div v-if="categoryList.length === 0" class="category-empty">
+            暂无类目，点击下方按钮创建
+          </div>
+        </div>
+        <div class="category-footer">
+          <div v-if="isAddingCategory" class="add-category-row">
+            <el-input
+              v-model="newCategoryName"
+              placeholder="输入类目名称"
               size="small"
-              effect="light"
-            >
-              {{ row.status === "active" ? "启用" : "暂停" }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="comparisonTarget" label="比对对象" width="140" align="center">
-          <template #default="{ row }">
-            <el-tag size="small" type="primary" effect="light">
-              {{ COMPARISON_LABEL[row.comparisonTarget] || row.comparisonTarget }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="适用店铺" min-width="140">
-          <template #default="{ row }">
-            <span>{{ formatShops(row) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="触发条件" min-width="240" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span class="condition-preview">{{ getRuleSummary(row) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="执行操作" min-width="180" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span class="action-preview">{{ formatActions(row) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="updatedAt" label="更新时间" width="170">
-          <template #default="{ row }">
-            <span class="time-text">{{ formatDate(row.updatedAt) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="160" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="handleEdit(row)">
-              <el-icon><Edit /></el-icon>
-              编辑
+              maxlength="20"
+              @keyup.enter="confirmAddCategory"
+              @keyup.escape="cancelAddCategory"
+            />
+            <el-button size="small" type="primary" @click="confirmAddCategory">
+              <el-icon><Check /></el-icon>
             </el-button>
-            <el-button link type="danger" size="small" @click="handleDelete(row)">
-              <el-icon><Delete /></el-icon>
-              删除
+            <el-button size="small" @click="cancelAddCategory">
+              <el-icon><Close /></el-icon>
             </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </div>
-
-    <!-- 空状态 -->
-    <div v-if="filteredRules.length === 0 && !loading" class="draft-empty">
-      <el-empty
-        :image-size="100"
-        :description="
-          props.rules.length === 0 ? '暂无草稿规则，点击「新建规则」创建第一条' : '未找到匹配的规则'
-        "
-      >
-        <template v-if="props.rules.length === 0">
-          <el-button type="primary" @click="handleCreate">
+          </div>
+          <el-button v-else text size="small" class="add-category-btn" @click="startAddCategory">
             <el-icon><Plus /></el-icon>
-            新建规则
+            新建类目
           </el-button>
-        </template>
-      </el-empty>
+        </div>
+      </div>
+
+      <!-- 右侧：规则内容区域 -->
+      <div class="draft-content">
+        <!-- 工具栏 -->
+        <div class="draft-toolbar">
+          <div class="toolbar-left">
+            <el-select v-model="filterStatus" placeholder="状态筛选" clearable style="width: 140px">
+              <el-option label="全部" value="" />
+              <el-option label="启用" value="active" />
+              <el-option label="暂停" value="inactive" />
+            </el-select>
+
+            <el-select v-model="filterTarget" placeholder="比对对象" clearable style="width: 160px">
+              <el-option label="全部" value="" />
+              <el-option
+                v-for="item in targetOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索规则名称..."
+              :prefix-icon="Search"
+              style="width: 280px"
+              clearable
+            />
+          </div>
+          <span class="toolbar-spacer" />
+          <div class="toolbar-right">
+            <span class="stat-text">共 {{ filteredRules.length }} 条规则</span>
+            <el-button type="primary" @click="handleCreate">
+              <el-icon><Plus /></el-icon>
+              新建规则
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 编辑类目名内联输入框 -->
+        <div v-if="editingCategoryName && selectedCategory !== ALL_CATEGORY" class="rename-banner">
+          <el-input
+            v-model="editCategoryInput"
+            placeholder="输入新类目名"
+            size="small"
+            style="width: 240px"
+            maxlength="20"
+            @keyup.enter="finishRenameCategory(selectedCategory)"
+            @keyup.escape="cancelRenameCategory"
+          />
+          <el-button size="small" type="primary" @click="finishRenameCategory(selectedCategory)">
+            确认
+          </el-button>
+          <el-button size="small" @click="cancelRenameCategory">取消</el-button>
+        </div>
+
+        <!-- 规则表格 -->
+        <div class="draft-table-wrapper">
+          <el-table
+            v-loading="loading"
+            :data="filteredRules"
+            style="width: 100%"
+            row-key="id"
+            class="draft-table"
+            :header-cell-style="{
+              background:
+                'linear-gradient(135deg, rgba(102, 126, 234, 0.06) 0%, rgba(118, 75, 162, 0.06) 100%)',
+              color: 'var(--el-text-color-primary)',
+              fontWeight: 700,
+              borderBottom: '1px solid var(--el-border-color-lighter)',
+            }"
+            stripe
+          >
+            <el-table-column type="index" label="序号" width="70" align="center" />
+            <el-table-column prop="name" label="规则名称" min-width="220" show-overflow-tooltip>
+              <template #default="{ row }">
+                <div class="name-cell">
+                  <el-icon color="var(--el-color-primary)"><Document /></el-icon>
+                  <span>{{ row.name }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="status" label="状态" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag
+                  :type="row.status === 'active' ? 'success' : 'info'"
+                  size="small"
+                  effect="light"
+                >
+                  {{ row.status === "active" ? "启用" : "暂停" }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="类目" width="120" align="center">
+              <template #default="{ row }">
+                <el-tag size="small" type="warning" effect="light">
+                  {{ formatCategories(row) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="comparisonTarget" label="比对对象" width="140" align="center">
+              <template #default="{ row }">
+                <el-tag size="small" type="primary" effect="light">
+                  {{ COMPARISON_LABEL[row.comparisonTarget] || row.comparisonTarget }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="适用店铺" min-width="140">
+              <template #default="{ row }">
+                <span>{{ formatShops(row) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="触发条件" min-width="240" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span class="condition-preview">{{ getRuleSummary(row) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="执行操作" min-width="180" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span class="action-preview">{{ formatActions(row) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="updatedAt" label="更新时间" width="170">
+              <template #default="{ row }">
+                <span class="time-text">{{ formatDate(row.updatedAt) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="160" align="center" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" size="small" @click="handleEdit(row)">
+                  <el-icon><Edit /></el-icon>
+                  编辑
+                </el-button>
+                <el-button link type="danger" size="small" @click="handleDelete(row)">
+                  <el-icon><Delete /></el-icon>
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-if="filteredRules.length === 0 && !loading" class="draft-empty">
+          <el-empty
+            :image-size="100"
+            :description="
+              props.rules.length === 0
+                ? '暂无草稿规则，点击「新建规则」创建第一条'
+                : '未找到匹配的规则'
+            "
+          >
+            <template v-if="props.rules.length === 0">
+              <el-button type="primary" @click="handleCreate">
+                <el-icon><Plus /></el-icon>
+                新建规则
+              </el-button>
+            </template>
+          </el-empty>
+        </div>
+      </div>
     </div>
 
     <!-- 规则表单弹窗 -->
@@ -143,13 +250,23 @@
 
 <script setup lang="ts">
 /**
- * SP 广告规则草稿箱面板：规则列表表格展示，带分类筛选
+ * SP 广告规则草稿箱面板：左侧规则类目 + 右侧规则表格展示
  */
 import type { AdRule } from "./types";
 
 import { ref, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Plus, Edit, Delete, Search, Document } from "@element-plus/icons-vue";
+import {
+  Plus,
+  Edit,
+  Delete,
+  Search,
+  Document,
+  Folder,
+  EditPen,
+  Check,
+  Close,
+} from "@element-plus/icons-vue";
 
 import RuleFormDialog from "./RuleFormDialog.vue";
 import { createRule, updateRule, deleteRule } from "@/api/ads/rule-strategy";
@@ -164,11 +281,38 @@ const emit = defineEmits<{
   (e: "update:rules", rules: AdRule[]): void;
 }>();
 
+const ALL_CATEGORY = "__all__";
+
 const formRef = ref<any>(null);
 const loading = ref(false);
 const searchKeyword = ref("");
 const filterStatus = ref<string>("");
 const filterTarget = ref<string>("");
+const selectedCategory = ref<string>(ALL_CATEGORY);
+
+// ── 类目管理状态 ──
+const isAddingCategory = ref(false);
+const newCategoryName = ref("");
+const editingCategoryName = ref("");
+const editCategoryInput = ref("");
+
+/**
+ * 从规则中提取类目列表（按规则数量降序）
+ */
+const categoryList = computed(() => {
+  const map = new Map<string, number>();
+  for (const rule of props.rules) {
+    const cats = rule.categories || [];
+    for (const cat of cats) {
+      if (cat) {
+        map.set(cat, (map.get(cat) || 0) + 1);
+      }
+    }
+  }
+  return Array.from(map.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+});
 
 const targetOptions = [
   { value: "campaign", label: "广告活动" },
@@ -219,7 +363,11 @@ const filteredRules = computed(() => {
       : rule.name.toLowerCase().includes(searchKeyword.value.toLowerCase());
     const matchesStatus = !filterStatus.value ? true : rule.status === filterStatus.value;
     const matchesTarget = !filterTarget.value ? true : rule.comparisonTarget === filterTarget.value;
-    return matchesSearch && matchesStatus && matchesTarget;
+    const matchesCategory =
+      selectedCategory.value === ALL_CATEGORY
+        ? true
+        : (rule.categories || []).includes(selectedCategory.value);
+    return matchesSearch && matchesStatus && matchesTarget && matchesCategory;
   });
 });
 
@@ -227,6 +375,12 @@ function formatShops(rule: AdRule): string {
   if (!rule.shops || rule.shops.length === 0) return "-";
   if (rule.shops.length === 1) return String(rule.shops[0]);
   return `${rule.shops.length} 个店铺`;
+}
+
+function formatCategories(rule: AdRule): string {
+  const cats = rule.categories || [];
+  if (cats.length === 0) return "-";
+  return cats.join("、");
 }
 
 function formatActions(rule: AdRule): string {
@@ -323,6 +477,122 @@ async function onFormSaved(data: AdRule): Promise<void> {
     ElMessage.error("保存失败，请重试");
   }
 }
+
+// ── 类目 CRUD ──
+
+function startAddCategory(): void {
+  isAddingCategory.value = true;
+  newCategoryName.value = "";
+}
+
+function cancelAddCategory(): void {
+  isAddingCategory.value = false;
+  newCategoryName.value = "";
+}
+
+function confirmAddCategory(): void {
+  const name = newCategoryName.value.trim();
+  if (!name) {
+    ElMessage.warning("请输入类目名称");
+    return;
+  }
+  if (categoryList.value.some((c) => c.name === name)) {
+    ElMessage.warning("类目名称已存在");
+    return;
+  }
+  // 新建类目后自动切换到该类目（空类目，无规则）
+  selectedCategory.value = name;
+  isAddingCategory.value = false;
+  newCategoryName.value = "";
+  ElMessage.success(`已创建类目「${name}」`);
+}
+
+function startRenameCategory(name: string): void {
+  editingCategoryName.value = name;
+  editCategoryInput.value = name;
+}
+
+function cancelRenameCategory(): void {
+  editingCategoryName.value = "";
+  editCategoryInput.value = "";
+}
+
+/**
+ * 重命名类目：更新所有关联规则的 categories 字段
+ */
+async function finishRenameCategory(oldName: string): Promise<void> {
+  const newName = (editCategoryInput.value || oldName).trim();
+  if (!newName || newName === oldName) {
+    editingCategoryName.value = "";
+    return;
+  }
+  if (categoryList.value.some((c) => c.name === newName)) {
+    ElMessage.warning("类目名称已存在");
+    return;
+  }
+
+  try {
+    loading.value = true;
+    const affectedRules = props.rules.filter((r) => (r.categories || []).includes(oldName));
+    const updatedRules = [...props.rules];
+
+    for (const rule of affectedRules) {
+      const newCategories = (rule.categories || []).map((c) => (c === oldName ? newName : c));
+      const updated = await updateRule(rule.id, { categories: newCategories } as any);
+      const idx = updatedRules.findIndex((r) => r.id === rule.id);
+      if (idx !== -1) updatedRules[idx] = updated;
+    }
+
+    emit("update:rules", updatedRules);
+    if (selectedCategory.value === oldName) {
+      selectedCategory.value = newName;
+    }
+    editingCategoryName.value = "";
+    ElMessage.success(`已重命名类目「${oldName}」→「${newName}」`);
+  } catch {
+    ElMessage.error("重命名失败，请重试");
+  } finally {
+    loading.value = false;
+  }
+}
+
+/**
+ * 删除类目：清除所有关联规则的该 categories 值
+ */
+async function deleteCategory(name: string): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除类目「${name}」吗？不会删除规则，仅清除规则的类目关联。`,
+      "删除确认",
+      { type: "warning" }
+    );
+  } catch {
+    return;
+  }
+
+  try {
+    loading.value = true;
+    const affectedRules = props.rules.filter((r) => (r.categories || []).includes(name));
+    const updatedRules = [...props.rules];
+
+    for (const rule of affectedRules) {
+      const newCategories = (rule.categories || []).filter((c) => c !== name);
+      const updated = await updateRule(rule.id, { categories: newCategories } as any);
+      const idx = updatedRules.findIndex((r) => r.id === rule.id);
+      if (idx !== -1) updatedRules[idx] = updated;
+    }
+
+    emit("update:rules", updatedRules);
+    if (selectedCategory.value === name) {
+      selectedCategory.value = ALL_CATEGORY;
+    }
+    ElMessage.success(`已删除类目「${name}」`);
+  } catch {
+    ElMessage.error("删除失败，请重试");
+  } finally {
+    loading.value = false;
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -330,6 +600,168 @@ async function onFormSaved(data: AdRule): Promise<void> {
   display: flex;
   flex-direction: column;
   min-height: 500px;
+}
+
+.draft-body {
+  display: flex;
+  gap: 20px;
+  min-height: 520px;
+}
+
+// ── 左侧类目侧边栏 ──
+.category-sidebar {
+  display: flex;
+  flex: 0 0 220px;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.category-header {
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-bottom: none;
+
+  .category-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.3px;
+  }
+}
+
+.category-list {
+  flex: 1;
+  padding: 10px 12px;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--el-border-color);
+    border-radius: 3px;
+  }
+}
+
+.category-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+  white-space: nowrap;
+}
+
+.category-item-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.category-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--el-color-primary-light-9);
+
+    .category-item-actions {
+      opacity: 1;
+    }
+  }
+
+  &.is-active {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border-left: 3px solid var(--el-color-primary);
+
+    .category-item-name {
+      font-weight: 600;
+      color: var(--el-color-primary);
+    }
+  }
+}
+
+.category-item-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+
+  .el-icon {
+    flex-shrink: 0;
+    font-size: 15px;
+    color: var(--el-color-primary);
+    opacity: 0.7;
+  }
+}
+
+.category-item-count {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.category-empty {
+  padding: 30px 16px;
+  font-size: 13px;
+  color: var(--el-text-color-placeholder);
+  text-align: center;
+}
+
+.category-footer {
+  padding: 12px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.add-category-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.add-category-btn {
+  width: 100%;
+  font-size: 13px;
+  color: var(--el-color-primary);
+
+  &:hover {
+    background: var(--el-color-primary-light-9);
+  }
+}
+
+// ── 右侧内容区 ──
+.draft-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rename-banner {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 22px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  background: var(--el-color-warning-light-9);
+  border: 1px solid var(--el-color-warning-light-5);
+  border-radius: 8px;
 }
 
 .draft-toolbar {

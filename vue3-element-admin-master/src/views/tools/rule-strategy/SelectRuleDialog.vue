@@ -171,7 +171,7 @@ const filteredRules = computed(() =>
   })
 );
 
-function open(_group: AdRuleGroup | null): void {
+function open(/* group: AdRuleGroup | null */): void {
   visible.value = true;
   selectedRules.value = [];
   insertPosition.value = "end";
