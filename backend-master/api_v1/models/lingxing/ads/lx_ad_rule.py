@@ -67,6 +67,13 @@ class LxAdRule(models.Model):
         help_text="店铺 profile_id 列表，如 [123, 456]",
     )
 
+    ad_type = models.CharField(
+        max_length=20,
+        default="all",
+        verbose_name="广告类型",
+        help_text="all：不限 / manual：手动 / auto：自动",
+    )
+
     effective_type = models.CharField(
         max_length=30,
         choices=EffectiveType.choices,
@@ -146,6 +153,17 @@ class LxAdRule(models.Model):
         verbose_name="标签不限",
     )
 
+    auto_targeting_groups = models.JSONField(
+        default=list,
+        verbose_name="自动定位组",
+        help_text="同类商品/紧密匹配/关联商品/宽泛匹配",
+    )
+
+    unlimited_auto_targeting = models.BooleanField(
+        default=False,
+        verbose_name="自动定位组不限",
+    )
+
     comparison_target = models.CharField(
         max_length=50,
         choices=ComparisonTarget.choices,
@@ -192,6 +210,12 @@ class LxAdRule(models.Model):
         default=dict,
         verbose_name="其他操作",
         help_text='{"type": "pause"|"archive"|"", "notify": true}',
+    )
+
+    targeting_bid_actions = models.JSONField(
+        default=list,
+        verbose_name="投放竞价操作列表",
+        help_text='Campaign AUTO/MANUAL 专属，每条包含 targetingGroups/conditionSets/bidAction',
     )
 
     negative_action = models.CharField(

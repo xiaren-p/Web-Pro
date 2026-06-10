@@ -23,11 +23,23 @@ export interface OtherAction {
   notify: boolean;
 }
 
+/** 一条投放竞价操作项（Campaign AUTO/MANUAL 专属） */
+export interface TargetingBidAction {
+  targetingGroups: string[];
+  unlimitedTargeting: boolean;
+  conditionSets: RuleConditionSet[];
+  bidAction: RuleAction;
+}
+
 export interface RuleFormData {
   id: string;
   name: string;
   shops: (number | string)[];
   status: "active" | "inactive";
+
+  /** 广告类型：不限 | 手动 | 自动 */
+  adType: "all" | "manual" | "auto";
+
   effectiveType: "date_range" | "within_days" | "beyond_days";
   effectiveDaysStart: number;
   effectiveDaysEnd: number;
@@ -35,17 +47,29 @@ export interface RuleFormData {
   effectiveStartDay: string;
   effectiveEnd: string;
   effectiveEndDay: string;
+
+  /** 比对对象 */
+  comparisonTarget: string;
+  comparisonMultiTargets: string[];
+
   categories: string[];
   unlimitedCategories: boolean;
   managers: (number | string)[];
   unlimitedManagers: boolean;
   tags: string[];
   unlimitedTags: boolean;
-  comparisonTarget: string;
-  comparisonMultiTargets: string[];
+
+  /** 自动定位组（仅 AUTO + 投放 + 定位组投放 时显示） */
+  autoTargetingGroups: string[];
+  unlimitedAutoTargeting: boolean;
+
   conditionSets: RuleConditionSet[];
   linkedTimeRules: (number | string)[];
   linkedTimeRulesExclude: (number | string)[];
+
+  /** 投放竞价操作列表（Campaign AUTO/MANUAL 时使用） */
+  targetingBidActions: TargetingBidAction[];
+
   bidAction: RuleAction;
   budgetAction: RuleAction;
   otherAction: OtherAction;

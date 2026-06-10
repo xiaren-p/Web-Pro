@@ -207,7 +207,9 @@ function handleEdit(row: AdRule): void {
 
 async function handleDelete(row: AdRule): Promise<void> {
   try {
-    await ElMessageBox.confirm(`确定要删除规则「${row.name}」吗？`, "删除确认", { type: "warning" });
+    await ElMessageBox.confirm(`确定要删除规则「${row.name}」吗？`, "删除确认", {
+      type: "warning",
+    });
   } catch {
     return;
   }
