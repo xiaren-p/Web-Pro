@@ -252,7 +252,7 @@
 /**
  * SP 广告规则草稿箱面板：左侧规则类目 + 右侧规则表格展示
  */
-import type { AdRule } from "./types";
+import type { AdRule, RuleFormData } from "./types";
 
 import { ref, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -458,7 +458,7 @@ async function handleDelete(row: AdRule): Promise<void> {
   }
 }
 
-async function onFormSaved(data: AdRule): Promise<void> {
+async function onFormSaved(data: RuleFormData): Promise<void> {
   try {
     const isEdit = data.id && props.rules.some((r) => r.id === data.id);
     if (isEdit) {
