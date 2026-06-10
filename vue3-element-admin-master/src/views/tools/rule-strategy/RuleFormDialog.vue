@@ -793,16 +793,25 @@
                       />
                     </template>
                     <!-- 单值模式：metric > X -->
-                    <el-input-number
-                      v-else
-                      v-model="cond.value"
-                      size="small"
-                      style="width: 120px"
-                      :min="0"
-                      :precision="2"
-                      :step="isPercentMetric(cond.metric) ? 1 : 0.01"
-                      controls-position="right"
-                    />
+                    <template v-else>
+                      <el-select v-model="cond.operator" style="width: 64px" size="small">
+                        <el-option
+                          v-for="o in operatorOptions"
+                          :key="o.value"
+                          :label="o.label"
+                          :value="o.value"
+                        />
+                      </el-select>
+                      <el-input-number
+                        v-model="cond.value"
+                        size="small"
+                        style="width: 120px"
+                        :min="0"
+                        :precision="2"
+                        :step="isPercentMetric(cond.metric) ? 1 : 0.01"
+                        controls-position="right"
+                      />
+                    </template>
                     <el-button
                       text
                       type="primary"
