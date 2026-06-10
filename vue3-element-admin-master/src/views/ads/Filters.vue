@@ -395,13 +395,13 @@ function openTemplates() {
 .filters-container {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 .filter-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--spacing-2);
   align-items: center;
 }
 
@@ -418,36 +418,22 @@ function openTemplates() {
   overflow: visible;
 }
 
-.w-90 {
-  width: 90px;
-}
-.w-100 {
-  width: 100px;
-}
-.w-110 {
-  width: 110px;
-}
-.w-120 {
-  width: 120px;
-}
-.w-130 {
-  width: 130px;
-}
-.w-80 {
-  width: 80px;
-}
-.w-160 {
-  width: 160px;
-}
-.w-150 {
-  width: 150px;
-}
+.w-90 { width: 90px; }
+.w-100 { width: 100px; }
+.w-110 { width: 110px; }
+.w-120 { width: 120px; }
+.w-130 { width: 130px; }
+.w-80 { width: 80px; }
+.w-160 { width: 160px; }
+.w-150 { width: 150px; }
 
 /* 筛选框高度 */
 .filter-row :deep(.el-select__wrapper),
 .filter-row :deep(.el-input__wrapper) {
   min-height: 32px;
+  border-radius: var(--radius-md);
 }
+
 .filter-row :deep(.el-range-editor.el-input__wrapper) {
   min-height: 32px;
   padding-top: 0;
@@ -464,6 +450,7 @@ function openTemplates() {
   flex: 0 0 210px;
   width: 210px;
 }
+
 :deep(.date-picker .el-range-editor.el-input__wrapper),
 :deep(.date-picker.el-range-editor.el-input__wrapper) {
   width: 210px !important;
@@ -477,20 +464,23 @@ function openTemplates() {
 
 .btn-msku-clear {
   padding: 5px 6px;
-  color: #909399;
+  color: var(--color-gray-500);
   border-left: 0;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
+
 .input-group-seamless :deep(.seamless-left .el-input__wrapper) {
   border-right: 0;
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
+
 .input-group-seamless :deep(.seamless-left .el-input__wrapper.is-focus) {
   z-index: 1;
-  border-right: 1px solid var(--el-color-primary);
+  border-right: 1px solid var(--color-primary-500);
 }
+
 .input-group-seamless :deep(.seamless-right .el-input__wrapper) {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
@@ -498,9 +488,9 @@ function openTemplates() {
 
 .filter-actions {
   display: flex;
-  gap: 6px;
+  gap: var(--spacing-2);
   align-items: center;
-  margin-left: 4px;
+  margin-left: var(--spacing-1);
 }
 
 .filter-actions :deep(.el-button) {
@@ -512,13 +502,14 @@ function openTemplates() {
 }
 
 .btn-template {
-  color: #606266;
-  border-color: #dcdfe6;
+  color: var(--color-gray-600);
+  border-color: var(--color-gray-300);
 }
+
 .btn-template:hover {
-  color: #409eff;
-  background-color: #ecf5ff;
-  border-color: #c6e2ff;
+  color: var(--color-primary-600);
+  background-color: var(--color-primary-50);
+  border-color: var(--color-primary-300);
 }
 
 /* 图标独立按钮 */
@@ -532,46 +523,50 @@ function openTemplates() {
 .filter-tags-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--spacing-2);
   align-items: center;
-  padding-top: 8px;
-  border-top: 1px solid #f0f2f5;
+  padding-top: var(--spacing-2);
+  border-top: 1px solid var(--color-gray-100);
 }
 
 .filter-tag {
   height: 24px;
-  padding: 0 8px;
-  font-size: 12px;
+  padding: 0 10px;
+  font-size: var(--font-size-xs);
   line-height: 22px;
-  color: #1677ff;
-  background: #e8f4ff;
-  border-color: #91caff;
-  border-radius: 12px;
+  color: var(--color-primary-700);
+  background: var(--color-primary-50);
+  border-color: var(--color-primary-200);
+  border-radius: var(--radius-full);
   transition:
-    background 0.15s,
-    border-color 0.15s;
+    background var(--transition-fast),
+    border-color var(--transition-fast);
 }
+
 .filter-tag:hover {
-  background: #d6eaff;
-  border-color: #409eff;
+  background: var(--color-primary-100);
+  border-color: var(--color-primary-400);
 }
+
 .filter-tag :deep(.el-tag__close) {
-  color: #91caff;
+  color: var(--color-primary-400);
 }
+
 .filter-tag :deep(.el-tag__close:hover) {
   color: #fff;
-  background-color: #409eff;
+  background-color: var(--color-primary-500);
 }
 
 .clear-all-icon {
-  margin-left: 2px;
-  font-size: 14px;
-  color: #909399;
+  margin-left: var(--spacing-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-500);
   cursor: pointer;
-  transition: color 0.15s;
+  transition: color var(--transition-fast);
 }
+
 .clear-all-icon:hover {
-  color: #f56c6c;
+  color: var(--color-danger-600);
 }
 
 @media (max-width: 1400px) {

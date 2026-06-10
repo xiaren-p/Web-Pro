@@ -542,8 +542,8 @@ onMounted(() => {
 /* 图标按钮（列配置触发器） */
 .btn-icon-only {
   padding: 0 9px;
-  color: #606266;
-  border-color: #dcdfe6;
+  color: var(--color-gray-600);
+  border-color: var(--color-gray-300);
 }
 
 /* 单元格行高：广告组面板 9px 上下留白 */
@@ -554,15 +554,15 @@ onMounted(() => {
 /* 默认竞价可编辑小框 */
 .bid-cell {
   display: inline-flex;
-  gap: 3px;
+  gap: var(--spacing-1);
   align-items: center;
   width: 65px;
 
   .bid-icon {
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: var(--font-size-xs);
     line-height: 1;
-    color: #606266;
+    color: var(--color-gray-600);
   }
 
   .bid-input {
@@ -573,11 +573,12 @@ onMounted(() => {
       height: 26px;
       min-height: 26px;
       padding: 0 6px;
+      border-radius: var(--radius-sm);
     }
 
     :deep(.el-input__inner) {
       height: 24px;
-      font-size: 12px;
+      font-size: var(--font-size-xs);
       text-align: right;
     }
   }

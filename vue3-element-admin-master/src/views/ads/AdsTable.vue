@@ -222,15 +222,19 @@ function formatTargetingType(val: string): string {
 </script>
 
 <style scoped>
+.data-table-container {
+  background: var(--bg-card);
+}
+
 .pager-row {
   display: flex;
-  gap: 10px;
+  gap: var(--spacing-3);
   align-items: center;
   justify-content: flex-end;
-  padding: 8px 16px;
-  background-color: #fff;
-  border-top: 1px solid #f0f2f5;
-  border-radius: 0 0 8px 8px;
+  padding: var(--spacing-2) var(--spacing-4);
+  background-color: var(--bg-card);
+  border-top: 1px solid var(--color-gray-100);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 /* 页数选择器高度与分页页码按钮对齐（background模式按钮为32px） */
@@ -244,8 +248,8 @@ function formatTargetingType(val: string): string {
 }
 
 .total-count {
-  font-size: 13px;
-  color: #606266;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-600);
   white-space: nowrap;
 }
 
@@ -261,54 +265,60 @@ function formatTargetingType(val: string): string {
 :deep(.el-table--group::after) {
   display: none;
 }
+
 :deep(.el-table__header th.el-table__cell) {
   border-right: none !important;
 }
+
 :deep(.el-table__body td.el-table__cell) {
-  border-bottom: 1px solid #f0f2f5 !important;
+  border-bottom: 1px solid var(--color-gray-100) !important;
 }
 
 /* 服务状态徽标 */
 .status-badge {
   display: inline-block;
-  padding: 2px 9px;
-  font-size: 12px;
-  font-weight: 500;
+  padding: 2px 10px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
   line-height: 20px;
   white-space: nowrap;
   border: 1px solid transparent;
-  border-radius: 10px;
-}
-.status-badge.status-success {
-  color: #67c23a;
-  background: #f0f9eb;
-  border-color: #c2e7b0;
-}
-.status-badge.status-danger {
-  color: #f56c6c;
-  background: #fef0f0;
-  border-color: #fab6b6;
-}
-.status-badge.status-warning {
-  color: #e6a23c;
-  background: #fdf6ec;
-  border-color: #f5dab1;
-}
-.status-badge.status-default {
-  color: #909399;
-  background: #f4f4f5;
-  border-color: #d3d4d6;
+  border-radius: var(--radius-full);
 }
 
-/* 表头：白底、深字、底部细分隔线 */
+.status-badge.status-success {
+  color: var(--color-success-700);
+  background: var(--color-success-50);
+  border-color: var(--color-success-200);
+}
+
+.status-badge.status-danger {
+  color: var(--color-danger-700);
+  background: var(--color-danger-50);
+  border-color: var(--color-danger-200);
+}
+
+.status-badge.status-warning {
+  color: var(--color-warning-700);
+  background: var(--color-warning-50);
+  border-color: var(--color-warning-200);
+}
+
+.status-badge.status-default {
+  color: var(--color-gray-700);
+  background: var(--color-gray-50);
+  border-color: var(--color-gray-200);
+}
+
+/* 表头：浅灰底、深字、底部细分隔线 */
 :deep(.el-table__header-wrapper th.el-table__cell),
 :deep(.el-table__header th) {
-  font-size: 13px;
-  font-weight: 600 !important;
-  color: #1f2937 !important;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold) !important;
+  color: var(--color-gray-700) !important;
   text-align: center;
-  background-color: #ffffff !important;
-  border-bottom: 1px solid #e5e7eb !important;
+  background-color: var(--color-gray-50) !important;
+  border-bottom: 1px solid var(--color-gray-200) !important;
 }
 
 :deep(.el-table__header th .cell) {
@@ -318,56 +328,62 @@ function formatTargetingType(val: string): string {
 
 /* 表格内容：紧凑高度、干净字体 */
 :deep(.el-table .el-table__cell) {
-  padding: 4px 0 !important;
-  font-size: 13px;
-  color: #303133;
+  padding: 6px 0 !important;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-800);
   border-right: none !important;
 }
+
 :deep(.el-table .cell) {
-  padding-right: 10px;
-  padding-left: 10px;
-  line-height: 1.4;
+  padding-right: 12px;
+  padding-left: 12px;
+  line-height: 1.5;
 }
 
 /* 有效列 switch：缩小 + 开启状态绿色 */
 :deep(.el-table .el-switch) {
   height: 16px;
 }
+
 :deep(.el-table .el-switch .el-switch__core) {
   width: 30px !important;
   min-width: 30px !important;
   height: 16px !important;
-  border-radius: 8px !important;
+  border-radius: var(--radius-full) !important;
 }
+
 :deep(.el-table .el-switch .el-switch__core .el-switch__action) {
   width: 12px !important;
   height: 12px !important;
 }
-/* 选中时：圆点归位到最右侧（30px - 12px圆点 - 2px右间距 = 16px，减去初始left:2px = translateX:14px）*/
+
 :deep(.el-table .el-switch.is-checked .el-switch__core .el-switch__action) {
   left: 16px !important;
 }
+
 :deep(.el-table .el-switch.is-checked .el-switch__core) {
-  background-color: #22c55e !important;
-  border-color: #22c55e !important;
+  background-color: var(--color-success-500) !important;
+  border-color: var(--color-success-500) !important;
 }
 
 /* 单元格 hover */
 :deep(.el-table .el-table__row) {
-  transition: background-color 0.2s ease;
+  transition: background-color var(--transition-fast);
 }
+
 :deep(.el-table .el-table__row:hover > td.el-table__cell) {
-  background-color: #f5f7fc !important;
+  background-color: var(--color-primary-50) !important;
 }
 
 /* 汇总行：置顶固定展示，中性背景区分 */
 :deep(.summary-row > td.el-table__cell) {
-  font-weight: 700;
-  color: #303133;
-  background-color: #fafbfc !important;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-gray-800);
+  background-color: var(--color-gray-100) !important;
 }
+
 :deep(.summary-row:hover > td.el-table__cell) {
-  background-color: #f0f2f5 !important;
+  background-color: var(--color-gray-200) !important;
 }
 
 /* 投放类型辅助行 */
@@ -375,29 +391,24 @@ function formatTargetingType(val: string): string {
   margin-top: 2px;
   font-size: 11px;
   line-height: 1.4;
-  color: #909399;
-}
-
-/* 汇总行广告活动名称标签 */
-.summary-label {
-  font-weight: 700;
-  color: #409eff;
-  letter-spacing: 0.04em;
+  color: var(--color-gray-500);
 }
 
 .summary-dash {
-  font-size: 13px;
-  color: #000;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-900);
 }
 
 /* 广告活动名称跳转链接 */
 .campaign-name-link {
-  color: #409eff;
+  color: var(--color-primary-600);
   text-decoration: none;
+  font-weight: var(--font-weight-medium);
+  transition: color var(--transition-fast);
+}
 
-  &:hover {
-    color: #66b1ff;
-    text-decoration: underline;
-  }
+.campaign-name-link:hover {
+  color: var(--color-primary-700);
+  text-decoration: underline;
 }
 </style>

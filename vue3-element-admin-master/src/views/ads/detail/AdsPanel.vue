@@ -667,9 +667,9 @@ onMounted(() => {
 <style scoped lang="scss">
 /* 图片放大 tooltip：白底、无内边距，让大图紧贴气泡边缘 */
 :global(.product-thumb-popper.el-popper.is-light) {
-  padding: 4px !important;
-  background: #fff !important;
-  border: 1px solid #e4e7ed !important;
+  padding: var(--spacing-1) !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--color-gray-200) !important;
 }
 
 /* 通用筛选栏、表格、徽标、分页样式 → src/styles/ads-panel.scss → .ads-detail-panel */
@@ -692,8 +692,8 @@ onMounted(() => {
   height: 44px;
   margin: 0 auto;
   object-fit: cover;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-sm);
 }
 
 .thumb-placeholder {
@@ -701,8 +701,8 @@ onMounted(() => {
   width: 44px;
   height: 44px;
   margin: 0 auto;
-  background: #f4f4f5;
-  border-radius: 4px;
+  background: var(--color-gray-100);
+  border-radius: var(--radius-sm);
 }
 
 /* ASIN 单元格：第一行标题，第二行ASIN/价格/星级，标题悬浮 tooltip 显示完整内容 */
@@ -715,7 +715,7 @@ onMounted(() => {
 
 .asin-title-row {
   display: flex;
-  gap: 4px;
+  gap: var(--spacing-1);
   align-items: center;
   overflow: hidden;
 }
@@ -724,31 +724,31 @@ onMounted(() => {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 12px;
-  color: #303133;
+  font-size: var(--font-size-xs);
+  color: var(--color-gray-800);
   white-space: nowrap;
 }
 
 .asin-row {
   display: flex;
-  gap: 6px;
+  gap: var(--spacing-2);
   align-items: center;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   white-space: nowrap;
 }
 
 .asin-text {
-  color: #409eff;
+  color: var(--color-primary-600);
   white-space: nowrap;
 }
 
 .asin-price {
-  color: #606266;
+  color: var(--color-gray-600);
   white-space: nowrap;
 }
 
 .asin-rating {
-  color: #f5a623;
+  color: var(--color-warning-500);
   white-space: nowrap;
 }
 

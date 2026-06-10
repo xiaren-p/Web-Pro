@@ -181,56 +181,56 @@ onMounted(() => {
 .ad-campaign-detail {
   /* ── 页头卡片 ── */
   .detail-header-card {
-    padding: 14px 20px 16px;
-    margin-bottom: 16px;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
+    padding: var(--spacing-4) var(--spacing-5) var(--spacing-4);
+    margin-bottom: var(--spacing-4);
+    background: var(--bg-card);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-lg);
   }
 
   /* 第一行：面包屑 */
   .breadcrumb-row {
     display: flex;
-    gap: 6px;
+    gap: var(--spacing-2);
     align-items: center;
-    margin-bottom: 10px;
-    font-size: 13px;
+    margin-bottom: var(--spacing-3);
+    font-size: var(--font-size-sm);
   }
 
   .breadcrumb-link {
     display: inline-flex;
-    gap: 3px;
+    gap: var(--spacing-1);
     align-items: center;
-    font-weight: 400;
-    color: #909399;
+    font-weight: var(--font-weight-normal);
+    color: var(--color-gray-500);
     cursor: pointer;
-    transition: color 0.2s;
+    transition: color var(--transition-fast);
 
     &:hover {
-      color: #409eff;
+      color: var(--color-primary-600);
     }
   }
 
   .back-icon {
-    font-size: 12px;
+    font-size: var(--font-size-xs);
   }
 
   .breadcrumb-sep {
-    font-size: 14px;
+    font-size: var(--font-size-sm);
     line-height: 1;
-    color: #dcdfe6;
+    color: var(--color-gray-300);
     user-select: none;
   }
 
   .breadcrumb-current {
-    font-size: 13px;
-    color: #606266;
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-600);
   }
 
   /* 第二行：标题 + 徽标 */
   .title-row {
     display: flex;
-    gap: 10px;
+    gap: var(--spacing-3);
     align-items: center;
   }
 
@@ -238,14 +238,14 @@ onMounted(() => {
     display: inline-block;
     flex-shrink: 0;
     padding: 2px 10px;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
     line-height: 20px;
-    color: #409eff;
+    color: var(--color-primary-700);
     letter-spacing: 0.5px;
-    background: #ecf5ff;
-    border: 1px solid #b3d8ff;
-    border-radius: 4px;
+    background: var(--color-primary-50);
+    border: 1px solid var(--color-primary-200);
+    border-radius: var(--radius-sm);
   }
 
   /* 状态图标 */
@@ -253,14 +253,14 @@ onMounted(() => {
     display: inline-flex;
     flex-shrink: 0;
     align-items: center;
-    font-size: 13px;
+    font-size: var(--font-size-sm);
     line-height: 1;
 
     &.state-enabled {
-      color: #22c55e;
+      color: var(--color-success-500);
 
       .el-icon {
-        font-size: 15px;
+        font-size: var(--font-size-lg);
       }
     }
 
@@ -274,18 +274,18 @@ onMounted(() => {
     }
 
     &.state-paused {
-      color: #9ca3af;
+      color: var(--color-gray-400);
 
       .el-icon {
-        font-size: 15px;
+        font-size: var(--font-size-lg);
       }
     }
 
     &.state-archived {
-      color: #ef4444;
+      color: var(--color-danger-500);
 
       .el-icon {
-        font-size: 15px;
+        font-size: var(--font-size-lg);
       }
     }
   }
@@ -294,43 +294,43 @@ onMounted(() => {
     margin: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 15px;
-    font-weight: 600;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
     line-height: 1.3;
-    color: #1f2937;
+    color: var(--color-gray-800);
     white-space: nowrap;
   }
 
   /* ── 导航 Tab ── */
   .detail-tabs {
     :deep(.el-tabs__header) {
-      padding: 0 4px;
+      padding: 0 var(--spacing-1);
       margin-bottom: 0;
-      background: #fff;
-      border-radius: 8px 8px 0 0;
+      background: var(--bg-card);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     }
 
     :deep(.el-tabs__nav-wrap::after) {
       height: 1px;
-      background: #e5e7eb;
+      background: var(--color-gray-200);
     }
 
     :deep(.el-tabs__item) {
       height: 44px;
       padding: 0 18px;
-      font-size: 14px;
-      font-weight: 500;
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-medium);
       line-height: 44px;
-      color: #6b7280;
-      transition: color 0.2s;
+      color: var(--color-gray-500);
+      transition: color var(--transition-fast);
 
       &:hover {
-        color: #409eff;
+        color: var(--color-primary-600);
       }
 
       &.is-active {
-        font-weight: 600;
-        color: #409eff;
+        font-weight: var(--font-weight-semibold);
+        color: var(--color-primary-600);
       }
     }
 
@@ -341,9 +341,9 @@ onMounted(() => {
   }
 
   .tab-placeholder {
-    padding: 32px 0;
-    font-size: 14px;
-    color: #c0c4cc;
+    padding: var(--spacing-8) 0;
+    font-size: var(--font-size-base);
+    color: var(--color-gray-400);
     text-align: center;
   }
 

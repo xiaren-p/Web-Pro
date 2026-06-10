@@ -58,7 +58,7 @@
           <el-tooltip content="列配置" placement="top">
             <el-button
               text
-              style="height: 22px; min-height: 22px; padding: 4px; font-size: 16px; color: #606266"
+              class="column-config-btn"
               @click="restoreDefaultColumns"
             >
               <el-icon><Operation /></el-icon>

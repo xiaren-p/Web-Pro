@@ -1,24 +1,26 @@
-/* ────────────────────────────────
-   广告详情面板通用样式
-   适用于 AdGroupsPanel / AdsPanel 等 ads 详情系列面板，
-   避免各组件重复书写筛选栏、表格、徽标、分页等相同样式。
-───────────────────────────────── */
+/**
+ * 广告详情面板通用样式
+ * 适用于 AdGroupsPanel / AdsPanel 等 ads 详情系列面板，
+ * 避免各组件重复书写筛选栏、表格、徽标、分页等相同样式。
+ * 使用全局设计系统变量，保持视觉一致性。
+ */
 
 .ads-detail-panel {
-  padding-top: 12px;
+  padding-top: var(--spacing-3);
 
-  /* 筛选栏 */
+  /* ── 筛选栏 ─────────────────────────────────────── */
   .filter-bar {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--spacing-2);
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: var(--spacing-2);
     background: transparent;
 
     .el-select__wrapper,
     .el-input__wrapper {
       min-height: 32px;
+      border-radius: var(--radius-md);
     }
 
     .el-range-editor.el-input__wrapper {
@@ -59,22 +61,22 @@
   }
 
   .btn-template {
-    color: #606266;
-    border-color: #dcdfe6;
+    color: var(--color-gray-600);
+    border-color: var(--color-gray-300);
 
     &:hover {
-      color: #409eff;
-      background: #ecf5ff;
-      border-color: #c6e2ff;
+      color: var(--color-primary-600);
+      background: var(--color-primary-50);
+      border-color: var(--color-primary-300);
     }
   }
 
-  /* 表格容器 */
+  /* ── 表格容器 ───────────────────────────────────── */
   .data-table-container {
     overflow: hidden;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-lg);
   }
 
   .data-table__content {
@@ -88,43 +90,44 @@
     display: none;
   }
 
+  /* ── 表头 ──────────────────────────────────────── */
   .el-table__header-wrapper th.el-table__cell,
   .el-table__header th {
-    padding: 9px 0 !important;
-    font-size: 13px;
-    font-weight: 600 !important;
-    color: #374151 !important;
+    padding: 10px 0 !important;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold) !important;
+    color: var(--color-gray-700) !important;
     text-align: center;
-    background-color: #f9fafb !important;
-    border-bottom: 1px solid #e5e7eb !important;
+    background-color: var(--color-gray-50) !important;
+    border-bottom: 1px solid var(--color-gray-200) !important;
   }
 
   .el-table__body td.el-table__cell {
-    border-bottom: 1px solid #f0f2f5 !important;
+    border-bottom: 1px solid var(--color-gray-100) !important;
   }
 
   /* 表头列分隔线展示为拖拽手柄，正常状态下级 1px 淡灰，hover 加深 */
   .el-table__header th.el-table__cell {
-    border-right: 1px solid #e5e7eb !important;
+    border-right: 1px solid var(--color-gray-200) !important;
 
     &:hover {
-      border-right-color: #c0c4cc !important;
+      border-right-color: var(--color-gray-400) !important;
     }
   }
 
   .el-table .el-table__cell {
-    font-size: 13px;
-    color: #303133;
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-800);
     border-right: none !important;
   }
 
   .el-table .cell {
-    padding-right: 10px;
-    padding-left: 10px;
-    line-height: 1.4;
+    padding-right: 12px;
+    padding-left: 12px;
+    line-height: 1.5;
   }
 
-  /* switch 小型化 + 开启绿色 */
+  /* ── Switch 小型化 + 开启绿色 ───────────────────── */
   .el-table .el-switch {
     height: 16px;
   }
@@ -133,7 +136,7 @@
     width: 30px !important;
     min-width: 30px !important;
     height: 16px !important;
-    border-radius: 8px !important;
+    border-radius: var(--radius-full) !important;
   }
 
   .el-table .el-switch .el-switch__core .el-switch__action {
@@ -146,74 +149,74 @@
   }
 
   .el-table .el-switch.is-checked .el-switch__core {
-    background-color: #22c55e !important;
-    border-color: #22c55e !important;
+    background-color: var(--color-success-500) !important;
+    border-color: var(--color-success-500) !important;
   }
 
-  /* 汇总行背景 */
+  /* ── 汇总行背景 ─────────────────────────────────── */
   .el-table .is-summary-row > td.el-table__cell {
-    padding: 9px 0 !important;
-    font-weight: 600;
-    color: #1a1a2e;
-    background-color: #f0f4ff !important;
-    border-top: 1px solid #d0d8ef !important;
-    border-bottom: 1px solid #d0d8ef !important;
+    padding: 10px 0 !important;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-gray-800);
+    background-color: var(--color-primary-50) !important;
+    border-top: 1px solid var(--color-primary-200) !important;
+    border-bottom: 1px solid var(--color-primary-200) !important;
   }
 
-  /* 行 hover */
+  /* ── 行 hover ───────────────────────────────────── */
   .el-table .el-table__row {
-    transition: background-color 0.15s ease;
+    transition: background-color var(--transition-fast);
   }
 
   .el-table .el-table__row:hover > td.el-table__cell {
-    background-color: #f5f7fc !important;
+    background-color: var(--color-primary-50) !important;
   }
 
-  /* 服务状态徽标 */
+  /* ── 服务状态徽标 ───────────────────────────────── */
   .status-badge {
     display: inline-block;
-    padding: 2px 9px;
-    font-size: 12px;
-    font-weight: 500;
+    padding: 2px 10px;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
     line-height: 20px;
     white-space: nowrap;
     border: 1px solid transparent;
-    border-radius: 10px;
+    border-radius: var(--radius-full);
 
     &.status-success {
-      color: #67c23a;
-      background: #f0f9eb;
-      border-color: #c2e7b0;
+      color: var(--color-success-700);
+      background: var(--color-success-50);
+      border-color: var(--color-success-200);
     }
 
     &.status-danger {
-      color: #f56c6c;
-      background: #fef0f0;
-      border-color: #fab6b6;
+      color: var(--color-danger-700);
+      background: var(--color-danger-50);
+      border-color: var(--color-danger-200);
     }
 
     &.status-warning {
-      color: #e6a23c;
-      background: #fdf6ec;
-      border-color: #f5dab1;
+      color: var(--color-warning-700);
+      background: var(--color-warning-50);
+      border-color: var(--color-warning-200);
     }
 
     &.status-default {
-      color: #909399;
-      background: #f4f4f5;
-      border-color: #d3d4d6;
+      color: var(--color-gray-700);
+      background: var(--color-gray-50);
+      border-color: var(--color-gray-200);
     }
   }
 
-  /* 分页栏 */
+  /* ── 分页栏 ─────────────────────────────────────── */
   .pager-row {
     display: flex;
-    gap: 10px;
+    gap: var(--spacing-3);
     align-items: center;
     justify-content: flex-end;
-    padding: 8px 16px;
-    background-color: #fff;
-    border-top: 1px solid #f0f2f5;
+    padding: var(--spacing-2) var(--spacing-4);
+    background-color: var(--bg-card);
+    border-top: 1px solid var(--color-gray-100);
 
     .el-select .el-input__wrapper {
       height: 32px !important;
@@ -227,35 +230,35 @@
   }
 
   .total-count {
-    font-size: 13px;
-    color: #909399;
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-600);
     white-space: nowrap;
   }
 
-  /* 汇总行标签 */
+  /* ── 汇总行标签 ─────────────────────────────────── */
   .summary-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #303133;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-gray-800);
   }
 
-  /* 通用复制图标：默认隐藏，由各容器 hover 触发显示 */
+  /* ── 通用复制图标：默认隐藏，hover 触发显示 ──────── */
   .copy-icon {
     display: none;
     flex-shrink: 0;
-    font-size: 13px;
-    color: #909399;
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-500);
     cursor: pointer;
 
     &:hover {
-      color: #409eff;
+      color: var(--color-primary-600);
     }
   }
 
-  /* MSKU / 广告活动 / 广告组名称单元格：flex 布局，最多两行截断，复制图标对齐第一行尾部 */
+  /* ── MSKU / 广告活动 / 广告组名称单元格 ───────────── */
   .msku-cell {
     display: flex;
-    gap: 4px;
+    gap: var(--spacing-1);
     align-items: flex-start;
     padding: 2px 0;
   }
@@ -266,27 +269,27 @@
     overflow: hidden;
     -webkit-line-clamp: 2;
     line-clamp: 2;
-    font-size: 12px;
+    font-size: var(--font-size-xs);
     line-height: 1.5;
-    color: #409eff;
+    color: var(--color-primary-600);
     word-break: break-all;
     -webkit-box-orient: vertical;
   }
 
   .msku-text--dark {
-    color: #303133;
+    color: var(--color-gray-800);
   }
 
   .msku-cell:hover .copy-icon {
     display: inline-flex;
   }
 
-  /* 状态图标（与 detail/index.vue 标题区同一套：绿点 / 暂停 / 归档 X） */
+  /* ── 状态图标（绿点 / 暂停 / 归档 X）─────────────── */
   .campaign-state-icon {
     display: inline-flex;
     flex-shrink: 0;
     align-items: center;
-    font-size: 12px;
+    font-size: var(--font-size-xs);
     line-height: 1;
 
     .dot-circle {
@@ -299,25 +302,23 @@
     }
 
     .el-icon {
-      font-size: 13px;
+      font-size: var(--font-size-sm);
     }
 
     &.state-enabled {
-      color: #22c55e;
+      color: var(--color-success-500);
     }
 
     &.state-paused {
-      color: #9ca3af;
+      color: var(--color-gray-400);
     }
 
     &.state-archived {
-      color: #ef4444;
+      color: var(--color-danger-500);
     }
 
     &.state-unknown {
-      color: #c0c4cc;
+      color: var(--color-gray-300);
     }
   }
 }
-
-/* 此处为内联应用后的汇总行样式工作入口，上方 .ads-detail-panel 块内已包含实际定义 */
