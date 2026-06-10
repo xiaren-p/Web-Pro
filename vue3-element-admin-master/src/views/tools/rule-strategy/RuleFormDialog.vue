@@ -652,11 +652,13 @@
                 </el-button>
               </div>
             </div>
-            <el-form-item label="定位组" label-width="80px">
+            <!-- 定位组（AUTO） / 投放对象（MANUAL） -->
+            <el-form-item
+              :label="form.adType === 'manual' ? '投放对象' : '定位组'"
+              label-width="80px"
+            >
               <div class="field-setting-row">
-                <el-checkbox v-model="tba.unlimitedTargeting" :disabled="form.adType === 'manual'">
-                  不限
-                </el-checkbox>
+                <el-checkbox v-model="tba.unlimitedTargeting">不限</el-checkbox>
                 <el-select
                   v-model="tba.targetingGroups"
                   multiple
@@ -666,13 +668,19 @@
                   :max-collapse-tags="1"
                   tag-effect="dark"
                   style="flex: 1"
-                  placeholder="选择定位组类型"
-                  :disabled="tba.unlimitedTargeting || form.adType === 'manual'"
+                  :placeholder="form.adType === 'manual' ? '选择投放对象' : '选择定位组类型'"
+                  :disabled="tba.unlimitedTargeting"
                 >
-                  <el-option value="close_match" label="同类商品" />
-                  <el-option value="loose_match" label="紧密匹配" />
-                  <el-option value="substitutes" label="关联商品" />
-                  <el-option value="complements" label="宽泛匹配" />
+                  <template v-if="form.adType === 'manual'">
+                    <el-option value="keyword" label="关键词" />
+                    <el-option value="product_targeting" label="商品" />
+                  </template>
+                  <template v-else>
+                    <el-option value="close_match" label="同类商品" />
+                    <el-option value="loose_match" label="紧密匹配" />
+                    <el-option value="substitutes" label="关联商品" />
+                    <el-option value="complements" label="宽泛匹配" />
+                  </template>
                 </el-select>
               </div>
             </el-form-item>
