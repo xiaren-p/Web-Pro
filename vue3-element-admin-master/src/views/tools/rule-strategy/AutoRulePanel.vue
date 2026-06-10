@@ -152,9 +152,29 @@
                   <span class="condition-summary">{{ getRuleSummary(row) }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="160" align="center" fixed="right">
-                <template #default="{ row }">
+              <el-table-column label="操作" width="200" align="center" fixed="right">
+                <template #default="{ row, $index }">
                   <div class="action-buttons">
+                    <el-button
+                      link
+                      type="primary"
+                      size="small"
+                      :disabled="$index === 0"
+                      @click="moveRuleUp($index)"
+                    >
+                      <el-icon><Top /></el-icon>
+                      上移
+                    </el-button>
+                    <el-button
+                      link
+                      type="primary"
+                      size="small"
+                      :disabled="$index === filteredGroupRules.length - 1"
+                      @click="moveRuleDown($index)"
+                    >
+                      <el-icon><Bottom /></el-icon>
+                      下移
+                    </el-button>
                     <el-button link type="primary" size="small" @click="viewRuleDetail(row)">
                       查看
                     </el-button>
@@ -268,6 +288,8 @@ import {
   FolderOpened,
   Document,
   DocumentCopy,
+  Top,
+  Bottom,
 } from "@element-plus/icons-vue";
 import Sortable from "sortablejs";
 import {
@@ -571,6 +593,76 @@ async function removeRuleHandler(rule: AdRule): Promise<void> {
     ElMessage.success("已移除规则");
   } catch {
     ElMessage.error("移除失败，请重试");
+  }
+}
+
+async function moveRuleUp(index: number): Promise<void> {
+  if (index === 0 || !selectedGroup.value) return;
+
+  const rules = groupRulesOrdered.value;
+  const order = selectedGroup.value.ruleOrder || rules.map((r) => r.id);
+  const newOrder = [...order];
+
+  const ruleId = rules[index].id;
+  const prevRuleId = rules[index - 1].id;
+
+  const orderIndex = newOrder.indexOf(ruleId);
+  const prevOrderIndex = newOrder.indexOf(prevRuleId);
+
+  if (orderIndex !== -1 && prevOrderIndex !== -1) {
+    newOrder[orderIndex] = prevRuleId;
+    newOrder[prevOrderIndex] = ruleId;
+  } else {
+    newOrder.splice(index - 1, 2, ruleId, prevRuleId);
+  }
+
+  try {
+    loading.value = true;
+    const updated = await updateRuleOrder(selectedGroup.value.id, newOrder);
+    const groups = [...props.ruleGroups];
+    const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
+    if (idx !== -1) groups[idx] = updated;
+    emit("update:ruleGroups", groups);
+  } catch {
+    ElMessage.error("移动失败，请重试");
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function moveRuleDown(index: number): Promise<void> {
+  if (!selectedGroup.value) return;
+
+  const rules = groupRulesOrdered.value;
+  if (index === rules.length - 1) return;
+
+  const order = selectedGroup.value.ruleOrder || rules.map((r) => r.id);
+  const newOrder = [...order];
+
+  const ruleId = rules[index].id;
+  const nextRuleId = rules[index + 1].id;
+
+  const orderIndex = newOrder.indexOf(ruleId);
+  const nextOrderIndex = newOrder.indexOf(nextRuleId);
+
+  if (orderIndex !== -1 && nextOrderIndex !== -1) {
+    newOrder[orderIndex] = nextRuleId;
+    newOrder[nextOrderIndex] = ruleId;
+  } else {
+    newOrder.splice(index, 2, nextRuleId, ruleId);
+  }
+
+  try {
+    loading.value = true;
+    const updated = await updateRuleOrder(selectedGroup.value.id, newOrder);
+    const groups = [...props.ruleGroups];
+    const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
+    if (idx !== -1) groups[idx] = updated;
+    emit("update:ruleGroups", groups);
+  } catch {
+    ElMessage.error("移动失败，请重试");
+  } finally {
+    loading.value = false;
   }
 }
 

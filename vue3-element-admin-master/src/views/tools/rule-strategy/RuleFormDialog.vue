@@ -159,6 +159,7 @@
           <el-radio value="ad_group" :disabled="true">广告组（开发中）</el-radio>
           <el-radio value="search_terms">用户搜索词</el-radio>
           <el-radio value="targeting">投放</el-radio>
+          <el-radio value="negative_targeting">否定投放</el-radio>
         </el-radio-group>
 
         <!-- 投放子选项 -->
@@ -406,7 +407,7 @@
           </div>
           <div class="condition-set-days">
             <el-select
-              :model-value="cSet.days ? cSet.days + '天' : ''"
+              :model-value="cSet.days === 0 ? '生命周期' : cSet.days ? cSet.days + '天' : ''"
               style="width: 130px"
               size="small"
               placeholder="天数"
@@ -415,9 +416,11 @@
               default-first-option
               @update:model-value="(v: any) => handleCondDaysChange(cSet, v)"
             >
+              <el-option label="生命周期" :value="0" />
               <el-option v-for="d in COND_DAY_PRESETS" :key="d" :label="d + '天'" :value="d" />
             </el-select>
-            <span class="days-suffix">内全部满足才触发</span>
+            <span v-if="cSet.days !== 0" class="days-suffix">内全部满足才触发</span>
+            <span v-else class="days-suffix">使用规则生效天数为条件窗口</span>
           </div>
           <div class="conditions-list">
             <div v-for="(cond, condIdx) in cSet.conditions" :key="condIdx" class="condition-row">
@@ -432,7 +435,7 @@
                 "
               >
                 <el-option
-                  v-for="m in metricOptions"
+                  v-for="m in availableMetricOptions"
                   :key="m.value"
                   :label="m.label"
                   :value="m.value"
@@ -721,7 +724,9 @@
                   <div class="tba-cs-header">
                     <span>条件组 {{ csIdx + 1 }}</span>
                     <el-select
-                      :model-value="cSet.days ? cSet.days + '天' : ''"
+                      :model-value="
+                        cSet.days === 0 ? '生命周期' : cSet.days ? cSet.days + '天' : ''
+                      "
                       style="width: 110px"
                       size="small"
                       placeholder="天数"
@@ -730,6 +735,7 @@
                       default-first-option
                       @update:model-value="(v: any) => handleCondDaysChange(cSet, v)"
                     >
+                      <el-option label="生命周期" :value="0" />
                       <el-option
                         v-for="d in COND_DAY_PRESETS"
                         :key="d"
@@ -737,7 +743,9 @@
                         :value="d"
                       />
                     </el-select>
-                    <span style="font-size: 12px; color: #909399">内全部满足</span>
+                    <span style="font-size: 12px; color: #909399">
+                      {{ cSet.days !== 0 ? "内全部满足" : "使用生效天数" }}
+                    </span>
                   </div>
                   <div
                     v-for="(cond, condIdx) in cSet.conditions"
@@ -755,7 +763,7 @@
                       "
                     >
                       <el-option
-                        v-for="m in metricOptions"
+                        v-for="m in availableMetricOptions"
                         :key="m.value"
                         :label="m.label"
                         :value="m.value"
@@ -1140,6 +1148,44 @@
           </div>
         </el-form-item>
       </template>
+
+      <!-- D. 否定投放：仅显示其他操作 -->
+      <template v-else-if="form.comparisonTarget === 'negative_targeting'">
+        <el-alert
+          title="否定投放仅支持其他操作（暂停/归档）"
+          type="warning"
+          :closable="false"
+          show-icon
+          class="mb-4"
+        />
+
+        <el-form-item label="其他操作">
+          <div class="action-single-row">
+            <el-select
+              v-model="form.otherAction.type"
+              style="width: 200px"
+              placeholder="选择其他操作（可选）"
+              clearable
+            >
+              <el-option
+                v-for="opt in otherActionOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+            <template v-if="form.otherAction.type && form.otherAction.type !== 'no_other'">
+              <span class="action-limit-label">是否通知</span>
+              <el-switch
+                v-model="form.otherAction.notify"
+                active-text="通知"
+                inactive-text="不通知"
+                inline-prompt
+              />
+            </template>
+          </div>
+        </el-form-item>
+      </template>
     </el-form>
 
     <template #footer>
@@ -1295,6 +1341,18 @@ const metricOptions = [
   { value: "spendsPercent", label: "花费占比 (%)" },
   { value: "adsSalesPercent", label: "销售额占比 (%)" },
 ];
+
+/** 否定投放场景下的受限指标：花费、ACoS、广告销售额 */
+const negativeTargetingMetricOptions = [
+  { value: "spend", label: "花费" },
+  { value: "acos", label: "ACoS (%)" },
+  { value: "adsSales", label: "广告销售额" },
+];
+
+/** 当前条件组可用的指标（否定投放时受限） */
+const availableMetricOptions = computed(() =>
+  form.comparisonTarget === "negative_targeting" ? negativeTargetingMetricOptions : metricOptions
+);
 const operatorOptions = [
   { value: ">", label: ">" },
   { value: "<", label: "<" },
@@ -1514,7 +1572,13 @@ function handleDaysChange(val: string | number, which: "start" | "end") {
   }
 }
 function handleCondDaysChange(cSet: { days: number }, val: string | number) {
-  const num = Number(String(val).replace(/天$/, ""));
+  const str = String(val).replace(/天$/, "");
+  // "生命周期" 直接用 0
+  if (str === "生命周期" || Number(str) === 0) {
+    cSet.days = 0;
+    return;
+  }
+  const num = Number(str);
   if (!isNaN(num) && num > 0) cSet.days = num;
 }
 function isPercentMetric(m: string) {
