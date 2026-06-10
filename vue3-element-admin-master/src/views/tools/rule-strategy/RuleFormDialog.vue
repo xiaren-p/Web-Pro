@@ -677,21 +677,24 @@
               </div>
             </el-form-item>
 
-            <!-- 条件（可折叠） -->
+            <!-- 条件 -->
             <el-form-item label="条件" label-width="80px">
-              <el-button text type="primary" size="small" @click="toggleTbaConds(tba)">
-                <el-icon><View /></el-icon>
-                {{
-                  (tba as any)._showConds
-                    ? "收起条件"
-                    : "查看条件 (" +
-                      tba.conditionSets.reduce(
-                        (s: number, cs: any) => s + cs.conditions.length,
-                        0
-                      ) +
-                      " 条)"
-                }}
+              <el-button text type="primary" size="small" @click="addTbaCondition(tba)">
+                <el-icon><Plus /></el-icon>
+                添加条件
               </el-button>
+              <template v-if="hasTbaConditions(tba)">
+                <el-button
+                  text
+                  type="primary"
+                  size="small"
+                  style="margin-left: 8px"
+                  @click="toggleTbaConds(tba)"
+                >
+                  <el-icon><View /></el-icon>
+                  {{ (tba as any)._showConds ? "收起条件" : "查看条件" }}
+                </el-button>
+              </template>
             </el-form-item>
             <template v-if="(tba as any)._showConds">
               <div class="tba-conditions">
@@ -1413,6 +1416,17 @@ function removeTargetingBidAction(i: number) {
 }
 function clearTbaConditions(tba: any) {
   tba.conditionSets = [{ target: "campaign", days: 7, conditions: [] }];
+  tba._showConds = false;
+}
+
+function hasTbaConditions(tba: any): boolean {
+  return tba.conditionSets.some((cs: any) => cs.conditions?.length > 0);
+}
+
+function addTbaCondition(tba: any) {
+  if (!tba.conditionSets?.length)
+    tba.conditionSets = [{ target: "campaign", days: 7, conditions: [] }];
+  tba.conditionSets[0].conditions.push({ metric: "clicks", operator: ">", value: 1 });
 }
 
 function handleDaysChange(val: string | number, which: "start" | "end") {
