@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="isReadonly ? '查看规则' : isEdit ? '编辑规则' : '创建规则'"
+    :title="dialogTitle"
     width="1100px"
     destroy-on-close
     :close-on-click-modal="false"
@@ -1143,7 +1143,7 @@
     </el-form>
 
     <template #footer>
-      <el-button @click="visible = false">{{ isReadonly ? "关闭" : "取消" }}</el-button>
+      <el-button @click="visible = false">{{ footerCloseText }}</el-button>
       <el-button v-if="!isReadonly" type="primary" :loading="saving" @click="handleSubmit">
         {{ isEdit ? "保存" : "创建" }}
       </el-button>
@@ -1238,18 +1238,26 @@ function createEmptyForm(): RuleFormData {
   };
 }
 
-const visible = ref(false),
-  formRef = ref<any>(null),
-  isEdit = ref(false),
-  isReadonly = ref(false),
-  saving = ref(false);
+const visible = ref(false);
+const formRef = ref<any>(null);
+const isEdit = ref(false);
+const isReadonly = ref(false);
+const saving = ref(false);
+
+/** 对话框标题 */
+const dialogTitle = computed(() =>
+  isReadonly.value ? "查看规则" : isEdit.value ? "编辑规则" : "创建规则"
+);
+
+/** 底部关闭按钮文本 */
+const footerCloseText = computed(() => (isReadonly.value ? "关闭" : "取消"));
 const form = reactive<RuleFormData>(createEmptyForm());
 
-const shopOptions = ref<any[]>([]),
-  managerOptions = ref<any[]>([]),
-  assortOptions = ref<{ value: string; label: string }[]>([]),
-  labelOptions = ref<{ value: string; label: string }[]>([]),
-  timeRuleOptions = ref<any[]>([]);
+const shopOptions = ref<any[]>([]);
+const managerOptions = ref<any[]>([]);
+const assortOptions = ref<{ value: string; label: string }[]>([]);
+const labelOptions = ref<{ value: string; label: string }[]>([]);
+const timeRuleOptions = ref<any[]>([]);
 
 const filteredShopOptions = computed(() =>
   !shopSearch.value
