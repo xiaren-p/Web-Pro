@@ -376,11 +376,11 @@
             </el-button>
           </div>
           <!-- 条件对象（投放/搜索词场景） -->
-          <div v-if="showCondTarget" class="condition-set-target">
+          <div v-if="showCondTarget" class="condition-set-days">
             <span class="target-label">条件对象</span>
             <el-select
               :model-value="cSet.target || 'campaign'"
-              style="width: 160px"
+              style="width: 140px"
               size="small"
               @update:model-value="
                 (v: any) => {
@@ -1123,9 +1123,7 @@ function blankTba(): TargetingBidAction & { _showConds?: boolean } {
   return {
     targetingGroups: [],
     unlimitedTargeting: false,
-    conditionSets: [
-      { target: "campaign", days: 7, conditions: [{ metric: "acos", operator: ">", value: 30 }] },
-    ],
+    conditionSets: [{ target: "campaign", days: 7, conditions: [] }],
     bidAction: { type: "", value: 0, limit: null },
     _showConds: false,
   };
