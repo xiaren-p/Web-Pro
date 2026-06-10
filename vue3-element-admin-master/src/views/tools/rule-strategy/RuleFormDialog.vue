@@ -305,9 +305,11 @@
       >
         <template #default>
           <p>
-            条件组之间为
-            <b>或</b>
-            关系（逐组匹配，命中即停），组内条件为
+            所有条件组必须
+            <b>全部满足</b>
+            才会执行（
+            <b>并</b>
+            关系），组内条件同样为
             <b>并</b>
             关系（全部满足才触发）。
           </p>
@@ -362,9 +364,6 @@
         <div v-for="(cSet, csIdx) in form.conditionSets" :key="csIdx" class="condition-set-card">
           <div class="condition-set-header">
             <span class="condition-set-label">条件组 {{ csIdx + 1 }}</span>
-            <el-tag v-if="form.conditionSets.length > 1" type="info" size="small" effect="plain">
-              {{ csIdx === 0 ? "优先匹配" : "备选" }}
-            </el-tag>
             <el-button
               v-if="form.conditionSets.length > 1"
               text
@@ -375,6 +374,28 @@
               <el-icon><Delete /></el-icon>
               删除
             </el-button>
+          </div>
+          <!-- 条件对象（投放/搜索词场景） -->
+          <div v-if="showCondTarget" class="condition-set-target">
+            <span class="target-label">条件对象</span>
+            <el-select
+              :model-value="cSet.target || 'campaign'"
+              style="width: 160px"
+              size="small"
+              @update:model-value="
+                (v: any) => {
+                  cSet.target = v;
+                }
+              "
+            >
+              <el-option
+                v-for="o in getCondTargetOpts()"
+                :key="o.value"
+                :label="o.label"
+                :value="o.value"
+                :disabled="o.disabled"
+              />
+            </el-select>
           </div>
           <div class="condition-set-days">
             <el-select
@@ -393,28 +414,6 @@
           </div>
           <div class="conditions-list">
             <div v-for="(cond, condIdx) in cSet.conditions" :key="condIdx" class="condition-row">
-              <!-- 条件对象（仅投放/搜索词显示） -->
-              <template v-if="showCondTarget">
-                <el-select
-                  :model-value="cond.target || 'campaign'"
-                  style="width: 140px"
-                  size="small"
-                  placeholder="对象"
-                  @update:model-value="
-                    (v: any) => {
-                      cond.target = v;
-                    }
-                  "
-                >
-                  <el-option
-                    v-for="o in getCondTargetOpts()"
-                    :key="o.value"
-                    :label="o.label"
-                    :value="o.value"
-                    :disabled="o.disabled"
-                  />
-                </el-select>
-              </template>
               <el-select
                 v-model="cond.metric"
                 style="width: 140px"
@@ -1769,7 +1768,7 @@ defineExpose({ open });
 
 .tba-card-label {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--el-text-color-primary);
 }
 

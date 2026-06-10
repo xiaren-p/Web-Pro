@@ -323,13 +323,13 @@ async function onFormSaved(data: AdRule): Promise<void> {
 
 .draft-condition-box {
   padding: 10px 14px;
-  background: var(--el-fill-color-lighter);
-  border-radius: 6px;
   font-size: 13px;
+  line-height: 1.5;
   color: var(--el-color-primary);
   word-break: break-all;
   white-space: pre-line;
-  line-height: 1.5;
+  background: var(--el-fill-color-lighter);
+  border-radius: 6px;
 }
 
 .draft-action-box {

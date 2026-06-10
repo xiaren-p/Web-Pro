@@ -388,8 +388,8 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
     background 0.2s;
 
   &:hover {
-    border-color: var(--el-color-primary-light-5);
     background: var(--el-color-primary-light-9);
+    border-color: var(--el-color-primary-light-5);
   }
 }
 
@@ -456,8 +456,8 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 14px;
   padding-bottom: 10px;
+  margin-bottom: 14px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
