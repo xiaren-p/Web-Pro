@@ -1347,6 +1347,7 @@ const negativeTargetingMetricOptions = [
   { value: "spend", label: "花费" },
   { value: "acos", label: "ACoS (%)" },
   { value: "adsSales", label: "广告销售额" },
+  { value: "orders", label: "订单" },
 ];
 
 /** 当前条件组可用的指标（否定投放时受限） */
