@@ -8,8 +8,28 @@ export interface ConditionWithRange {
 }
 
 export interface RuleConditionSet {
+  /** 条件对象：campaign(广告活动实体)、ad_group(广告组实体)、targeting(投放实体)、search_term(搜索词实体) */
+  target: string;
   days: number;
   conditions: ConditionWithRange[];
+}
+
+/** 投放/搜索词 条件对象选项 */
+export function getConditionTargetOptions(
+  comparisonTarget: string
+): { value: string; label: string; disabled?: boolean }[] {
+  if (comparisonTarget === "search_terms") {
+    return [
+      { value: "campaign", label: "广告活动实体" },
+      { value: "ad_group", label: "广告组实体", disabled: true },
+      { value: "search_term", label: "搜索词实体" },
+    ];
+  }
+  return [
+    { value: "campaign", label: "广告活动实体" },
+    { value: "ad_group", label: "广告组实体", disabled: true },
+    { value: "targeting", label: "投放实体" },
+  ];
 }
 
 export interface RuleAction {

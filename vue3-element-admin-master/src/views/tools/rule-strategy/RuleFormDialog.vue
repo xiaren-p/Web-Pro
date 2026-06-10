@@ -377,6 +377,28 @@
             </el-button>
           </div>
           <div class="condition-set-days">
+            <span class="condition-target-label">条件对象</span>
+            <el-select
+              :model-value="(cSet as any).target || 'campaign'"
+              style="width: 140px"
+              size="small"
+              placeholder="条件对象"
+              @update:model-value="
+                (v: any) => {
+                  (cSet as any).target = v;
+                }
+              "
+            >
+              <el-option
+                v-for="o in getCondTargetOpts()"
+                :key="o.value"
+                :label="o.label"
+                :value="o.value"
+                :disabled="o.disabled"
+              />
+            </el-select>
+          </div>
+          <div class="condition-set-days">
             <el-select
               :model-value="cSet.days ? cSet.days + '天' : ''"
               style="width: 130px"
@@ -608,7 +630,7 @@
           class="mb-4"
         />
 
-        <!-- C. 投放竞价操作（可添加多条） -->
+        <!-- C. 投放竞价操作 -->
         <div class="tba-section">
           <div class="tba-header">
             <span class="tba-title">投放竞价操作</span>
@@ -620,16 +642,16 @@
           <div v-for="(tba, idx) in form.targetingBidActions" :key="idx" class="tba-card">
             <div class="tba-card-header">
               <span class="tba-card-label">投放竞价 {{ idx + 1 }}</span>
-              <el-button
-                v-if="form.targetingBidActions.length > 1"
-                text
-                type="danger"
-                size="small"
-                @click="removeTargetingBidAction(idx)"
-              >
-                <el-icon><Delete /></el-icon>
-                删除
-              </el-button>
+              <div class="tba-card-header-actions">
+                <el-button text size="small" @click="clearTbaConditions(tba)">
+                  <el-icon><Delete /></el-icon>
+                  清空条件
+                </el-button>
+                <el-button text type="danger" size="small" @click="removeTargetingBidAction(idx)">
+                  <el-icon><Delete /></el-icon>
+                  删除
+                </el-button>
+              </div>
             </div>
             <el-form-item label="定位组" label-width="80px">
               <div class="field-setting-row">
@@ -767,6 +789,7 @@
                   style="margin-top: 4px"
                   @click="
                     tba.conditionSets.push({
+                      target: 'campaign',
                       days: 7,
                       conditions: [{ metric: 'acos', operator: '>', value: 30 }],
                     })
@@ -840,9 +863,9 @@
           </div>
         </div>
 
-        <!-- 广告组默认竞价操作（开发中） -->
+        <!-- 广告组默认竞价（开发中） -->
         <el-form-item label="广告组竞价">
-          <el-select style="width: 280px" placeholder="广告组默认竞价操作（开发中）" disabled>
+          <el-select style="width: 280px" placeholder="广告组默认竞价（开发中）" disabled>
             <el-option label="开发中，敬请期待" value="" />
           </el-select>
         </el-form-item>
@@ -1101,7 +1124,9 @@ function blankTba(): TargetingBidAction & { _showConds?: boolean } {
   return {
     targetingGroups: [],
     unlimitedTargeting: false,
-    conditionSets: [{ days: 7, conditions: [{ metric: "acos", operator: ">", value: 30 }] }],
+    conditionSets: [
+      { target: "campaign", days: 7, conditions: [{ metric: "acos", operator: ">", value: 30 }] },
+    ],
     bidAction: { type: "", value: 0, limit: null },
     _showConds: false,
   };
@@ -1121,17 +1146,19 @@ function createEmptyForm(): RuleFormData {
     effectiveStartDay: "",
     effectiveEnd: "",
     effectiveEndDay: "",
-    comparisonTarget: "",
+    comparisonTarget: "campaign",
     comparisonMultiTargets: [],
     categories: [],
-    unlimitedCategories: false,
+    unlimitedCategories: true,
     managers: [],
-    unlimitedManagers: false,
+    unlimitedManagers: true,
     tags: [],
-    unlimitedTags: false,
+    unlimitedTags: true,
     autoTargetingGroups: [],
-    unlimitedAutoTargeting: false,
-    conditionSets: [{ days: 30, conditions: [{ metric: "acos", operator: ">", value: 30 }] }],
+    unlimitedAutoTargeting: true,
+    conditionSets: [
+      { target: "campaign", days: 30, conditions: [{ metric: "acos", operator: ">", value: 30 }] },
+    ],
     linkedTimeRules: [],
     linkedTimeRulesExclude: [],
     targetingBidActions: [],
@@ -1206,8 +1233,6 @@ const bidActionOptions = [
 const budgetActionOptions = [
   { value: "budget_increase", label: "广告活动预算增加" },
   { value: "budget_decrease", label: "广告活动预算减少" },
-  { value: "ad_group_bid_increase", label: "广告组默认竞价增加" },
-  { value: "ad_group_bid_decrease", label: "广告组默认竞价减少" },
   { value: "no_adjust", label: "不调整" },
 ];
 const otherActionOptions = [
@@ -1241,9 +1266,21 @@ function onTargetChange(): void {
   form.comparisonMultiTargets = [];
   form.otherAction = { type: "", notify: true };
   form.targetingBidActions = [];
-  if (form.comparisonTarget === "campaign" && form.targetingBidActions.length === 0) {
-    form.targetingBidActions.push(blankTba() as any);
+}
+
+function getCondTargetOpts() {
+  if (form.comparisonTarget === "search_terms") {
+    return [
+      { value: "campaign", label: "广告活动实体" },
+      { value: "ad_group", label: "广告组实体", disabled: true },
+      { value: "search_term", label: "搜索词实体" },
+    ];
   }
+  return [
+    { value: "campaign", label: "广告活动实体" },
+    { value: "ad_group", label: "广告组实体", disabled: true },
+    { value: "targeting", label: "投放实体" },
+  ];
 }
 function onBidActionClear() {
   if (!form.bidAction.type) {
@@ -1266,6 +1303,7 @@ const formRules = {
       trigger: "change",
     },
   ],
+  comparisonTarget: [{ required: true, message: "请选择比对对象", trigger: "change" }],
 };
 
 const ORDERED_OPS: Record<string, number> = { ">": 1, ">=": 2, "<=": 3, "<": 4 };
@@ -1333,7 +1371,11 @@ function onSelectChange(values: any[], options: any[], field: string): void {
 }
 
 function addConditionSet() {
-  form.conditionSets.push({ days: 30, conditions: [{ metric: "acos", operator: ">", value: 30 }] });
+  form.conditionSets.push({
+    target: "campaign",
+    days: 30,
+    conditions: [{ metric: "acos", operator: ">", value: 30 }],
+  });
 }
 function removeConditionSet(i: number) {
   if (form.conditionSets.length > 1) form.conditionSets.splice(i, 1);
@@ -1367,6 +1409,9 @@ function toggleTbaConds(tba: any) {
 function removeTargetingBidAction(i: number) {
   form.targetingBidActions.splice(i, 1);
 }
+function clearTbaConditions(tba: any) {
+  tba.conditionSets = [{ target: "campaign", days: 7, conditions: [] }];
+}
 
 function handleDaysChange(val: string | number, which: "start" | "end") {
   const num = Number(String(val).replace(/天$/, ""));
@@ -1399,9 +1444,6 @@ function open(data?: Partial<RuleFormData> | null): void {
       t._showConds = false;
     });
     Object.assign(form, raw);
-    if (form.targetingBidActions.length === 0 && form.comparisonTarget === "campaign") {
-      form.targetingBidActions.push(blankTba() as any);
-    }
   }
   visible.value = true;
   loadOptions();
@@ -1588,6 +1630,13 @@ defineExpose({ open });
   border: 1px solid #d6e4ff;
   border-radius: 8px;
 }
+
+.condition-target-label {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #606266;
+}
 .days-suffix {
   font-size: 13px;
   font-weight: 500;
@@ -1670,6 +1719,11 @@ defineExpose({ open });
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
+}
+.tba-card-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 .tba-card-label {
   font-size: 13px;

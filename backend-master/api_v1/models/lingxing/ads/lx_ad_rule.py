@@ -70,6 +70,7 @@ class LxAdRule(models.Model):
     ad_type = models.CharField(
         max_length=20,
         default="all",
+        blank=True,
         verbose_name="广告类型",
         help_text="all：不限 / manual：手动 / auto：自动",
     )
