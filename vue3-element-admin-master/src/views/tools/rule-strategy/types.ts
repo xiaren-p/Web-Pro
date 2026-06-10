@@ -1,4 +1,6 @@
 export interface ConditionWithRange {
+  /** 条件对象：仅投放/search_terms 时需要，campaign/ad_group 不需要 */
+  target?: string;
   metric: string;
   operator: string;
   value: number;
@@ -8,13 +10,11 @@ export interface ConditionWithRange {
 }
 
 export interface RuleConditionSet {
-  /** 条件对象：campaign(广告活动实体)、ad_group(广告组实体)、targeting(投放实体)、search_term(搜索词实体) */
-  target: string;
   days: number;
   conditions: ConditionWithRange[];
 }
 
-/** 投放/搜索词 条件对象选项 */
+/** 条件对象选项（仅投放/搜索词场景显示） */
 export function getConditionTargetOptions(
   comparisonTarget: string
 ): { value: string; label: string; disabled?: boolean }[] {

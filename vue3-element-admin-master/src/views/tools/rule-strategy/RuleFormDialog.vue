@@ -377,28 +377,6 @@
             </el-button>
           </div>
           <div class="condition-set-days">
-            <span class="condition-target-label">条件对象</span>
-            <el-select
-              :model-value="(cSet as any).target || 'campaign'"
-              style="width: 140px"
-              size="small"
-              placeholder="条件对象"
-              @update:model-value="
-                (v: any) => {
-                  (cSet as any).target = v;
-                }
-              "
-            >
-              <el-option
-                v-for="o in getCondTargetOpts()"
-                :key="o.value"
-                :label="o.label"
-                :value="o.value"
-                :disabled="o.disabled"
-              />
-            </el-select>
-          </div>
-          <div class="condition-set-days">
             <el-select
               :model-value="cSet.days ? cSet.days + '天' : ''"
               style="width: 130px"
@@ -415,6 +393,28 @@
           </div>
           <div class="conditions-list">
             <div v-for="(cond, condIdx) in cSet.conditions" :key="condIdx" class="condition-row">
+              <!-- 条件对象（仅投放/搜索词显示） -->
+              <template v-if="showCondTarget">
+                <el-select
+                  :model-value="cond.target || 'campaign'"
+                  style="width: 140px"
+                  size="small"
+                  placeholder="对象"
+                  @update:model-value="
+                    (v: any) => {
+                      cond.target = v;
+                    }
+                  "
+                >
+                  <el-option
+                    v-for="o in getCondTargetOpts()"
+                    :key="o.value"
+                    :label="o.label"
+                    :value="o.value"
+                    :disabled="o.disabled"
+                  />
+                </el-select>
+              </template>
               <el-select
                 v-model="cond.metric"
                 style="width: 140px"
@@ -789,7 +789,6 @@
                   style="margin-top: 4px"
                   @click="
                     tba.conditionSets.push({
-                      target: 'campaign',
                       days: 7,
                       conditions: [{ metric: 'acos', operator: '>', value: 30 }],
                     })
@@ -1124,9 +1123,7 @@ function blankTba(): TargetingBidAction & { _showConds?: boolean } {
   return {
     targetingGroups: [],
     unlimitedTargeting: false,
-    conditionSets: [
-      { target: "campaign", days: 7, conditions: [{ metric: "acos", operator: ">", value: 30 }] },
-    ],
+    conditionSets: [{ days: 7, conditions: [{ metric: "acos", operator: ">", value: 30 }] }],
     bidAction: { type: "", value: 0, limit: null },
     _showConds: false,
   };
@@ -1156,9 +1153,7 @@ function createEmptyForm(): RuleFormData {
     unlimitedTags: true,
     autoTargetingGroups: [],
     unlimitedAutoTargeting: true,
-    conditionSets: [
-      { target: "campaign", days: 30, conditions: [{ metric: "acos", operator: ">", value: 30 }] },
-    ],
+    conditionSets: [{ days: 30, conditions: [{ metric: "acos", operator: ">", value: 30 }] }],
     linkedTimeRules: [],
     linkedTimeRulesExclude: [],
     targetingBidActions: [],
@@ -1199,6 +1194,11 @@ const showAutoTargetingField = computed(
     form.adType === "auto" &&
     form.comparisonTarget === "targeting" &&
     form.comparisonMultiTargets.includes("targeting")
+);
+
+/** 是否在每个条件前显示条件对象下拉（仅投放/搜索词） */
+const showCondTarget = computed(() =>
+  ["targeting", "search_terms"].includes(form.comparisonTarget)
 );
 
 const metricOptions = [
@@ -1372,7 +1372,6 @@ function onSelectChange(values: any[], options: any[], field: string): void {
 
 function addConditionSet() {
   form.conditionSets.push({
-    target: "campaign",
     days: 30,
     conditions: [{ metric: "acos", operator: ">", value: 30 }],
   });
@@ -1410,7 +1409,7 @@ function removeTargetingBidAction(i: number) {
   form.targetingBidActions.splice(i, 1);
 }
 function clearTbaConditions(tba: any) {
-  tba.conditionSets = [{ target: "campaign", days: 7, conditions: [] }];
+  tba.conditionSets = [{ days: 7, conditions: [] }];
 }
 
 function handleDaysChange(val: string | number, which: "start" | "end") {
@@ -1478,8 +1477,10 @@ defineExpose({ open });
   max-height: 65vh;
   padding-right: 8px;
   overflow-y: auto;
+
   :deep(.el-divider) {
     margin: 20px 0 16px;
+
     .el-divider__text {
       font-size: 13px;
       font-weight: 700;
@@ -1487,24 +1488,29 @@ defineExpose({ open });
       background: #fff;
     }
   }
+
   :deep(.el-form-item) {
-    margin-bottom: 18px;
+    margin-bottom: 20px;
   }
+
   :deep(.el-form-item__label) {
     font-size: 13px;
     font-weight: 500;
     line-height: 32px;
     color: #374151;
   }
+
   :deep(.el-input__wrapper) {
     border-radius: 6px;
     transition:
       box-shadow 0.2s,
       border-color 0.2s;
   }
+
   :deep(.el-select .el-input__wrapper.is-focus) {
     box-shadow: 0 0 0 1px #409eff inset;
   }
+
   :deep(.el-input-number .el-input__wrapper.is-focus) {
     box-shadow: 0 0 0 1px #409eff inset;
   }
@@ -1517,29 +1523,34 @@ defineExpose({ open });
   gap: 8px;
   align-items: center;
 }
+
 .fx-label,
 .fx-hint {
   font-size: 13px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   white-space: nowrap;
 }
+
 .fx-sep {
   font-size: 13px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
+
 .effective-date-row {
   display: flex;
   gap: 8px;
   align-items: center;
 }
+
 .date-sep {
   font-size: 13px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
+
 .effective-date-hint {
   margin-left: 4px;
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   white-space: nowrap;
 }
 
@@ -1547,45 +1558,53 @@ defineExpose({ open });
 .form-hint {
   margin-left: 10px;
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   white-space: nowrap;
 }
+
 .field-setting-row {
   display: flex;
   gap: 8px;
   align-items: center;
   width: 100%;
 }
+
 .comparison-radios {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
 }
+
 .targeting-sub-row {
   display: flex;
   gap: 16px;
   align-items: center;
-  padding: 12px 16px;
+  padding: 14px 16px;
   margin-top: 10px;
-  background: #fafbfc;
-  border: 1px solid #ebeef5;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: 8px;
 }
+
 .comparison-checkboxes {
   display: flex;
   gap: 16px;
 }
+
 .rule-relation-alert {
   margin: 8px 0 4px;
+
   :deep(.el-alert__title) {
     font-size: 13px;
   }
+
   p {
     margin: 2px 0;
     font-size: 12px;
     line-height: 1.6;
   }
 }
+
 .mb-4 {
   margin-bottom: 16px;
 }
@@ -1594,156 +1613,183 @@ defineExpose({ open });
 .condition-sets {
   margin-top: 10px;
 }
+
 .condition-set-card {
-  padding: 18px 20px;
+  padding: 16px 20px;
   margin-bottom: 12px;
-  background: #fafbfc;
-  border: 1px solid #ebeef5;
-  border-radius: 10px;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   transition:
     border-color 0.2s,
     box-shadow 0.2s;
+
   &:hover {
-    border-color: #c6ddfc;
-    box-shadow: 0 2px 12px rgba(64, 158, 255, 0.06);
+    border-color: var(--el-color-primary-light-5);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   }
 }
+
 .condition-set-header {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   margin-bottom: 14px;
 }
+
 .condition-set-label {
   flex: 1;
   font-size: 14px;
-  font-weight: 700;
-  color: #1f2937;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
+
 .condition-set-days {
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 10px 14px;
-  margin-bottom: 14px;
-  background: #f0f5ff;
-  border: 1px solid #d6e4ff;
-  border-radius: 8px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  background: var(--el-color-primary-light-9);
+  border: 1px solid var(--el-color-primary-light-7);
+  border-radius: 6px;
 }
 
 .condition-target-label {
   flex-shrink: 0;
   font-size: 13px;
   font-weight: 500;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
+
 .days-suffix {
   font-size: 13px;
   font-weight: 500;
-  color: #409eff;
+  color: var(--el-color-primary);
   white-space: nowrap;
 }
+
 .conditions-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 12px;
 }
+
 .condition-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   padding: 8px 12px;
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  transition: border-color 0.15s;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  transition: border-color 0.2s;
+
   &:hover {
-    border-color: #d6e4ff;
+    border-color: var(--el-color-primary-light-5);
   }
 }
+
 .range-placeholder {
   min-width: 20px;
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   text-align: center;
 }
+
 .range-var {
   display: inline-block;
   padding: 2px 10px;
   font-size: 12px;
   font-weight: 600;
-  color: #409eff;
-  background: #ecf5ff;
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
   border-radius: 4px;
 }
+
 .conflict-alert {
   margin-top: 6px;
+
   :deep(.el-alert__title) {
     font-size: 12px;
   }
 }
+
 .add-set-btn {
   margin-top: 4px;
 }
+
 .input-suffix {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 // 投放竞价操作
 .tba-section {
   margin-bottom: 18px;
 }
+
 .tba-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
 }
+
 .tba-title {
   font-size: 14px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--el-text-color-primary);
 }
+
 .tba-card {
-  padding: 18px 20px;
+  padding: 16px 20px;
   margin-bottom: 12px;
-  background: #fafbfc;
-  border: 1px solid #ebeef5;
-  border-radius: 10px;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
+
 .tba-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
 }
+
 .tba-card-header-actions {
   display: flex;
   gap: 8px;
   align-items: center;
 }
+
 .tba-card-label {
   font-size: 13px;
   font-weight: 700;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
+
 .tba-conditions {
-  padding: 10px 16px;
+  padding: 12px 16px;
   margin: 8px 0;
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
 }
+
 .tba-condition-set {
   padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+
   &:last-child {
     border-bottom: none;
   }
 }
+
 .tba-cs-header {
   display: flex;
   gap: 8px;
@@ -1751,26 +1797,28 @@ defineExpose({ open });
   margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 // 执行操作
 .action-single-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
+
 .action-unit {
   font-size: 13px;
   font-weight: 500;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
+
 .action-limit-label {
   margin-left: 4px;
   font-size: 13px;
   font-weight: 500;
-  color: #606266;
+  color: var(--el-text-color-regular);
   white-space: nowrap;
 }
 
@@ -1778,23 +1826,26 @@ defineExpose({ open });
 .keyword-add-panel {
   padding: 14px 18px;
   margin-top: 10px;
-  background: #fafbfc;
-  border: 1px solid #ebeef5;
-  border-radius: 10px;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
 }
+
 .kadd-row {
   display: flex;
   gap: 10px;
   align-items: center;
   margin-bottom: 10px;
+
   &:last-child {
     margin-bottom: 0;
   }
 }
+
 .kadd-label {
   flex-shrink: 0;
   width: 72px;
   font-size: 13px;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 </style>

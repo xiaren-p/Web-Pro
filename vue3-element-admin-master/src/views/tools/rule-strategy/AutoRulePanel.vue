@@ -360,7 +360,7 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .group-panel-title {
@@ -382,12 +382,14 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   margin-bottom: 4px;
   cursor: pointer;
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--el-border-radius-base);
-  transition: all 0.25s;
+  border-radius: 6px;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
 
   &:hover {
-    background: var(--el-color-primary-light-9);
     border-color: var(--el-color-primary-light-5);
+    background: var(--el-color-primary-light-9);
   }
 }
 
@@ -454,7 +456,9 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .section-title {
@@ -464,12 +468,12 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
 }
 
 .section-hint {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--el-text-color-secondary);
 }
 
 .empty-hint {
-  padding: 30px 0;
+  padding: 32px 0;
   font-size: 13px;
   color: var(--el-text-color-placeholder);
   text-align: center;
@@ -480,11 +484,12 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 10px 14px;
+  padding: 12px 14px;
   margin-bottom: 6px;
+  background: var(--el-bg-color-overlay);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--el-border-radius-base);
-  transition: border-color 0.25s;
+  border-radius: 8px;
+  transition: border-color 0.2s;
 
   &:hover {
     border-color: var(--el-color-primary-light-5);
@@ -502,7 +507,7 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   font-weight: 600;
   color: var(--el-color-primary);
   background: var(--el-color-primary-light-9);
-  border-radius: var(--el-border-radius-base);
+  border-radius: 6px;
 }
 
 .group-rule-info {
@@ -539,11 +544,13 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 12px 14px;
   margin-bottom: 4px;
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--el-border-radius-base);
-  transition: all 0.25s;
+  border-radius: 6px;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
 
   &:hover {
     border-color: var(--el-color-primary-light-5);
@@ -576,7 +583,7 @@ function isRuleInCurrentGroup(ruleId: string): boolean {
   font-size: 12px;
   color: var(--el-color-primary);
   background: var(--el-color-primary-light-9);
-  border-radius: var(--el-border-radius-base);
+  border-radius: 4px;
 }
 
 // ── 弹窗内 ──

@@ -257,7 +257,7 @@ async function onFormSaved(data: AdRule): Promise<void> {
 }
 
 .draft-empty {
-  padding: 40px 0;
+  padding: 60px 0;
 }
 
 .draft-list {
@@ -267,20 +267,20 @@ async function onFormSaved(data: AdRule): Promise<void> {
 }
 
 .draft-card {
-  padding: 16px 20px;
-  background: var(--el-bg-color);
+  padding: 20px 20px;
+  background: var(--el-bg-color-overlay);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--el-border-radius-base);
-  transition: box-shadow 0.25s;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s;
 
   &:hover {
-    box-shadow: var(--el-box-shadow-light);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   }
 }
 
-// ── 卡片头部 ──
 .draft-card-header {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .draft-card-title-row {
@@ -290,7 +290,7 @@ async function onFormSaved(data: AdRule): Promise<void> {
 }
 
 .draft-card-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
@@ -301,12 +301,10 @@ async function onFormSaved(data: AdRule): Promise<void> {
   gap: 8px;
 }
 
-// ── 元信息 ──
 .draft-meta-grid {
   display: flex;
-  gap: 20px;
+  gap: 24px;
   font-size: 13px;
-  color: var(--el-text-color-regular);
 }
 
 .draft-meta-item {
@@ -323,53 +321,38 @@ async function onFormSaved(data: AdRule): Promise<void> {
   color: var(--el-text-color-regular);
 }
 
-// ── 条件规则 ──
 .draft-condition-box {
-  display: flex;
-  gap: 6px;
-  padding: 8px 12px;
-  background: var(--el-fill-color-light);
-  border-radius: var(--el-border-radius-base);
-}
-
-.draft-condition-label {
-  flex-shrink: 0;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.draft-condition-text {
+  padding: 10px 14px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 6px;
   font-size: 13px;
   color: var(--el-color-primary);
   word-break: break-all;
   white-space: pre-line;
+  line-height: 1.5;
 }
 
-// ── 执行操作 ──
 .draft-action-box {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
+  font-size: 13px;
 }
 
 .draft-action-label {
-  flex-shrink: 0;
-  font-size: 13px;
   color: var(--el-text-color-secondary);
 }
 
 .draft-action-value {
-  font-size: 13px;
   font-weight: 500;
   color: var(--el-color-warning);
 }
 
-// ── 尾部 ──
 .draft-card-footer {
   display: flex;
   gap: 8px;
-  padding-top: 12px;
-  margin-top: 12px;
+  padding-top: 14px;
+  margin-top: 14px;
   border-top: 1px solid var(--el-border-color-lighter);
 }
 </style>

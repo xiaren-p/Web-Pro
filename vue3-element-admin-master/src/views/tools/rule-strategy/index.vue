@@ -1,33 +1,21 @@
 <template>
-  <div class="rule-strategy-page">
-    <!-- 标题栏 -->
-    <div class="page-title">
-      <div class="title-left">
-        <el-icon size="20">
-          <Setting />
-        </el-icon>
-        <h2 class="title-text">SP 广告规则策略</h2>
-      </div>
-      <div class="title-right">
-        <span class="stat">
-          <strong>{{ ruleGroups.length }}</strong>
-          规则组
-        </span>
-        <span class="stat-divider">|</span>
-        <span class="stat">
-          <strong>{{ ruleGroups.reduce((s, g) => s + g.rules.length, 0) }}</strong>
-          生效规则
-        </span>
-        <span class="stat-divider">|</span>
-        <span class="stat">
-          <strong>{{ draftRules.length }}</strong>
-          草稿
+  <div class="app-container">
+    <!-- 标题行 -->
+    <div class="page-header">
+      <div class="page-header__left">
+        <el-icon size="18" color="var(--el-color-primary)"><Setting /></el-icon>
+        <h2 class="page-header__title">SP 广告规则策略</h2>
+        <span class="page-header__divider">|</span>
+        <span class="page-header__stat">
+          {{ ruleGroups.length }} 规则组 ·
+          {{ ruleGroups.reduce((s, g) => s + g.rules.length, 0) }} 生效规则 ·
+          {{ draftRules.length }} 草稿
         </span>
       </div>
     </div>
 
     <!-- Tab -->
-    <el-tabs v-model="activeTab" class="rule-tabs">
+    <el-tabs v-model="activeTab">
       <el-tab-pane label="自动规则" name="auto">
         <AutoRulePanel
           :rules="draftRules"
@@ -80,59 +68,31 @@ onMounted(loadRuleData);
 </script>
 
 <style scoped lang="scss">
-.rule-strategy-page {
-  padding: 0;
-}
-
-.page-title {
+.page-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-bottom: 14px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-}
+  margin-bottom: 20px;
 
-.title-left {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  color: var(--el-color-primary);
-}
-
-.title-text {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.title-right {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-
-.stat strong {
-  margin-right: 2px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.stat-divider {
-  color: var(--el-border-color);
-}
-
-.rule-tabs {
-  :deep(.el-tabs__header) {
-    margin-bottom: 16px;
+  &__left {
+    display: flex;
+    gap: 8px;
+    align-items: center;
   }
 
-  :deep(.el-tabs__nav-wrap::after) {
-    height: 1px;
+  &__title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+  }
+
+  &__divider {
+    color: var(--el-border-color);
+  }
+
+  &__stat {
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
   }
 }
 </style>
