@@ -88,18 +88,10 @@
                 borderBottom: '1px solid var(--el-border-color-lighter)',
               }"
             >
-              <el-table-column prop="weight" label="权重" width="100" align="center">
-                <template #default="{ row, $index }">
-                  <div class="weight-cell">
-                    <el-input-number
-                      v-model="row.weight"
-                      :min="0"
-                      :step="1"
-                      size="small"
-                      controls-position="right"
-                      style="width: 90px"
-                      @change="handleWeightChange(row, $index)"
-                    />
+              <el-table-column label="执行顺序" width="120" align="center">
+                <template #default="{ $index }">
+                  <div class="order-cell">
+                    <span class="order-number">{{ $index + 1 }}</span>
                   </div>
                 </template>
               </el-table-column>
@@ -107,46 +99,68 @@
                 <template #default="{ row }">
                   <div class="name-cell">
                     <el-icon><Document /></el-icon>
-                    <span>{{ row.rule.name }}</span>
+                    <span>{{ row.name }}</span>
                   </div>
                 </template>
               </el-table-column>
               <el-table-column prop="status" label="状态" width="100" align="center">
                 <template #default="{ row }">
                   <el-tag
-                    :type="row.rule.status === 'active' ? 'success' : 'info'"
+                    :type="row.status === 'active' ? 'success' : 'info'"
                     size="small"
                     effect="light"
                   >
-                    {{ row.rule.status === "active" ? "启用" : "暂停" }}
+                    {{ row.status === "active" ? "启用" : "暂停" }}
                   </el-tag>
                 </template>
               </el-table-column>
               <el-table-column label="比对对象" width="140" align="center">
                 <template #default="{ row }">
                   <el-tag size="small" type="primary" effect="light">
-                    {{ COMPARISON_LABEL[row.rule.comparisonTarget] || row.rule.comparisonTarget }}
+                    {{ COMPARISON_LABEL[row.comparisonTarget] || row.comparisonTarget }}
                   </el-tag>
                 </template>
               </el-table-column>
               <el-table-column label="适用店铺" min-width="120">
                 <template #default="{ row }">
-                  {{ formatShops(row.rule) }}
+                  {{ formatShops(row) }}
                 </template>
               </el-table-column>
               <el-table-column label="触发条件" min-width="220" show-overflow-tooltip>
                 <template #default="{ row }">
-                  <span class="condition-summary">{{ getRuleSummary(row.rule) }}</span>
+                  <span class="condition-summary">{{ getRuleSummary(row) }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="120" align="center" fixed="right">
-                <template #default="{ row }">
-                  <el-button link type="primary" size="small" @click="viewRuleDetail(row)">
-                    查看
-                  </el-button>
-                  <el-button link type="danger" size="small" @click="removeRuleHandler(row)">
-                    移除
-                  </el-button>
+              <el-table-column label="操作" width="200" align="center" fixed="right">
+                <template #default="{ row, $index }">
+                  <div class="action-buttons">
+                    <el-button
+                      link
+                      type="primary"
+                      size="small"
+                      :disabled="$index === 0"
+                      @click="moveRuleUp($index)"
+                    >
+                      <el-icon><Top /></el-icon>
+                      上移
+                    </el-button>
+                    <el-button
+                      link
+                      type="primary"
+                      size="small"
+                      :disabled="$index === filteredGroupRules.length - 1"
+                      @click="moveRuleDown($index)"
+                    >
+                      <el-icon><Bottom /></el-icon>
+                      下移
+                    </el-button>
+                    <el-button link type="primary" size="small" @click="viewRuleDetail(row)">
+                      查看
+                    </el-button>
+                    <el-button link type="danger" size="small" @click="removeRuleHandler(row)">
+                      移除
+                    </el-button>
+                  </div>
                 </template>
               </el-table-column>
             </el-table>
@@ -236,7 +250,7 @@
 /**
  * SP 广告自动规则面板：左侧规则组 + 右侧规则表格展示
  */
-import type { AdRule, AdRuleGroup, AdRuleGroupItem } from "./types";
+import type { AdRule, AdRuleGroup } from "./types";
 
 import { ref, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -250,6 +264,8 @@ import {
   FolderOpened,
   Document,
   DocumentCopy,
+  Top,
+  Bottom,
 } from "@element-plus/icons-vue";
 import {
   createGroup,
@@ -257,6 +273,7 @@ import {
   deleteGroup,
   addRulesToGroup,
   removeRuleFromGroup,
+  updateRuleOrder,
 } from "@/api/ads/rule-strategy";
 
 import SelectRuleDialog from "./SelectRuleDialog.vue";
@@ -286,23 +303,37 @@ const selectedGroup = computed(
   () => props.ruleGroups.find((g) => g.id === selectedGroupId.value) || null
 );
 
-const groupRulesWithWeight = computed(() => {
+/**
+ * 按 ruleOrder 排序后的规则列表
+ */
+const groupRulesOrdered = computed(() => {
   const group = selectedGroup.value;
   if (!group) return [];
-  return (group.rules || []).map((rule, index) => ({
-    rule,
-    weight:
-      (group as any).ruleItems?.find((item: any) => item.rule.id === rule.id)?.weight ?? index,
-  }));
+
+  const rules = group.rules || [];
+  const order = group.ruleOrder || [];
+
+  // 按 ruleOrder 的顺序排序
+  return [...rules].sort((a, b) => {
+    const indexA = order.indexOf(a.id);
+    const indexB = order.indexOf(b.id);
+
+    // 如果都在 order 中，按 order 排序
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB;
+    }
+    // 如果只有一个在 order 中，排在前面
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+    // 都不在 order 中，按原顺序
+    return 0;
+  });
 });
 
 const filteredGroupRules = computed(() => {
-  const rules = groupRulesWithWeight.value;
+  const rules = groupRulesOrdered.value;
   const keyword = searchKeyword.value.toLowerCase();
-  const filtered = keyword
-    ? rules.filter((item) => item.rule.name.toLowerCase().includes(keyword))
-    : rules;
-  return [...filtered].sort((a, b) => a.weight - b.weight);
+  return keyword ? rules.filter((rule) => rule.name.toLowerCase().includes(keyword)) : rules;
 });
 
 const COMPARISON_LABEL: Record<string, string> = {
@@ -394,17 +425,34 @@ function openSelectRules(): void {
   selectDialogRef.value?.open(selectedGroup.value);
 }
 
-async function handleAddRules(items: { rule: AdRule; weight: number }[]): Promise<void> {
+async function handleAddRules(items: { rule: AdRule; insertIndex: number }[]): Promise<void> {
   if (!selectedGroup.value) return;
   try {
     loading.value = true;
     const ruleIds = items.map((item) => item.rule.id);
     const updated = await addRulesToGroup(selectedGroup.value.id, ruleIds);
 
-    const groups = [...props.ruleGroups];
-    const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
-    if (idx !== -1) groups[idx] = updated;
-    emit("update:ruleGroups", groups);
+    // 如果有指定插入位置，更新 ruleOrder
+    if (items.length > 0 && items[0].insertIndex >= 0) {
+      const currentOrder = updated.ruleOrder || [...updated.rules.map((r) => r.id)];
+      const newRuleIds = items.map((item) => item.rule.id);
+      // 先移除新添加的规则 ID
+      const filteredOrder = currentOrder.filter((id) => !newRuleIds.includes(String(id)));
+      // 在指定位置插入
+      const insertIndex = items[0].insertIndex;
+      filteredOrder.splice(insertIndex, 0, ...newRuleIds);
+      // 保存新顺序
+      const updatedWithOrder = await updateRuleOrder(selectedGroup.value.id, filteredOrder);
+      const groups = [...props.ruleGroups];
+      const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
+      if (idx !== -1) groups[idx] = updatedWithOrder;
+      emit("update:ruleGroups", groups);
+    } else {
+      const groups = [...props.ruleGroups];
+      const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
+      if (idx !== -1) groups[idx] = updated;
+      emit("update:ruleGroups", groups);
+    }
     ElMessage.success(`已添加 ${items.length} 条规则到「${updated.name}」`);
   } catch {
     ElMessage.error("添加失败，请重试");
@@ -413,17 +461,17 @@ async function handleAddRules(items: { rule: AdRule; weight: number }[]): Promis
   }
 }
 
-async function removeRuleHandler(item: AdRuleGroupItem): Promise<void> {
+async function removeRuleHandler(rule: AdRule): Promise<void> {
   if (!selectedGroup.value) return;
   try {
-    await ElMessageBox.confirm(`确定要从组中移除规则「${item.rule.name}」吗？`, "移除确认", {
+    await ElMessageBox.confirm(`确定要从组中移除规则「${rule.name}」吗？`, "移除确认", {
       type: "warning",
     });
   } catch {
     return;
   }
   try {
-    const updated = await removeRuleFromGroup(selectedGroup.value.id, item.rule.id);
+    const updated = await removeRuleFromGroup(selectedGroup.value.id, rule.id);
     const groups = [...props.ruleGroups];
     const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
     if (idx !== -1) groups[idx] = updated;
@@ -434,12 +482,82 @@ async function removeRuleHandler(item: AdRuleGroupItem): Promise<void> {
   }
 }
 
-function handleWeightChange(item: AdRuleGroupItem, index: number): void {
-  ElMessage.success(`规则「${item.rule.name}」权重已更新为 ${item.weight}`);
+async function moveRuleUp(index: number): Promise<void> {
+  if (index === 0 || !selectedGroup.value) return;
+
+  const rules = groupRulesOrdered.value;
+  const order = selectedGroup.value.ruleOrder || rules.map((r) => r.id);
+  const newOrder = [...order];
+
+  // 交换当前规则和上一个规则的位置
+  const ruleId = rules[index].id;
+  const prevRuleId = rules[index - 1].id;
+
+  const orderIndex = newOrder.indexOf(ruleId);
+  const prevOrderIndex = newOrder.indexOf(prevRuleId);
+
+  if (orderIndex !== -1 && prevOrderIndex !== -1) {
+    newOrder[orderIndex] = prevRuleId;
+    newOrder[prevOrderIndex] = ruleId;
+  } else {
+    // 如果规则不在 order 中，直接交换
+    newOrder.splice(index - 1, 2, ruleId, prevRuleId);
+  }
+
+  try {
+    loading.value = true;
+    const updated = await updateRuleOrder(selectedGroup.value.id, newOrder);
+    const groups = [...props.ruleGroups];
+    const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
+    if (idx !== -1) groups[idx] = updated;
+    emit("update:ruleGroups", groups);
+  } catch {
+    ElMessage.error("移动失败，请重试");
+  } finally {
+    loading.value = false;
+  }
 }
 
-function viewRuleDetail(item: AdRuleGroupItem): void {
-  detailDialogRef.value?.open(item.rule, true);
+async function moveRuleDown(index: number): Promise<void> {
+  if (!selectedGroup.value) return;
+
+  const rules = groupRulesOrdered.value;
+  if (index === rules.length - 1) return;
+
+  const order = selectedGroup.value.ruleOrder || rules.map((r) => r.id);
+  const newOrder = [...order];
+
+  // 交换当前规则和下一个规则的位置
+  const ruleId = rules[index].id;
+  const nextRuleId = rules[index + 1].id;
+
+  const orderIndex = newOrder.indexOf(ruleId);
+  const nextOrderIndex = newOrder.indexOf(nextRuleId);
+
+  if (orderIndex !== -1 && nextOrderIndex !== -1) {
+    newOrder[orderIndex] = nextRuleId;
+    newOrder[nextOrderIndex] = ruleId;
+  } else {
+    // 如果规则不在 order 中，直接交换
+    newOrder.splice(index, 2, nextRuleId, ruleId);
+  }
+
+  try {
+    loading.value = true;
+    const updated = await updateRuleOrder(selectedGroup.value.id, newOrder);
+    const groups = [...props.ruleGroups];
+    const idx = groups.findIndex((g) => g.id === selectedGroup.value!.id);
+    if (idx !== -1) groups[idx] = updated;
+    emit("update:ruleGroups", groups);
+  } catch {
+    ElMessage.error("移动失败，请重试");
+  } finally {
+    loading.value = false;
+  }
+}
+
+function viewRuleDetail(rule: AdRule): void {
+  detailDialogRef.value?.open(rule, true);
 }
 </script>
 
@@ -670,8 +788,28 @@ function viewRuleDetail(item: AdRuleGroupItem): void {
   }
 }
 
-.weight-cell {
+.order-cell {
   display: flex;
+  justify-content: center;
+}
+
+.order-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  border-radius: 6px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
   justify-content: center;
 }
 

@@ -84,3 +84,11 @@ export function removeRuleFromGroup(
 ): Promise<AdRuleGroup> {
   return request.post(`/ads/rule-strategy/groups/${groupId}/remove-rule`, { ruleId });
 }
+
+/** 更新规则组的规则顺序 */
+export function updateRuleOrder(
+  groupId: string | number,
+  ruleOrder: (string | number)[]
+): Promise<AdRuleGroup> {
+  return request.put(`/ads/rule-strategy/groups/${groupId}/update`, { ruleOrder });
+}

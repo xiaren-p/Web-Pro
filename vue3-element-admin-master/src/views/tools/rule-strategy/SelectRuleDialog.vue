@@ -73,35 +73,39 @@
         </el-table-column>
       </el-table>
 
-      <!-- 已选规则展示和权重设置 -->
+      <!-- 已选规则展示和插入位置设置 -->
       <div v-if="selectedRules.length > 0" class="selected-section">
         <div class="selected-header">
-          <span class="selected-title">已选规则 - 设置权重</span>
-          <span class="selected-tip">权重越小，执行顺序越靠前</span>
+          <span class="selected-title">已选规则 - 设置插入位置</span>
+        </div>
+        <div class="insert-position-row">
+          <span class="insert-label">插入位置：</span>
+          <el-radio-group v-model="insertPosition" size="default">
+            <el-radio-button value="end">添加到末尾</el-radio-button>
+            <el-radio-button value="start">添加到开头</el-radio-button>
+            <el-radio-button value="custom">指定位置</el-radio-button>
+          </el-radio-group>
+          <el-input-number
+            v-if="insertPosition === 'custom'"
+            v-model="customInsertIndex"
+            :min="1"
+            :max="(props.group?.rules?.length || 0) + 1"
+            size="small"
+            controls-position="right"
+            style="width: 120px"
+          />
+          <span v-if="insertPosition === 'custom'" class="insert-hint">
+            (共 {{ (props.group?.rules?.length || 0) + 1 }} 个位置)
+          </span>
         </div>
         <div class="selected-list">
-          <div
-            v-for="(item, index) in selectedRulesWithWeight"
-            :key="item.rule.id"
-            class="selected-item"
-          >
+          <div v-for="(rule, index) in selectedRules" :key="rule.id" class="selected-item">
             <span class="item-index">{{ index + 1 }}</span>
             <div class="item-info">
-              <span class="item-name">{{ item.rule.name }}</span>
-              <span class="item-target">{{ COMPARISON_LABEL[item.rule.comparisonTarget] }}</span>
+              <span class="item-name">{{ rule.name }}</span>
+              <span class="item-target">{{ COMPARISON_LABEL[rule.comparisonTarget] }}</span>
             </div>
-            <div class="item-weight">
-              <span class="weight-label">权重</span>
-              <el-input-number
-                v-model="item.weight"
-                :min="0"
-                :step="1"
-                size="small"
-                controls-position="right"
-                style="width: 120px"
-              />
-            </div>
-            <el-button link type="danger" size="small" @click="removeSelected(item.rule)">
+            <el-button link type="danger" size="small" @click="removeSelected(rule)">
               <el-icon><Delete /></el-icon>
             </el-button>
           </div>
@@ -136,14 +140,15 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "confirm", rules: { rule: AdRule; weight: number }[]): void;
+  (e: "confirm", rules: { rule: AdRule; insertIndex: number }[]): void;
 }>();
 
 const visible = ref(false);
 const tableRef = ref<InstanceType<typeof ElTable>>();
 const searchKeyword = ref("");
 const selectedRules = ref<AdRule[]>([]);
-const selectedRulesWithWeight = ref<{ rule: AdRule; weight: number }[]>([]);
+const insertPosition = ref<"start" | "end" | "custom">("end");
+const customInsertIndex = ref(1);
 
 const COMPARISON_LABEL: Record<string, string> = {
   campaign: "广告活动",
@@ -166,33 +171,26 @@ const filteredRules = computed(() =>
   })
 );
 
-function open(group: AdRuleGroup | null): void {
+function open(_group: AdRuleGroup | null): void {
   visible.value = true;
   selectedRules.value = [];
-  selectedRulesWithWeight.value = [];
+  insertPosition.value = "end";
+  customInsertIndex.value = 1;
 }
 
 function handleClosed(): void {
   searchKeyword.value = "";
   selectedRules.value = [];
-  selectedRulesWithWeight.value = [];
+  insertPosition.value = "end";
+  customInsertIndex.value = 1;
 }
 
 function handleSelectionChange(selection: AdRule[]): void {
   selectedRules.value = selection;
-
-  selectedRulesWithWeight.value = selection.map((rule) => {
-    const existing = selectedRulesWithWeight.value.find((item) => item.rule.id === rule.id);
-    if (existing) return existing;
-    return { rule, weight: 0 };
-  });
 }
 
 function removeSelected(rule: AdRule): void {
   selectedRules.value = selectedRules.value.filter((r) => r.id !== rule.id);
-  selectedRulesWithWeight.value = selectedRulesWithWeight.value.filter(
-    (item) => item.rule.id !== rule.id
-  );
   tableRef.value?.toggleRowSelection(rule, false);
 }
 
@@ -212,8 +210,32 @@ function getRuleSummary(rule: AdRule): string {
 }
 
 function handleConfirm(): void {
-  const sorted = [...selectedRulesWithWeight.value].sort((a, b) => a.weight - b.weight);
-  emit("confirm", sorted);
+  let insertIndex: number;
+  const currentLength = props.group?.rules?.length || 0;
+
+  switch (insertPosition.value) {
+    case "start":
+      insertIndex = 0;
+      break;
+    case "end":
+      insertIndex = currentLength;
+      break;
+    case "custom":
+      insertIndex = customInsertIndex.value - 1; // 转换为 0-based
+      break;
+    default:
+      insertIndex = currentLength;
+  }
+
+  // 确保 insertIndex 在有效范围内
+  insertIndex = Math.max(0, Math.min(insertIndex, currentLength));
+
+  const result = selectedRules.value.map((rule) => ({
+    rule,
+    insertIndex,
+  }));
+
+  emit("confirm", result);
   visible.value = false;
 }
 
@@ -288,7 +310,24 @@ defineExpose({ open });
   color: var(--el-color-primary);
 }
 
-.selected-tip {
+.insert-position-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+}
+
+.insert-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+}
+
+.insert-hint {
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
@@ -350,17 +389,5 @@ defineExpose({ open });
   color: var(--el-color-primary);
   background: var(--el-color-primary-light-9);
   border-radius: 4px;
-}
-
-.item-weight {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.weight-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--el-text-color-secondary);
 }
 </style>
