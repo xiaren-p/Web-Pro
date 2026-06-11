@@ -407,7 +407,7 @@
           </div>
           <div class="condition-set-days">
             <el-select
-              :model-value="cSet.days === 0 ? '生命周期' : cSet.days ? cSet.days + '天' : ''"
+              :model-value="cSet.days === -1 ? '生命周期' : cSet.days ? cSet.days + '天' : ''"
               style="width: 130px"
               size="small"
               placeholder="天数"
@@ -416,10 +416,10 @@
               default-first-option
               @update:model-value="(v: any) => handleCondDaysChange(cSet, v)"
             >
-              <el-option label="生命周期" :value="0" />
+              <el-option label="生命周期" :value="-1" />
               <el-option v-for="d in COND_DAY_PRESETS" :key="d" :label="d + '天'" :value="d" />
             </el-select>
-            <span v-if="cSet.days !== 0" class="days-suffix">内全部满足才触发</span>
+            <span v-if="cSet.days !== -1" class="days-suffix">内全部满足才触发</span>
             <span v-else class="days-suffix">使用规则生效天数为条件窗口</span>
           </div>
           <div class="conditions-list">
@@ -735,7 +735,7 @@
                       default-first-option
                       @update:model-value="(v: any) => handleCondDaysChange(cSet, v)"
                     >
-                      <el-option label="生命周期" :value="0" />
+                      <el-option label="生命周期" :value="-1" />
                       <el-option
                         v-for="d in COND_DAY_PRESETS"
                         :key="d"
@@ -744,7 +744,7 @@
                       />
                     </el-select>
                     <span style="font-size: 12px; color: #909399">
-                      {{ cSet.days !== 0 ? "内全部满足" : "使用生效天数" }}
+                      {{ cSet.days !== -1 ? "内全部满足" : "使用生效天数" }}
                     </span>
                   </div>
                   <div
@@ -1574,9 +1574,9 @@ function handleDaysChange(val: string | number, which: "start" | "end") {
 }
 function handleCondDaysChange(cSet: { days: number }, val: string | number) {
   const str = String(val).replace(/天$/, "");
-  // "生命周期" 直接用 0
-  if (str === "生命周期" || Number(str) === 0) {
-    cSet.days = 0;
+  // "生命周期" 用 -1 标识
+  if (str === "生命周期" || Number(str) === -1) {
+    cSet.days = -1;
     return;
   }
   const num = Number(str);
