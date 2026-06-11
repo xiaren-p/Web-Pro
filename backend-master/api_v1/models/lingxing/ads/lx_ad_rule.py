@@ -24,6 +24,7 @@ class ComparisonTarget(models.TextChoices):
     AD_GROUP = "ad_group", "广告组"
     SEARCH_TERMS = "search_terms", "用户搜索词"
     TARGETING = "targeting", "投放"
+    NEGATIVE_TARGETING = "negative_targeting", "否定投放"
 
 
 class AddKeywordMatchType(models.TextChoices):
