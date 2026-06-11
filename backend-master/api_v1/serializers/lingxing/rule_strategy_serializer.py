@@ -89,7 +89,7 @@ class LxAdRuleGroupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LxAdRuleGroup
-        fields = ["id", "name", "execution_cycle", "rule_order", "rules", "creator", "created_at", "updated_at"]
+        fields = ["id", "name", "execution_cycle", "rule_order", "weight", "rules", "creator", "created_at", "updated_at"]
         read_only_fields = ["id", "creator", "created_at", "updated_at"]
 
     def get_rules(self, obj) -> list[dict]:
