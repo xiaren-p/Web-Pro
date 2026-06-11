@@ -111,6 +111,7 @@ export interface AdRuleGroup {
   name: string;
   rules: AdRule[];
   ruleOrder?: (number | string)[];
+  weight?: number;
   executionCycle: number;
   createdAt: string;
 }

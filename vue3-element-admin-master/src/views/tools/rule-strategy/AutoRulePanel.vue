@@ -13,7 +13,7 @@
 
         <div class="group-list">
           <div
-            v-for="group in props.ruleGroups"
+            v-for="group in sortedRuleGroups"
             :key="group.id"
             class="group-item"
             :class="{ 'is-selected': selectedGroupId === group.id }"
@@ -25,6 +25,8 @@
                 <span>{{ group.rules?.length || 0 }} 条规则</span>
                 <span class="group-item-sep">·</span>
                 <span>每 {{ group.executionCycle ?? 1 }} 天</span>
+                <span class="group-item-sep">·</span>
+                <span class="group-item-weight">权重 {{ group.weight ?? 0 }}</span>
               </div>
             </div>
             <div class="group-item-actions">
@@ -250,6 +252,19 @@
             设为 3 表示每 3 天执行一次，设为 1 表示每天执行
           </div>
         </el-form-item>
+        <el-form-item label="权重">
+          <div class="weight-row">
+            <el-input-number
+              v-model="groupForm.weight"
+              :min="0"
+              :max="999"
+              :step="1"
+              controls-position="right"
+              style="width: 140px"
+            />
+            <span class="weight-hint">数值越低，优先级越高</span>
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="groupDialogVisible = false">取消</el-button>
@@ -318,7 +333,7 @@ const emit = defineEmits<{
 const loading = ref(false);
 const groupDialogVisible = ref(false);
 const editingGroup = ref<AdRuleGroup | null>(null);
-const groupForm = ref({ name: "", executionCycle: 1 });
+const groupForm = ref({ name: "", executionCycle: 1, weight: 0 });
 const selectedGroupId = ref<string>("");
 const searchKeyword = ref("");
 const selectDialogRef = ref<any>(null);
@@ -328,6 +343,13 @@ let sortableInstance: Sortable | null = null;
 
 const selectedGroup = computed(
   () => props.ruleGroups.find((g) => g.id === selectedGroupId.value) || null
+);
+
+/**
+ * 按权重升序排序后的规则组列表
+ */
+const sortedRuleGroups = computed(() =>
+  [...props.ruleGroups].sort((a, b) => (a.weight ?? 0) - (b.weight ?? 0))
 );
 
 /**
@@ -483,13 +505,17 @@ function formatShops(rule: AdRule): string {
 
 function openCreateGroup(): void {
   editingGroup.value = null;
-  groupForm.value = { name: "", executionCycle: 1 };
+  groupForm.value = { name: "", executionCycle: 1, weight: 0 };
   groupDialogVisible.value = true;
 }
 
 function openEditGroup(group: AdRuleGroup): void {
   editingGroup.value = group;
-  groupForm.value = { name: group.name, executionCycle: group.executionCycle ?? 1 };
+  groupForm.value = {
+    name: group.name,
+    executionCycle: group.executionCycle ?? 1,
+    weight: group.weight ?? 0,
+  };
   groupDialogVisible.value = true;
 }
 
@@ -501,6 +527,7 @@ async function confirmGroup(): Promise<void> {
   const payload = {
     name: groupForm.value.name.trim(),
     executionCycle: groupForm.value.executionCycle,
+    weight: groupForm.value.weight,
   };
   try {
     if (editingGroup.value) {
@@ -814,6 +841,12 @@ function viewRuleDetail(rule: AdRule): void {
   user-select: none;
 }
 
+.group-item-weight {
+  font-size: 11px;
+  color: var(--el-color-primary);
+  opacity: 0.7;
+}
+
 .group-item-actions {
   display: flex;
   flex-shrink: 0;
@@ -1058,5 +1091,17 @@ function viewRuleDetail(rule: AdRule): void {
   color: var(--el-text-color-secondary);
   background: var(--el-color-info-light-9);
   border-radius: 8px;
+}
+
+// ── 权重提示 ──
+.weight-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.weight-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>
