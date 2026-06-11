@@ -145,6 +145,8 @@ CELERY_TASK_ROUTES = {
     'api_v2.tasks.ad_time_pricing_task.run_ad_time_pricing_task':         {'queue': 'single_thread_queue'},
     'api_v2.tasks.time_pricing_task.run_time_pricing_task':                       {'queue': 'single_thread_queue'},
     'api_v2.tasks.bid_adjustment_task.run_bid_adjustment_task':                   {'queue': 'single_thread_queue'},
+    'api_v2.tasks.optimization_strategy_task.run_optimization_strategy_task':       {'queue': 'single_thread_queue'},
+    'api_v2.tasks.optimization_execution_task.run_optimization_execution_task':     {'queue': 'single_thread_queue'},
 }
 
 CELERY_BEAT_SCHEDULE = {

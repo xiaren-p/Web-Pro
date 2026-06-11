@@ -12,6 +12,9 @@ from api_v2.models.sp_bid_adjustment import (
     SpBidAdjustment,
 )
 from api_v2.models.lx_api_err import LxApiErr
+from api_v2.models.sp_ad_optimization_strategy import (
+    SpAdOptimizationStrategy,
+)
 from api_v2.models.workflow_execution import ExecutionStatus, WorkflowExecution, WorkflowType
 
 __all__ = [
@@ -31,4 +34,5 @@ __all__ = [
     'AdjustmentStatusChoices',
     'ExecutionStatusChoices',
     'LxApiErr',
+    'SpAdOptimizationStrategy',
 ]

@@ -17,6 +17,8 @@ from api_v2.views.app_view import (
     list_apps,
     rotate_secret,
 )
+from api_v2.views.optimization_strategy_view import trigger_optimization_strategy
+from api_v2.views.optimization_execution_view import trigger_optimization_execution
 from api_v2.views.task_view import cancel_workflow, get_workflow_status, start_workflow
 
 app_name = 'api_v2'
@@ -45,4 +47,10 @@ urlpatterns = [
 
     # 竞价调整执行
     path('ads/bid-adjustment/run/', trigger_bid_adjustment, name='bid_adjustment_run'),
+
+    # SP广告优化策略匹配
+    path('ads/optimization-strategy/run/', trigger_optimization_strategy, name='ads_optimization_strategy_run'),
+
+    # SP广告优化策略执行
+    path('ads/optimization-strategy/execute/', trigger_optimization_execution, name='ads_optimization_strategy_execute'),
 ]

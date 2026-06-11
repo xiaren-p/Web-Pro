@@ -81,33 +81,50 @@
             <el-option value="date_range" label="日期范围" />
           </el-select>
           <template v-if="form.effectiveType !== 'date_range'">
-            <span class="fx-label">最近</span>
-            <el-select
-              :model-value="form.effectiveDaysStart ? form.effectiveDaysStart + '天' : ''"
-              style="width: 110px"
-              placeholder="起始天"
-              filterable
-              allow-create
-              default-first-option
-              @update:model-value="(v: any) => handleDaysChange(v, 'start')"
-            >
-              <el-option v-for="d in DAY_PRESETS" :key="d" :label="d + '天'" :value="d" />
-            </el-select>
-            <span class="fx-sep">至</span>
-            <el-select
-              :model-value="form.effectiveDaysEnd ? form.effectiveDaysEnd + '天' : ''"
-              style="width: 110px"
-              placeholder="结束天"
-              filterable
-              allow-create
-              default-first-option
-              @update:model-value="(v: any) => handleDaysChange(v, 'end')"
-            >
-              <el-option v-for="d in DAY_PRESETS" :key="d" :label="d + '天'" :value="d" />
-            </el-select>
-            <span class="fx-hint">
-              {{ form.effectiveType === "beyond_days" ? "之外的广告实体" : "内的广告实体" }}
-            </span>
+            <!-- within_days：双值区间 -->
+            <template v-if="form.effectiveType === 'within_days'">
+              <span class="fx-label">最近</span>
+              <el-select
+                :model-value="form.effectiveDaysStart ? form.effectiveDaysStart + '天' : ''"
+                style="width: 110px"
+                placeholder="起始天"
+                filterable
+                allow-create
+                default-first-option
+                @update:model-value="(v: any) => handleDaysChange(v, 'start')"
+              >
+                <el-option v-for="d in DAY_PRESETS" :key="d" :label="d + '天'" :value="d" />
+              </el-select>
+              <span class="fx-sep">至</span>
+              <el-select
+                :model-value="form.effectiveDaysEnd ? form.effectiveDaysEnd + '天' : ''"
+                style="width: 110px"
+                placeholder="结束天"
+                filterable
+                allow-create
+                default-first-option
+                @update:model-value="(v: any) => handleDaysChange(v, 'end')"
+              >
+                <el-option v-for="d in DAY_PRESETS" :key="d" :label="d + '天'" :value="d" />
+              </el-select>
+              <span class="fx-hint">内的广告实体</span>
+            </template>
+            <!-- beyond_days：单值 X 天之后不生效 -->
+            <template v-else>
+              <span class="fx-label">创建后</span>
+              <el-select
+                :model-value="form.effectiveDaysStart ? form.effectiveDaysStart + '天' : ''"
+                style="width: 110px"
+                placeholder="天数"
+                filterable
+                allow-create
+                default-first-option
+                @update:model-value="(v: any) => handleDaysChange(v, 'start')"
+              >
+                <el-option v-for="d in DAY_PRESETS" :key="d" :label="d + '天'" :value="d" />
+              </el-select>
+              <span class="fx-hint">之外的广告实体</span>
+            </template>
           </template>
           <template v-else>
             <div class="effective-date-row">
@@ -662,9 +679,9 @@
                 </el-button>
               </div>
             </div>
-            <!-- 定位组（AUTO） / 投放对象（MANUAL） -->
+            <!-- 定位组 + 投放对象（adType=all 时同时显示） -->
             <el-form-item
-              :label="form.adType === 'manual' ? '投放对象' : '定位组'"
+              :label="form.adType === 'all' ? '定位组 / 投放对象' : form.adType === 'manual' ? '投放对象' : '定位组'"
               label-width="80px"
             >
               <div class="field-setting-row">
@@ -675,21 +692,31 @@
                   filterable
                   collapse-tags
                   collapse-tags-tooltip
-                  :max-collapse-tags="1"
+                  :max-collapse-tags="2"
                   tag-effect="dark"
                   style="flex: 1"
-                  :placeholder="form.adType === 'manual' ? '选择投放对象' : '选择定位组类型'"
+                  :placeholder="
+                    form.adType === 'manual' ? '选择投放对象' :
+                    form.adType === 'auto' ? '选择定位组类型' :
+                    '选择定位组 / 投放对象'
+                  "
                   :disabled="tba.unlimitedTargeting"
                 >
-                  <template v-if="form.adType === 'manual'">
-                    <el-option value="keyword" label="关键词" />
-                    <el-option value="product_targeting" label="商品" />
+                  <!-- auto 定位组 -->
+                  <template v-if="form.adType === 'auto' || form.adType === 'all'">
+                    <el-option-group label="定位组">
+                      <el-option value="close_match" label="同类商品" />
+                      <el-option value="loose_match" label="紧密匹配" />
+                      <el-option value="substitutes" label="关联商品" />
+                      <el-option value="complements" label="宽泛匹配" />
+                    </el-option-group>
                   </template>
-                  <template v-else>
-                    <el-option value="close_match" label="同类商品" />
-                    <el-option value="loose_match" label="紧密匹配" />
-                    <el-option value="substitutes" label="关联商品" />
-                    <el-option value="complements" label="宽泛匹配" />
+                  <!-- manual 投放对象 -->
+                  <template v-if="form.adType === 'manual' || form.adType === 'all'">
+                    <el-option-group label="投放对象">
+                      <el-option value="keyword" label="关键词" />
+                      <el-option value="product_targeting" label="商品" />
+                    </el-option-group>
                   </template>
                 </el-select>
               </div>

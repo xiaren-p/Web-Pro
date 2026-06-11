@@ -5,6 +5,8 @@ from api_v2.tasks.time_pricing_task import run_time_pricing_task
 from api_v2.tasks.ad_time_pricing_task import run_ad_time_pricing_task
 from api_v2.tasks.bid_adjustment_task import run_bid_adjustment_task
 from api_v2.tasks.listing_image_upload_task import upload_listing_images_task
+from api_v2.tasks.optimization_strategy_task import run_optimization_strategy_task
+from api_v2.tasks.optimization_execution_task import run_optimization_execution_task
 from api_v2.tasks.qinglong_env_sync_task import sync_qinglong_env_task
 
 __all__ = [
@@ -14,4 +16,6 @@ __all__ = [
     'run_ad_time_pricing_task',
     'run_time_pricing_task',
     'run_bid_adjustment_task',
+    'run_optimization_strategy_task',
+    'run_optimization_execution_task',
 ]
