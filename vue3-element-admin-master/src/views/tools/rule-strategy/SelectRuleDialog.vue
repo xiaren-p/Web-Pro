@@ -127,6 +127,7 @@
  * 选择规则弹窗组件：用于从草稿箱选择多条规则添加到规则组
  */
 import type { AdRule, AdRuleGroup } from "./types";
+import { COMPARISON_LABEL } from "./types";
 
 import { ref, computed } from "vue";
 import { Search, Document, Delete } from "@element-plus/icons-vue";
@@ -149,15 +150,6 @@ const searchKeyword = ref("");
 const selectedRules = ref<AdRule[]>([]);
 const insertPosition = ref<"start" | "end" | "custom">("end");
 const customInsertIndex = ref(1);
-
-const COMPARISON_LABEL: Record<string, string> = {
-  campaign: "广告活动",
-  ad_group: "广告组",
-  targeting: "定位组投放",
-  keyword: "关键词投放",
-  product_targeting: "商品投放",
-  search_terms: "用户搜索词",
-};
 
 const existingRuleIds = computed(() => new Set(props.group?.rules.map((r) => r.id) || []));
 

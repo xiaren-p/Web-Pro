@@ -253,6 +253,12 @@
  * SP 广告规则草稿箱面板：左侧规则类目 + 右侧规则表格展示
  */
 import type { AdRule, RuleFormData } from "./types";
+import {
+  COMPARISON_LABEL,
+  COMPARISON_TARGET_OPTIONS,
+  ACTION_LABEL,
+  NO_VALUE_ACTIONS,
+} from "./types";
 
 import { ref, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -314,47 +320,7 @@ const categoryList = computed(() => {
     .sort((a, b) => b.count - a.count);
 });
 
-const targetOptions = [
-  { value: "campaign", label: "广告活动" },
-  { value: "ad_group", label: "广告组" },
-  { value: "targeting", label: "定位组投放" },
-  { value: "keyword", label: "关键词投放" },
-  { value: "product_targeting", label: "商品投放" },
-  { value: "search_terms", label: "用户搜索词" },
-];
-
-const COMPARISON_LABEL: Record<string, string> = {
-  campaign: "广告活动",
-  ad_group: "广告组",
-  targeting: "定位组投放",
-  keyword: "关键词投放",
-  product_targeting: "商品投放",
-  search_terms: "用户搜索词",
-};
-
-const ACTION_LABEL: Record<string, string> = {
-  bid_percent_decrease: "竞价降低",
-  bid_percent_increase: "竞价提高",
-  bid_fixed_decrease: "竞价减少",
-  bid_fixed_increase: "竞价增加",
-  budget_increase: "预算增加",
-  budget_decrease: "预算减少",
-  no_adjust: "不调整",
-  pause: "暂停",
-  archive: "归档",
-  negative_exact: "精准否定",
-  negative_phrase: "否定词组",
-  add_keyword: "添加关键词",
-};
-
-const NO_VALUE_ACTIONS = new Set([
-  "no_adjust",
-  "pause",
-  "archive",
-  "negative_exact",
-  "negative_phrase",
-  "add_keyword",
-]);
+const targetOptions = COMPARISON_TARGET_OPTIONS;
 
 const filteredRules = computed(() => {
   return props.rules.filter((rule) => {

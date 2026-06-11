@@ -109,7 +109,7 @@
             <div class="draft-rule__info">
               <span class="draft-rule__name">{{ rule.name }}</span>
               <span class="draft-rule__target">
-                {{ COMPARISON_LABEL[rule.comparisonTarget] || rule.comparisonTarget }}
+                {{ CMP_LABEL[rule.comparisonTarget] || rule.comparisonTarget }}
               </span>
               <span class="draft-rule__summary">{{ getRuleSummary(rule) }}</span>
             </div>
@@ -185,6 +185,7 @@
  * 所属板块：tools / 广告规则策略。
  */
 import type { AdRule, AdRuleGroup } from "@/views/tools/rule-strategy/types";
+import { COMPARISON_LABEL } from "@/views/tools/rule-strategy/types";
 
 import { ref, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -219,14 +220,12 @@ const filteredDraftRules = computed(() =>
     : props.rules.filter((r) => r.name.toLowerCase().includes(searchKeyword.value.toLowerCase()))
 );
 
-const COMPARISON_LABEL: Record<string, string> = {
-  campaign: "广告活动",
-  adGroup: "广告组",
-  targeting: "定位组投放",
-  keyword: "关键词投放",
-  productTargeting: "商品投放",
-  searchTerms: "用户搜索词",
-};
+/** 比对对象标签（同时支持 snake_case 和 camelCase 查找） */
+const CMP_LABEL = { ...COMPARISON_LABEL } as Record<string, string>;
+CMP_LABEL.adGroup = COMPARISON_LABEL.ad_group;
+CMP_LABEL.productTargeting = COMPARISON_LABEL.product_targeting;
+CMP_LABEL.searchTerms = COMPARISON_LABEL.search_terms;
+CMP_LABEL.negativeTargeting = COMPARISON_LABEL.negative_targeting;
 
 function getRuleStatusType(status: string): "success" | "info" {
   return status === "active" ? "success" : "info";

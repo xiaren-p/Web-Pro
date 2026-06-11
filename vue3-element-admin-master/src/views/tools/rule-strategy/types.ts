@@ -14,6 +14,55 @@ export interface RuleConditionSet {
   conditions: ConditionWithRange[];
 }
 
+// ── 共享常量 ──
+
+/** 比对对象中文标签映射 */
+export const COMPARISON_LABEL: Record<string, string> = {
+  campaign: "广告活动",
+  ad_group: "广告组",
+  targeting: "定位组投放",
+  keyword: "关键词投放",
+  product_targeting: "商品投放",
+  search_terms: "用户搜索词",
+  negative_targeting: "否定投放",
+};
+
+/** 比对对象筛选下拉选项（不含否定投放等特殊类型） */
+export const COMPARISON_TARGET_OPTIONS: { value: string; label: string }[] = [
+  { value: "campaign", label: "广告活动" },
+  { value: "ad_group", label: "广告组" },
+  { value: "targeting", label: "定位组投放" },
+  { value: "keyword", label: "关键词投放" },
+  { value: "product_targeting", label: "商品投放" },
+  { value: "search_terms", label: "用户搜索词" },
+];
+
+/** 操作中文标签映射 */
+export const ACTION_LABEL: Record<string, string> = {
+  bid_percent_decrease: "竞价降低",
+  bid_percent_increase: "竞价提高",
+  bid_fixed_decrease: "竞价减少",
+  bid_fixed_increase: "竞价增加",
+  budget_increase: "预算增加",
+  budget_decrease: "预算减少",
+  no_adjust: "不调整",
+  pause: "暂停",
+  archive: "归档",
+  negative_exact: "精准否定",
+  negative_phrase: "否定词组",
+  add_keyword: "添加关键词",
+};
+
+/** 无值操作类型集合（这些操作的 value 为空即可） */
+export const NO_VALUE_ACTIONS: ReadonlySet<string> = new Set([
+  "no_adjust",
+  "pause",
+  "archive",
+  "negative_exact",
+  "negative_phrase",
+  "add_keyword",
+]);
+
 /** 条件对象选项（仅投放/搜索词场景显示） */
 export function getConditionTargetOptions(
   comparisonTarget: string
@@ -31,6 +80,8 @@ export function getConditionTargetOptions(
     { value: "targeting", label: "投放实体" },
   ];
 }
+
+// ── 类型接口 ──
 
 export interface RuleAction {
   type: string;

@@ -98,6 +98,11 @@
  * 所属板块：tools / 广告规则策略。
  */
 import type { AdRule } from "@/views/tools/rule-strategy/types";
+import {
+  COMPARISON_LABEL,
+  ACTION_LABEL,
+  NO_VALUE_ACTIONS,
+} from "@/views/tools/rule-strategy/types";
 
 import { ref, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -126,30 +131,6 @@ const filteredRules = computed(() =>
     ? props.rules
     : props.rules.filter((r) => r.name.toLowerCase().includes(searchKeyword.value.toLowerCase()))
 );
-
-const COMPARISON_LABEL: Record<string, string> = {
-  campaign: "广告活动",
-  ad_group: "广告组",
-  targeting: "定位组投放",
-  keyword: "关键词投放",
-  product_targeting: "商品投放",
-  search_terms: "用户搜索词",
-};
-
-const ACTION_LABEL: Record<string, string> = {
-  bid_percent_decrease: "竞价降低",
-  bid_percent_increase: "竞价提高",
-  bid_fixed_decrease: "竞价减少",
-  bid_fixed_increase: "竞价增加",
-  budget_increase: "预算增加",
-  budget_decrease: "预算减少",
-  no_adjust: "不调整",
-  pause: "暂停",
-  archive: "归档",
-  negative_exact: "精准否定",
-  negative_phrase: "否定词组",
-  add_keyword: "添加关键词",
-};
 
 function formatShops(rule: AdRule): string {
   if (!rule.shops || rule.shops.length === 0) return "-";
@@ -184,15 +165,6 @@ function formatActions(rule: AdRule): string {
     parts.push(ACTION_LABEL[rule.addKeywordAction] || rule.addKeywordAction);
   return parts.length > 0 ? parts.join(" · ") : "-";
 }
-
-const NO_VALUE_ACTIONS = new Set([
-  "no_adjust",
-  "pause",
-  "archive",
-  "negative_exact",
-  "negative_phrase",
-  "add_keyword",
-]);
 
 function getRuleSummary(rule: AdRule): string {
   return rule.conditionSets

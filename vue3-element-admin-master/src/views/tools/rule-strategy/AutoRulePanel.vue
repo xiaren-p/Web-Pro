@@ -290,6 +290,7 @@
  * SP 广告自动规则面板：左侧规则组 + 右侧规则表格展示，支持拖拽排序。
  */
 import type { AdRule, AdRuleGroup } from "./types";
+import { COMPARISON_LABEL } from "./types";
 
 import { ref, computed, watch, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -478,15 +479,6 @@ async function handleDragEnd(evt: Sortable.SortableEvent): Promise<void> {
     loading.value = false;
   }
 }
-
-const COMPARISON_LABEL: Record<string, string> = {
-  campaign: "广告活动",
-  ad_group: "广告组",
-  targeting: "定位组投放",
-  keyword: "关键词投放",
-  product_targeting: "商品投放",
-  search_terms: "用户搜索词",
-};
 
 function getRuleSummary(rule: AdRule): string {
   return rule.conditionSets
