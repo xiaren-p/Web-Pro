@@ -30,6 +30,12 @@ class LxAdRuleGroup(models.Model):
         help_text="规则 ID 数组，如 [3, 7, 1]，按序执行",
     )
 
+    weight = models.IntegerField(
+        default=0,
+        verbose_name="权重",
+        help_text="数值越低优先级越高，默认 0 表示最高优先级",
+    )
+
     creator = models.CharField(
         max_length=100,
         default="",
