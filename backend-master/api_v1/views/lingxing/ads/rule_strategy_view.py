@@ -41,6 +41,9 @@ class RuleStrategyViewSet(viewsets.ViewSet):
             })
 
         # 新增
+        rule_name = request.data.get("name", "").strip()
+        if rule_name and LxAdRule.objects.filter(name=rule_name).exists():
+            return drf_error(f"规则名称「{rule_name}」已存在，请使用其他名称", status=409)
         ser = LxAdRuleSerializer(data=request.data, context={"request": request})
         if not ser.is_valid():
             return drf_error("参数错误", status=400, data={"errors": ser.errors})
@@ -67,6 +70,10 @@ class RuleStrategyViewSet(viewsets.ViewSet):
         ser = LxAdRuleSerializer(obj, data=request.data, partial=True)
         if not ser.is_valid():
             return drf_error("参数错误", status=400, data={"errors": ser.errors})
+        # 更新时检查名称唯一性（排除自身）
+        new_name = request.data.get("name", "").strip()
+        if new_name and LxAdRule.objects.filter(name=new_name).exclude(pk=obj.pk).exists():
+            return drf_error(f"规则名称「{new_name}」已存在，请使用其他名称", status=409)
         obj = ser.save()
         return drf_ok(LxAdRuleSerializer(obj).data)
 

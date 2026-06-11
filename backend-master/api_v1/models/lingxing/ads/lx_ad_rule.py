@@ -52,6 +52,7 @@ class LxAdRule(models.Model):
 
     name = models.CharField(
         max_length=100,
+        unique=True,
         verbose_name="规则名称",
     )
 

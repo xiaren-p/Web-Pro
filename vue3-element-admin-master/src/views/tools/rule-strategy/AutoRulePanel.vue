@@ -574,14 +574,22 @@ async function handleAddRules(items: { rule: AdRule; insertIndex: number }[]): P
   if (!selectedGroup.value) return;
   try {
     loading.value = true;
-    const ruleIds = items.map((item) => item.rule.id);
+    const existingIds = new Set((selectedGroup.value.rules || []).map((r) => r.id));
+    // 过滤掉已在组内的规则，防止重复添加
+    const newItems = items.filter((item) => !existingIds.has(item.rule.id));
+    if (newItems.length === 0) {
+      ElMessage.warning("所选规则已在当前组中");
+      loading.value = false;
+      return;
+    }
+    const ruleIds = newItems.map((item) => item.rule.id);
     const updated = await addRulesToGroup(selectedGroup.value.id, ruleIds);
 
-    if (items.length > 0 && items[0].insertIndex >= 0) {
+    if (newItems.length > 0 && newItems[0].insertIndex >= 0) {
       const currentOrder = updated.ruleOrder || [...updated.rules.map((r) => r.id)];
-      const newRuleIds = items.map((item) => item.rule.id);
+      const newRuleIds = newItems.map((item) => item.rule.id);
       const filteredOrder = currentOrder.filter((id) => !newRuleIds.includes(String(id)));
-      const insertIndex = items[0].insertIndex;
+      const insertIndex = newItems[0].insertIndex;
       filteredOrder.splice(insertIndex, 0, ...newRuleIds);
       const updatedWithOrder = await updateRuleOrder(selectedGroup.value.id, filteredOrder);
       const groups = [...props.ruleGroups];
@@ -594,7 +602,7 @@ async function handleAddRules(items: { rule: AdRule; insertIndex: number }[]): P
       if (idx !== -1) groups[idx] = updated;
       emit("update:ruleGroups", groups);
     }
-    ElMessage.success(`已添加 ${items.length} 条规则到「${updated.name}」`);
+    ElMessage.success(`已添加 ${newItems.length} 条规则到「${updated.name}」`);
   } catch {
     ElMessage.error("添加失败，请重试");
   } finally {

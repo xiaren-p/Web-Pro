@@ -105,16 +105,33 @@ class LxAdRuleGroupSerializer(serializers.ModelSerializer):
         return [LxAdRuleSerializer(rule).data for rule in ordered if rule is not None]
 
     def to_representation(self, instance):
-        """将输出键名转为 camelCase。"""
+        """将输出键名转为 camelCase，rule_order 去重返回。"""
         data = super().to_representation(instance)
+        # rule_order 去重：保持顺序，移除重复 ID
+        if data.get("rule_order"):
+            seen = set()
+            deduped = []
+            for rid in data["rule_order"]:
+                if rid not in seen:
+                    seen.add(rid)
+                    deduped.append(rid)
+            data["rule_order"] = deduped
         return _to_camel_case(data)
 
     def to_internal_value(self, data):
-        """将前端 camelCase 键名转回 snake_case。"""
+        """将前端 camelCase 键名转回 snake_case，并对 rule_order 去重。"""
         snake_data = {_camel_to_snake(k): v for k, v in data.items()}
-        # 前端可能传 rules 数组，但后端只存 rule_order ID 数组
         if "rules" in snake_data:
             del snake_data["rules"]
+        # 对 rule_order 去重
+        if snake_data.get("rule_order"):
+            seen = set()
+            deduped = []
+            for rid in snake_data["rule_order"]:
+                if rid not in seen:
+                    seen.add(rid)
+                    deduped.append(rid)
+            snake_data["rule_order"] = deduped
         return super().to_internal_value(snake_data)
 
     def create(self, validated_data):

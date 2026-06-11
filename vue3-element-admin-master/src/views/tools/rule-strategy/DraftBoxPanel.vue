@@ -460,8 +460,15 @@ async function handleDelete(row: AdRule): Promise<void> {
 
 async function onFormSaved(data: RuleFormData): Promise<void> {
   try {
+    // 编辑模式：id 非空且在已有规则列表中
     const isEdit = data.id && props.rules.some((r) => r.id === data.id);
     if (isEdit) {
+      // 检查规则名是否与已有规则重复（排除自身）
+      const nameConflict = props.rules.some((r) => r.name === data.name && r.id !== data.id);
+      if (nameConflict) {
+        ElMessage.warning("规则名称已存在，请使用其他名称");
+        return;
+      }
       const updated = await updateRule(data.id, data as any);
       const rules = [...props.rules];
       const idx = rules.findIndex((r) => r.id === data.id);
@@ -469,6 +476,12 @@ async function onFormSaved(data: RuleFormData): Promise<void> {
       emit("update:rules", rules);
       ElMessage.success("规则已更新");
     } else {
+      // 新建模式：检查规则名唯一性
+      const nameConflict = props.rules.some((r) => r.name === data.name);
+      if (nameConflict) {
+        ElMessage.warning("规则名称已存在，请使用其他名称");
+        return;
+      }
       const created = await createRule(data as any);
       emit("update:rules", [...props.rules, created]);
       ElMessage.success("规则已创建");
