@@ -29,6 +29,7 @@ from typing import Any
 
 from django.db.models import Q, Sum
 
+from api_v1.models.lingxing.ads.basic.lx_sp_ad_group import LxSpAdGroup
 from api_v1.models.lingxing.ads.basic.lx_sp_campaign import LxSpCampaign
 from api_v1.models.lingxing.ads.basic.lx_sp_keyword import LxSpKeyword
 from api_v1.models.lingxing.ads.report.lx_sp_keyword_report import LxSpKeywordReport
@@ -436,13 +437,13 @@ def _execute_targeting_bid_actions(
             results.append({"序号": idx, "状态": "跳过", "原因": "无竞价操作或操作类型为不调整"})
             continue
 
-        current_bid = float(keyword.bid) if keyword.bid else 0.0
+        current_bid = float(keyword["bid"]) if keyword["bid"] else 0.0
         new_bid = _calc_adjusted_bid(current_bid, bid_action)
         if new_bid is None:
             results.append({
                 "序号": idx, "状态": "跳过",
                 "原因": f"不支持的竞价操作类型 {bid_type}",
-                "关键词ID": keyword.keyword_id,
+                "关键词ID": keyword["keyword_id"],
             })
             continue
 
@@ -453,7 +454,7 @@ def _execute_targeting_bid_actions(
         bid_executed = True
         results.append({
             "序号": idx, "状态": "待执行",
-            "关键词ID": keyword.keyword_id, "关键词": keyword.keyword_text,
+            "关键词ID": keyword["keyword_id"], "关键词": keyword["keyword_text"],
             "调整前竞价": current_bid, "调整后竞价": round(new_bid, 4),
             "竞价操作类型": bid_type,
             "操作参数": {
@@ -546,12 +547,12 @@ def _execute_single_rule(
         if days_val > max_days:
             max_days = days_val
 
-    metrics = _query_keyword_report(keyword.keyword_id, campaign.profile_id, max_days, today)
+    metrics = _query_keyword_report(keyword["keyword_id"], campaign.profile_id, max_days, today)
     passed, reason = _check_all_condition_sets(rule, metrics)
     if not passed:
         logger.info(
             "[executor_keyword] 规则「%s」(%s) kw=%d 条件组不通过: %s",
-            rule_name, rule_id, keyword.keyword_id, reason,
+            rule_name, rule_id, keyword["keyword_id"], reason,
         )
         return None, False
 
@@ -565,16 +566,16 @@ def _execute_single_rule(
         "优先级": rule.get("priority", 0),
         "广告活动ID": campaign.campaign_id,
         "店铺ID": campaign.profile_id,
-        "关键词ID": keyword.keyword_id,
-        "关键词": keyword.keyword_text,
-        "当前竞价": float(keyword.bid) if keyword.bid else 0.0,
+        "关键词ID": keyword["keyword_id"],
+        "关键词": keyword["keyword_text"],
+        "当前竞价": float(keyword["bid"]) if keyword["bid"] else 0.0,
         "条件组结果": "通过",
         "报表数据": metrics,
         "预算操作": budget_result,
         "其他操作": other_result,
         "投放竞价操作": targeting_results,
     }
-    _write_debug_file(f"kw_{keyword.keyword_id}_{rule_id}.json", result)
+    _write_debug_file(f"kw_{keyword["keyword_id"]}_{rule_id}.json", result)
     return result, bid_executed
 
 
@@ -620,18 +621,46 @@ def execute_keyword_rules() -> dict[str, Any]:
     today = date.today()
     _ensure_debug_dir()
 
-    # ── 步骤 1：扫描所有可用的关键词 ──
-    keywords = list(
+    # ── 步骤 1：扫描所有可用的关键词（不限制个体竞价是否为空，后续用广告组竞价兜底）──
+    keywords_raw = list(
         LxSpKeyword.objects
-        .filter(state="enabled", bid__isnull=False)
+        .filter(state="enabled")
         .only("campaign_id", "profile_id", "keyword_id", "keyword_text", "bid", "ad_group_id")
     )
-    if not keywords:
+    if not keywords_raw:
         return {
             "扫描关键词数": 0, "周期跳过数": 0, "有策略匹配数": 0,
             "执行规则数": 0, "受影响关键词数": 0,
             "结果详情": [], "错误列表": [],
         }
+
+    # ── 竞价继承：个体 bid → 广告组 default_bid；两者都为空则跳过 ──
+    ad_group_ids = {k.ad_group_id for k in keywords_raw}
+    ad_group_bid_map: dict[int, float] = {}
+    if ad_group_ids:
+        for ag in LxSpAdGroup.objects.filter(
+            ad_group_id__in=list(ad_group_ids),
+            default_bid__isnull=False,
+        ).only("ad_group_id", "default_bid"):
+            ad_group_bid_map[ag.ad_group_id] = float(ag.default_bid)
+
+    keywords: list[dict] = []
+    for k in keywords_raw:
+        if k.bid is not None:
+            bid = float(k.bid)
+        else:
+            bid = ad_group_bid_map.get(k.ad_group_id)
+            if bid is None:
+                continue
+        keywords.append({
+            "keyword_id": k.keyword_id,
+            "campaign_id": k.campaign_id,
+            "profile_id": k.profile_id,
+            "keyword_text": k.keyword_text,
+            "bid": bid,
+            "ad_group_id": k.ad_group_id,
+        })
+
     logger.info(
         "[executor_keyword] 扫描到 %d 个启用关键词",
         len(keywords),
@@ -639,10 +668,10 @@ def execute_keyword_rules() -> dict[str, Any]:
 
     # ── 步骤 2：前置周期跳过（仅针对竞价操作，不影响预算/其他操作）──
     cycle_skip_count = 0
-    active_keywords: list[LxSpKeyword] = []
+    active_keywords: list[dict] = []
     for kw in keywords:
         last_time = _get_last_adjustment_time(
-            kw.keyword_id, kw.campaign_id, kw.profile_id,
+            kw["keyword_id"], kw["campaign_id"], kw["profile_id"],
         )
         ok, __ = _is_execution_cycle_ok(last_time, DEFAULT_CYCLE_DAYS)
         if not ok:
@@ -663,7 +692,7 @@ def execute_keyword_rules() -> dict[str, Any]:
         }
 
     # ── 步骤 3：批量加载策略记录 + 广告活动 ──
-    unique_pairs = list({(k.campaign_id, k.profile_id) for k in active_keywords})
+    unique_pairs = list({(k["campaign_id"], k["profile_id"]) for k in active_keywords})
     strategy_map: dict[tuple[int, int, str], SpAdOptimizationStrategy] = {}
     campaign_map: dict[tuple[int, int], LxSpCampaign] = {}
 
@@ -693,11 +722,11 @@ def execute_keyword_rules() -> dict[str, Any]:
     affected_keywords: set[int] = set()
 
     for kw in active_keywords:
-        campaign = campaign_map.get((kw.campaign_id, kw.profile_id))
+        campaign = campaign_map.get((kw["campaign_id"], kw["profile_id"]))
         if campaign is None:
             continue
 
-        strategy = strategy_map.get((kw.campaign_id, kw.profile_id, "manual"))
+        strategy = strategy_map.get((kw["campaign_id"], kw["profile_id"], "manual"))
         if strategy is None:
             continue
 
@@ -710,7 +739,7 @@ def execute_keyword_rules() -> dict[str, Any]:
             if bid_already_executed:
                 logger.info(
                     "[executor_keyword] kw=%d 已有规则执行竞价，跳过规则「%s」",
-                    kw.keyword_id, rule.get("rule_name", "?"),
+                    kw["keyword_id"], rule.get("rule_name", "?"),
                 )
                 continue
 
@@ -718,7 +747,7 @@ def execute_keyword_rules() -> dict[str, Any]:
                 result, bid_done = _execute_single_rule(rule, kw, campaign, today)
             except Exception as exc:
                 error_msg = (
-                    f"kw={kw.keyword_id} rule={rule.get('rule_id')} "
+                    f"kw={kw["keyword_id"]} rule={rule.get('rule_id')} "
                     f"异常: {exc}"
                 )
                 logger.exception("[executor_keyword] %s", error_msg)
@@ -728,7 +757,7 @@ def execute_keyword_rules() -> dict[str, Any]:
             if result is not None:
                 all_results.append(result)
                 executed_rule_count += 1
-                affected_keywords.add(kw.keyword_id)
+                affected_keywords.add(kw["keyword_id"])
                 if bid_done:
                     bid_already_executed = True
                 break  # 命中即停

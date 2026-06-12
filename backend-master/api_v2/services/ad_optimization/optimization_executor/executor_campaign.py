@@ -32,6 +32,7 @@ from typing import Any
 
 from django.db.models import Q, Sum
 
+from api_v1.models.lingxing.ads.basic.lx_sp_ad_group import LxSpAdGroup
 from api_v1.models.lingxing.ads.basic.lx_sp_campaign import LxSpCampaign
 from api_v1.models.lingxing.ads.basic.lx_sp_keyword import LxSpKeyword
 from api_v1.models.lingxing.ads.basic.lx_sp_target import LxSpTarget
@@ -295,35 +296,66 @@ def _aggregate_keyword_reports(
 # 投放实体查询（不含报表）
 # ============================================================
 
+def _load_ad_group_bid_map(
+    ad_group_ids: set[int],
+    profile_id: int,
+) -> dict[int, float]:
+    """按广告组 ID 批量查询 default_bid，返回 {ad_group_id: bid} 映射。"""
+    if not ad_group_ids:
+        return {}
+    return {
+        ag.ad_group_id: float(ag.default_bid)
+        for ag in LxSpAdGroup.objects.filter(
+            ad_group_id__in=list(ad_group_ids),
+            profile_id=profile_id,
+            default_bid__isnull=False,
+        ).only("ad_group_id", "default_bid")
+    }
+
+
 def _get_auto_targets(
     campaign_id: int,
     profile_id: int,
     target_groups: list[str],
 ) -> list[dict[str, Any]]:
-    """查自动广告的定位组（expression_type=auto, 状态=启用, 竞价不为空）。
+    """查自动广告的定位组（expression_type=auto, 状态=启用）。
 
     按 expression.type 过滤用户选择的定位组类型（同类商品/紧密匹配/关联商品/宽泛匹配）。
+    关键词当前生效竞价 = 个体竞价 OR 广告组竞价。
     """
     if not target_groups:
         return []
     expr_values = {_EXPR_TYPE_AUTO_MAP.get(tg, tg) for tg in target_groups}
-    result: list[dict[str, Any]] = []
+
+    entities: list[dict[str, Any]] = []
+    ad_group_ids: set[int] = set()
     for t in LxSpTarget.objects.filter(
         campaign_id=campaign_id,
         profile_id=profile_id,
         expression_type="auto",
         state="enabled",
-        bid__isnull=False,
     ):
         for item in (t.expression if isinstance(t.expression, list) else []):
             if isinstance(item, dict) and item.get("type", "") in expr_values:
-                result.append({
+                entities.append({
                     "target_id": t.target_id,
-                    "bid": float(t.bid) if t.bid else 0.0,
+                    "bid": float(t.bid) if t.bid else None,
                     "expr_type": item.get("type", ""),
                     "ad_group_id": t.ad_group_id,
                 })
+                ad_group_ids.add(t.ad_group_id)
                 break
+
+    # 竞价继承：个体 bid → 广告组 default_bid；两者都为空则过滤
+    ad_group_bid_map = _load_ad_group_bid_map(ad_group_ids, profile_id)
+    result: list[dict[str, Any]] = []
+    for e in entities:
+        if e["bid"] is None:
+            inherited = ad_group_bid_map.get(e["ad_group_id"])
+            if inherited is None:
+                continue
+            e["bid"] = inherited
+        result.append(e)
     return result
 
 
@@ -331,42 +363,72 @@ def _get_manual_keywords(
     campaign_id: int,
     profile_id: int,
 ) -> list[dict[str, Any]]:
-    """查手动广告的所有开启关键词（状态=启用, 竞价不为空）。"""
-    return [
-        {
+    """查手动广告的所有开启关键词（状态=启用）。
+
+    关键词当前生效竞价 = 个体竞价 OR 广告组竞价。
+    """
+    entities: list[dict[str, Any]] = []
+    ad_group_ids: set[int] = set()
+    for k in LxSpKeyword.objects.filter(
+        campaign_id=campaign_id,
+        profile_id=profile_id,
+        state="enabled",
+    ):
+        entities.append({
             "keyword_id": k.keyword_id,
-            "bid": float(k.bid) if k.bid else 0.0,
+            "bid": float(k.bid) if k.bid else None,
             "ad_group_id": k.ad_group_id,
             "keyword_text": k.keyword_text,
-        }
-        for k in LxSpKeyword.objects.filter(
-            campaign_id=campaign_id,
-            profile_id=profile_id,
-            state="enabled",
-            bid__isnull=False,
-        )
-    ]
+        })
+        ad_group_ids.add(k.ad_group_id)
+
+    # 竞价继承：个体 bid → 广告组 default_bid；两者都为空则过滤
+    ad_group_bid_map = _load_ad_group_bid_map(ad_group_ids, profile_id)
+    result: list[dict[str, Any]] = []
+    for e in entities:
+        if e["bid"] is None:
+            inherited = ad_group_bid_map.get(e["ad_group_id"])
+            if inherited is None:
+                continue
+            e["bid"] = inherited
+        result.append(e)
+    return result
 
 
 def _get_manual_product_targets(
     campaign_id: int,
     profile_id: int,
 ) -> list[dict[str, Any]]:
-    """查手动广告的商品投放（LxSpTarget, expression_type=manual, 状态=启用, 竞价不为空）。"""
-    return [
-        {
+    """查手动广告的商品投放（LxSpTarget, expression_type=manual, 状态=启用）。
+
+    关键词当前生效竞价 = 个体竞价 OR 广告组竞价。
+    """
+    entities: list[dict[str, Any]] = []
+    ad_group_ids: set[int] = set()
+    for t in LxSpTarget.objects.filter(
+        campaign_id=campaign_id,
+        profile_id=profile_id,
+        expression_type="manual",
+        state="enabled",
+    ):
+        entities.append({
             "target_id": t.target_id,
-            "bid": float(t.bid) if t.bid else 0.0,
+            "bid": float(t.bid) if t.bid else None,
             "ad_group_id": t.ad_group_id,
-        }
-        for t in LxSpTarget.objects.filter(
-            campaign_id=campaign_id,
-            profile_id=profile_id,
-            expression_type="manual",
-            state="enabled",
-            bid__isnull=False,
-        )
-    ]
+        })
+        ad_group_ids.add(t.ad_group_id)
+
+    # 竞价继承：个体 bid → 广告组 default_bid；两者都为空则过滤
+    ad_group_bid_map = _load_ad_group_bid_map(ad_group_ids, profile_id)
+    result: list[dict[str, Any]] = []
+    for e in entities:
+        if e["bid"] is None:
+            inherited = ad_group_bid_map.get(e["ad_group_id"])
+            if inherited is None:
+                continue
+            e["bid"] = inherited
+        result.append(e)
+    return result
 
 
 # ============================================================
@@ -659,15 +721,21 @@ def _execute_targeting_bid_item(
             metrics = target_metrics.get(entity_id)
             entity_label = f"定位组/商品投放 {entity_id}"
 
+        # 无报表数据时的处理：
+        #   - 没有条件组 → 数据不影响决策，构造全 0 指标继续竞价比对
+        #   - 有条件组 → 无法评估条件，必须跳过
         if metrics is None:
-            plans.append({
-                "实体类型": etype,
-                "实体ID": entity_id,
-                "实体名称": entity_label,
-                "结果": "跳过",
-                "原因": "无报表数据",
-            })
-            continue
+            if condition_sets:
+                plans.append({
+                    "实体类型": etype,
+                    "实体ID": entity_id,
+                    "实体名称": entity_label,
+                    "结果": "跳过",
+                    "原因": "无报表数据（有条件组需评估）",
+                })
+                continue
+            # 无条件组 → 构造全零指标，继续竞价比对
+            metrics = _build_metrics_dict(0, 0, 0, 0, 0, 0)
 
         # 条件组 AND 全通过
         conds_failed_reason = ""
