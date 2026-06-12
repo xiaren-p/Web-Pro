@@ -300,7 +300,7 @@ def _load_ad_group_bid_map(
     ad_group_ids: set[int],
     profile_id: int,
 ) -> dict[int, float]:
-    """按广告组 ID 批量查询 default_bid，返回 {ad_group_id: bid} 映射。"""
+    """按广告组 ID 批量查询 default_bid（仅启用状态），返回 {ad_group_id: bid} 映射。"""
     if not ad_group_ids:
         return {}
     return {

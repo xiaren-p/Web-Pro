@@ -596,25 +596,38 @@ def execute_product_targeting_rules() -> dict[str, Any]:
             "结果详情": [], "错误列表": [],
         }
 
-    # ── 竞价继承：个体 bid → 广告组 default_bid → 0 ──
+    # ── 竞价继承 + 广告活动/广告组状态过滤 ──
+    # 优先用商品投放自身 bid，无 bid 则继承广告组 default_bid
+    # 广告组 state != "enabled" 的商品投放直接过滤（不可参与执行）
     ad_group_ids = {t.ad_group_id for t in product_targets_raw}
-    ad_group_bid_map: dict[int, float] = {}
+    ad_group_map: dict[int, tuple[float | None, str]] = {}
     if ad_group_ids:
         for ag in LxSpAdGroup.objects.filter(
             ad_group_id__in=list(ad_group_ids),
-            state="enabled",
-            default_bid__isnull=False,
-        ).only("ad_group_id", "default_bid"):
-            ad_group_bid_map[ag.ad_group_id] = float(ag.default_bid)
+        ).only("ad_group_id", "default_bid", "state"):
+            ad_group_map[ag.ad_group_id] = (
+                float(ag.default_bid) if ag.default_bid is not None else None,
+                ag.state or "",
+            )
 
+    ad_group_skip_count = 0
     product_targets: list[dict] = []
     for t in product_targets_raw:
+        ag_info = ad_group_map.get(t.ad_group_id)
+        ag_state = ag_info[1] if ag_info else ""
+        ag_default_bid = ag_info[0] if ag_info else None
+
+        # 广告组未启用 → 跳过
+        if ag_state != "enabled":
+            ad_group_skip_count += 1
+            continue
+
         if t.bid is not None:
             bid = float(t.bid)
         else:
-            bid = ad_group_bid_map.get(t.ad_group_id)
-            if bid is None:
+            if ag_default_bid is None:
                 continue
+            bid = ag_default_bid
         product_targets.append({
             "target_id": t.target_id,
             "campaign_id": t.campaign_id,
@@ -625,8 +638,8 @@ def execute_product_targeting_rules() -> dict[str, Any]:
         })
 
     logger.info(
-        "[executor_product_targeting] 扫描到 %d 个启用商品投放",
-        len(product_targets),
+        "[executor_product_targeting] 扫描到 %d 个启用商品投放（广告组未启用跳过 %d 个）",
+        len(product_targets), ad_group_skip_count,
     )
 
     # ── 步骤 2：前置周期跳过（仅针对竞价操作，不影响预算/其他操作）──
