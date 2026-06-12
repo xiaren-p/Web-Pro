@@ -290,6 +290,7 @@ def _serialize_rule(
         "group_name": rule._group_name,
         "priority": priority,
         "comparison_target": rule.comparison_target,
+        "comparison_multi_targets": rule.comparison_multi_targets,
         "condition_sets": rule.condition_sets,
         "bid_action": rule.bid_action,
         "budget_action": rule.budget_action,
