@@ -590,25 +590,15 @@ def _execute_targeting_bid_item(
     group_id: int,
     today: date,
 ) -> dict[str, Any]:
-    """执行单条投放竞价操作（targeting_bid_action）。
-
-    流程：
-      1. 筛选投放实体 —— 根据广告类型（自动/手动）和用户选的投放对象，查询实际投放实体
-      2. 执行周期检查 —— 查该实体最近一次成功调整记录，判断是否满足规则组执行周期
-      3. 条件组评估 —— 组间 AND：所有条件组必须全部通过
-      4. 竞价计算 —— 计算调整后竞价
-      5. 输出到本地 JSON 文件（临时，后续改为写 SpBidAdjustment 表）
-    """
+    """对单条 targeting_bid_action 执行筛选投放实体 + 条件组 AND + 竞价计算。"""
+    _ = group_id  # TODO: 从 group_id 查 LxAdRuleGroup.execution_cycle
     targeting_type = campaign.targeting_type or "auto"
     target_groups = tba.get("targetingGroups", []) or []
     unlimited = bool(tba.get("unlimitedTargeting", False))
     condition_sets = tba.get("conditionSets", []) or []
     bid_action = tba.get("bidAction") or {}
 
-    # 获取规则组执行周期（默认 1 天）
-    execution_cycle_days = int(group_id) if group_id else 1
-    # 实际应从规则组表取：这里暂时用 1 天的默认值，后续接入 LxAdRuleGroup.execution_cycle
-    _ = execution_cycle_days  # TODO: 从 group_id 查 LxAdRuleGroup.execution_cycle
+    # 当前执行周期硬编码为 1 天（后续从 LxAdRuleGroup.execution_cycle 取）
 
     bid_type = bid_action.get("type", "")
     if not bid_type or bid_type == "no_adjust":
@@ -710,7 +700,7 @@ def _execute_targeting_bid_item(
             })
             continue
 
-        # 执行周期检查（暂时用默认值 1 天）
+        # 执行周期检查（当前硬编码 1 天，后续从 LxAdRuleGroup 取）
         can_exec, reason = _check_last_adjustment(
             etype, entity_id,
             campaign.campaign_id, campaign.profile_id,
@@ -742,14 +732,7 @@ def _execute_targeting_bid_item(
             continue
 
         if new_bid == current_bid:
-            plans.append({
-                "实体类型": etype,
-                "实体ID": entity_id,
-                "实体名称": entity_label,
-                "结果": "无需调整",
-                "原因": "调整前后竞价未变化",
-                "当前竞价": current_bid,
-            })
+            # 调整前后竞价相同，不写表
             continue
 
         plans.append({
