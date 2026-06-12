@@ -50,7 +50,8 @@ def _check_shop_match(rule: LxAdRule, profile_id: int) -> bool:
     shop_list: list = rule.shops or []
     if not shop_list:
         return True
-    return profile_id in shop_list
+    # shops 列中存储的是字符串格式的 profile_id，需统一为字符串做精确匹配
+    return str(profile_id) in (str(s) for s in shop_list)
 
 
 # ============================================================
@@ -98,21 +99,25 @@ def _check_effective_period(
     effective_type = rule.effective_type
 
     if effective_type == EffectiveType.WITHIN_DAYS:
-        if creation_date is None:
-            return False
         start = rule.effective_days_start
         end = rule.effective_days_end
-        if start is None or end is None:
+        # 天数字段均未配置 → 视为不限时间（始终命中）
+        if start is None and end is None:
+            return True
+        # 已配置天数但 creation_date 缺失或参数不完整 → 无法计算窗口，跳过
+        if creation_date is None or start is None or end is None:
             return False
         window_start = creation_date + timedelta(days=start)
         window_end = creation_date + timedelta(days=end)
         return window_start <= today <= window_end
 
     if effective_type == EffectiveType.BEYOND_DAYS:
-        if creation_date is None:
-            return False
         start = rule.effective_days_start
+        # 天数字段未配置 → 视为不限时间（始终命中）
         if start is None:
+            return True
+        # 已配置天数但 creation_date 缺失 → 无法计算阈值，跳过
+        if creation_date is None:
             return False
         threshold = creation_date + timedelta(days=start)
         return today > threshold
