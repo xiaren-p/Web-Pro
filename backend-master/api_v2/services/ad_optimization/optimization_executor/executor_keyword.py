@@ -15,9 +15,8 @@
 单条规则流程（_execute_single_rule）：
   a. 分时策略联动——linked_time_rules / linked_time_rules_exclude 判断
   b. 规则级条件组（组间 AND）——查关键词报表，所有组必须全通过
-  c. 投放竞价操作——每条 targeting_bid_action 独立评估、独立执行
+  c. 竞价操作——检查条件组 → 调整竞价 → 写 SpBidAdjustment 表
   d. 预算操作（占位）/ 其他操作（占位）
-  e. 输出到本地 JSON 调试文件（临时）
 """
 from __future__ import annotations
 
@@ -31,7 +30,6 @@ from api_v1.models.lingxing.ads.basic.lx_sp_ad_group import LxSpAdGroup
 from api_v1.models.lingxing.ads.basic.lx_sp_campaign import LxSpCampaign
 from api_v1.models.lingxing.ads.basic.lx_sp_keyword import LxSpKeyword
 from api_v1.models.lingxing.ads.report.lx_sp_keyword_report import LxSpKeywordReport
-from api_v2.models.ad_time_pricing_hit import AdTimePricingHit
 from api_v2.models.sp_ad_optimization_strategy import SpAdOptimizationStrategy
 from api_v2.models.sp_bid_adjustment import (
     AdjustmentStatusChoices,
@@ -39,63 +37,69 @@ from api_v2.models.sp_bid_adjustment import (
     SpBidAdjustment,
 )
 
+from api_v2.services.ad_optimization.optimization_executor._shared import (
+    BATCH_SIZE,
+    DEFAULT_CONDITION_DAYS,
+    DEFAULT_CYCLE_DAYS,
+    build_metrics_dict,
+    calc_adjusted_bid,
+    check_all_condition_sets,
+    check_time_pricing_link as _shared_check_time_pricing_link,
+    execute_budget_action as _shared_execute_budget_action,
+    execute_other_action as _shared_execute_other_action,
+    get_last_adjustment_time as _shared_get_last_adjustment_time,
+    is_execution_cycle_ok as _shared_is_execution_cycle_ok,
+)
+
 logger = logging.getLogger(__name__)
 
-# 默认执行周期（天），后续从 LxAdRuleGroup.execution_cycle 取
-DEFAULT_CYCLE_DAYS = 1
-
-# 竞价最低保底值
-MIN_BID_FLOOR = 0.02
-
-# 条件组默认查询天数
-DEFAULT_CONDITION_DAYS = 30
-
-# 批量查询分片大小
-BATCH_SIZE = 500
-
-# 比对对象常量
 COMPARISON_TARGET_KEYWORD = "keyword"
 
 
+# ── 本地包装：适配旧调用方签名 ──
+def _build_metrics_dict(*args: Any, **kwargs: Any) -> dict[str, float]:
+    return build_metrics_dict(*args, **kwargs)
+
+
+def _check_time_pricing_link(
+    rule: dict[str, Any], campaign_id: int, profile_id: int,
+) -> bool:
+    return _shared_check_time_pricing_link(
+        rule, campaign_id, profile_id, "[executor_keyword]",
+    )
+
+
+def _check_all_condition_sets(*args: Any, **kwargs: Any) -> tuple[bool, str]:
+    return check_all_condition_sets(*args, **kwargs)
+
+
+def _calc_adjusted_bid(*args: Any, **kwargs: Any) -> float | None:
+    return calc_adjusted_bid(*args, **kwargs)
+
+
+def _get_last_adjustment_time(
+    keyword_id: int, campaign_id: int, profile_id: int,
+) -> datetime | None:
+    return _shared_get_last_adjustment_time(
+        "keyword", keyword_id, campaign_id, profile_id,
+    )
+
+
+def _is_execution_cycle_ok(*args: Any, **kwargs: Any) -> tuple[bool, str]:
+    return _shared_is_execution_cycle_ok(*args, **kwargs)
+
+
+def _execute_budget_action(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    return _shared_execute_budget_action(*args, **kwargs)
+
+
+def _execute_other_action(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    return _shared_execute_other_action(*args, **kwargs)
+
+
 # ============================================================
-# 指标聚合与报表查询
+# 报表查询（维度专属，不可抽离）
 # ============================================================
-
-def _build_metrics_dict(
-    impressions: float,
-    clicks: float,
-    cost: float,
-    orders: float,
-    sales: float,
-    units: float,
-) -> dict[str, float]:
-    """由聚合值构建标准化指标字典。
-
-    Args:
-        impressions: 曝光量汇总
-        clicks: 点击量汇总
-        cost: 花费汇总
-        orders: 订单数汇总
-        sales: 销售额汇总
-        units: 销量汇总
-
-    Returns:
-        包含基础指标与衍生指标的字典。
-    """
-    return {
-        "impressions": impressions, "clicks": clicks,
-        "cost": cost, "spend": cost,
-        "orders": orders, "sales": sales,
-        "adssales": sales, "units": units, "adsvolume": units,
-        "cpa": cost / orders if orders > 0 else 0.0,
-        "acos": (cost / sales * 100) if sales > 0 else 0.0,
-        "roas": (sales / cost) if cost > 0 else 0.0,
-        "cpc": cost / clicks if clicks > 0 else 0.0,
-        "ctr": (clicks / impressions * 100) if impressions > 0 else 0.0,
-        "cvr": (orders / clicks * 100) if clicks > 0 else 0.0,
-        "spendspercent": 0.0, "adssalespercent": 0.0,
-    }
-
 
 def _query_keyword_report(
     keyword_id: int,
@@ -143,242 +147,7 @@ def _query_keyword_report(
 
 
 # ============================================================
-# 分时策略联动
-# ============================================================
-
-def _check_time_pricing_link(rule: dict[str, Any], campaign_id: int, profile_id: int) -> bool:
-    """分时策略联动检查。
-
-    Args:
-        rule: 规则 JSON
-        campaign_id: 广告活动 ID
-        profile_id: 店铺 ID
-
-    Returns:
-        True 表示通过。
-    """
-    linked_ids = rule.get("linked_time_rules") or []
-    exclude_ids = rule.get("linked_time_rules_exclude") or []
-    if not linked_ids and not exclude_ids:
-        return True
-
-    try:
-        hit = AdTimePricingHit.objects.filter(
-            campaign_id=campaign_id, profile_id=profile_id,
-        ).first()
-    except Exception as exc:
-        logger.warning(
-            "[executor_keyword] 查分时记录失败 campaign=%d: %s",
-            campaign_id, exc, exc_info=True,
-        )
-        return False
-
-    hit_rule_ids: set[str] = set()
-    if hit and hit.hit_time_pricing_rules:
-        hit_rule_ids = set(str(hit.hit_time_pricing_rules).split(","))
-
-    if exclude_ids:
-        if hit_rule_ids & {str(x) for x in exclude_ids}:
-            return False
-    if linked_ids:
-        if not (hit_rule_ids & {str(x) for x in linked_ids}):
-            return False
-
-    return True
-
-
-# ============================================================
-# 条件评估
-# ============================================================
-
-def _evaluate_single_condition(actual: float, operator: str, target: float) -> bool:
-    """评估单个条件（实际值 vs 阈值）。
-
-    Args:
-        actual: 实际指标值
-        operator: 比较操作符
-        target: 阈值
-
-    Returns:
-        True 表示条件成立。
-    """
-    if operator == ">":
-        return actual > target
-    if operator == "<":
-        return actual < target
-    if operator == ">=":
-        return actual >= target
-    if operator == "<=":
-        return actual <= target
-    if operator == "==":
-        return actual == target
-    if operator == "!=":
-        return actual != target
-    logger.warning("[executor_keyword] 未知操作符 %s", operator)
-    return False
-
-
-def _evaluate_condition_set(condition_set: dict[str, Any], metrics: dict[str, float]) -> bool:
-    """评估单个条件组（组内 AND），支持区间模式。
-
-    Args:
-        condition_set: 条件组 JSON
-        metrics: 指标字典
-
-    Returns:
-        True 表示该组全部通过。
-    """
-    conditions = condition_set.get("conditions") or []
-    if not conditions:
-        return True
-
-    for cond in conditions:
-        metric_key = str(cond.get("metric", "")).lower()
-        operator = str(cond.get("operator", ">"))
-        value = float(cond.get("value", 0) or 0)
-
-        actual = metrics.get(metric_key)
-        if actual is None:
-            return False
-        if not _evaluate_single_condition(actual, operator, value):
-            return False
-        if bool(cond.get("isRange", False)):
-            operator2 = str(cond.get("operator2", "<"))
-            value2 = float(cond.get("value2", 0) or 0)
-            if not _evaluate_single_condition(actual, operator2, value2):
-                return False
-
-    return True
-
-
-def _check_all_condition_sets(rule: dict[str, Any], metrics: dict[str, float] | None) -> tuple[bool, str]:
-    """检查规则的所有条件组是否全部通过（组间 AND）。
-
-    Args:
-        rule: 规则 JSON
-        metrics: 指标字典
-
-    Returns:
-        (是否通过, 失败原因)。
-    """
-    condition_sets = rule.get("condition_sets") or []
-    if not condition_sets:
-        return True, ""
-    if metrics is None:
-        return False, "无报表数据"
-    for cs in condition_sets:
-        if not _evaluate_condition_set(cs, metrics):
-            days = cs.get("days", "?")
-            return False, f"条件组（近{days}天）未通过"
-    return True, ""
-
-
-# ============================================================
-# 竞价计算
-# ============================================================
-
-def _calc_adjusted_bid(current_bid: float, bid_action: dict[str, Any]) -> float | None:
-    """根据竞价操作类型计算调整后的竞价。
-
-    支持四种操作：百分比降低/提高、固定值降低/提高。
-    调整后竞价不低于 MIN_BID_FLOOR。
-
-    Args:
-        current_bid: 当前竞价
-        bid_action: {"type", "value", "limit"}
-
-    Returns:
-        调整后竞价或 None（未知类型）。
-    """
-    action_type = bid_action.get("type", "")
-    value = float(bid_action.get("value", 0) or 0)
-    limit = bid_action.get("limit")
-    limit_val = float(limit) if limit is not None else None
-
-    if action_type == "bid_percent_decrease":
-        new_bid = current_bid * (1 - value / 100)
-        if limit_val is not None:
-            new_bid = max(new_bid, limit_val)
-        return max(new_bid, MIN_BID_FLOOR)
-
-    if action_type == "bid_percent_increase":
-        new_bid = current_bid * (1 + value / 100)
-        if limit_val is not None:
-            new_bid = min(new_bid, limit_val)
-        return new_bid
-
-    if action_type == "bid_fixed_decrease":
-        new_bid = current_bid - value
-        if limit_val is not None:
-            new_bid = max(new_bid, limit_val)
-        return max(new_bid, MIN_BID_FLOOR)
-
-    if action_type == "bid_fixed_increase":
-        new_bid = current_bid + value
-        if limit_val is not None:
-            new_bid = min(new_bid, limit_val)
-        return new_bid
-
-    logger.warning("[executor_keyword] 未知竞价操作类型 %s", action_type)
-    return None
-
-
-# ============================================================
-# 执行周期检查
-# ============================================================
-
-def _get_last_adjustment_time(
-    keyword_id: int,
-    campaign_id: int,
-    profile_id: int,
-) -> datetime | None:
-    """查询关键词最近一次竞价调整成功记录的时间。
-
-    Args:
-        keyword_id: 关键词 ID
-        campaign_id: 广告活动 ID
-        profile_id: 店铺 ID
-
-    Returns:
-        adjustment_time 或 None。
-    """
-    last = (
-        SpBidAdjustment.objects
-        .filter(
-            campaign_id=campaign_id,
-            profile_id=profile_id,
-            keyword_id=keyword_id,
-            execution_type=ExecutionTypeChoices.BID_ADJUSTMENT,
-            adjustment_status=AdjustmentStatusChoices.SUCCESS,
-        )
-        .order_by("-adjustment_time")
-        .first()
-    )
-    if last and last.adjustment_time:
-        return last.adjustment_time
-    return None
-
-
-def _is_execution_cycle_ok(last_time: datetime | None, cycle_days: int) -> tuple[bool, str]:
-    """判断执行周期是否已满足。
-
-    Args:
-        last_time: 上次执行时间
-        cycle_days: 执行周期天数
-
-    Returns:
-        (是否满足, 原因说明)。
-    """
-    if last_time is None:
-        return True, "首次调整，无历史记录"
-    days_since = (datetime.now(dt_timezone.utc) - last_time).days
-    if days_since < cycle_days:
-        return False, f"执行周期未到（距上次 {days_since} 天，需 ≥ {cycle_days} 天）"
-    return True, f"距上次 {days_since} 天，周期满足"
-
-
-# ============================================================
-# 投放竞价操作
+# 投放竞价操作（维度专属）
 # ============================================================
 
 def _execute_targeting_bid_actions(
@@ -418,51 +187,6 @@ def _execute_targeting_bid_actions(
             "limit": bid_action.get("limit"),
         },
     }], True
-
-
-# ============================================================
-# 预算操作 / 其他操作（占位）
-# ============================================================
-
-def _execute_budget_action(rule: dict[str, Any]) -> dict[str, Any]:
-    """规则级预算操作（占位）。
-
-    Args:
-        rule: 规则 JSON
-
-    Returns:
-        预算操作结果。
-    """
-    budget_action = rule.get("budget_action") or {}
-    action_type = (budget_action or {}).get("type", "") if isinstance(budget_action, dict) else ""
-    if not action_type or action_type == "no_adjust":
-        return {"操作": "预算操作", "状态": "跳过", "原因": "无操作或不调整"}
-    return {
-        "操作": "预算操作", "状态": "占位",
-        "类型": action_type,
-        "值": budget_action.get("value"),
-        "上限": budget_action.get("limit"),
-    }
-
-
-def _execute_other_action(rule: dict[str, Any]) -> dict[str, Any]:
-    """规则级其他操作——暂停/归档（占位）。
-
-    Args:
-        rule: 规则 JSON
-
-    Returns:
-        其他操作结果。
-    """
-    other_action = rule.get("other_action") or {}
-    action_type = (other_action or {}).get("type", "") if isinstance(other_action, dict) else ""
-    if not action_type or action_type == "no_other":
-        return {"操作": "其他操作", "状态": "跳过", "原因": "无操作"}
-    return {
-        "操作": "其他操作", "状态": "占位",
-        "类型": action_type,
-        "通知": other_action.get("notify", False),
-    }
 
 
 # ============================================================

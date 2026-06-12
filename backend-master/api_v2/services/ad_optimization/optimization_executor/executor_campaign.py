@@ -37,12 +37,19 @@ from api_v1.models.lingxing.ads.basic.lx_sp_target import LxSpTarget
 from api_v1.models.lingxing.ads.report.lx_sp_campaign_report import LxSpCampaignReport
 from api_v1.models.lingxing.ads.report.lx_sp_keyword_report import LxSpKeywordReport
 from api_v1.models.lingxing.ads.report.lx_sp_target_report import LxSpTargetReport
-from api_v2.models.ad_time_pricing_hit import AdTimePricingHit
 from api_v2.models.sp_ad_optimization_strategy import SpAdOptimizationStrategy
 from api_v2.models.sp_bid_adjustment import (
     AdjustmentStatusChoices,
     ExecutionTypeChoices,
     SpBidAdjustment,
+)
+
+from api_v2.services.ad_optimization.optimization_executor._shared import (
+    EXPR_TYPE_AUTO_MAP,
+    build_metrics_dict,
+    calc_adjusted_bid,
+    check_time_pricing_link as _shared_check_time_pricing_link,
+    evaluate_condition_set,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,14 +59,6 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 COMPARISON_TARGET_CAMPAIGN = "campaign"
-
-# 前端 targetGroup 值 → LxSpTarget.expression 中实际存储的 type 值
-_EXPR_TYPE_AUTO_MAP = {
-    "close_match": "closeMatch",
-    "loose_match": "looseMatch",
-    "substitutes": "substitutes",
-    "complements": "complements",
-}
 
 
 def _parse_creation_date(raw_val: Any) -> date | None:
@@ -81,26 +80,8 @@ def _build_metrics_dict(
     sales: float,
     units: float,
 ) -> dict[str, float]:
-    """由聚合值构建标准化指标字典。"""
-    return {
-        "impressions": impressions,
-        "clicks": clicks,
-        "cost": cost,
-        "spend": cost,
-        "orders": orders,
-        "sales": sales,
-        "adssales": sales,
-        "units": units,
-        "adsvolume": units,
-        "cpa": cost / orders if orders > 0 else 0.0,
-        "acos": (cost / sales * 100) if sales > 0 else 0.0,
-        "roas": (sales / cost) if cost > 0 else 0.0,
-        "cpc": cost / clicks if clicks > 0 else 0.0,
-        "ctr": (clicks / impressions * 100) if impressions > 0 else 0.0,
-        "cvr": (orders / clicks * 100) if clicks > 0 else 0.0,
-        "spendspercent": 0.0,
-        "adssalespercent": 0.0,
-    }
+    """由聚合值构建标准化指标字典（委托 _shared.build_metrics_dict）。"""
+    return build_metrics_dict(impressions, clicks, cost, orders, sales, units)
 
 
 # ============================================================
@@ -112,7 +93,7 @@ def _check_time_pricing_link(
     campaign_id: int,
     profile_id: int,
 ) -> bool:
-    """检查规则中"关联分时策略 / 排除分时策略"是否满足。
+    """检查规则中"关联分时策略 / 排除分时策略"是否满足（委托 _shared）。
 
     逻辑：
       - 规则中 linked_time_rules（关联分时）和 linked_time_rules_exclude（排除分时）
@@ -121,36 +102,7 @@ def _check_time_pricing_link(
       - 如果设置了排除列表，且命中的分时 ID 在排除列表中 → 不通过
       - 如果设置了关联列表，且命中的分时 ID 不在关联列表中 → 不通过
     """
-    linked_ids = rule.get("linked_time_rules") or []
-    exclude_ids = rule.get("linked_time_rules_exclude") or []
-
-    if not linked_ids and not exclude_ids:
-        return True
-
-    try:
-        hit = AdTimePricingHit.objects.filter(
-            campaign_id=campaign_id,
-            profile_id=profile_id,
-        ).first()
-    except Exception as e:
-        logger.warning("[executor_campaign] 查分时命中记录失败: %s", e, exc_info=True)
-        return False
-
-    hit_ids: set[str] = set()
-    if hit and hit.hit_time_pricing_rules:
-        hit_ids = set(str(hit.hit_time_pricing_rules).split(","))
-
-    if exclude_ids:
-        exclude_set = {str(x) for x in exclude_ids}
-        if hit_ids & exclude_set:
-            return False
-
-    if linked_ids:
-        linked_set = {str(x) for x in linked_ids}
-        if not (hit_ids & linked_set):
-            return False
-
-    return True
+    return _shared_check_time_pricing_link(rule, campaign_id, profile_id, "[executor_campaign]")
 
 
 # ============================================================
@@ -304,7 +256,7 @@ def _get_auto_targets(
     """
     if not target_groups:
         return []
-    expr_values = {_EXPR_TYPE_AUTO_MAP.get(tg, tg) for tg in target_groups}
+    expr_values = {EXPR_TYPE_AUTO_MAP.get(tg, tg) for tg in target_groups}
 
     entities: list[dict[str, Any]] = []
     ad_group_ids: set[int] = set()
@@ -428,62 +380,16 @@ def _check_campaign_min_days(
     return (today - creation_date).days >= min_days
 
 
-def _evaluate_single_condition(
-    metric_value: float,
-    operator: str,
-    target_value: float,
-) -> bool:
-    """评估单个条件（实际值 vs 阈值）。"""
-    if operator == ">":
-        return metric_value > target_value
-    if operator == "<":
-        return metric_value < target_value
-    if operator == ">=":
-        return metric_value >= target_value
-    if operator == "<=":
-        return metric_value <= target_value
-    if operator == "==":
-        return metric_value == target_value
-    if operator == "!=":
-        return metric_value != target_value
-    logger.warning("[executor_campaign] 未知操作符: %s", operator)
-    return False
-
-
 def _evaluate_condition_set(
     condition_set: dict[str, Any],
     metrics: dict[str, float],
 ) -> bool:
-    """评估单个条件组。
+    """评估单个条件组（委托 _shared.evaluate_condition_set）。
 
     组内 AND：所有条件必须全部通过。
     支持区间模式（isRange + operator2 + value2，如 10 < 花费 < 50）。
     """
-    conditions = condition_set.get("conditions", []) or []
-    if not conditions:
-        return True
-
-    for cond in conditions:
-        metric_key = str(cond.get("metric", "")).lower()
-        operator = str(cond.get("operator", ">"))
-        value = float(cond.get("value", 0) or 0)
-
-        actual = metrics.get(metric_key)
-        if actual is None:
-            logger.warning("[executor_campaign] 指标不支持: %s", metric_key)
-            return False
-
-        if not _evaluate_single_condition(actual, operator, value):
-            return False
-
-        # 区间模式：还要检查上限
-        if bool(cond.get("isRange", False)):
-            op2 = str(cond.get("operator2", "<"))
-            v2 = float(cond.get("value2", 0) or 0)
-            if not _evaluate_single_condition(actual, op2, v2):
-                return False
-
-    return True
+    return evaluate_condition_set(condition_set, metrics)
 
 
 def _check_condition_sets(
@@ -523,47 +429,11 @@ def _calc_bid_from_action(
     current_bid: float,
     bid_action: dict[str, Any],
 ) -> float | None:
-    """根据竞价操作类型计算调整后的竞价。
-
-    支持四种类型：
-      - 竞价百分比降低：新竞价 = 当前竞价 × (1 - 百分比/100)，不低于下限
-      - 竞价百分比提高：新竞价 = 当前竞价 × (1 + 百分比/100)，不高于上限
-      - 竞价固定降低：新竞价 = 当前竞价 - 固定值，不低于下限
-      - 竞价固定提高：新竞价 = 当前竞价 + 固定值，不高于上限
+    """根据竞价操作类型计算调整后的竞价（委托 _shared.calc_adjusted_bid）。
 
     返回 None 表示操作类型未知（不执行）。
     """
-    action_type = bid_action.get("type", "")
-    value = float(bid_action.get("value", 0) or 0)
-    limit = bid_action.get("limit")
-    limit_val = float(limit) if limit is not None else None
-
-    if action_type == "bid_percent_decrease":
-        new_bid = current_bid * (1 - value / 100)
-        if limit_val is not None:
-            new_bid = max(new_bid, limit_val)
-        return max(new_bid, 0.02)
-
-    if action_type == "bid_percent_increase":
-        new_bid = current_bid * (1 + value / 100)
-        if limit_val is not None:
-            new_bid = min(new_bid, limit_val)
-        return new_bid
-
-    if action_type == "bid_fixed_decrease":
-        new_bid = current_bid - value
-        if limit_val is not None:
-            new_bid = max(new_bid, limit_val)
-        return max(new_bid, 0.02)
-
-    if action_type == "bid_fixed_increase":
-        new_bid = current_bid + value
-        if limit_val is not None:
-            new_bid = min(new_bid, limit_val)
-        return new_bid
-
-    logger.warning("[executor_campaign] 未知竞价操作类型: %s", action_type)
-    return None
+    return calc_adjusted_bid(current_bid, bid_action)
 
 
 # ============================================================
@@ -673,7 +543,7 @@ def _execute_targeting_bid_item(
     if not entities:
         return {"action": "投放竞价", "状态": "跳过", "原因": "无匹配的投放实体"}
 
-    # ── 2. 批量查报表（取最大天数一次查完）──
+    # ── 2. 批量查报表（取最大天数一次查完，并按条件组天数预缓存）──
     max_days = 30
     for cs in condition_sets:
         d = int(cs.get("days", 30) or 30)
@@ -685,6 +555,23 @@ def _execute_targeting_bid_item(
 
     target_metrics = _aggregate_target_reports(target_ids, campaign.profile_id, max_days, today)
     keyword_metrics = _aggregate_keyword_reports(keyword_ids, campaign.profile_id, max_days, today)
+
+    # 预缓存：条件组天数 ≠ max_days 时，避免逐实体单独查询
+    _cs_metrics_cache: dict[tuple[int, str], dict[int, dict[str, float]]] = {}
+    for cs in condition_sets:
+        cs_days = int(cs.get("days", 30) or 30)
+        if cs_days == max_days:
+            continue
+        cache_key_kw = (cs_days, "keyword")
+        if cache_key_kw not in _cs_metrics_cache:
+            _cs_metrics_cache[cache_key_kw] = _aggregate_keyword_reports(
+                keyword_ids, campaign.profile_id, cs_days, today,
+            )
+        cache_key_tgt = (cs_days, "target")
+        if cache_key_tgt not in _cs_metrics_cache:
+            _cs_metrics_cache[cache_key_tgt] = _aggregate_target_reports(
+                target_ids, campaign.profile_id, cs_days, today,
+            )
 
     # ── 3. 逐实体评估 → 生成调整计划 ──
     plans: list[dict[str, Any]] = []
@@ -722,12 +609,8 @@ def _execute_targeting_bid_item(
         for cs in condition_sets:
             cs_days = int(cs.get("days", 30) or 30)
             if cs_days != max_days:
-                if etype == "keyword":
-                    m = _aggregate_keyword_reports([entity_id], campaign.profile_id, cs_days, today)
-                    filtered = m.get(entity_id)
-                else:
-                    m = _aggregate_target_reports([entity_id], campaign.profile_id, cs_days, today)
-                    filtered = m.get(entity_id)
+                cache_key = (cs_days, "keyword" if etype == "keyword" else "target")
+                filtered = _cs_metrics_cache.get(cache_key, {}).get(entity_id)
             else:
                 filtered = metrics
 
@@ -1042,6 +925,14 @@ def execute_campaign_rules() -> dict[str, Any]:
             all_strategies[(s.campaign_id, s.profile_id, s.targeting_type)] = s
     logger.info("[executor_campaign] 有策略记录: %d", len(all_strategies))
 
+    # 批量预加载所有需要访问的广告活动（避免循环内 N+1 查询）
+    _campaign_qs = LxSpCampaign.objects.filter(state="enabled").only(
+        "campaign_id", "profile_id", "targeting_type", "creation_date",
+    )
+    campaign_map: dict[tuple[int, int], LxSpCampaign] = {
+        (c.campaign_id, c.profile_id): c for c in _campaign_qs
+    }
+
     # ── 3. 遍历执行 ──
     all_results: list[dict[str, Any]] = []
     errors: list[str] = []
@@ -1061,9 +952,7 @@ def execute_campaign_rules() -> dict[str, Any]:
         if not rules:
             continue
 
-        campaign = LxSpCampaign.objects.filter(
-            campaign_id=cid, profile_id=pid,
-        ).first()
+        campaign = campaign_map.get((cid, pid))
         if campaign is None:
             continue
 
@@ -1079,7 +968,7 @@ def execute_campaign_rules() -> dict[str, Any]:
                 all_results.append(result)
                 executed += 1
                 # 统计是否有真正的竞价变动
-                tba_results = result.get("投放竞价操作", []) or []
+                tba_results = result.get("竞价操作", []) or []
                 bid_effected = any(
                     isinstance(t, dict) and t.get("执行实体数", 0) > 0
                     for t in tba_results
