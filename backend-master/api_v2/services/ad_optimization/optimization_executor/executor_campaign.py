@@ -1063,8 +1063,16 @@ def execute_campaign_rules() -> dict[str, Any]:
             if result is not None:
                 all_results.append(result)
                 executed += 1
-                affected.add((cid, pid))
-                break  # 命中即停
+                # 统计是否有真正的竞价变动
+                tba_results = result.get("投放竞价操作", []) or []
+                bid_effected = any(
+                    isinstance(t, dict) and t.get("执行实体数", 0) > 0
+                    for t in tba_results
+                )
+                if bid_effected:
+                    affected.add((cid, pid))
+                    break  # 竞价已执行，该广告活动后续规则全部跳过
+                # bid_effected=False：条件通过但无竞价变动，继续尝试下一条规则
 
     logger.info(
         "[executor_campaign] 完成: campaign=%d, strategy=%d, executed=%d, affected=%d, errors=%d",

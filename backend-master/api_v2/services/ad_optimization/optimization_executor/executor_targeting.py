@@ -797,7 +797,8 @@ def execute_targeting_rules() -> dict[str, Any]:
                 affected_targets.add(target["target_id"])
                 if bid_done:
                     bid_already_executed = True
-                break  # 命中即停
+                    break  # 竞价已执行，该定位组后续规则全部跳过
+                # bid_done=False：条件通过但竞价无变化，继续尝试下一条规则
 
     logger.info(
         "[executor_targeting] 完成: active=%d, executed=%d, affected=%d, errors=%d",
