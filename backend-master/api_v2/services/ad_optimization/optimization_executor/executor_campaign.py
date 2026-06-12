@@ -587,20 +587,8 @@ def _execute_targeting_bid_item(
             metrics = target_metrics.get(entity_id)
             entity_label = f"定位组/商品投放 {entity_id}"
 
-        # 无报表数据时的处理：
-        #   - 没有条件组 → 数据不影响决策，构造全 0 指标继续竞价比对
-        #   - 有条件组 → 无法评估条件，必须跳过
+        # 无报表数据 → 视为全 0，继续条件评估与竞价比对
         if metrics is None:
-            if condition_sets:
-                plans.append({
-                    "实体类型": etype,
-                    "实体ID": entity_id,
-                    "实体名称": entity_label,
-                    "结果": "跳过",
-                    "原因": "无报表数据（有条件组需评估）",
-                })
-                continue
-            # 无条件组 → 构造全零指标，继续竞价比对
             metrics = _build_metrics_dict(0, 0, 0, 0, 0, 0)
 
         # 条件组 AND 全通过

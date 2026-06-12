@@ -242,7 +242,7 @@ def evaluate_condition_set(
 
         actual = metrics.get(metric_key)
         if actual is None:
-            return False
+            actual = 0.0
 
         if not evaluate_single_condition(actual, operator, value):
             return False
@@ -274,7 +274,8 @@ def check_all_condition_sets(
         return True, ""
 
     if metrics is None:
-        return False, "无报表数据"
+        # 无报表数据视为全 0，继续评估条件
+        metrics = {}
 
     for cs in condition_sets:
         if not evaluate_condition_set(cs, metrics):
