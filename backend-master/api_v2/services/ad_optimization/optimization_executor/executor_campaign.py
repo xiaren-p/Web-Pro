@@ -46,10 +46,15 @@ from api_v2.models.sp_bid_adjustment import (
 
 from api_v2.services.ad_optimization.optimization_executor._shared import (
     EXPR_TYPE_AUTO_MAP,
+    apply_bid_update,
     build_metrics_dict,
     calc_adjusted_bid,
     check_time_pricing_link as _shared_check_time_pricing_link,
     evaluate_condition_set,
+    execute_budget_action as _shared_execute_budget_action,
+    execute_pause_archive_action,
+    resolve_adjustment_status,
+    resolve_rules,
 )
 
 logger = logging.getLogger(__name__)
@@ -716,35 +721,27 @@ def _execute_budget_action(
     rule: dict[str, Any],
     campaign: LxSpCampaign,
 ) -> dict[str, Any]:
-    """规则级预算操作 —— 占位。"""
-    budget_action = rule.get("budget_action") or {}
-    action_type = (budget_action or {}).get("type", "") if isinstance(budget_action, dict) else ""
-    if not action_type or action_type == "no_adjust":
-        return {"action": "预算操作", "状态": "跳过", "原因": "无操作或不调整"}
-    return {
-        "action": "预算操作",
-        "状态": "占位",
-        "操作类型": action_type,
-        "值": budget_action.get("value", 0),
-        "上限": budget_action.get("limit"),
-    }
+    """规则级预算操作 —— 委托 _shared。"""
+    _ = campaign  # 预算操作暂时不依赖 campaign
+    return _shared_execute_budget_action(rule)
 
 
 def _execute_other_action(
     rule: dict[str, Any],
     campaign: LxSpCampaign,
 ) -> dict[str, Any]:
-    """规则级其他操作 —— 占位（暂停/归档）。"""
-    other_action = rule.get("other_action") or {}
-    action_type = (other_action or {}).get("type", "") if isinstance(other_action, dict) else ""
-    if not action_type or action_type == "no_other":
-        return {"action": "其他操作", "状态": "跳过", "原因": "无操作"}
-    return {
-        "action": "其他操作",
-        "状态": "占位",
-        "操作类型": action_type,
-        "通知": other_action.get("notify", False),
-    }
+    """规则级暂停/归档操作 —— 委托 _shared.execute_pause_archive_action。
+
+    广告活动维度：entity_type="campaign"，不传 entity_id。
+    """
+    from api_v2.models.sp_ad_pause_archive import PauseArchiveEntityType
+
+    return execute_pause_archive_action(
+        rule,
+        campaign_id=campaign.campaign_id,
+        profile_id=campaign.profile_id,
+        entity_type=PauseArchiveEntityType.CAMPAIGN,
+    )
 
 
 # ============================================================
@@ -801,14 +798,23 @@ def _execute_campaign_rule(
             entity_id = p.get("实体ID")
             if entity_id is None:
                 continue
+            bid_before_val = p.get("调整前竞价")
+            bid_after_val = p.get("调整后竞价")
+            adj_status, exec_status, msg = resolve_adjustment_status(
+                campaign.campaign_id, campaign.profile_id,
+                float(bid_before_val) if bid_before_val else 0.0,
+                float(bid_after_val) if bid_after_val else 0.0,
+            )
             record = SpBidAdjustment(
                 campaign_id=campaign.campaign_id,
                 profile_id=campaign.profile_id,
                 execution_type=ExecutionTypeChoices.BID_ADJUSTMENT,
                 auto_rule_id=rule.get("rule_id"),
-                bid_before=p.get("调整前竞价"),
-                bid_after=p.get("调整后竞价"),
-                adjustment_status=AdjustmentStatusChoices.PENDING,
+                bid_before=bid_before_val,
+                bid_after=bid_after_val,
+                adjustment_status=adj_status,
+                execution_status=exec_status,
+                msg=msg,
                 adjustment_time=now,
             )
             if entity_type == "keyword":
@@ -818,6 +824,12 @@ def _execute_campaign_rule(
             records.append(record)
         if records:
             SpBidAdjustment.objects.bulk_create(records, batch_size=500)
+            # 同步更新实体表 bid
+            for rec in records:
+                etype = "keyword" if rec.keyword_id else "target"
+                eid = rec.keyword_id or rec.target_id
+                if eid:
+                    apply_bid_update(etype, eid, float(rec.bid_after or 0))
             total_written += len(records)
 
     if total_written > 0:
@@ -909,7 +921,7 @@ def execute_campaign_rules() -> dict[str, Any]:
             q |= Q(campaign_id=cid, profile_id=pid)
         for s in SpAdOptimizationStrategy.objects.filter(
             q, rule_updated_today=True,
-        ).exclude(auto_rules=[]):
+        ).exclude(auto_rules=[], manual_rules=[]):
             all_strategies[(s.campaign_id, s.profile_id, s.targeting_type)] = s
     logger.info("[executor_campaign] 有策略记录: %d", len(all_strategies))
 
@@ -936,7 +948,7 @@ def execute_campaign_rules() -> dict[str, Any]:
         if strategy is None:
             continue
 
-        rules = _extract_campaign_rules(strategy.auto_rules)
+        rules = _extract_campaign_rules(resolve_rules(strategy))
         if not rules:
             continue
 

@@ -40,14 +40,17 @@ from api_v2.services.ad_optimization.optimization_executor._shared import (
     BATCH_SIZE,
     DEFAULT_CONDITION_DAYS,
     DEFAULT_CYCLE_DAYS,
+    apply_bid_update,
     calc_adjusted_bid,
     check_all_condition_sets,
     check_time_pricing_link as _shared_check_time_pricing_link,
     execute_budget_action as _shared_execute_budget_action,
-    execute_other_action as _shared_execute_other_action,
+    execute_pause_archive_action,
     get_last_adjustment_time as _shared_get_last_adjustment_time,
     is_execution_cycle_ok as _shared_is_execution_cycle_ok,
     query_target_report,
+    resolve_adjustment_status,
+    resolve_rules,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,9 +92,22 @@ def _execute_budget_action(*args: Any, **kwargs: Any) -> dict[str, Any]:
     return _shared_execute_budget_action(*args, **kwargs)
 
 
-def _execute_other_action(*args: Any, **kwargs: Any) -> dict[str, Any]:
-    return _shared_execute_other_action(*args, **kwargs)
+def _execute_other_action(
+    rule: dict[str, Any], product_target: dict, campaign: LxSpCampaign,
+) -> dict[str, Any]:
+    """规则级暂停/归档操作 —— 委托 _shared.execute_pause_archive_action。
 
+    商品投放维度：entity_type="product_targeting"，传入 target_id。
+    """
+    from api_v2.models.sp_ad_pause_archive import PauseArchiveEntityType
+
+    return execute_pause_archive_action(
+        rule,
+        campaign_id=campaign.campaign_id,
+        profile_id=campaign.profile_id,
+        entity_type=PauseArchiveEntityType.PRODUCT_TARGETING,
+        entity_id=product_target["target_id"],
+    )
 
 # ============================================================
 # 报表查询（维度专属，不可抽离）
@@ -208,7 +224,7 @@ def _execute_single_rule(
 
     targeting_results, bid_executed = _execute_targeting_bid_actions(rule, product_target, campaign, today)
     budget_result = _execute_budget_action(rule)
-    other_result = _execute_other_action(rule)
+    other_result = _execute_other_action(rule, product_target, campaign)
 
     # ── 写 SpBidAdjustment 表（仅竞价变动时写入）──
     if bid_executed:
@@ -218,17 +234,27 @@ def _execute_single_rule(
             if isinstance(tba_result, dict) and tba_result.get("状态") == "待执行":
                 new_bid = tba_result.get("调整后竞价")
                 break
+        bid_before = float(product_target["bid"]) if product_target["bid"] else 0.0
+        adj_status, exec_status, msg = resolve_adjustment_status(
+            campaign.campaign_id, campaign.profile_id,
+            bid_before, float(new_bid) if new_bid else 0.0,
+        )
         SpBidAdjustment.objects.create(
             target_id=product_target["target_id"],
             campaign_id=campaign.campaign_id,
             profile_id=campaign.profile_id,
             execution_type=ExecutionTypeChoices.BID_ADJUSTMENT,
             auto_rule_id=rule.get("rule_id"),
-            bid_before=float(product_target["bid"]) if product_target["bid"] else 0.0,
+            bid_before=bid_before,
             bid_after=new_bid,
-            adjustment_status=AdjustmentStatusChoices.PENDING,
+            adjustment_status=adj_status,
+            execution_status=exec_status,
+            msg=msg,
             adjustment_time=now,
         )
+        # 同步更新实体表 bid
+        if new_bid is not None:
+            apply_bid_update("target", product_target["target_id"], float(new_bid))
         logger.info(
             "[executor_product_targeting] 写入 SpBidAdjustment pt=%d campaign=%d bid=%.4f→%.4f",
             product_target["target_id"], campaign.campaign_id,
@@ -386,7 +412,7 @@ def execute_product_targeting_rules() -> dict[str, Any]:
 
         strategy_qs = SpAdOptimizationStrategy.objects.filter(
             q, rule_updated_today=True, targeting_type="manual",
-        ).exclude(auto_rules=[])
+        ).exclude(auto_rules=[], manual_rules=[])
         for s in strategy_qs:
             key = (s.campaign_id, s.profile_id, s.targeting_type)
             strategy_map[key] = s
@@ -412,7 +438,7 @@ def execute_product_targeting_rules() -> dict[str, Any]:
         if strategy is None:
             continue
 
-        rules = _extract_product_targeting_rules(strategy.auto_rules)
+        rules = _extract_product_targeting_rules(resolve_rules(strategy))
         if not rules:
             continue
 

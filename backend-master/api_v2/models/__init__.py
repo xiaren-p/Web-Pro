@@ -12,6 +12,11 @@ from api_v2.models.sp_bid_adjustment import (
     SpBidAdjustment,
 )
 from api_v2.models.lx_api_err import LxApiErr
+from api_v2.models.sp_ad_pause_archive import (
+    PauseArchiveEntityType,
+    PauseArchiveExecutionType,
+    SpAdPauseArchive,
+)
 from api_v2.models.sp_ad_optimization_strategy import (
     SpAdOptimizationStrategy,
 )
@@ -35,4 +40,7 @@ __all__ = [
     'ExecutionStatusChoices',
     'LxApiErr',
     'SpAdOptimizationStrategy',
+    'SpAdPauseArchive',
+    'PauseArchiveExecutionType',
+    'PauseArchiveEntityType',
 ]

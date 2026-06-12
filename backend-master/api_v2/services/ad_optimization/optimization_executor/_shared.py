@@ -13,9 +13,16 @@ from typing import Any
 from django.db.models import Sum
 
 from api_v1.models.lingxing.ads.report.lx_sp_target_report import LxSpTargetReport
-from api_v2.models.ad_time_pricing_hit import AdTimePricingHit
+from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
+from api_v2.models.sp_ad_optimization_strategy import ManualRulesStatus, SpAdOptimizationStrategy
+from api_v2.models.sp_ad_pause_archive import (
+    PauseArchiveEntityType,
+    PauseArchiveExecutionType,
+    SpAdPauseArchive,
+)
 from api_v2.models.sp_bid_adjustment import (
     AdjustmentStatusChoices,
+    ExecutionStatusChoices,
     ExecutionTypeChoices,
     SpBidAdjustment,
 )
@@ -427,15 +434,96 @@ def execute_budget_action(rule: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def execute_other_action(rule: dict[str, Any]) -> dict[str, Any]:
-    """规则级其他操作——暂停/归档（占位）。
+def execute_pause_archive_action(
+    rule: dict[str, Any],
+    campaign_id: int,
+    profile_id: int,
+    entity_type: str,
+    entity_id: int | None = None,
+) -> dict[str, Any]:
+    """执行规则级暂停/归档操作：写 SpAdPauseArchive 表 + 更新实体状态。
+
+    TODO: 归档（archive）目前统一按暂停（pause）处理，execution_type 写 PAUSE，
+          实体状态更新为 "paused"。两者当前效果一致，后续如需区分再调整。
 
     Args:
         rule: 规则 JSON
+        campaign_id: 广告活动 ID
+        profile_id: 店铺 ID
+        entity_type: 投放实体类型（"campaign" / "targeting" / "keyword" / "product_targeting"）
+        entity_id: 实体 ID（campaign 维度时为 None）
 
     Returns:
-        其他操作结果字典。
+        操作结果字典。
     """
+    other_action = rule.get("other_action") or {}
+    action_type = (other_action or {}).get("type", "") if isinstance(other_action, dict) else ""
+
+    if not action_type or action_type == "no_other":
+        return {"操作": "暂停/归档", "状态": "跳过", "原因": "无操作"}
+
+    # TODO: 归档（archive）当前统一按暂停（pause）执行
+    execution_type = PauseArchiveExecutionType.PAUSE
+    new_state = "paused"
+    now = datetime.now(dt_timezone.utc)
+    rule_name = rule.get("rule_name", "?")
+
+    # 1. 写 SpAdPauseArchive 表
+    record = SpAdPauseArchive(
+        campaign_id=campaign_id,
+        profile_id=profile_id,
+        entity_type=entity_type,
+        execution_type=execution_type,
+        auto_rule_id=rule.get("rule_id"),
+        execution_status=ExecutionStatusChoices.PENDING,
+        execution_time=now,
+        msg=f"规则「{rule_name}」触发{action_type}操作",
+    )
+    if entity_type == PauseArchiveEntityType.KEYWORD and entity_id:
+        record.keyword_id = entity_id
+    elif entity_type in (PauseArchiveEntityType.TARGETING, PauseArchiveEntityType.PRODUCT_TARGETING) and entity_id:
+        record.target_id = entity_id
+    # campaign 维度不设 keyword_id / target_id
+    record.save()
+
+    # 2. 更新实体表状态
+    if entity_type == PauseArchiveEntityType.CAMPAIGN:
+        from api_v1.models.lingxing.ads.basic.lx_sp_campaign import LxSpCampaign
+        LxSpCampaign.objects.filter(
+            campaign_id=campaign_id, profile_id=profile_id,
+        ).update(state=new_state)
+        logger.info(
+            "[_shared] 暂停/归档: entity=campaign campaign=%d state→%s",
+            campaign_id, new_state,
+        )
+    elif entity_type == PauseArchiveEntityType.KEYWORD and entity_id:
+        from api_v1.models.lingxing.ads.basic.lx_sp_keyword import LxSpKeyword
+        LxSpKeyword.objects.filter(keyword_id=entity_id).update(state=new_state)
+        logger.info(
+            "[_shared] 暂停/归档: entity=keyword kw=%d state→%s", entity_id, new_state,
+        )
+    elif entity_type in (PauseArchiveEntityType.TARGETING, PauseArchiveEntityType.PRODUCT_TARGETING) and entity_id:
+        from api_v1.models.lingxing.ads.basic.lx_sp_target import LxSpTarget
+        LxSpTarget.objects.filter(target_id=entity_id).update(state=new_state)
+        logger.info(
+            "[_shared] 暂停/归档: entity=target tg=%d state→%s", entity_id, new_state,
+        )
+
+    return {
+        "操作": "暂停/归档",
+        "状态": "完成",
+        "规则触发的操作类型": action_type,
+        "实际执行类型": execution_type,
+        "实体类型": entity_type,
+        "实体ID": entity_id or campaign_id,
+        "新状态": new_state,
+        "通知": other_action.get("notify", False),
+    }
+
+
+# 保留旧签名兼容占位版本（供 executor 内部包装使用）
+def execute_other_action(rule: dict[str, Any]) -> dict[str, Any]:
+    """规则级其他操作——暂停/归档（占位，仅返回状态不写表）。"""
     other_action = rule.get("other_action") or {}
     action_type = (other_action or {}).get("type", "") if isinstance(other_action, dict) else ""
     if not action_type or action_type == "no_other":
@@ -445,3 +533,100 @@ def execute_other_action(rule: dict[str, Any]) -> dict[str, Any]:
         "类型": action_type,
         "通知": other_action.get("notify", False),
     }
+
+
+# ============================================================
+# 竞价调整状态解析 & 实体 bid 更新
+# ============================================================
+
+def resolve_adjustment_status(
+    campaign_id: int,
+    profile_id: int,
+    bid_before: float,
+    bid_after: float,
+) -> tuple[str, str, str]:
+    """根据分时竞价状态决定 SpBidAdjustment 写入状态。
+
+    查 ad_time_pricing_hit 表，按 is_time_pricing 区分：
+      - is_time_pricing=1（正常分时）→ SUCCESS + SUCCESS + 详细 msg
+      - 无记录 / is_time_pricing=0（无分时）→ PENDING + PENDING
+
+    Args:
+        campaign_id: 广告活动 ID
+        profile_id: 店铺 ID
+        bid_before: 调整前竞价
+        bid_after: 调整后竞价
+
+    Returns:
+        (adjustment_status, execution_status, msg) 三元组。
+    """
+    hit = AdTimePricingHit.objects.filter(
+        campaign_id=campaign_id, profile_id=profile_id,
+    ).first()
+
+    if hit and hit.is_time_pricing == TimePricingHitStatus.YES:
+        return (
+            AdjustmentStatusChoices.SUCCESS,
+            ExecutionStatusChoices.SUCCESS,
+            f"分时生效中，竞价由 {bid_before:.4f} → {bid_after:.4f}，已直接执行",
+        )
+    return (
+        AdjustmentStatusChoices.PENDING,
+        ExecutionStatusChoices.PENDING,
+        "",
+    )
+
+
+def apply_bid_update(
+    entity_type: str,
+    entity_id: int,
+    new_bid: float,
+) -> None:
+    """将调整后的竞价回写到实体表。
+
+    Args:
+        entity_type: 实体类型（"keyword" 或 "target"）
+        entity_id: 实体 ID（关键词 ID 或定位组/商品投放 ID）
+        new_bid: 调整后竞价
+    """
+    from api_v1.models.lingxing.ads.basic.lx_sp_keyword import LxSpKeyword
+    from api_v1.models.lingxing.ads.basic.lx_sp_target import LxSpTarget
+
+    if entity_type == "keyword":
+        LxSpKeyword.objects.filter(keyword_id=entity_id).update(bid=new_bid)
+        logger.info(
+            "[_shared] 更新实体竞价 kw=%d bid=%.4f", entity_id, new_bid,
+        )
+    else:
+        LxSpTarget.objects.filter(target_id=entity_id).update(bid=new_bid)
+        logger.info(
+            "[_shared] 更新实体竞价 tg=%d bid=%.4f", entity_id, new_bid,
+        )
+
+
+# ============================================================
+# 手动/自动规则解析
+# ============================================================
+
+def resolve_rules(strategy: SpAdOptimizationStrategy) -> list[dict[str, Any]]:
+    """根据手动/自动模式返回实际生效的规则列表。
+
+    手动规则 JSON 结构与自动完全一致，仅字段来源不同。
+
+    Args:
+        strategy: SpAdOptimizationStrategy 实例
+
+    Returns:
+        生效的规则 JSON 列表（manual_rules 或 auto_rules）。
+    """
+    from django.utils import timezone as dj_timezone
+
+    if (
+        strategy.is_manual_rules == ManualRulesStatus.YES
+        and (
+            strategy.manual_rules_expiry is None
+            or strategy.manual_rules_expiry > dj_timezone.now()
+        )
+    ):
+        return strategy.manual_rules or []
+    return strategy.auto_rules or []

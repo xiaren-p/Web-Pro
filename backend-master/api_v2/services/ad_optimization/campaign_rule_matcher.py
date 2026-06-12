@@ -170,31 +170,34 @@ def _check_comparison_target_compatibility(
     target = rule.comparison_target
     multi = rule.comparison_multi_targets or []
 
-    # auto campaign 禁止 comparison_target 直接为关键词/商品投放（非 targeting 容器内）
-    if targeting_type == "auto" and target in (
-        ComparisonTarget.KEYWORD,
-        ComparisonTarget.PRODUCT_TARGETING,
-    ):
-        return False
-
-    # comparison_target 为 targeting 时，按 multi_targets 校验兼容性
-    if target == ComparisonTarget.TARGETING:
-        if not multi:
-            return True  # 无多选则不限
-        if targeting_type == "auto":
-            # auto 仅兼容 "targeting"
-            compatible = [
-                t for t in multi
-                if t == ComparisonTarget.TARGETING.value
-            ]
-            return len(compatible) > 0
-        if targeting_type == "manual":
-            # manual 兼容 keyword / product_targeting，不兼容 "targeting"
+    # ── manual campaign ──
+    if targeting_type == "manual":
+        # 直接的 comparison_target 不能是 targeting（定位组是 auto 专属）
+        # 但当 multi 为空时，视为不限 → 匹配通过（分组阶段按 targeting_type 展开到 keyword + product_targeting）
+        if target == ComparisonTarget.TARGETING:
+            return True
+        # targeting 容器：按 multi_targets 校验，只取 keyword / product_targeting
+        if target == ComparisonTarget.TARGETING and multi:
             compatible = [
                 t for t in multi
                 if t in (ComparisonTarget.KEYWORD.value, ComparisonTarget.PRODUCT_TARGETING.value)
             ]
             return len(compatible) > 0
+        return True
+
+    # ── auto campaign ──
+    if targeting_type == "auto":
+        # 不能直接命中 keyword 或 product_targeting
+        if target in (ComparisonTarget.KEYWORD, ComparisonTarget.PRODUCT_TARGETING):
+            return False
+        # targeting 容器：按 multi_targets 校验，只取 "targeting"
+        if target == ComparisonTarget.TARGETING and multi:
+            compatible = [
+                t for t in multi
+                if t == ComparisonTarget.TARGETING.value
+            ]
+            return len(compatible) > 0
+        return True
 
     return True
 
@@ -269,12 +272,14 @@ def _check_field_match(
 def _serialize_rule(
     rule: LxAdRule,
     priority: int,
+    targeting_type: str,
 ) -> dict[str, Any]:
     """将 LxAdRule 实例序列化为 auto_rules 规则 JSON 对象。
 
     Args:
         rule: 广告规则实例
         priority: 优先级值（数字越小越优先）
+        targeting_type: campaign 的投放类型（auto / manual）
 
     Returns:
         规则的 JSON 字典
@@ -287,6 +292,8 @@ def _serialize_rule(
         "priority": priority,
         "comparison_target": rule.comparison_target,
         "comparison_multi_targets": rule.comparison_multi_targets,
+        # 匹配阶段写入投放类型，供 executor 分流使用
+        "targeting_type": targeting_type,
         "condition_sets": rule.condition_sets,
         "bid_action": rule.bid_action,
         "budget_action": rule.budget_action,
@@ -392,7 +399,7 @@ def match_rules_for_campaign(
             rule._group_name = group.name
 
             # 计算优先级并序列化
-            matched_rules.append(_serialize_rule(rule, _calc_priority(group.weight, idx)))
+            matched_rules.append(_serialize_rule(rule, _calc_priority(group.weight, idx), targeting_type))
 
     # 按 comparison_target 分组 —— targeting 按 multi_targets 拆到子维度
     if not matched_rules:
@@ -405,8 +412,14 @@ def match_rules_for_campaign(
         # 投放（targeting）是归类容器，真实维度在 comparison_multi_targets 中
         if ct == ComparisonTarget.TARGETING.value:
             multi = r.get("comparison_multi_targets") or []
+            _tt = r.get("targeting_type", "")
             if multi:
                 for sub in multi:
+                    # targeting_type 不兼容的子维度直接跳过
+                    if _tt == "auto" and sub != ComparisonTarget.TARGETING.value:
+                        continue
+                    if _tt == "manual" and sub == ComparisonTarget.TARGETING.value:
+                        continue
                     if sub in (
                         ComparisonTarget.KEYWORD.value,
                         ComparisonTarget.PRODUCT_TARGETING.value,
@@ -414,6 +427,13 @@ def match_rules_for_campaign(
                     ):
                         target_map.setdefault(sub, []).append(r)
                 continue
+            # multi 为空时：根据 targeting_type 决定分发到哪些子维度
+            if _tt == "auto":
+                target_map.setdefault(ComparisonTarget.TARGETING.value, []).append(r)
+            else:
+                target_map.setdefault(ComparisonTarget.KEYWORD.value, []).append(r)
+                target_map.setdefault(ComparisonTarget.PRODUCT_TARGETING.value, []).append(r)
+            continue
         target_map.setdefault(ct, []).append(r)
 
     # 输出：每个 comparison_target 一个 item，内部规则按优先级升序
