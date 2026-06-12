@@ -13,7 +13,7 @@
       先检查广告活动创建天数是否 ≥ 条件组要求天数，不足则整条规则跳过；
       然后查询广告活动报表（近 N 天聚合），判断条件是否成立
   c. 条件全部通过后，执行三类操作（三者独立并行）：
-     ┌─ 投放竞价操作（targeting_bid_actions）—— 完整实现
+     ┌─ 竞价操作（targeting_bid_actions）—— 完整实现
      │   ├─ 自动广告 → 定位组（LxSpTarget expression_type=auto）+ LxSpTargetReport
      │   └─ 手动广告 → 关键词（LxSpKeyword）+ LxSpKeywordReport
      │                  → 商品投放（LxSpTarget expression_type=manual）+ LxSpTargetReport
@@ -643,7 +643,7 @@ def _check_last_adjustment(
 
 
 # ============================================================
-# 投放竞价操作（完整实现）
+# 竞价操作（完整实现）
 # ============================================================
 
 def _execute_targeting_bid_item(
@@ -836,7 +836,7 @@ def _execute_targeting_bid_actions(
     campaign: LxSpCampaign,
     today: date,
 ) -> list[dict[str, Any]]:
-    """执行规则中所有投放竞价操作。每条互不影响。"""
+    """执行规则中所有竞价操作。每条互不影响。"""
     tba_list = rule.get("targeting_bid_actions", []) or []
     if not tba_list:
         return []
@@ -947,7 +947,7 @@ def _execute_campaign_rule(
         "投放类型": campaign.targeting_type,
         "预算操作": budget_result,
         "其他操作": other_result,
-        "投放竞价操作": targeting_results,
+        "竞价操作": targeting_results,
     }
 
     # 临时：写本地 JSON 调试文件

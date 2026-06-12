@@ -522,19 +522,30 @@ def _execute_single_rule(
         return None, False
 
     max_days = DEFAULT_CONDITION_DAYS
-    for cs in (rule.get("condition_sets") or []):
+    condition_sets = rule.get("condition_sets") or []
+    for cs in condition_sets:
         days_val = int(cs.get("days", DEFAULT_CONDITION_DAYS) or DEFAULT_CONDITION_DAYS)
         if days_val > max_days:
             max_days = days_val
 
-    metrics = _query_keyword_report(keyword["keyword_id"], campaign.profile_id, max_days, today)
-    passed, reason = _check_all_condition_sets(rule, metrics)
-    if not passed:
-        logger.info(
-            "[executor_keyword] 规则「%s」(%s) kw=%d 条件组不通过: %s",
-            rule_name, rule_id, keyword["keyword_id"], reason,
-        )
-        return None, False
+    # 每个条件组用各自天数的独立报表数据评估
+    metrics_for_display = _query_keyword_report(keyword["keyword_id"], campaign.profile_id, max_days, today)
+    metrics_by_days: dict[int, dict[str, float]] = {max_days: metrics_for_display or _build_metrics_dict(0, 0, 0, 0, 0, 0)}
+
+    for cs in condition_sets:
+        cs_days = int(cs.get("days", DEFAULT_CONDITION_DAYS) or DEFAULT_CONDITION_DAYS)
+        if cs_days not in metrics_by_days:
+            m = _query_keyword_report(keyword["keyword_id"], campaign.profile_id, cs_days, today)
+            metrics_by_days[cs_days] = m or _build_metrics_dict(0, 0, 0, 0, 0, 0)
+        cs_metrics = metrics_by_days[cs_days]
+        if not _evaluate_condition_set(cs, cs_metrics):
+            logger.info(
+                "[executor_keyword] 规则「%s」(%s) kw=%d 条件组（近%d天）不通过",
+                rule_name, rule_id, keyword["keyword_id"], cs_days,
+            )
+            return None, False
+
+    logger.info("[executor_keyword] 规则「%s」(%s) kw=%d 条件全部通过", rule_name, rule_id, keyword["keyword_id"])
 
     targeting_results, bid_executed = _execute_targeting_bid_actions(rule, keyword, campaign, today)
     budget_result = _execute_budget_action(rule)
@@ -550,10 +561,10 @@ def _execute_single_rule(
         "关键词": keyword["keyword_text"],
         "当前竞价": float(keyword["bid"]) if keyword["bid"] else 0.0,
         "条件组结果": "通过",
-        "报表数据": metrics,
+        "报表数据": metrics_for_display,
         "预算操作": budget_result,
         "其他操作": other_result,
-        "投放竞价操作": targeting_results,
+        "竞价操作": targeting_results,
     }
     _write_debug_file(f"kw_{keyword["keyword_id"]}_{rule_id}.json", result)
     return result, bid_executed
