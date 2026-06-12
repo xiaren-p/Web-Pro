@@ -168,35 +168,31 @@ def _check_comparison_target_compatibility(
         True 表示兼容
     """
     target = rule.comparison_target
+    multi = rule.comparison_multi_targets or []
 
-    # manual campaign 禁止 comparison_target="targeting"
-    if targeting_type == "manual" and target == ComparisonTarget.TARGETING:
-        return False
-
-    # auto campaign 禁止比较对象为关键词/商品投放
+    # auto campaign 禁止 comparison_target 直接为关键词/商品投放（非 targeting 容器内）
     if targeting_type == "auto" and target in (
         ComparisonTarget.KEYWORD,
         ComparisonTarget.PRODUCT_TARGETING,
     ):
         return False
 
-    # targeting 多选子项兼容性
+    # comparison_target 为 targeting 时，按 multi_targets 校验兼容性
     if target == ComparisonTarget.TARGETING:
-        multi = rule.comparison_multi_targets or []
         if not multi:
             return True  # 无多选则不限
         if targeting_type == "auto":
-            # auto 仅兼容 "targeting"，排除 keyword / product_targeting
+            # auto 仅兼容 "targeting"
             compatible = [
                 t for t in multi
-                if t not in (ComparisonTarget.KEYWORD.value, ComparisonTarget.PRODUCT_TARGETING.value)
+                if t == ComparisonTarget.TARGETING.value
             ]
             return len(compatible) > 0
         if targeting_type == "manual":
-            # manual 兼容 keyword / product_targeting，排除 "targeting"
+            # manual 兼容 keyword / product_targeting，不兼容 "targeting"
             compatible = [
                 t for t in multi
-                if t != ComparisonTarget.TARGETING.value
+                if t in (ComparisonTarget.KEYWORD.value, ComparisonTarget.PRODUCT_TARGETING.value)
             ]
             return len(compatible) > 0
 
