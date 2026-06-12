@@ -102,6 +102,7 @@ import AdUploadDialog from "./AdUploadDialog.vue";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import { ElMessage } from "element-plus";
 import { getAdCampaigns, getAdOptions, getAdPortfolioOptions } from "@/api/ads";
+import { ShopsAPI } from "@/api/shops";
 
 defineOptions({ name: "AdsText" });
 
@@ -132,6 +133,7 @@ const countries = ref<{ value: string; label: string }[]>([]);
 const profiles = ref<{ value: string; label: string }[]>([]);
 const portfolios = ref<{ value: string; label: string }[]>([]);
 const biddingTypes = ref<{ value: string; label: string }[]>([]);
+const owners = ref<{ value: string; label: string }[]>([]);
 const summary = ref<Record<string, unknown> | null>(null);
 
 onMounted(() => {
@@ -142,6 +144,7 @@ onMounted(() => {
   });
 
   remoteSearchPortfolio("");
+  loadOwners();
 });
 
 const adsTypes = [{ value: "sp", label: "SP" }];
@@ -151,18 +154,6 @@ const tagsList = [
   { value: "promo", label: "促销" },
   { value: "new", label: "新品" },
   { value: "clearance", label: "清仓" },
-];
-
-const owners = [
-  { value: "it--1", label: "it--1" },
-  { value: "罗奕明", label: "罗奕明" },
-  { value: "彭承豪", label: "彭承豪" },
-  { value: "李湧龙", label: "李湧龙" },
-  { value: "孔颖娴", label: "孔颖娴" },
-  { value: "肖娈", label: "肖娈" },
-  { value: "pinx", label: "pinx" },
-  { value: "刘浩珠", label: "刘浩珠" },
-  { value: "陈慧瑩", label: "陈慧瑩" },
 ];
 
 const campaignStatuses = [
@@ -286,6 +277,14 @@ function remoteSearchPortfolio(query: string = "") {
   getAdPortfolioOptions({ keyword: query }).then((res: any) => {
     portfolios.value = [{ value: "-1", label: "未设置广告组合" }, ...(res.portfolios || [])];
   });
+}
+
+async function loadOwners(): Promise<void> {
+  const data = await ShopsAPI.getOwners();
+  owners.value = (data || []).map((item) => ({
+    value: String(item.value || item.id),
+    label: item.label || item.name || String(item.value || item.id),
+  }));
 }
 
 function search() {
