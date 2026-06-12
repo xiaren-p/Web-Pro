@@ -397,14 +397,27 @@ def match_rules_for_campaign(
             # 计算优先级并序列化
             matched_rules.append(_serialize_rule(rule, _calc_priority(group.weight, idx)))
 
-    # 按 comparison_target 分组
+    # 按 comparison_target 分组 —— targeting 按 multi_targets 拆到子维度
     if not matched_rules:
         return []
 
     from collections import OrderedDict
     target_map: dict[str, list[dict[str, Any]]] = OrderedDict()
     for r in matched_rules:
-        target_map.setdefault(r["comparison_target"], []).append(r)
+        ct = r["comparison_target"]
+        # 投放（targeting）是归类容器，真实维度在 comparison_multi_targets 中
+        if ct == ComparisonTarget.TARGETING.value:
+            multi = r.get("comparison_multi_targets") or []
+            if multi:
+                for sub in multi:
+                    if sub in (
+                        ComparisonTarget.KEYWORD.value,
+                        ComparisonTarget.PRODUCT_TARGETING.value,
+                        ComparisonTarget.TARGETING.value,
+                    ):
+                        target_map.setdefault(sub, []).append(r)
+                continue
+        target_map.setdefault(ct, []).append(r)
 
     # 输出：每个 comparison_target 一个 item，内部规则按优先级升序
     result: list[dict[str, Any]] = []
