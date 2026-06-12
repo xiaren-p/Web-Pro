@@ -435,7 +435,7 @@ def _get_expression_type_label(expression: list | None) -> str:
     return "未知"
 
 
-def _is_target_group_match(target: LxSpTarget, target_groups: list[str]) -> bool:
+def _is_target_group_match(target: dict, target_groups: list[str]) -> bool:
     """判断定位组的 expression.type 是否在用户选择的定位组类型列表中。
 
     需做前端值 → DB 值映射（如 close_match → closeMatch）。
@@ -457,68 +457,42 @@ def _is_target_group_match(target: LxSpTarget, target_groups: list[str]) -> bool
 
 def _execute_targeting_bid_actions(
     rule: dict[str, Any],
-    target: LxSpTarget,
+    target: dict,
     campaign: LxSpCampaign,
     today: date,
 ) -> tuple[list[dict[str, Any]], bool]:
-    """对单个定位组执行投放竞价操作。
-
-    每条 targeting_bid_action：
-      - 匹配定位组类型，不匹配静默跳过
-      - 竞价计算，新竞价 = 当前竞价时跳过
-      - campaign / today 为签名保留
-    """
+    """对单个定位组执行竞价操作。维度级竞价使用规则级 bid_action。"""
     _ = campaign, today
-    tba_list: list[dict[str, Any]] = rule.get("targeting_bid_actions") or []
-    if not tba_list:
+
+    bid_action: dict[str, Any] = rule.get("bid_action") or {}
+    bid_type = bid_action.get("type", "")
+    if not bid_type or bid_type == "no_adjust":
         return [], False
 
-    bid_executed = False
-    results: list[dict[str, Any]] = []
+    current_bid = float(target["bid"]) if target["bid"] else 0.0
+    new_bid = _calc_adjusted_bid(current_bid, bid_action)
+    if new_bid is None:
+        return [{
+            "状态": "跳过",
+            "原因": f"不支持的竞价操作类型 {bid_type}",
+            "定位组ID": target["target_id"],
+        }], False
 
-    for idx, tba in enumerate(tba_list):
-        target_groups: list[str] = tba.get("targetingGroups") or []
-        unlimited = bool(tba.get("unlimitedTargeting", False))
-        bid_action: dict[str, Any] = tba.get("bidAction") or {}
+    if new_bid == current_bid:
+        return [], False
 
-        if not unlimited and not _is_target_group_match(target, target_groups):
-            continue
-
-        bid_type = bid_action.get("type", "")
-        if not bid_type or bid_type == "no_adjust":
-            results.append({"序号": idx, "状态": "跳过", "原因": "无竞价操作或操作类型为不调整"})
-            continue
-
-        current_bid = float(target["bid"]) if target["bid"] else 0.0
-        new_bid = _calc_adjusted_bid(current_bid, bid_action)
-        if new_bid is None:
-            results.append({
-                "序号": idx, "状态": "跳过",
-                "原因": f"不支持的竞价操作类型 {bid_type}",
-                "定位组ID": target["target_id"],
-            })
-            continue
-
-        if new_bid == current_bid:
-            # 调整前后竞价相同，不写表
-            continue
-
-        bid_executed = True
-        expr_label = _get_expression_type_label(target["expression"])
-        results.append({
-            "序号": idx, "状态": "待执行",
-            "定位组ID": target["target_id"], "定位组类型": expr_label,
-            "调整前竞价": current_bid, "调整后竞价": round(new_bid, 4),
-            "竞价操作类型": bid_type,
-            "操作参数": {
-                "type": bid_type,
-                "value": bid_action.get("value"),
-                "limit": bid_action.get("limit"),
-            },
-        })
-
-    return results, bid_executed
-
+    expr_label = _get_expression_type_label(target["expression"])
+    return [{
+        "状态": "待执行",
+        "定位组ID": target["target_id"], "定位组类型": expr_label,
+        "调整前竞价": current_bid, "调整后竞价": round(new_bid, 4),
+        "竞价操作类型": bid_type,
+        "操作参数": {
+            "type": bid_type,
+            "value": bid_action.get("value"),
+            "limit": bid_action.get("limit"),
+        },
+    }], True
 
 def _execute_budget_action(rule: dict[str, Any]) -> dict[str, Any]:
     """规则级预算操作（占位）。
@@ -563,7 +537,7 @@ def _execute_other_action(rule: dict[str, Any]) -> dict[str, Any]:
 
 def _execute_single_rule(
     rule: dict[str, Any],
-    target: LxSpTarget,
+    target: dict,
     campaign: LxSpCampaign,
     today: date,
 ) -> tuple[dict[str, Any] | None, bool]:
@@ -572,19 +546,19 @@ def _execute_single_rule(
     流程：
       a. 分时策略联动检查
       b. 规则级条件组全通过
-      c. 投放竞价操作
+      c. 竞价操作
       d. 预算/其他操作（占位）
       e. 输出本地调试文件
 
     Args:
         rule: 规则 JSON
-        target: LxSpTarget 实例
+        target: 定位组字典（含 target_id / bid / expression）
         campaign: LxSpCampaign 实例
         today: 基准日期
 
     Returns:
         (结果字典或 None, 是否真正产生了竞价变动)。
-        竞价变动表示至少有一个投放竞价操作调整了竞价。
+        竞价变动表示至少有一个竞价操作调整了竞价。
     """
     rule_id = rule.get("rule_id", "?")
     rule_name = rule.get("rule_name", "?")
@@ -624,7 +598,7 @@ def _execute_single_rule(
         "报表数据": metrics,
         "预算操作": budget_result,
         "其他操作": other_result,
-        "投放竞价操作": targeting_results,
+        "竞价操作": targeting_results,
     }
     _write_debug_file(f"tg_{target["target_id"]}_{rule_id}.json", result)
     return result, bid_executed

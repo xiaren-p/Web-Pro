@@ -410,61 +410,41 @@ def _is_execution_cycle_ok(last_time: datetime | None, cycle_days: int) -> tuple
 
 def _execute_targeting_bid_actions(
     rule: dict[str, Any],
-    keyword: LxSpKeyword,
+    keyword: dict,
     campaign: LxSpCampaign,
     today: date,
 ) -> tuple[list[dict[str, Any]], bool]:
-    """对单个关键词执行投放竞价操作。"""
+    """对单个关键词执行竞价操作。维度级竞价使用规则级 bid_action。"""
     _ = campaign, today
-    tba_list: list[dict[str, Any]] = rule.get("targeting_bid_actions") or []
-    if not tba_list:
+
+    bid_action: dict[str, Any] = rule.get("bid_action") or {}
+    bid_type = bid_action.get("type", "")
+    if not bid_type or bid_type == "no_adjust":
         return [], False
 
-    bid_executed = False
-    results: list[dict[str, Any]] = []
+    current_bid = float(keyword["bid"]) if keyword["bid"] else 0.0
+    new_bid = _calc_adjusted_bid(current_bid, bid_action)
+    if new_bid is None:
+        return [{
+            "状态": "跳过",
+            "原因": f"不支持的竞价操作类型 {bid_type}",
+            "关键词ID": keyword["keyword_id"],
+        }], False
 
-    for idx, tba in enumerate(tba_list):
-        target_groups: list[str] = tba.get("targetingGroups") or []
-        unlimited = bool(tba.get("unlimitedTargeting", False))
-        bid_action: dict[str, Any] = tba.get("bidAction") or {}
+    if new_bid == current_bid:
+        return [], False
 
-        if not unlimited and "keyword" not in target_groups:
-            results.append({"序号": idx, "状态": "跳过", "原因": "投放对象未选择关键词"})
-            continue
-
-        bid_type = bid_action.get("type", "")
-        if not bid_type or bid_type == "no_adjust":
-            results.append({"序号": idx, "状态": "跳过", "原因": "无竞价操作或操作类型为不调整"})
-            continue
-
-        current_bid = float(keyword["bid"]) if keyword["bid"] else 0.0
-        new_bid = _calc_adjusted_bid(current_bid, bid_action)
-        if new_bid is None:
-            results.append({
-                "序号": idx, "状态": "跳过",
-                "原因": f"不支持的竞价操作类型 {bid_type}",
-                "关键词ID": keyword["keyword_id"],
-            })
-            continue
-
-        if new_bid == current_bid:
-            # 调整前后竞价相同，不写表
-            continue
-
-        bid_executed = True
-        results.append({
-            "序号": idx, "状态": "待执行",
-            "关键词ID": keyword["keyword_id"], "关键词": keyword["keyword_text"],
-            "调整前竞价": current_bid, "调整后竞价": round(new_bid, 4),
-            "竞价操作类型": bid_type,
-            "操作参数": {
-                "type": bid_type,
-                "value": bid_action.get("value"),
-                "limit": bid_action.get("limit"),
-            },
-        })
-
-    return results, bid_executed
+    return [{
+        "状态": "待执行",
+        "关键词ID": keyword["keyword_id"], "关键词": keyword["keyword_text"],
+        "调整前竞价": current_bid, "调整后竞价": round(new_bid, 4),
+        "竞价操作类型": bid_type,
+        "操作参数": {
+            "type": bid_type,
+            "value": bid_action.get("value"),
+            "limit": bid_action.get("limit"),
+        },
+    }], True
 
 
 # ============================================================
@@ -518,7 +498,7 @@ def _execute_other_action(rule: dict[str, Any]) -> dict[str, Any]:
 
 def _execute_single_rule(
     rule: dict[str, Any],
-    keyword: LxSpKeyword,
+    keyword: dict,
     campaign: LxSpCampaign,
     today: date,
 ) -> tuple[dict[str, Any] | None, bool]:
