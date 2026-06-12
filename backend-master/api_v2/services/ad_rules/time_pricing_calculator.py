@@ -194,7 +194,7 @@ def get_ad_items(
     Args:
         campaign_id: 广告活动 ID
         profile_id: 店铺 Profile ID
-        targeting_type: 投放类型（auto=定位组, manual=关键词）
+        targeting_type: 投放类型（auto=定位组, manual=关键词+商品投放）
 
     Returns:
         [{"item_type": "target"/"keyword", "item_id": int, "ad_group_id": int, "bid": float}]
@@ -203,8 +203,52 @@ def get_ad_items(
     if targeting_type == "auto":
         return [it for it in all_items if it["item_type"] == "target"]
     if targeting_type == "manual":
-        return [it for it in all_items if it["item_type"] == "keyword"]
+        return [it for it in all_items if it["item_type"] in ("keyword", "target")]
     return all_items
+
+
+def filter_enabled_items(
+    items: list[dict[str, Any]],
+    campaign_id: int,
+    profile_id: int,
+) -> list[dict[str, Any]]:
+    """过滤出广告活动和广告组均为 enabled 的投放项。
+
+    分时竞价执行前的最后一道防线：
+
+    1. 校验广告活动（LxSpCampaign.state == "enabled"）
+    2. 校验广告组（LxSpAdGroup.state == "enabled"）
+
+    两项必须同时满足，否则过滤掉。
+
+    Args:
+        items: 待过滤的投放项列表
+        campaign_id: 广告活动 ID
+        profile_id: 店铺 ID
+
+    Returns:
+        通过状态校验的投放项列表
+    """
+    from api_v1.models.lingxing.ads.basic.lx_sp_ad_group import LxSpAdGroup
+    from api_v1.models.lingxing.ads.basic.lx_sp_campaign import LxSpCampaign
+
+    campaign_ok = LxSpCampaign.objects.filter(
+        campaign_id=campaign_id, profile_id=profile_id, state="enabled",
+    ).exists()
+    if not campaign_ok:
+        return []
+
+    ad_group_ids = {it["ad_group_id"] for it in items if it.get("ad_group_id")}
+    valid_ad_groups: set[int] = set()
+    if ad_group_ids:
+        valid_ad_groups = {
+            ag.ad_group_id
+            for ag in LxSpAdGroup.objects.filter(
+                ad_group_id__in=list(ad_group_ids), state="enabled",
+            ).only("ad_group_id")
+        }
+
+    return [it for it in items if it.get("ad_group_id") in valid_ad_groups]
 
 
 # ============================================================

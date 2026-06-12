@@ -53,6 +53,7 @@ from api_v2.services.ad_rules.time_pricing_calculator import (
     MAX_ERROR_COUNT,
     build_item_map,
     calc_new_bid,
+    filter_enabled_items,
     get_ad_items,
     write_batch,
 )
@@ -220,6 +221,8 @@ def _process_single_hit(
         return 0, 0
 
     items = get_ad_items(hit.campaign_id, hit.profile_id, hit.targeting_type, item_map)
+    # 分时执行前校验：过滤掉广告活动/广告组已暂停的投放项
+    items = filter_enabled_items(items, hit.campaign_id, hit.profile_id)
     if not items:
         logger.warning("[time_pricing] 无投放项 campaign=%d profile=%d", hit.campaign_id, hit.profile_id)
         return 0, 0
