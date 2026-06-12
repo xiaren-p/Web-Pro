@@ -24,9 +24,7 @@
 """
 from __future__ import annotations
 
-import json
 import logging
-import os
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 from typing import Any
 
@@ -55,9 +53,6 @@ logger = logging.getLogger(__name__)
 
 COMPARISON_TARGET_CAMPAIGN = "campaign"
 
-# 调试输出目录（临时，后续改为写 SpBidAdjustment 表）
-_DEBUG_DIR = os.path.join(os.path.dirname(__file__), "_debug_output")
-
 # 前端 targetGroup 值 → LxSpTarget.expression 中实际存储的 type 值
 _EXPR_TYPE_AUTO_MAP = {
     "close_match": "closeMatch",
@@ -65,23 +60,6 @@ _EXPR_TYPE_AUTO_MAP = {
     "substitutes": "substitutes",
     "complements": "complements",
 }
-
-# ============================================================
-# 通用工具
-# ============================================================
-
-def _ensure_debug_dir() -> str:
-    """确保调试输出目录存在并返回路径。"""
-    os.makedirs(_DEBUG_DIR, exist_ok=True)
-    return _DEBUG_DIR
-
-
-def _write_debug_file(filename: str, data: Any) -> None:
-    """将执行计划写入本地 JSON 文件（临时调试用，后续删除）。"""
-    filepath = os.path.join(_ensure_debug_dir(), filename)
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2, default=str)
-    logger.info("[executor_campaign] 调试输出: %s", filepath)
 
 
 def _parse_creation_date(raw_val: Any) -> date | None:
@@ -934,28 +912,64 @@ def _execute_campaign_rule(
 
     logger.info("[executor_campaign] 规则「%s」(id=%s) 条件全部通过，开始执行操作", rule_name, rule_id)
 
-    # c. 执行操作
+    # c. 执行竞价操作 → 写入 SpBidAdjustment
     targeting_results = _execute_targeting_bid_actions(rule, campaign, today)
+
+    # 从每条 targeting_bid_action 的明细中提取"待执行"记录批量写表
+    total_written = 0
+    for tba_result in targeting_results:
+        if not isinstance(tba_result, dict):
+            continue
+        plans = tba_result.get("明细", []) or []
+        records: list[SpBidAdjustment] = []
+        now = datetime.now(dt_timezone.utc)
+        for p in plans:
+            if p.get("结果") != "待执行":
+                continue
+            entity_type = p.get("实体类型", "")
+            entity_id = p.get("实体ID")
+            if entity_id is None:
+                continue
+            record = SpBidAdjustment(
+                campaign_id=campaign.campaign_id,
+                profile_id=campaign.profile_id,
+                execution_type=ExecutionTypeChoices.BID_ADJUSTMENT,
+                auto_rule_id=rule.get("rule_id"),
+                bid_before=p.get("调整前竞价"),
+                bid_after=p.get("调整后竞价"),
+                adjustment_status=AdjustmentStatusChoices.PENDING,
+                adjustment_time=now,
+            )
+            if entity_type == "keyword":
+                record.keyword_id = entity_id
+            else:
+                record.target_id = entity_id
+            records.append(record)
+        if records:
+            SpBidAdjustment.objects.bulk_create(records, batch_size=500)
+            total_written += len(records)
+
+    if total_written > 0:
+        logger.info(
+            "[executor_campaign] 写入 SpBidAdjustment %d 条, campaign=%d, rule=%s",
+            total_written, campaign.campaign_id, rule.get("rule_id"),
+        )
+
     budget_result = _execute_budget_action(rule, campaign)
     other_result = _execute_other_action(rule, campaign)
 
-    result = {
+    return {
         "规则ID": rule_id,
         "规则名称": rule_name,
         "优先级": rule.get("priority", 0),
         "广告活动ID": campaign.campaign_id,
         "店铺ID": campaign.profile_id,
         "投放类型": campaign.targeting_type,
+        "写入记录数": total_written,
         "预算操作": budget_result,
         "其他操作": other_result,
-        "投放竞价操作": targeting_results,
+        "竞价操作": targeting_results,
     }
-
-    # 临时：写本地 JSON 调试文件
-    safe_name = f"{campaign.campaign_id}_{rule_id}"
-    _write_debug_file(f"exec_{safe_name}.json", result)
-
-    return result
 
 
 # ============================================================

@@ -21,9 +21,7 @@
 """
 from __future__ import annotations
 
-import json as _json
 import logging
-import os
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 from typing import Any
 
@@ -43,9 +41,6 @@ from api_v2.models.sp_bid_adjustment import (
 
 logger = logging.getLogger(__name__)
 
-# 调试输出目录（临时，后续删除）
-_DEBUG_DIR = os.path.join(os.path.dirname(__file__), "_debug_output")
-
 # 默认执行周期（天），后续从 LxAdRuleGroup.execution_cycle 取
 DEFAULT_CYCLE_DAYS = 1
 
@@ -60,28 +55,6 @@ BATCH_SIZE = 500
 
 # 比对对象常量
 COMPARISON_TARGET_KEYWORD = "keyword"
-
-
-# ============================================================
-# 通用工具
-# ============================================================
-
-def _ensure_debug_dir() -> None:
-    """确保调试输出目录存在。"""
-    os.makedirs(_DEBUG_DIR, exist_ok=True)
-
-
-def _write_debug_file(filename: str, data: Any) -> None:
-    """将执行计划写入本地 JSON 调试文件（临时，后续删除）。
-
-    Args:
-        filename: 输出文件名
-        data: 待序列化的执行计划数据
-    """
-    filepath = os.path.join(_DEBUG_DIR, filename)
-    with open(filepath, "w", encoding="utf-8") as f:
-        _json.dump(data, f, ensure_ascii=False, indent=2, default=str)
-    logger.info("[executor_keyword] 调试输出 %s", filepath)
 
 
 # ============================================================
@@ -540,6 +513,31 @@ def _execute_single_rule(
     budget_result = _execute_budget_action(rule)
     other_result = _execute_other_action(rule)
 
+    # ── 写 SpBidAdjustment 表（仅竞价变动时写入）──
+    if bid_executed:
+        now = datetime.now(dt_timezone.utc)
+        new_bid = None
+        for tba_result in targeting_results:
+            if isinstance(tba_result, dict) and tba_result.get("状态") == "待执行":
+                new_bid = tba_result.get("调整后竞价")
+                break
+        SpBidAdjustment.objects.create(
+            keyword_id=keyword["keyword_id"],
+            campaign_id=campaign.campaign_id,
+            profile_id=campaign.profile_id,
+            execution_type=ExecutionTypeChoices.BID_ADJUSTMENT,
+            auto_rule_id=rule.get("rule_id"),
+            bid_before=float(keyword["bid"]) if keyword["bid"] else 0.0,
+            bid_after=new_bid,
+            adjustment_status=AdjustmentStatusChoices.PENDING,
+            adjustment_time=now,
+        )
+        logger.info(
+            "[executor_keyword] 写入 SpBidAdjustment kw=%d campaign=%d bid=%.4f→%.4f",
+            keyword["keyword_id"], campaign.campaign_id,
+            float(keyword["bid"]) if keyword["bid"] else 0.0, new_bid,
+        )
+
     result = {
         "规则ID": rule_id,
         "规则名称": rule_name,
@@ -553,9 +551,8 @@ def _execute_single_rule(
         "报表数据": metrics,
         "预算操作": budget_result,
         "其他操作": other_result,
-        "投放竞价操作": targeting_results,
+        "竞价操作": targeting_results,
     }
-    _write_debug_file(f"kw_{keyword["keyword_id"]}_{rule_id}.json", result)
     return result, bid_executed
 
 
@@ -599,7 +596,6 @@ def execute_keyword_rules() -> dict[str, Any]:
         }
     """
     today = date.today()
-    _ensure_debug_dir()
 
     # ── 步骤 1：扫描所有可用的关键词（不限制个体竞价是否为空，后续用广告组竞价兜底）──
     keywords_raw = list(
