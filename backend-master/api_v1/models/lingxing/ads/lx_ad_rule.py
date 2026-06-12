@@ -25,6 +25,8 @@ class ComparisonTarget(models.TextChoices):
     SEARCH_TERMS = "search_terms", "用户搜索词"
     TARGETING = "targeting", "投放"
     NEGATIVE_TARGETING = "negative_targeting", "否定投放"
+    KEYWORD = "keyword", "关键词"
+    PRODUCT_TARGETING = "product_targeting", "商品投放"
 
 
 class AddKeywordMatchType(models.TextChoices):
