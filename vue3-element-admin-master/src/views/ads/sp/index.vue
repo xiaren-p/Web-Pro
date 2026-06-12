@@ -1,6 +1,33 @@
 <template>
-  <div class="ads-text-container p-6">
-    <section class="content-block">
+  <div class="ads-text-container">
+    <section class="ads-page-header">
+      <div class="ads-page-header__content">
+        <p class="ads-page-header__eyebrow">Amazon Ads Operations</p>
+        <h1 class="ads-page-header__title">SP 广告管理</h1>
+        <p class="ads-page-header__description">
+          统一管理广告活动、预算风险、投放状态与转化效率，帮助运营团队快速定位异常并完成批量决策。
+        </p>
+      </div>
+      <div class="ads-page-header__meta">
+        <div class="ads-page-header__metric">
+          <span class="ads-page-header__metric-label">当前结果</span>
+          <strong class="ads-page-header__metric-value">{{ total.toLocaleString() }}</strong>
+        </div>
+        <el-button class="ads-page-header__queue" @click="queueDrawerVisible = true">
+          查看队列
+        </el-button>
+      </div>
+    </section>
+
+    <section class="content-block filter-panel-block">
+      <div class="content-block__heading">
+        <div>
+          <h2 class="content-block__title">筛选控制台</h2>
+          <p class="content-block__subtitle">
+            按站点、店铺、SKU、广告组合与服务状态快速收敛运营范围。
+          </p>
+        </div>
+      </div>
       <Filters
         :filters="filters"
         :countries="countries"
@@ -22,9 +49,6 @@
       />
     </section>
 
-    <!-- Toolbar removed here; controls consolidated into table-controls above AdsTable -->
-
-    <!-- 指标统计（暂不展示） -->
     <section v-if="false" class="content-block">
       <Indicators />
     </section>
@@ -32,9 +56,12 @@
     <section class="content-block data-table-block">
       <div class="table-controls">
         <div class="left-controls">
-          <!-- 新建广告：下拉选择操作类型 -->
+          <div class="table-controls__title-group">
+            <h2 class="table-controls__title">广告活动列表</h2>
+            <span class="table-controls__summary">{{ tableColumns.length }} 个显示字段</span>
+          </div>
           <el-dropdown @command="handleNewAdCommand">
-            <el-button type="primary">
+            <el-button type="primary" class="primary-action-button">
               新建广告
               <el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
@@ -44,20 +71,14 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-
-          <!-- 查看队列 -->
-          <el-button style="margin-left: 8px" @click="queueDrawerVisible = true">
-            查看队列
-          </el-button>
         </div>
 
         <div class="right-controls">
-          <el-checkbox v-model="onlyOverBudget" style="margin-right: 8px">
-            只查看超预算的
-          </el-checkbox>
+          <el-checkbox v-model="onlyOverBudget" class="risk-switch">只查看超预算</el-checkbox>
           <el-tooltip content="列配置" placement="top">
-            <el-button text class="column-config-btn" @click="restoreDefaultColumns">
+            <el-button class="column-config-btn" @click="restoreDefaultColumns">
               <el-icon><Operation /></el-icon>
+              列配置
             </el-button>
           </el-tooltip>
         </div>

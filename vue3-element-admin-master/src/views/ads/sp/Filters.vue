@@ -395,13 +395,13 @@ function openTemplates() {
 .filters-container {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-2);
+  gap: 12px;
 }
 
 .filter-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-2);
+  gap: 10px;
   align-items: center;
 }
 
@@ -446,12 +446,42 @@ function openTemplates() {
 /* 筛选框高度 */
 .filter-row :deep(.el-select__wrapper),
 .filter-row :deep(.el-input__wrapper) {
-  min-height: 32px;
-  border-radius: var(--radius-md);
+  min-height: 34px;
+  background: #f8fafc;
+  border: 1px solid #dbe4ef;
+  border-radius: 10px;
+  box-shadow: none;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.filter-row :deep(.el-select__wrapper:hover),
+.filter-row :deep(.el-input__wrapper:hover) {
+  background: #ffffff;
+  border-color: #bfdbfe;
+}
+
+.filter-row :deep(.el-select__wrapper.is-focused),
+.filter-row :deep(.el-input__wrapper.is-focus) {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.filter-row :deep(.el-input__inner),
+.filter-row :deep(.el-select__placeholder) {
+  font-size: 13px;
+  color: #334155;
+}
+
+.filter-row :deep(.el-input__inner::placeholder) {
+  color: #94a3b8;
 }
 
 .filter-row :deep(.el-range-editor.el-input__wrapper) {
-  min-height: 32px;
+  min-height: 34px;
   padding-top: 0;
   padding-bottom: 0;
 }
@@ -504,13 +534,14 @@ function openTemplates() {
 
 .filter-actions {
   display: flex;
-  gap: var(--spacing-2);
+  gap: 6px;
   align-items: center;
-  margin-left: var(--spacing-1);
+  margin-left: 2px;
 }
 
 .filter-actions :deep(.el-button) {
-  height: 32px;
+  height: 34px;
+  border-radius: 10px;
 }
 
 .filter-actions :deep(.el-button + .el-button) {
@@ -518,20 +549,25 @@ function openTemplates() {
 }
 
 .btn-template {
-  color: var(--color-gray-600);
-  border-color: var(--color-gray-300);
+  height: 34px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
 }
 
 .btn-template:hover {
-  color: var(--color-primary-600);
-  background-color: var(--color-primary-50);
-  border-color: var(--color-primary-300);
+  color: #2563eb;
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
 
 /* 图标独立按钮 */
 .btn-icon-only {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   padding: 0;
 }
 
@@ -539,10 +575,10 @@ function openTemplates() {
 .filter-tags-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-2);
+  gap: 8px;
   align-items: center;
-  padding-top: var(--spacing-2);
-  border-top: 1px solid var(--color-gray-100);
+  padding: 12px 0 0;
+  border-top: 1px solid #edf2f7;
 }
 
 .filter-tag {
@@ -551,20 +587,21 @@ function openTemplates() {
   align-items: center;
   height: 26px;
   padding: 0 10px 0 12px;
-  font-size: var(--font-size-xs);
+  font-size: 12px;
+  font-weight: 500;
   line-height: 24px;
-  color: var(--color-primary-700);
-  background: var(--color-primary-50);
-  border-color: var(--color-primary-200);
-  border-radius: var(--radius-full);
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  border-radius: 999px;
   transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast);
+    background 160ms ease,
+    border-color 160ms ease;
 }
 
 .filter-tag:hover {
-  background: var(--color-primary-100);
-  border-color: var(--color-primary-400);
+  background: #dbeafe;
+  border-color: #93c5fd;
 }
 
 .filter-tag :deep(.el-tag__close) {
@@ -575,27 +612,27 @@ function openTemplates() {
   height: 16px;
   margin-top: 1px;
   font-size: 12px;
-  color: var(--color-primary-400);
-  border-radius: var(--radius-full);
-  transition: all var(--transition-fast);
+  color: #60a5fa;
+  border-radius: 999px;
+  transition: all 160ms ease;
 }
 
 .filter-tag :deep(.el-tag__close:hover) {
-  color: #fff;
-  background-color: var(--color-primary-500);
-  transform: scale(1.1);
+  color: #ffffff;
+  background-color: #2563eb;
+  transform: scale(1.08);
 }
 
 .clear-all-icon {
-  margin-left: var(--spacing-1);
-  font-size: var(--font-size-sm);
-  color: var(--color-gray-500);
+  margin-left: 2px;
+  font-size: 14px;
+  color: #94a3b8;
   cursor: pointer;
-  transition: color var(--transition-fast);
+  transition: color 160ms ease;
 }
 
 .clear-all-icon:hover {
-  color: var(--color-danger-600);
+  color: #dc2626;
 }
 
 @media (max-width: 1400px) {

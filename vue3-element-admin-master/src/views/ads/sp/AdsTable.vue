@@ -332,42 +332,36 @@ function formatValue(val: any): string {
 </script>
 
 <style scoped>
-/* ═══════════════════════════════════════════════════════════════
-   Ads 数据看板表格样式 – 电商数据友好风格
-   ═══════════════════════════════════════════════════════════════ */
-
 .data-table-container {
-  background: var(--bg-card);
+  background: #ffffff;
 }
 
-/* ── 表头：白色背景 + 底部边框 + 轻微阴影 ────────────────── */
 :deep(.el-table__header-wrapper th.el-table__cell),
 :deep(.el-table__header th) {
   position: sticky;
   top: 0;
   z-index: 10;
-  padding: 14px 0 !important;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold) !important;
-  color: var(--color-gray-700) !important;
+  padding: 12px 0 !important;
+  font-size: 12px;
+  font-weight: 700 !important;
+  color: #475569 !important;
   text-align: center;
-  background-color: #ffffff !important;
-  border-bottom: 2px solid var(--color-gray-200) !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  background-color: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-shadow: none;
 }
 
-/* 排序指示器优化 */
 :deep(.el-table__header th .caret-wrapper) {
   margin-left: 6px;
-  transform: scale(1.1);
+  transform: scale(1.04);
 }
 
 :deep(.el-table__header th .el-icon) {
-  color: var(--color-gray-400);
+  color: #94a3b8;
 }
 
 :deep(.el-table__header th .is-active .el-icon) {
-  color: var(--color-primary-500);
+  color: #2563eb;
 }
 
 :deep(.el-table__header th .cell) {
@@ -377,7 +371,6 @@ function formatValue(val: any): string {
   width: 100%;
 }
 
-/* 去掉竖向分割线 */
 :deep(.el-table__header th.el-table__cell) {
   border-right: none !important;
 }
@@ -388,25 +381,23 @@ function formatValue(val: any): string {
   display: none;
 }
 
-/* ── 表格行：细分隔线 + 舒适间距 ───────────────────────── */
 :deep(.el-table .el-table__cell) {
-  padding: 12px 0 !important;
-  font-size: var(--font-size-sm);
-  color: var(--color-gray-800);
+  padding: 11px 0 !important;
+  font-size: 13px;
+  color: #334155;
   border-right: none !important;
 }
 
 :deep(.el-table .cell) {
   padding-right: 14px;
   padding-left: 14px;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 
 :deep(.el-table__body td.el-table__cell) {
-  border-bottom: 1px solid var(--color-gray-100) !important;
+  border-bottom: 1px solid #edf2f7 !important;
 }
 
-/* ── 数据值格式化 ────────────────────────────────────────── */
 .data-value {
   display: inline-flex;
   gap: 3px;
@@ -415,24 +406,23 @@ function formatValue(val: any): string {
 }
 
 .data-bold {
-  font-weight: var(--font-weight-bold);
+  font-weight: 700;
 }
 
 .data-null {
-  color: var(--color-gray-300);
+  color: #cbd5e1;
 }
 
 .data-up {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-success-600);
+  font-weight: 700;
+  color: #16a34a;
 }
 
 .data-down {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-danger-500);
+  font-weight: 700;
+  color: #dc2626;
 }
 
-/* 趋势箭头 */
 .trend-icon {
   display: inline-flex;
   align-items: center;
@@ -444,21 +434,20 @@ function formatValue(val: any): string {
   transform: rotate(180deg);
 }
 
-/* ── 斑马纹 ─────────────────────────────────────────────── */
 :deep(.zebra-row > td.el-table__cell) {
-  background-color: #fafbfc;
+  background-color: #fbfdff;
 }
 
-/* ── 行 hover ───────────────────────────────────────────── */
 :deep(.el-table .el-table__row) {
-  transition: all var(--transition-fast);
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
 :deep(.el-table .el-table__row:hover > td.el-table__cell) {
-  background-color: var(--color-primary-50) !important;
+  background-color: #eff6ff !important;
 }
 
-/* hover 时左侧高亮条 */
 :deep(.el-table__body-wrapper .el-table__row) {
   position: relative;
 }
@@ -470,69 +459,55 @@ function formatValue(val: any): string {
   width: 3px;
   height: 100%;
   content: "";
-  background: var(--color-primary-500);
+  background: #2563eb;
   border-radius: 0 2px 2px 0;
 }
 
-/* ── 汇总行：蓝色渐变背景 + 垂直条纹 + 图标 ────────────────── */
 :deep(.summary-row > td.el-table__cell) {
   position: relative;
-  font-weight: var(--font-weight-bold);
-  color: var(--color-gray-800);
-  background: linear-gradient(135deg, #f0f7ff 0%, #e8f3ff 100%) !important;
-  box-shadow: 0 1px 0 var(--color-primary-200) inset;
+  font-weight: 700;
+  color: #0f172a;
+  background: #eff6ff !important;
+  box-shadow: 0 1px 0 #bfdbfe inset;
 }
 
 :deep(.summary-row > td.el-table__cell:first-child::before) {
   position: absolute;
-  top: 8%;
+  top: 12%;
   left: 0;
   width: 3px;
-  height: 84%;
+  height: 76%;
   content: "";
-  background: var(--color-primary-500);
+  background: #2563eb;
   border-radius: 0 3px 3px 0;
 }
 
-:deep(.summary-row > td.el-table__cell:last-child::after) {
-  position: absolute;
-  top: 8%;
-  right: 0;
-  width: 3px;
-  height: 84%;
-  content: "";
-  background: var(--color-primary-500);
-  border-radius: 3px 0 0 3px;
-}
-
 :deep(.summary-row:hover > td.el-table__cell) {
-  background: linear-gradient(135deg, #e8f3ff 0%, #dceaff 100%) !important;
-  border-color: var(--color-primary-300);
+  background: #dbeafe !important;
 }
 
 .summary-indicator {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-primary-700);
+  font-size: 13px;
+  font-weight: 700;
+  color: #1d4ed8;
 }
 
 .summary-icon {
   font-size: 16px;
-  color: var(--color-primary-500);
+  color: #2563eb;
 }
 
-/* ── 服务状态徽标：彩色实心背景 + 白色文字 ──────────────── */
 .status-badge {
   display: inline-block;
-  padding: 3px 11px;
+  padding: 2px 10px;
   font-size: 11px;
-  font-weight: var(--font-weight-semibold);
+  font-weight: 700;
   line-height: 18px;
   white-space: nowrap;
-  border-radius: var(--radius-full);
+  border-radius: 999px;
 }
 
 .status-badge.status-success {
@@ -554,12 +529,11 @@ function formatValue(val: any): string {
 }
 
 .status-badge.status-default {
-  color: var(--color-gray-600);
-  background: var(--color-gray-100);
-  border: 1px solid var(--color-gray-200);
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
 }
 
-/* ── Switch 开关：更圆润 + 绿色高亮 ─────────────────────── */
 :deep(.el-table .el-switch) {
   height: 20px;
 }
@@ -568,9 +542,9 @@ function formatValue(val: any): string {
   width: 36px !important;
   min-width: 36px !important;
   height: 20px !important;
-  border: 2px solid var(--color-gray-300);
-  border-radius: var(--radius-full) !important;
-  transition: all var(--transition-fast);
+  border: 2px solid #cbd5e1;
+  border-radius: 999px !important;
+  transition: all 160ms ease;
 }
 
 :deep(.el-table .el-switch .el-switch__core .el-switch__action) {
@@ -578,7 +552,7 @@ function formatValue(val: any): string {
   left: 1px;
   width: 14px !important;
   height: 14px !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14);
 }
 
 :deep(.el-table .el-switch.is-checked .el-switch__core .el-switch__action) {
@@ -586,86 +560,82 @@ function formatValue(val: any): string {
 }
 
 :deep(.el-table .el-switch.is-checked .el-switch__core) {
-  background-color: var(--color-success-500) !important;
-  border-color: var(--color-success-500) !important;
+  background-color: #16a34a !important;
+  border-color: #16a34a !important;
 }
 
 :deep(.el-table .el-switch.is-disabled .el-switch__core) {
-  opacity: 0.7;
+  opacity: 0.72;
 }
 
-/* ── 店铺/国家 标签 ─────────────────────────────────────── */
 .profile-name {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-gray-800);
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .country-tag {
   display: inline-block;
   padding: 1px 8px;
-  margin-top: 2px;
+  margin-top: 3px;
   font-size: 11px;
-  font-weight: var(--font-weight-medium);
-  color: var(--color-gray-500);
-  background: var(--color-gray-100);
-  border-radius: var(--radius-full);
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
 }
 
-/* ── 投放类型辅助行 ─────────────────────────────────────── */
 .targeting-type-line {
   margin-top: 2px;
   font-size: 11px;
   line-height: 1.4;
-  color: var(--color-gray-500);
+  color: #64748b;
 }
 
-/* ── 汇总行占位 ────────────────────────────────────────── */
 .summary-dash {
-  font-size: var(--font-size-sm);
-  color: var(--color-gray-400);
+  font-size: 13px;
+  color: #cbd5e1;
 }
 
-/* ── 汇总标签 ──────────────────────────────────────────── */
 .summary-label {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-primary-700);
-  letter-spacing: 0.05em;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1d4ed8;
+  letter-spacing: 0.04em;
 }
 
-/* ── 广告活动名称链接 ───────────────────────────────────── */
 .campaign-name-link {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-primary-600);
+  font-weight: 700;
+  color: #2563eb;
   text-decoration: none;
-  transition: all var(--transition-fast);
+  transition:
+    color 160ms ease,
+    text-decoration-color 160ms ease;
 }
 
 .campaign-name-link:hover {
-  color: var(--color-primary-700);
+  color: #1d4ed8;
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-underline-offset: 3px;
 }
 
-/* ── 分析按钮 ──────────────────────────────────────────── */
 .analyze-btn {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-primary-600);
+  font-weight: 700;
+  color: #2563eb;
 }
 
 .analyze-btn:hover {
-  color: var(--color-primary-700);
+  color: #1d4ed8;
 }
 
-/* ── 分页栏：三栏布局 ────────────────────────────────────────────── */
 .pager-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-3) var(--spacing-4);
+  padding: 14px 18px;
   background: #ffffff;
-  border-top: 1px solid var(--color-gray-200);
+  border-top: 1px solid #e2e8f0;
 }
 
 .pager-left {
@@ -681,7 +651,7 @@ function formatValue(val: any): string {
 .pager-right {
   display: flex;
   flex: 1;
-  gap: var(--spacing-2);
+  gap: 8px;
   align-items: center;
   justify-content: flex-end;
 }
@@ -690,19 +660,19 @@ function formatValue(val: any): string {
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: var(--font-size-sm);
-  color: var(--color-gray-500);
+  font-size: 13px;
+  color: #64748b;
   white-space: nowrap;
 }
 
 .count-icon {
-  color: var(--color-gray-400);
+  color: #94a3b8;
 }
 
 .page-size-label,
 .page-size-suffix {
-  font-size: var(--font-size-sm);
-  color: var(--color-gray-500);
+  font-size: 13px;
+  color: #64748b;
 }
 
 .page-size-select {
@@ -712,7 +682,9 @@ function formatValue(val: any): string {
 .pager-row :deep(.el-select .el-input__wrapper) {
   height: 32px !important;
   min-height: 32px !important;
-  border-radius: var(--radius-md);
+  border-color: #cbd5e1;
+  border-radius: 10px;
+  box-shadow: none;
 }
 
 .pager-row :deep(.el-select .el-input__inner) {
@@ -721,11 +693,10 @@ function formatValue(val: any): string {
 }
 
 .pager-row :deep(.el-pager li) {
-  font-weight: var(--font-weight-medium);
-  border-radius: var(--radius-md);
+  font-weight: 600;
+  border-radius: 10px;
 }
 
-/* 隐藏底部伪元素线 */
 .data-table__content {
   border-top: none;
   border-right: none;
