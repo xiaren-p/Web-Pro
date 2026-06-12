@@ -7,7 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from api_v1.utils.responses import drf_ok, drf_error
-from api_v1.models import LxSellers, LxUserList
+from api_v1.models import LxSellers, LxShops
 # write_log 调用已移除
 from concurrent.futures import TimeoutError as FuturesTimeout
 
@@ -56,26 +56,35 @@ class SellerViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="owners")
     def owners(self, request):
-        """直接从数据库 lx_user_list 获取负责人列表返回前端"""
+        """直接从数据库 lx_shops 获取卖家账号负责人列表返回前端。"""
         try:
-            qs = LxUserList.objects.all()
+            qs = (
+                LxShops.objects
+                .exclude(seller_account_id__isnull=True)
+                .exclude(account_name__isnull=True)
+                .exclude(account_name="")
+                .values("seller_account_id", "account_name")
+                .distinct()
+                .order_by("account_name")
+            )
             out: List[dict] = []
-            
+
             for item in qs:
-                uid = item.uid
-                name = item.name or ''
-                name_zh = item.name_zh or ''
-                # 返回前端所需格式
+                uid = item["seller_account_id"]
+                name = item["account_name"] or str(uid)
                 out.append({
-                    'id': uid,
-                    'label': name_zh or name,
-                    'name': name_zh or name,
-                    'raw': {
-                        'uid': uid,
-                        'name': name,
-                        'name_zh': name_zh,
-                        'has_rule': item.has_rule
-                    }
+                    "id": uid,
+                    "uid": uid,
+                    "value": uid,
+                    "label": name,
+                    "name": name,
+                    "name_zh": name,
+                    "raw": {
+                        "uid": uid,
+                        "seller_account_id": uid,
+                        "name": name,
+                        "name_zh": name,
+                    },
                 })
 
             return drf_ok(out)

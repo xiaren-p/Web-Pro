@@ -1,4 +1,4 @@
-"""店铺配置下拉数据视图（LxAdsProfile）。"""
+"""广告通用店铺配置下拉数据视图（LxAdsProfile）。"""
 from __future__ import annotations
 
 from rest_framework import viewsets

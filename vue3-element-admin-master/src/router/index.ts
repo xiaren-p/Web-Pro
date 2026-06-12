@@ -79,8 +79,8 @@ export const constantRoutes: RouteRecordRaw[] = [
       {
         path: "/ads/campaign/detail",
         name: "AdCampaignDetail",
-        component: () => import("@/views/ads/detail/index.vue"),
-        meta: { title: "广告活动详情", hidden: true, keepAlive: false },
+        component: () => import("@/views/ads/sp/detail/index.vue"),
+        meta: { title: "SP 广告活动详情", hidden: true, keepAlive: false },
       },
       {
         path: "/tools/rule-strategy",

@@ -26,8 +26,8 @@
  */
 import { ref } from "vue";
 
-import NegativeKeywordPanel from "@/views/ads/detail/NegativeKeywordPanel.vue";
-import AutoNegativeTargetingPanel from "@/views/ads/detail/AutoNegativeTargetingPanel.vue";
+import NegativeKeywordPanel from "@/views/ads/sp/detail/NegativeKeywordPanel.vue";
+import AutoNegativeTargetingPanel from "@/views/ads/sp/detail/AutoNegativeTargetingPanel.vue";
 
 defineProps<{
   campaignId: string;

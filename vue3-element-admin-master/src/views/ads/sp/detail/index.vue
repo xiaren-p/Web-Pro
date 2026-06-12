@@ -6,10 +6,10 @@
       <div class="breadcrumb-row">
         <span class="breadcrumb-link" @click="goBack">
           <el-icon class="back-icon"><ArrowLeft /></el-icon>
-          全部广告
+          SP 广告活动
         </span>
         <span class="breadcrumb-sep">/</span>
-        <span class="breadcrumb-current">广告活动详情</span>
+        <span class="breadcrumb-current">SP 广告活动详情</span>
       </div>
 
       <!-- 第二行：活动名称 + 类型徽标 -->
@@ -103,12 +103,12 @@ import { useRoute, useRouter } from "vue-router";
 import { ArrowLeft, VideoPause, CircleClose } from "@element-plus/icons-vue";
 import { useLocalStorage } from "@vueuse/core";
 import { getAdCampaignDetail, type AdCampaignDetailResponse } from "@/api/ads";
-import AdGroupsPanel from "@/views/ads/detail/AdGroupsPanel.vue";
-import AdsPanel from "@/views/ads/detail/AdsPanel.vue";
-import AutoTargetingPanel from "@/views/ads/detail/AutoTargetingPanel.vue";
-import AutoNegativePanel from "@/views/ads/detail/AutoNegativePanel.vue";
-import KeywordPanel from "@/views/ads/detail/KeywordPanel.vue";
-import NegativeKeywordPanel from "@/views/ads/detail/NegativeKeywordPanel.vue";
+import AdGroupsPanel from "@/views/ads/sp/detail/AdGroupsPanel.vue";
+import AdsPanel from "@/views/ads/sp/detail/AdsPanel.vue";
+import AutoTargetingPanel from "@/views/ads/sp/detail/AutoTargetingPanel.vue";
+import AutoNegativePanel from "@/views/ads/sp/detail/AutoNegativePanel.vue";
+import KeywordPanel from "@/views/ads/sp/detail/KeywordPanel.vue";
+import NegativeKeywordPanel from "@/views/ads/sp/detail/NegativeKeywordPanel.vue";
 
 defineOptions({ name: "AdCampaignDetail" });
 

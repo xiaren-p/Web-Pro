@@ -1,5 +1,4 @@
-from api_v1.views.lingxing.ads.shop_profile_view import ShopProfileViewSet
-from api_v1.views.lingxing.ads.ad_portfolio_view import AdPortfolioViewSet
+"""SP 广告视图子包。"""
 from api_v1.views.lingxing.ads.sp.ad_campaign_view import AdCampaignViewSet
 from api_v1.views.lingxing.ads.sp.ad_group_view import AdGroupViewSet
 from api_v1.views.lingxing.ads.sp.ad_view import AdViewSet
@@ -11,9 +10,14 @@ from api_v1.views.lingxing.ads.sp.time_pricing_strategy_view import TimePricingS
 from api_v1.views.lingxing.ads.sp.rule_strategy_view import RuleStrategyViewSet, RuleStrategyGroupViewSet
 
 __all__ = [
-    "ShopProfileViewSet", "AdPortfolioViewSet", "AdCampaignViewSet",
-    "AdGroupViewSet", "AdViewSet", "AutoTargetingViewSet",
-    "KeywordViewSet", "AutoNegativeTargetingViewSet", "NegativeKeywordViewSet",
+    "AdCampaignViewSet",
+    "AdGroupViewSet",
+    "AdViewSet",
+    "AutoTargetingViewSet",
+    "KeywordViewSet",
+    "AutoNegativeTargetingViewSet",
+    "NegativeKeywordViewSet",
     "TimePricingStrategyViewSet",
-    "RuleStrategyViewSet", "RuleStrategyGroupViewSet",
+    "RuleStrategyViewSet",
+    "RuleStrategyGroupViewSet",
 ]

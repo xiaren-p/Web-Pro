@@ -1,4 +1,4 @@
-"""分时调价策略视图（LxTimePricingStrategy）。"""
+"""SP 广告分时调价策略视图（LxTimePricingStrategy）。"""
 from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.decorators import action

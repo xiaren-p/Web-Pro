@@ -1,4 +1,4 @@
-"""广告组合数据视图（AdPortfolio）。"""
+"""广告通用组合数据视图（AdPortfolio）。"""
 from __future__ import annotations
 
 from rest_framework import viewsets
