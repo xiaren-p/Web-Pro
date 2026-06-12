@@ -1,11 +1,19 @@
 """SP 广告优化策略——规则匹配器（campaign_rule_matcher）。
 
-对单个 LxSpCampaign 执行 LxAdRule 的五步串联匹配，返回"规则组 + 规则"两级
-嵌套的 auto_rules JSON 结构。主函数 match_rules_for_campaign 供主编排服务调用。
+对单个 LxSpCampaign 执行 LxAdRule 的五步串联匹配，返回按比对对象分组的扁平化 auto_rules。
+
+五步匹配规则：
+  ① 适用店铺：rule.shops 为空即不限，否则 profile_id 必须在 shops 中
+  ② 广告类型：ad_type（all/auto/manual）必须兼容 campaign 的 targeting_type
+  ③ 生效周期：以 campaign 创建时间为基准，支持 within_days / beyond_days / date_range
+  ④ 比对对象兼容：手动广告不能命中定位组规则，自动广告不能命中关键词/商品规则
+  ⑤ 字段设置：归类/负责人/标签/自动定位组 的交集匹配
+
+匹配结果按 comparison_target 分 item 后扁平化，同一 item 内规则按全局优先级升序。
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 
 from api_v1.models.lingxing.ads.lx_ad_rule import (
@@ -16,14 +24,21 @@ from api_v1.models.lingxing.ads.lx_ad_rule import (
 from api_v1.models.lingxing.ads.lx_ad_rule_group import LxAdRuleGroup
 
 
+# 前端 targetGroup 值 → LxSpTarget.expression.type 数据库值
+_EXPR_TYPE_AUTO_MAP = {
+    "close_match": "closeMatch",
+    "loose_match": "looseMatch",
+    "substitutes": "substitutes",
+    "complements": "complements",
+}
+
+
 # ============================================================
-# 五步匹配中的独立校验函数
+# 步骤①：适用店铺匹配
 # ============================================================
 
 def _check_shop_match(rule: LxAdRule, profile_id: int) -> bool:
-    """步骤①：适用店铺匹配。
-
-    rule.shops 为空列表时视为不限（始终命中）。
+    """rule.shops 为空列表时视为不限（始终命中）。
 
     Args:
         rule: 广告规则实例
@@ -38,11 +53,12 @@ def _check_shop_match(rule: LxAdRule, profile_id: int) -> bool:
     return profile_id in shop_list
 
 
-def _check_ad_type_match(rule: LxAdRule, targeting_type: str) -> bool:
-    """步骤②：广告类型匹配。
+# ============================================================
+# 步骤②：广告类型匹配
+# ============================================================
 
-    ad_type="all" 不限；"auto" 仅匹配 targeting_type="auto"；
-    "manual" 仅匹配 targeting_type="manual"。
+def _check_ad_type_match(rule: LxAdRule, targeting_type: str) -> bool:
+    """ad_type="all" 不限；"auto" 仅匹配 targeting_type="auto"；"manual" 仅匹配 "manual"。
 
     Args:
         rule: 广告规则实例
@@ -56,19 +72,20 @@ def _check_ad_type_match(rule: LxAdRule, targeting_type: str) -> bool:
     return rule.ad_type == targeting_type
 
 
+# ============================================================
+# 步骤③：生效周期匹配
+# ============================================================
+
 def _check_effective_period(
     rule: LxAdRule,
     creation_date: date | None,
     today: date,
 ) -> bool:
-    """步骤③：生效周期匹配。
-
-    以 campaign.creation_date 为基准计算时间窗口。
+    """以 campaign.creation_date 为基准计算时间窗口。
 
     - within_days：今日 ∈ [creation_date + start_days, creation_date + end_days]
-    - beyond_days：今日 > creation_date + start_days（不含），单值，表示"创建后超过 X 天"
-    - date_range：今日月日在 [start_m/d, end_m/d] 范围内（年无关，跨年兼容）
-    - 若 effective_type 不在以上三种之一，视为不匹配
+    - beyond_days：今日 > creation_date + start_days（不含），单值
+    - date_range：今日月日在 [start_month/day, end_month/day] 范围内（年无关，跨年兼容）
 
     Args:
         rule: 广告规则实例
@@ -124,16 +141,19 @@ def _check_effective_period(
     return False
 
 
+# ============================================================
+# 步骤④：比对对象兼容性校验
+# ============================================================
+
 def _check_comparison_target_compatibility(
     rule: LxAdRule,
     targeting_type: str,
 ) -> bool:
-    """步骤④：比对对象兼容性校验。
+    """检查规则的比对对象是否与 campaign 投放类型兼容。
 
     - manual campaign 不能命中 comparison_target="targeting"（手动广告无定位组）
-    - auto campaign 不能命中 comparison_target 为 keyword 或 product_targeting
-    - 当 comparison_target="targeting" 时，检查 comparison_multi_targets
-      是否至少包含一个与 targeting_type 兼容的选项
+    - auto campaign 不能命中 keyword 或 product_targeting（自动广告无关键词/商品投放）
+    - targeting 多选子项需至少有一个兼容项
 
     Args:
         rule: 广告规则实例
@@ -175,6 +195,10 @@ def _check_comparison_target_compatibility(
     return True
 
 
+# ============================================================
+# 步骤⑤：字段设置匹配
+# ============================================================
+
 def _check_field_match(
     rule: LxAdRule,
     product_assorts: list[str],
@@ -182,23 +206,17 @@ def _check_field_match(
     product_uids: list[int],
     auto_targeting_groups: list[str],
 ) -> bool:
-    """步骤⑤：字段设置匹配。
+    """检查产品字段是否命中规则的字段设置。
 
-    参照 strategy_matcher.check_field_match() 的交集匹配逻辑：
-    - 归类（categories）：rule.categories 非空时，至少一个 product_assort 在其中
-    - 负责人（managers）：rule.managers 非空时，至少一个 product_uid 在其中
-    - 标签（tags）：rule.tags 非空时，至少一个 product_label 在其中
-    - 自动定位组（auto_targeting_groups）：rule.auto_targeting_groups 非空
-      且不是"不限"时，至少一个 campaign 的定位组在其中
-
-    每个维度若 unlimited 标记为 True 或对应列表为空，则该维度视为不限。
+    四个维度（归类/负责人/标签/自动定位组），每个维度若 unlimited 为 True
+    或对应列表为空则该维度不限。交集匹配：规则的限定值 ∩ 产品实际字段有交集即命中。
 
     Args:
         rule: 广告规则实例
         product_assorts: 产品归类列表（已扁平去重）
         product_labels: 产品标签列表（已扁平去重）
         product_uids: 产品负责人 uid 列表（已扁平去重）
-        auto_targeting_groups: campaign 的自动定位组列表
+        auto_targeting_groups: campaign 的自动定位组列表（DB 值）
 
     Returns:
         True 表示字段命中
@@ -226,15 +244,10 @@ def _check_field_match(
             if not any(t in rule_tags for t in product_labels):
                 return False
 
-    # 自动定位组匹配
-    # 注意：rule 中的 targetGroup 值（前端）：
-    #   close_match / loose_match / substitutes / complements
-    # LxSpTarget.expression 中的 type 值（数据库）：
-    #   closeMatch / looseMatch / substitutes / complements
+    # 自动定位组匹配：rule 中的值是前端值（close_match 等），需映射为 DB 值做交集
     if not rule.unlimited_auto_targeting:
         rule_atgs: list[str] = rule.auto_targeting_groups or []
         if rule_atgs:
-            # 将前端值映射为数据库值做交集匹配
             atg_mapped = {
                 _EXPR_TYPE_AUTO_MAP.get(tg, tg)
                 for tg in rule_atgs
@@ -246,23 +259,21 @@ def _check_field_match(
 
 
 # ============================================================
-# 规则序列化：将 LxAdRule 实例转为 JSON 字典
+# 规则序列化
 # ============================================================
 
 def _serialize_rule(
     rule: LxAdRule,
     priority: int,
 ) -> dict[str, Any]:
-    """将 LxAdRule 实例序列化为 auto_rules 中的规则 JSON 对象。
-
-    追加优先级字段，数字越小优先级越高。
+    """将 LxAdRule 实例序列化为 auto_rules 规则 JSON 对象。
 
     Args:
         rule: 广告规则实例
-        priority: 计算的优先级值
+        priority: 优先级值（数字越小越优先）
 
     Returns:
-        规则的 JSON 字典表示
+        规则的 JSON 字典
     """
     return {
         "rule_id": rule.id,
@@ -290,24 +301,21 @@ def _serialize_rule(
 
 
 # ============================================================
-# 优先级常量
+# 优先级计算
 # ============================================================
 
-# 规则组权重因子：组权重 × 组内序号偏移 = 规则独立优先级
-# 优先级 = group.weight * GROUP_WEIGHT_MULTIPLIER + rule_index
-# 数字越小优先级越高。组权重 0–999，组内规则最大 1000 条。
+# 规则组权重因子：group.weight × 1000 + rule_index = 全局优先级，数字越小优先级越高
 GROUP_WEIGHT_MULTIPLIER = 1000
 
 
 def _calc_priority(group_weight: int, rule_index: int) -> int:
     """根据规则组权重和组内序号计算单条规则的全局优先级。
 
-    公式：group_weight * 1000 + rule_index
-    rule_index 反映组内 rule_order 的顺序（0-based）。
-    数字越小优先级越高。
+    公式：group_weight * 1000 + rule_index。
+    rule_index 为 0-based 组内顺序号（rule_order 中的位置）。
 
     Args:
-        group_weight: 规则组权重（0–999）
+        group_weight: 规则组权重（0–999，数字越小优先级越高）
         rule_index: 组内规则序号（0-based，0 优先级最高）
 
     Returns:
@@ -317,7 +325,7 @@ def _calc_priority(group_weight: int, rule_index: int) -> int:
 
 
 # ============================================================
-# 主入口：match_rules_for_campaign
+# 主入口
 # ============================================================
 
 def match_rules_for_campaign(
@@ -331,10 +339,7 @@ def match_rules_for_campaign(
     rules_by_group: list[tuple[LxAdRuleGroup, list[LxAdRule]]],
     today: date,
 ) -> list[dict[str, Any]]:
-    """对单个 campaign 执行全部规则组×规则的五步串联匹配。
-
-    匹配完成后，按比对对象（comparison_target）分 item，每个 item
-    内规则按优先级升序排列（数字越小优先级越高）。
+    """对单个 campaign 执行五步串联匹配，返回按比对对象分组的扁平化 auto_rules。
 
     Args:
         profile_id: 店铺 Profile ID
@@ -348,16 +353,13 @@ def match_rules_for_campaign(
         today: 今天日期
 
     Returns:
-        auto_rules JSON 结构，按 comparison_target 分 item 后扁平化：
-        [{
-            "comparison_target": "campaign",
-            "rules": [
-                {"rule_id": 3, "priority": 5, "rule_name": "…", …},
-                {"rule_id": 7, "priority": 1003, "rule_name": "…", …}
-            ]
-        }]
+        auto_rules JSON 结构，按 comparison_target 分 item：
+        [
+            {"comparison_target": "campaign", "rules": [{...}, ...]},
+            {"comparison_target": "keyword", "rules": [{...}, ...]},
+        ]
     """
-    # ── 收集全部命中规则（扁平列表）──
+    # 收集全部命中规则（扁平列表）
     matched_rules: list[dict[str, Any]] = []
 
     for group, rules in rules_by_group:
@@ -365,26 +367,18 @@ def match_rules_for_campaign(
             # 步骤①：适用店铺
             if not _check_shop_match(rule, profile_id):
                 continue
-
             # 步骤②：广告类型
             if not _check_ad_type_match(rule, targeting_type):
                 continue
-
             # 步骤③：生效周期
             if not _check_effective_period(rule, campaign_creation_date, today):
                 continue
-
             # 步骤④：比对对象兼容
             if not _check_comparison_target_compatibility(rule, targeting_type):
                 continue
-
             # 步骤⑤：字段设置
             if not _check_field_match(
-                rule,
-                product_assorts,
-                product_labels,
-                product_uids,
-                auto_targeting_groups,
+                rule, product_assorts, product_labels, product_uids, auto_targeting_groups,
             ):
                 continue
 
@@ -392,33 +386,22 @@ def match_rules_for_campaign(
             rule._group_id = group.id
             rule._group_name = group.name
 
-            # 计算优先级
-            priority = _calc_priority(group.weight, idx)
+            # 计算优先级并序列化
+            matched_rules.append(_serialize_rule(rule, _calc_priority(group.weight, idx)))
 
-            # 全部命中 → 序列化加入
-            matched_rules.append(_serialize_rule(rule, priority))
-
-    # ── 按 comparison_target 分组 ──
-    # 空列表直接返回
+    # 按 comparison_target 分组
     if not matched_rules:
         return []
 
-    # 按 comparison_target 聚合
     from collections import OrderedDict
     target_map: dict[str, list[dict[str, Any]]] = OrderedDict()
     for r in matched_rules:
-        ct = r["comparison_target"]
-        if ct not in target_map:
-            target_map[ct] = []
-        target_map[ct].append(r)
+        target_map.setdefault(r["comparison_target"], []).append(r)
 
     # 输出：每个 comparison_target 一个 item，内部规则按优先级升序
     result: list[dict[str, Any]] = []
     for ct, rules in target_map.items():
         rules.sort(key=lambda r: r["priority"])
-        result.append({
-            "comparison_target": ct,
-            "rules": rules,
-        })
+        result.append({"comparison_target": ct, "rules": rules})
 
     return result
