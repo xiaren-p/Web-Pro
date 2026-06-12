@@ -308,6 +308,7 @@ def _load_ad_group_bid_map(
         for ag in LxSpAdGroup.objects.filter(
             ad_group_id__in=list(ad_group_ids),
             profile_id=profile_id,
+            state="enabled",
             default_bid__isnull=False,
         ).only("ad_group_id", "default_bid")
     }

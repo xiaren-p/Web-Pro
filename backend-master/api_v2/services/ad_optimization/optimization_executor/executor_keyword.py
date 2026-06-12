@@ -620,6 +620,7 @@ def execute_keyword_rules() -> dict[str, Any]:
     if ad_group_ids:
         for ag in LxSpAdGroup.objects.filter(
             ad_group_id__in=list(ad_group_ids),
+            state="enabled",
             default_bid__isnull=False,
         ).only("ad_group_id", "default_bid"):
             ad_group_bid_map[ag.ad_group_id] = float(ag.default_bid)
