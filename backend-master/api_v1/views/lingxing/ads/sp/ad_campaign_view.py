@@ -178,24 +178,22 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 pass
         else:
             # 无排序参数时默认按曝光量降序
-            route = resolve("ad_campaign_list")
             date_start = data.get("date_start")
             date_end = data.get("date_end")
-            if date_start and date_end and route:
-                from django.db.models import Sum, Q as DQ, OuterRef, Subquery, IntegerField, Value
+            from django.db.models import Sum, Q as DQ, OuterRef, Subquery, IntegerField
+            report_filter = DQ()
+            if date_start and date_end:
                 report_filter = DQ(report_date__gte=date_start, report_date__lte=date_end)
-                imp_sub = LxSpCampaignReport.objects.filter(
-                    DQ(campaign_id=OuterRef("campaign_id")),
-                    DQ(profile_id=OuterRef("profile_id")),
-                    report_filter,
-                ).values("campaign_id", "profile_id").annotate(
-                    total_imp=Sum("impressions")
-                ).values("total_imp")
-                qs = qs.annotate(_total_impressions=Subquery(imp_sub, output_field=IntegerField())).order_by(
-                    "-_total_impressions"
-                )
-            else:
-                qs = qs.order_by("-start_date")
+            imp_sub = LxSpCampaignReport.objects.filter(
+                DQ(campaign_id=OuterRef("campaign_id")),
+                DQ(profile_id=OuterRef("profile_id")),
+                report_filter,
+            ).values("campaign_id", "profile_id").annotate(
+                total_imp=Sum("impressions")
+            ).values("total_imp")
+            qs = qs.annotate(_total_impressions=Subquery(imp_sub, output_field=IntegerField())).order_by(
+                "-_total_impressions"
+            )
 
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
