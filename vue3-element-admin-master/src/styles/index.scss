@@ -577,7 +577,7 @@ html.sidebar-color-blue .layout-mix .layout__sidebar--left .el-menu {
 
 // ─── 通用工具类：背景 ─────────────────────────────────────────────────────────
 .bg-white {
-  background-color: #ffffff;
+  background-color: var(--surface-base);
 }
 .bg-gray-50 {
   background-color: var(--color-gray-50);

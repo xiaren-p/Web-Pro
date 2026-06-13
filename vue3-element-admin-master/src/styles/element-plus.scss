@@ -520,7 +520,7 @@ $border-light: 1px solid var(--border-subtle);
     &.el-tag--info {
       color: var(--text-secondary);
       background-color: var(--surface-subtle);
-      border-color: var(--color-gray-200);
+      border-color: var(--border-base);
     }
   }
 
@@ -553,7 +553,7 @@ $border-light: 1px solid var(--border-subtle);
     &.el-tag--info {
       color: var(--text-secondary);
       background-color: var(--surface-subtle);
-      border-color: var(--color-gray-200);
+      border-color: var(--border-base);
     }
   }
 
@@ -803,7 +803,7 @@ $border-light: 1px solid var(--border-subtle);
 
   &.el-alert--info {
     background-color: var(--surface-subtle);
-    border-color: var(--color-gray-200);
+    border-color: var(--border-base);
 
     .el-alert__title {
       color: var(--text-secondary);
@@ -886,7 +886,7 @@ $border-light: 1px solid var(--border-subtle);
 
 // ─── El MessageBox ───────────────────────────────────────────────────────────
 .el-overlay {
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgb(15 23 42 / 50%);
   backdrop-filter: blur(4px);
 }
 
