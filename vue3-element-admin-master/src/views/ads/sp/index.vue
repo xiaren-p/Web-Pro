@@ -335,6 +335,7 @@ async function loadTableData() {
       sponsored_type: filters.adsTypes.join(","),
       portfolio_id: filters.portfolios.join(","),
       bidding_type: filters.biddingType,
+      tags: filters.tags.join(","),
       profiles: filters.profiles.join(","),
       countries: filters.countries.join(","),
       date_start: filters.range?.[0] || "",

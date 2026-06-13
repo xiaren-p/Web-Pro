@@ -99,6 +99,16 @@ class AdCampaignViewSet(viewsets.ViewSet):
             # bidding 为 JSONField，内部结构为 {"strategy": "manual", "adjustments": []}
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
+        # 标签筛选：tags 是后端 LxSpAd→LxProductInfo 计算出品的扁平去重列表
+        # 前端传逗号分隔标签值，后端通过已计算好的 tags 字段 JSON 重叠匹配
+        tags = data.get("tags")
+        if tags:
+            tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+            tag_q = Q()
+            for t in tag_list:
+                tag_q |= Q(tags__icontains=t)
+            qs = qs.filter(tag_q)
+
         portfolio_id = data.get("portfolio_id")
         if portfolio_id:
             p_ids = [p for p in portfolio_id.split(",") if p]
@@ -229,7 +239,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         _default_ccy: dict[str, Any] = {"icon": "￥", "code": "CNY", "rate": 1.0}
 
         # 收集完整筛选集的所有 profile_id 与 currency_code
-        all_profile_ids_in_qs = list(qs.values_list("profile_id", flat=True).distinct())
+        all_profile_ids_in_qs = list(qs.order_by().values_list("profile_id", flat=True).distinct())
         all_profiles_in_qs = list(LxAdsProfile.objects.filter(profile_id__in=all_profile_ids_in_qs))
         all_currency_codes = {p.currency_code for p in all_profiles_in_qs if p.currency_code}
 
