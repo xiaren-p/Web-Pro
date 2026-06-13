@@ -69,12 +69,10 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if isinstance(keyword, str) and keyword.strip():
             kw = keyword.strip()
             base_q = Q(name__icontains=kw)
-            # campaign_id 为 BigIntegerField，不支持 icontains，仅做精确数值匹配
             try:
                 base_q |= Q(campaign_id=int(kw))
             except (ValueError, TypeError):
                 pass
-            # 通过 LxAdsProfile.sid 反向查找匹配的 profile_id（替代旧 store_id__icontains）
             matched_pids = list(
                 LxAdsProfile.objects.filter(sid__icontains=kw).values_list("profile_id", flat=True)
             )
@@ -96,11 +94,8 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         bidding_strategy = data.get("bidding_type")
         if bidding_strategy:
-            # bidding 为 JSONField，内部结构为 {"strategy": "manual", "adjustments": []}
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
-        # 标签筛选：tags 是后端 LxSpAd→LxProductInfo 计算出品的扁平去重列表
-        # 前端传逗号分隔标签值，后端通过已计算好的 tags 字段 JSON 重叠匹配
         tags = data.get("tags")
         if tags:
             tag_list = [t.strip() for t in tags.split(",") if t.strip()]
@@ -132,7 +127,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             ).values_list("profile_id", flat=True)
             qs = qs.filter(profile_id__in=profile_ids)
 
-        # ── ASIN / MSKU 搜索：通过 LxListingData 反查 sku/asin → LxSpAd → 广告活动/广告组 ──
+        # ── ASIN / MSKU 搜索 ──
         skus = data.get("skus")
         asin_search_type = data.get("asinSearchType", "sku")
         if skus:
@@ -140,7 +135,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
             if sku_list:
                 listing_filter = Q()
                 if asin_search_type == "parent_asin":
-                    # 父 ASIN → 查出所有子 ASIN → 子 MSKU
                     listing_filter |= Q(sku__in=sku_list)
                     child_skus = list(
                         LxListingData.objects.filter(parent_asin__in=sku_list)
@@ -152,7 +146,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
                     if child_skus:
                         listing_filter |= Q(sku__in=child_skus)
                 else:
-                    # 按 MSKU 或 ASIN 查询 → 先通过 LxListingData 补全 ASIN
                     listing_filter |= Q(sku__in=sku_list)
                     related_asins = list(
                         LxListingData.objects.filter(seller_sku__in=sku_list)
@@ -163,7 +156,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
                     if related_asins:
                         listing_filter |= Q(asin__in=related_asins)
 
-                # 通过 LxSpAd 的 sku/asin 字段反查 campaign_id + profile_id
                 matched_ads = LxSpAd.objects.filter(listing_filter).values(
                     "campaign_id", "profile_id"
                 ).distinct()
@@ -173,6 +165,9 @@ class AdCampaignViewSet(viewsets.ViewSet):
                     for cid, pid in campaign_pairs:
                         pair_q |= Q(campaign_id=cid, profile_id=pid)
                     qs = qs.filter(pair_q)
+
+        date_start = data.get("date_start")
+        date_end = data.get("date_end")
 
         sort_prop = data.get("sort_prop")
         sort_order = data.get("sort_order")
@@ -186,16 +181,17 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 qs = qs.order_by(f"{order_prefix}{db_field}")
             except Exception:
                 pass
+
+        # ── 加载排序/分页前的基础 campaign 数据 ──
+        if sort_prop and sort_order in ["asc", "desc"]:
+            p_num, p_size = self._get_page_params(data)
+            total, items, p_num, p_size = paginate_queryset(request, qs)
         else:
-            # 无排序参数时默认按曝光量降序。
-            # 性能关键：对全量筛选集做一次批量 GROUP BY 聚合后 Python 内存排序，
-            # 避免原 Subquery + annotate 逐行子查询导致 6000+ 次独立 SQL。
-            date_start = data.get("date_start")
-            date_end = data.get("date_end")
-            imp_map: dict[str, int] = {}
+            p_num, p_size = self._get_page_params(data)
             filtered_ids = list(
                 qs.values_list("campaign_id", "profile_id").distinct()
             )
+            imp_map: dict[str, int] = {}
             if filtered_ids:
                 all_cids_set = {cid for cid, _ in filtered_ids}
                 all_pids_set = {pid for _, pid in filtered_ids}
@@ -217,31 +213,38 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 for cid_val, pid_val in filtered_ids:
                     cp_key = f"{cid_val}::{pid_val}"
                     imp_map.setdefault(cp_key, 0)
-            # 按曝光量降序排序（纯内存，无额外 DB 查询）
             qs = qs.only(
                 "id", "campaign_id", "profile_id", "name", "campaign_type",
                 "targeting_type", "daily_budget", "start_date", "end_date",
                 "state", "serving_status", "bidding", "portfolio_id", "tags",
                 "creation_date", "last_updated_date",
             )
-            campaign_list = list(qs)
-            campaign_list.sort(
+            campaigns = list(qs)
+            total = len(campaigns)
+            campaigns.sort(
                 key=lambda obj: imp_map.get(
                     f"{obj.campaign_id}::{obj.profile_id}", 0
                 ),
                 reverse=True,
             )
-            total = len(campaign_list)
-            p_num, p_size = self._get_page_params(data)
             start_idx = (p_num - 1) * p_size
             end_idx = start_idx + p_size
-            items = campaign_list[start_idx:end_idx]
+            items = campaigns[start_idx:end_idx]
 
-        # 有自定义排序时走标准分页
-        if sort_prop and sort_order in ["asc", "desc"]:
-            total, items, p_num, p_size = paginate_queryset(request, qs)
+            # 一次加载完后从 Python 列表提取所有 profile_id（不再重新查询 DB）
+            all_profile_ids = sorted({
+                obj.profile_id
+                for obj in campaigns
+                if obj.profile_id
+            })
+            # 将 (campaign_id, profile_id) → 汇率映射构建也从内存列表走
+            all_campaign_pairs = [
+                (obj.campaign_id, obj.profile_id)
+                for obj in campaigns
+                if obj.campaign_id and obj.profile_id
+            ]
 
-        # ── 组装店铺与国家数据 ──
+        # ── 店铺与国家数据 ──
         item_profile_ids = [item.profile_id for item in items if item.profile_id]
         profiles_page = list(LxAdsProfile.objects.filter(profile_id__in=item_profile_ids))
 
@@ -255,7 +258,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 "sid": sp.sid or "",
             }
 
-        # ── 组装广告组合数据（需同时匹配 portfolio_id + profile_id）──
+        # ── 广告组合数据 ──
         portfolio_pairs = [
             (item.portfolio_id, item.profile_id)
             for item in items
@@ -269,21 +272,20 @@ class AdCampaignViewSet(viewsets.ViewSet):
             for ap in LxAdsPortfolio.objects.filter(pf_q):
                 portfolio_map[f"{ap.portfolio_id}::{ap.profile_id}"] = ap.name or str(ap.portfolio_id)
 
-        # ── 汇率体系（一步查表：LxAdsProfile.currency_code → LxExchangeRate.code）──
+        # ── 汇率体系 ──
         _default_ccy: dict[str, Any] = {"icon": "￥", "code": "CNY", "rate": 1.0}
 
-        # 收集完整筛选集的所有 profile_id 与 currency_code
-        all_profile_ids_in_qs = list(qs.order_by().values_list("profile_id", flat=True).distinct())
-        all_profiles_in_qs = list(LxAdsProfile.objects.filter(profile_id__in=all_profile_ids_in_qs))
+        if sort_prop and sort_order in ["asc", "desc"]:
+            all_profile_ids = list(qs.values_list("profile_id", flat=True).distinct())
+            all_campaign_pairs = list(
+                qs.values_list("campaign_id", "profile_id")
+            )
+        all_profiles_in_qs = list(LxAdsProfile.objects.filter(profile_id__in=all_profile_ids))
         all_currency_codes = {p.currency_code for p in all_profiles_in_qs if p.currency_code}
 
-        # 多货币场景下必须获取 USD 汇率作为统一换算基准；若筛选集中不含美国站点，
-        # rate_map_all 中缺少 USD 会导致第 203 行 fallback 到硬编码 7.2，使金额偏差 ~5%。
         if len(all_currency_codes) > 1:
             all_currency_codes.add("USD")
 
-        # 一次查询获取所有相关汇率，每个币种取最新日期记录
-        # 生产环境 lx_exchange_rate 表可能尚未建好，查询异常时安全兜底为 _default_ccy
         all_rates: list = []
         try:
             all_rates = list(LxExchangeRate.objects.filter(code__in=all_currency_codes).order_by("-date"))
@@ -300,20 +302,17 @@ class AdCampaignViewSet(viewsets.ViewSet):
                     "rate": parse_exchange_rate(r.my_rate, r.rate_org),
                 }
 
-        # profile_id → 汇率信息的统一映射（全量 + 分页通用）
         profile_to_rate_all: dict[str, dict[str, Any]] = {
             str(p.profile_id): rate_map_all.get(p.currency_code, _default_ccy)
             for p in all_profiles_in_qs
         }
 
-        # 判断是否单一货币，决定汇总行货币基准
         unique_codes: set[str] = {
             rate_map_all.get(c, _default_ccy).get("code", "CNY")
             for c in all_currency_codes
         }
         is_single_currency: bool = len(unique_codes) <= 1
 
-        # 获取美元汇率（多货币时用于统一换算基准）
         usd_rate_info = rate_map_all.get("USD", {"rate": 7.2})
         rate_usd_to_cny: float = float(usd_rate_info.get("rate", 7.2))
         _usd_ccy: dict[str, Any] = {"icon": "$", "code": "USD", "rate": rate_usd_to_cny}
@@ -332,25 +331,26 @@ class AdCampaignViewSet(viewsets.ViewSet):
             for item in items
         }
 
-        # 多货币时：构建完整查询集下 campaign_id → 货币信息映射（汇总行换算用）
+        # 全量 campaign → 货币信息（汇总行换算用，复用已加载的内存列表）
         currency_by_campaign_all: dict[str, dict[str, Any]] = {}
         if not is_single_currency:
             currency_by_campaign_all = {
                 build_campaign_profile_key(cid, pid): profile_to_rate_all.get(str(pid), _default_ccy)
-                for cid, pid in qs.values_list("campaign_id", "profile_id")
+                for cid, pid in all_campaign_pairs
             }
 
-        # 按日期范围聚合指标
-        date_start = data.get("date_start")
-        date_end = data.get("date_end")
+        # ── 指标聚合 ──
         campaign_pairs = [
             (str(item.campaign_id), str(item.profile_id))
             for item in items
             if item.campaign_id and item.profile_id
         ]
 
+        all_pairs_set: set[tuple[str, str]] = {
+            (str(cid), str(pid)) for cid, pid in all_campaign_pairs
+        }
         summary_with_meta = self._build_total_metrics(
-            qs, date_start, date_end,
+            all_pairs_set, date_start, date_end,
             is_single_currency=is_single_currency,
             ref_currency=ref_currency,
             currency_by_campaign_all=currency_by_campaign_all,
@@ -377,36 +377,29 @@ class AdCampaignViewSet(viewsets.ViewSet):
             dic["profile_alias"] = p_info.get("profile_alias", str(item.profile_id))
             dic["country_name"] = p_info.get("country_name", "-")
 
-            # 兼容前端驼峰命名的列字段配置
             dic["startDate"] = dic.get("start_date")
 
-            # 预算字段：序列化器已带 daily_budget，补充驼峰别名
             dic["budget"] = dic.get("daily_budget")
 
-            # 广告类型简写映射：sponsoredProducts → SP, sponsoredBrands → SB, sponsoredDisplay → SD
             raw_type = dic.get("campaign_type", "")
             dic["sponsored_type"] = CAMPAIGN_TYPE_SHORT.get(raw_type, raw_type)
             dic["sponsored_type_raw"] = raw_type
 
-            # 竞价策略：从 bidding JSONField 中提取 strategy 并映射为中文 label
             bidding_val = dic.get("bidding")
             raw_strategy = bidding_val.get("strategy", "") if isinstance(bidding_val, dict) else ""
             dic["bidding_type"] = BIDDING_STRATEGY_LABEL.get(raw_strategy, raw_strategy)
             dic["bidding_type_raw"] = raw_strategy
 
-            # 使用 portfolio_id + profile_id 联合键映射出 portfolio_name
             if item.portfolio_id and item.profile_id:
                 pf_key = f"{item.portfolio_id}::{item.profile_id}"
                 dic["portfolio_name"] = portfolio_map.get(pf_key, "")
             else:
                 dic["portfolio_name"] = ""
 
-            # 服务状态：后端统一解析，前端直接渲染
             _ss = resolve_service_status(item.serving_status)
             dic["service_status_label"] = _ss["label"]
             dic["service_status_type"] = _ss["type"]
 
-            # 填充聚合后的指标数据
             dic.update(
                 metrics_map.get(
                     build_campaign_profile_key(item.campaign_id, item.profile_id),
@@ -414,13 +407,11 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 )
             )
 
-            # 补充 LxAdsProfile.sid（店铺 ID，旧 store_id 字段）
             dic["store_id"] = p_info.get("sid", "")
 
             res_list.append(dic)
 
-        # ── 批量补充标签和负责人数据 ──
-        # 通过 LxSpAd 的 campaign_id+profile_id → asin → LxProductInfo.label / principal_list
+        # ── 标签和负责人数据 ──
         item_keys = [(str(item.campaign_id), str(item.profile_id)) for item in items]
         ad_rows = LxSpAd.objects.filter(
             build_campaign_profile_query(item_keys)
@@ -431,7 +422,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
             if a["asin"]:
                 asin_by_key.setdefault(key, set()).add(a["asin"])
         all_asins = {a for aset in asin_by_key.values() for a in aset}
-        # 标签映射 asin → label 列表
         asin_label_map: dict[str, list[str]] = {}
         asin_principal_map: dict[str, list[str]] = {}
         if all_asins:
@@ -441,13 +431,11 @@ class AdCampaignViewSet(viewsets.ViewSet):
             for p in product_rows:
                 asin_label_map.setdefault(p["asin"], [])
                 asin_principal_map.setdefault(p["asin"], [])
-                # label 是逗号拼接字符串
                 raw_label = (p["label"] or "").strip()
                 if raw_label:
                     asin_label_map[p["asin"]].extend(
                         [t.strip() for t in raw_label.split(",") if t.strip()]
                     )
-                # principal_list 是 JSON 数组 [{"uid":..., "realname":...}, ...]
                 pl = p["principal_list"]
                 if isinstance(pl, list):
                     names = [x.get("realname", "") for x in pl if isinstance(x, dict) and x.get("realname")]
@@ -459,12 +447,10 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 dic.get("campaign_id"), dic.get("profile_id")
             )
             asins = asin_by_key.get(key, set())
-            # 标签：扁平化去重
             tags_set: set[str] = set()
             for a in asins:
                 tags_set.update(asin_label_map.get(a, []))
             dic["tags"] = sorted(tags_set)
-            # 负责人：扁平化去重
             principals_set: set[str] = set()
             for a in asins:
                 principals_set.update(asin_principal_map.get(a, []))
@@ -626,12 +612,8 @@ class AdCampaignViewSet(viewsets.ViewSet):
         for row in agg_rows:
             row_key = build_campaign_profile_key(row["campaign_id"], row["profile_id"])
             ccy = campaign_currency_map.get(row_key, {"icon": "$", "code": "USD", "rate": rate_usd_to_cny})
-            # 各行展示值始终使用本国货币符号与本地金额，多货币时不做换算
             icon: str = ccy["icon"]
 
-            # rate 仅用于占比（%）计算时对齐参考基准
-            # 单一货币：rate = 1.0（本地金额直接参与占比计算）
-            # 多货币：rate = 本地货币对人民币汇率 ÷ 美元对人民币汇率（将本地金额换算为美元基准）
             rate: float = (ccy["rate"] / rate_usd_to_cny) if not is_single_currency else 1.0
 
             row_cost = float(row["total_cost"] or 0)
@@ -641,7 +623,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
             row_impressions = int(row["total_impressions"] or 0)
             row_same_sales = float(row["total_same_sales"] or 0)
 
-            # 仅用于与汇总行（全量美元基准）做占比比较，不对外展示
             ref_sales = row_sales * rate
             ref_spends = row_cost * rate
 
@@ -696,7 +677,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
     @staticmethod
     def _build_total_metrics(
-        campaign_ids_qs: Any,
+        all_pairs_set: set[tuple[str, str]],
         date_start: str | None,
         date_end: str | None,
         *,
@@ -711,7 +692,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         - 多货币时：按 campaign 分组聚合后，依 ``rate ÷ rate_usd_to_cny`` 统一换算为美元（USD）再汇总。
 
         Args:
-            campaign_ids_qs (QuerySet): 完整筛选结果的 LxSpCampaign QuerySet。
+            all_pairs_set (set[tuple[str, str]]): 完整 (campaign_id, profile_id) 对集合。
             date_start (str | None): 起始日期。
             date_end (str | None): 截止日期。
             is_single_currency (bool): 是否仅含单一货币。
@@ -723,12 +704,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
             dict[str, Any]: 汇总行指标字段，含 _meta 内部基准值（不对外暴露）。
         """
         icon: str = ref_currency["icon"]
-
-        # Step 1：拉取所有有效 (campaign_id, profile_id) 复合键集合（1 次轻量查询）
-        all_pairs_set: set[tuple[str, str]] = {
-            (str(cid), str(pid))
-            for cid, pid in campaign_ids_qs.values_list("campaign_id", "profile_id")
-        }
 
         if not all_pairs_set:
             return {
@@ -760,7 +735,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 },
             }
 
-        # Step 2：双字段 IN 过滤报表表（仅 1 次 DB 查询）
         all_campaign_ids = list({cid for cid, _ in all_pairs_set})
         all_profile_ids = list({pid for _, pid in all_pairs_set})
 
@@ -773,7 +747,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if date_end:
             base_qs = base_qs.filter(report_date__lte=date_end)
 
-        # Step 3：DB 端按 (campaign_id, profile_id) 分组聚合（1 次 SQL，DB 端完成所有 SUM）
         per_campaign = base_qs.values("campaign_id", "profile_id").annotate(
             s_sales=Sum("sales"),
             s_same_sales=Sum("same_sales"),
@@ -788,17 +761,14 @@ class AdCampaignViewSet(viewsets.ViewSet):
         t_sales = t_same_sales = t_cost = 0.0
         t_orders = t_same_orders = t_units = t_clicks = t_impressions = 0
 
-        # Step 4：Python 端过滤有效对 + 汇率换算累加
         for row in per_campaign:
             pair_key = (str(row["campaign_id"]), str(row["profile_id"]))
             if pair_key not in all_pairs_set:
-                # 排除跨店同 campaign_id 碰撞产生的极少数误匹配行
                 continue
 
             if not is_single_currency:
                 row_key = build_campaign_profile_key(row["campaign_id"], row["profile_id"])
                 ccy = currency_by_campaign_all.get(row_key, {"rate": rate_usd_to_cny})
-                # 本地货币 → 人民币 → 美元：rate / rate_usd_to_cny
                 rate = ccy.get("rate", rate_usd_to_cny) / rate_usd_to_cny
                 t_sales += float(row["s_sales"] or 0) * rate
                 t_same_sales += float(row["s_same_sales"] or 0) * rate
@@ -814,7 +784,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
             t_clicks += int(row["s_clicks"] or 0)
             t_impressions += int(row["s_impressions"] or 0)
 
-        # 衍生指标计算（与货币无关的公式对单/多货币均适用）
         acos = f"{round(t_cost / t_sales * 100, 2)}%" if t_sales > 0 else "0"
         roas = round(t_sales / t_cost, 2) if t_cost > 0 else 0
         cvr = f"{round(t_orders / t_clicks * 100, 2)}%" if t_clicks > 0 else "0"
@@ -843,7 +812,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
             "spends": fmt_money(t_cost, icon),
             "spendsPercent": "100%" if t_cost > 0 else "0",
             "cpa": fmt_money(cpa_raw, icon) if cpa_raw != 0 else "0",
-            # 内部原始数值，在 list 方法中弹出，不发往前端
             "_meta": {
                 "ads_sales_ref": round(t_sales, 6),
                 "spends_ref": round(t_cost, 6),
