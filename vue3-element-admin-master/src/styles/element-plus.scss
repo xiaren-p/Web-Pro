@@ -3,8 +3,8 @@
  * 基于设计系统统一所有组件的视觉表现
  */
 
-$border: 1px solid var(--color-gray-200);
-$border-light: 1px solid var(--color-gray-100);
+$border: 1px solid var(--border-base);
+$border-light: 1px solid var(--border-subtle);
 
 // ─── El Dialog ───────────────────────────────────────────────────────────────
 .el-dialog {
@@ -17,12 +17,13 @@ $border-light: 1px solid var(--color-gray-100);
     align-items: center;
     padding: 18px 24px;
     margin: 0;
+    background: var(--surface-base);
     border-bottom: $border-light;
 
     .el-dialog__title {
       font-size: var(--font-size-lg);
       font-weight: var(--font-weight-semibold);
-      color: var(--color-gray-900);
+      color: var(--text-primary);
     }
   }
 
@@ -36,6 +37,7 @@ $border-light: 1px solid var(--color-gray-100);
     align-items: center;
     justify-content: flex-end;
     padding: 16px 24px;
+    background: var(--surface-subtle);
     border-top: $border-light;
   }
 
@@ -49,7 +51,7 @@ $border-light: 1px solid var(--color-gray-100);
     transition: background-color var(--transition-fast);
 
     &:hover {
-      background-color: var(--color-gray-100);
+      background-color: var(--surface-subtle);
     }
 
     .el-dialog__close {
@@ -61,8 +63,9 @@ $border-light: 1px solid var(--color-gray-100);
 
 // ─── El Drawer ───────────────────────────────────────────────────────────────
 .el-drawer {
+  background: var(--surface-base);
   border-radius: 16px 0 0 16px;
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-dialog);
 
   .el-drawer__header {
     display: flex;
@@ -75,7 +78,7 @@ $border-light: 1px solid var(--color-gray-100);
     .el-drawer__title {
       font-size: var(--font-size-lg);
       font-weight: var(--font-weight-semibold);
-      color: var(--color-gray-900);
+      color: var(--text-primary);
     }
   }
 
@@ -89,6 +92,7 @@ $border-light: 1px solid var(--color-gray-100);
     align-items: center;
     justify-content: flex-end;
     padding: 16px 24px;
+    background: var(--surface-subtle);
     border-top: $border-light;
   }
 
@@ -100,7 +104,7 @@ $border-light: 1px solid var(--color-gray-100);
     transition: background-color var(--transition-fast);
 
     &:hover {
-      background-color: var(--color-gray-100);
+      background-color: var(--surface-subtle);
     }
   }
 }
@@ -114,22 +118,23 @@ $border-light: 1px solid var(--color-gray-100);
 
 // ─── El Card ─────────────────────────────────────────────────────────────────
 .el-card {
-  border: 1px solid var(--color-gray-100);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  background: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
   transition: box-shadow var(--transition-base);
 
   &:hover {
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
   }
 
   .el-card__header {
     padding: 16px 20px;
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
-    color: var(--color-gray-900);
-    background: var(--color-gray-50);
-    border-bottom: 1px solid var(--color-gray-100);
+    color: var(--text-primary);
+    background: var(--surface-subtle);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .el-card__body {
@@ -152,21 +157,21 @@ $border-light: 1px solid var(--color-gray-100);
     padding: 12px 0 !important;
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
-    color: var(--color-gray-600);
-    background-color: var(--color-gray-50) !important;
-    border-bottom: 1px solid var(--color-gray-200) !important;
+    color: var(--text-secondary);
+    background-color: var(--surface-subtle) !important;
+    border-bottom: 1px solid var(--border-base) !important;
 
     // 表头 hover 时的分隔线颜色
     &:hover {
-      border-right-color: var(--color-gray-300) !important;
+      border-right-color: var(--border-strong) !important;
     }
   }
 
   td.el-table__cell {
     padding: 12px 0 !important;
     font-size: var(--font-size-sm);
-    color: var(--color-gray-700);
-    border-bottom: 1px solid var(--color-gray-100) !important;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-subtle) !important;
   }
 
   // 单元格内容
@@ -180,7 +185,7 @@ $border-light: 1px solid var(--color-gray-100);
     transition: background-color var(--transition-fast);
 
     &:hover > td.el-table__cell {
-      background-color: var(--color-gray-50) !important;
+      background-color: var(--surface-hover) !important;
     }
   }
 
@@ -189,7 +194,7 @@ $border-light: 1px solid var(--color-gray-100);
     .el-table__row {
       &.el-table__row--striped {
         td.el-table__cell {
-          background-color: var(--color-gray-50);
+          background-color: var(--surface-subtle);
         }
       }
     }
@@ -200,7 +205,12 @@ $border-light: 1px solid var(--color-gray-100);
 .el-button {
   font-weight: var(--font-weight-medium);
   border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
+  transition:
+    background-color var(--transition-ui),
+    border-color var(--transition-ui),
+    color var(--transition-ui),
+    box-shadow var(--transition-ui),
+    transform var(--transition-ui);
 
   // 主要按钮优化
   &--primary {
@@ -253,7 +263,7 @@ $border-light: 1px solid var(--color-gray-100);
 
   // 文字按钮优化
   &--text {
-    color: var(--color-gray-600);
+    color: var(--text-secondary);
 
     &:hover {
       color: var(--color-primary-600);
@@ -355,7 +365,7 @@ $border-light: 1px solid var(--color-gray-100);
   .el-input__wrapper {
     padding: 6px 12px;
     border-radius: var(--radius-md);
-    box-shadow: 0 0 0 1px var(--color-gray-300) inset;
+    box-shadow: 0 0 0 1px var(--border-base) inset;
     transition: box-shadow var(--transition-fast);
 
     &:hover {
@@ -369,16 +379,16 @@ $border-light: 1px solid var(--color-gray-100);
 
   .el-input__inner {
     font-size: var(--font-size-base);
-    color: var(--color-gray-700);
+    color: var(--text-secondary);
 
     &::placeholder {
-      color: var(--color-gray-400);
+      color: var(--text-tertiary);
     }
   }
 
   .el-input__prefix,
   .el-input__suffix {
-    color: var(--color-gray-400);
+    color: var(--text-tertiary);
   }
 }
 
@@ -387,7 +397,7 @@ $border-light: 1px solid var(--color-gray-100);
     padding: 8px 12px;
     font-size: var(--font-size-base);
     border-radius: var(--radius-md);
-    box-shadow: 0 0 0 1px var(--color-gray-300) inset;
+    box-shadow: 0 0 0 1px var(--border-base) inset;
     transition: box-shadow var(--transition-fast);
 
     &:hover {
@@ -399,7 +409,7 @@ $border-light: 1px solid var(--color-gray-100);
     }
 
     &::placeholder {
-      color: var(--color-gray-400);
+      color: var(--text-tertiary);
     }
   }
 }
@@ -422,7 +432,7 @@ $border-light: 1px solid var(--color-gray-100);
 
   .el-form-item__label {
     font-weight: var(--font-weight-medium);
-    color: var(--color-gray-700);
+    color: var(--text-secondary);
   }
 
   // 必填星号
@@ -497,8 +507,8 @@ $border-light: 1px solid var(--color-gray-100);
     }
 
     &.el-tag--info {
-      color: var(--color-gray-700);
-      background-color: var(--color-gray-100);
+      color: var(--text-secondary);
+      background-color: var(--surface-subtle);
       border-color: var(--color-gray-200);
     }
   }
@@ -530,8 +540,8 @@ $border-light: 1px solid var(--color-gray-100);
     }
 
     &.el-tag--info {
-      color: var(--color-gray-600);
-      background-color: var(--color-gray-50);
+      color: var(--text-secondary);
+      background-color: var(--surface-subtle);
       border-color: var(--color-gray-200);
     }
   }
@@ -550,7 +560,7 @@ $border-light: 1px solid var(--color-gray-100);
     height: 32px;
     font-weight: var(--font-weight-medium);
     line-height: 32px;
-    color: var(--color-gray-600);
+    color: var(--text-secondary);
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
 
@@ -573,7 +583,7 @@ $border-light: 1px solid var(--color-gray-100);
     min-width: 32px;
     height: 32px;
     font-weight: var(--font-weight-medium);
-    color: var(--color-gray-600);
+    color: var(--text-secondary);
     border-radius: var(--radius-md);
 
     &:hover {
@@ -593,7 +603,7 @@ $border-light: 1px solid var(--color-gray-100);
 
   .el-pagination__total,
   .el-pagination__jump {
-    color: var(--color-gray-600);
+    color: var(--text-secondary);
   }
 
   .el-pagination__sizes {
@@ -605,26 +615,26 @@ $border-light: 1px solid var(--color-gray-100);
 
 // ─── El Popover / Popup ──────────────────────────────────────────────────────
 .el-popover.el-popper {
-  border: 1px solid var(--color-gray-200);
+  border: 1px solid var(--border-base);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-popover);
 }
 
 .el-popper {
-  border: 1px solid var(--color-gray-200);
+  border: 1px solid var(--border-base);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-popover);
 }
 
 // ─── El Descriptions ─────────────────────────────────────────────────────────
 .el-descriptions {
   .el-descriptions__label {
     font-weight: var(--font-weight-medium);
-    color: var(--color-gray-600);
+    color: var(--text-secondary);
   }
 
   .el-descriptions__content {
-    color: var(--color-gray-800);
+    color: var(--text-primary);
   }
 }
 
@@ -642,7 +652,7 @@ $border-light: 1px solid var(--color-gray-100);
 .el-checkbox {
   .el-checkbox__input {
     .el-checkbox__inner {
-      border-color: var(--color-gray-300);
+      border-color: var(--border-strong);
       border-radius: var(--radius-sm);
       transition: all var(--transition-fast);
 
@@ -660,7 +670,7 @@ $border-light: 1px solid var(--color-gray-100);
   }
 
   .el-checkbox__label {
-    color: var(--color-gray-700);
+    color: var(--text-secondary);
   }
 }
 
@@ -668,7 +678,7 @@ $border-light: 1px solid var(--color-gray-100);
 .el-radio {
   .el-radio__input {
     .el-radio__inner {
-      border-color: var(--color-gray-300);
+      border-color: var(--border-strong);
       transition: all var(--transition-fast);
 
       &:hover {
@@ -685,27 +695,27 @@ $border-light: 1px solid var(--color-gray-100);
   }
 
   .el-radio__label {
-    color: var(--color-gray-700);
+    color: var(--text-secondary);
   }
 }
 
 // ─── El Dropdown ─────────────────────────────────────────────────────────────
 .el-dropdown-menu {
   padding: 6px 0;
-  border: 1px solid var(--color-gray-200);
+  border: 1px solid var(--border-base);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-popover);
 
   .el-dropdown-menu__item {
     padding: 8px 16px;
     margin: 0 4px;
-    color: var(--color-gray-700);
+    color: var(--text-secondary);
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
 
     &:hover {
       color: var(--color-gray-900);
-      background-color: var(--color-gray-100);
+      background-color: var(--surface-subtle);
     }
   }
 }
@@ -722,7 +732,7 @@ $border-light: 1px solid var(--color-gray-100);
           padding: 0 20px;
           font-weight: var(--font-weight-medium);
           line-height: 40px;
-          color: var(--color-gray-600);
+          color: var(--text-secondary);
           transition: all var(--transition-fast);
 
           &:hover {
@@ -770,7 +780,7 @@ $border-light: 1px solid var(--color-gray-100);
     &:last-child {
       .el-breadcrumb__inner {
         font-weight: var(--font-weight-medium);
-        color: var(--color-gray-800);
+        color: var(--text-primary);
       }
     }
   }
@@ -781,11 +791,11 @@ $border-light: 1px solid var(--color-gray-100);
   border-radius: var(--radius-md);
 
   &.el-alert--info {
-    background-color: var(--color-gray-50);
+    background-color: var(--surface-subtle);
     border-color: var(--color-gray-200);
 
     .el-alert__title {
-      color: var(--color-gray-700);
+      color: var(--text-secondary);
     }
   }
 
@@ -820,7 +830,7 @@ $border-light: 1px solid var(--color-gray-100);
 // ─── El Message ──────────────────────────────────────────────────────────────
 .el-message {
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-popover);
 
   .el-message__icon {
     font-size: 18px;
@@ -854,11 +864,11 @@ $border-light: 1px solid var(--color-gray-100);
   }
 
   &.el-message--info {
-    background-color: var(--color-gray-50);
-    border: 1px solid var(--color-gray-200);
+    background-color: var(--surface-subtle);
+    border: 1px solid var(--border-base);
 
     .el-message__content {
-      color: var(--color-gray-800);
+      color: var(--text-primary);
     }
   }
 }
@@ -888,7 +898,7 @@ $border-light: 1px solid var(--color-gray-100);
   }
 
   .el-message-box__message {
-    color: var(--color-gray-600);
+    color: var(--text-secondary);
   }
 
   .el-message-box__btns {
@@ -927,7 +937,7 @@ $border-light: 1px solid var(--color-gray-100);
 // ─── El Progress ─────────────────────────────────────────────────────────────
 .el-progress {
   .el-progress-bar__outer {
-    background-color: var(--color-gray-100);
+    background-color: var(--surface-subtle);
     border-radius: var(--radius-full);
   }
 

@@ -1,33 +1,6 @@
 <template>
   <div class="ads-text-container">
-    <section class="ads-page-header">
-      <div class="ads-page-header__content">
-        <p class="ads-page-header__eyebrow">Amazon Ads Operations</p>
-        <h1 class="ads-page-header__title">SP 广告管理</h1>
-        <p class="ads-page-header__description">
-          统一管理广告活动、预算风险、投放状态与转化效率，帮助运营团队快速定位异常并完成批量决策。
-        </p>
-      </div>
-      <div class="ads-page-header__meta">
-        <div class="ads-page-header__metric">
-          <span class="ads-page-header__metric-label">当前结果</span>
-          <strong class="ads-page-header__metric-value">{{ total.toLocaleString() }}</strong>
-        </div>
-        <el-button class="ads-page-header__queue" @click="queueDrawerVisible = true">
-          查看队列
-        </el-button>
-      </div>
-    </section>
-
     <section class="content-block filter-panel-block">
-      <div class="content-block__heading">
-        <div>
-          <h2 class="content-block__title">筛选控制台</h2>
-          <p class="content-block__subtitle">
-            按站点、店铺、SKU、广告组合与服务状态快速收敛运营范围。
-          </p>
-        </div>
-      </div>
       <Filters
         :filters="filters"
         :countries="countries"
@@ -49,7 +22,7 @@
       />
     </section>
 
-    <section v-if="false" class="content-block">
+    <section class="content-block indicators-panel-block">
       <Indicators />
     </section>
 
@@ -71,6 +44,9 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
+          <el-button class="queue-action-button" @click="queueDrawerVisible = true">
+            查看队列
+          </el-button>
         </div>
 
         <div class="right-controls">

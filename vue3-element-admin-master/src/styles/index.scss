@@ -14,7 +14,9 @@
 // ─── 页面容器 ─────────────────────────────────────────────────────────────────
 .app-container {
   min-height: calc(100vh - 80px);
-  padding: 20px;
+  padding: 20px 24px 24px;
+  color: var(--text-primary);
+  background: var(--app-bg);
 }
 
 // ─── 进度条颜色 ─────────────────────────────────────────────────────────────
@@ -87,10 +89,10 @@ html.sidebar-color-blue .layout-mix .layout__sidebar--left .el-menu {
 .search-container {
   padding: 16px 20px;
   margin-bottom: 20px;
-  background-color: var(--bg-card);
-  border: 1px solid var(--color-gray-200);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xs);
+  background-color: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
 
   .search-buttons {
     margin-right: 0;
@@ -123,27 +125,27 @@ html.sidebar-color-blue .layout-mix .layout__sidebar--left .el-menu {
   // 表格内容区域
   &__content {
     overflow: hidden;
-    background: var(--bg-card);
-    border: 1px solid var(--color-gray-200);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xs);
+    background: var(--surface-base);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-card);
   }
 
   // 分页区域
   .el-pagination {
     justify-content: flex-end;
     padding: 16px;
-    border-top: 1px solid var(--color-gray-100);
+    border-top: 1px solid var(--border-subtle);
   }
 }
 
 // ─── 页面卡片 ─────────────────────────────────────────────────────────────────
 .page-card {
   overflow: hidden;
-  background: var(--bg-card);
-  border: 1px solid var(--color-gray-200);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xs);
+  background: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
 }
 
 .page-card__header {
@@ -151,14 +153,14 @@ html.sidebar-color-blue .layout-mix .layout__sidebar--left .el-menu {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  background: var(--color-gray-50);
-  border-bottom: 1px solid var(--color-gray-100);
+  background: var(--surface-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .page-card__title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-gray-900);
+  color: var(--text-primary);
 }
 
 .page-card__body {
@@ -171,8 +173,8 @@ html.sidebar-color-blue .layout-mix .layout__sidebar--left .el-menu {
   align-items: center;
   justify-content: flex-end;
   padding: 16px 20px;
-  background: var(--color-gray-50);
-  border-top: 1px solid var(--color-gray-100);
+  background: var(--surface-subtle);
+  border-top: 1px solid var(--border-subtle);
 }
 
 // ─── 通用工具类：Flex 布局 ───────────────────────────────────────────────────
@@ -606,23 +608,23 @@ html.sidebar-color-blue .layout-mix .layout__sidebar--left .el-menu {
 
 // ─── 通用工具类：边框 ─────────────────────────────────────────────────────────
 .border {
-  border: 1px solid var(--color-gray-200);
+  border: 1px solid var(--border-base);
 }
 .border-t {
-  border-top: 1px solid var(--color-gray-200);
+  border-top: 1px solid var(--border-base);
 }
 .border-b {
-  border-bottom: 1px solid var(--color-gray-200);
+  border-bottom: 1px solid var(--border-base);
 }
 .border-l {
-  border-left: 1px solid var(--color-gray-200);
+  border-left: 1px solid var(--border-base);
 }
 .border-r {
-  border-right: 1px solid var(--color-gray-200);
+  border-right: 1px solid var(--border-base);
 }
 
 .border-light {
-  border: 1px solid var(--color-gray-100);
+  border: 1px solid var(--border-subtle);
 }
 
 // ─── 通用工具类：鼠标 ─────────────────────────────────────────────────────────
@@ -779,9 +781,9 @@ html.sidebar-color-blue .layout-mix .layout__sidebar--left .el-menu {
   }
 
   &--info {
-    color: var(--color-gray-700);
-    background-color: var(--color-gray-100);
-    border: 1px solid var(--color-gray-200);
+    color: var(--text-secondary);
+    background-color: var(--surface-subtle);
+    border: 1px solid var(--border-base);
   }
 
   &--primary {
@@ -794,27 +796,33 @@ html.sidebar-color-blue .layout-mix .layout__sidebar--left .el-menu {
 // ─── 通用组件：统计卡片 ───────────────────────────────────────────────────────
 .stat-card {
   padding: 20px;
-  background: var(--bg-card);
-  border: 1px solid var(--color-gray-200);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xs);
-  transition: all var(--transition-base);
+  background: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  transition:
+    background-color var(--transition-ui),
+    border-color var(--transition-ui),
+    box-shadow var(--transition-ui),
+    transform var(--transition-ui);
 
   &:hover {
-    box-shadow: var(--shadow-md);
+    background: var(--surface-raised);
+    border-color: var(--border-base);
+    box-shadow: var(--shadow-sm);
     transform: translateY(-1px);
   }
 
   .stat-card__label {
     margin-bottom: 8px;
     font-size: var(--font-size-sm);
-    color: var(--color-gray-500);
+    color: var(--text-tertiary);
   }
 
   .stat-card__value {
     font-size: var(--font-size-3xl);
     font-weight: var(--font-weight-bold);
-    color: var(--color-gray-900);
+    color: var(--text-primary);
   }
 
   .stat-card__trend {
@@ -842,20 +850,20 @@ html.sidebar-color-blue .layout-mix .layout__sidebar--left .el-menu {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-gray-100);
+  background: var(--app-bg-muted);
   border-radius: var(--radius-full);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-gray-300);
+  background: var(--border-strong);
   border-radius: var(--radius-full);
   transition: background var(--transition-fast);
 
   &:hover {
-    background: var(--color-gray-400);
+    background: var(--text-tertiary);
   }
 }
 
 ::-webkit-scrollbar-thumb:active {
-  background: var(--color-gray-500);
+  background: var(--text-secondary);
 }
