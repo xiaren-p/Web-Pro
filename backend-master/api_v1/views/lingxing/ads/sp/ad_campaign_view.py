@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.db.models import IntegerField, OuterRef, Q, Subquery, Sum
+from django.db.models import Q, Sum
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -129,26 +129,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 qs = qs.order_by(f"{order_prefix}{db_field}")
             except Exception:
                 pass
-        else:
-            date_start = data.get("date_start")
-            date_end = data.get("date_end")
-            report_filter = Q()
-            if date_start:
-                report_filter &= Q(report_date__gte=date_start)
-            if date_end:
-                report_filter &= Q(report_date__lte=date_end)
-
-            impressions_subquery = LxSpCampaignReport.objects.filter(
-                Q(campaign_id=OuterRef("campaign_id")),
-                Q(profile_id=OuterRef("profile_id")),
-                report_filter,
-            ).values("campaign_id", "profile_id").annotate(
-                total_impressions=Sum("impressions")
-            ).values("total_impressions")
-
-            qs = qs.annotate(
-                total_impressions=Subquery(impressions_subquery, output_field=IntegerField())
-            ).order_by("-total_impressions")
 
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
