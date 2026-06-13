@@ -542,8 +542,8 @@ onMounted(() => {
 /* 图标按钮（列配置触发器） */
 .btn-icon-only {
   padding: 0 9px;
-  color: var(--color-gray-600);
-  border-color: var(--color-gray-300);
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
 }
 
 /* 单元格行高：广告组面板 9px 上下留白 */
@@ -562,7 +562,7 @@ onMounted(() => {
     flex-shrink: 0;
     font-size: var(--font-size-xs);
     line-height: 1;
-    color: var(--color-gray-600);
+    color: var(--text-secondary);
   }
 
   .bid-input {

@@ -1,38 +1,10 @@
 <template>
   <div class="ads-text-container">
-    <section class="ads-page-header">
-      <div class="ads-page-header__content">
-        <p class="ads-page-header__eyebrow">Amazon Ads Operations</p>
-        <h1 class="ads-page-header__title">SP 广告管理</h1>
-        <p class="ads-page-header__description">
-          统一管理广告活动、预算风险、投放状态与转化效率，帮助运营团队快速定位异常并完成批量决策。
-        </p>
-      </div>
-      <div class="ads-page-header__meta">
-        <div class="ads-page-header__metric">
-          <span class="ads-page-header__metric-label">当前结果</span>
-          <strong class="ads-page-header__metric-value">{{ total.toLocaleString() }}</strong>
-        </div>
-        <el-button class="ads-page-header__queue" @click="queueDrawerVisible = true">
-          查看队列
-        </el-button>
-      </div>
-    </section>
-
     <section class="content-block filter-panel-block">
-      <div class="content-block__heading">
-        <div>
-          <h2 class="content-block__title">筛选控制台</h2>
-          <p class="content-block__subtitle">
-            按站点、店铺、SKU、广告组合与服务状态快速收敛运营范围。
-          </p>
-        </div>
-      </div>
       <Filters
         :filters="filters"
         :countries="countries"
         :profiles="profiles"
-        :ads-types="adsTypes"
         :portfolios="portfolios"
         :sku-options="skuOptions"
         :tags-list="tagsList"
@@ -49,8 +21,8 @@
       />
     </section>
 
-    <section v-if="false" class="content-block">
-      <Indicators />
+    <section class="content-block indicators-panel-block">
+      <Indicators :summary="summary" />
     </section>
 
     <section class="content-block data-table-block">
@@ -71,6 +43,9 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
+          <el-button class="queue-action-button" @click="queueDrawerVisible = true">
+            查看队列
+          </el-button>
         </div>
 
         <div class="right-controls">
@@ -167,8 +142,6 @@ onMounted(() => {
   remoteSearchPortfolio("");
   loadOwners();
 });
-
-const adsTypes = [{ value: "sp", label: "SP" }];
 
 const tagsList = [
   { value: "unset", label: "未添加标签" },
@@ -351,11 +324,18 @@ async function loadTableData() {
       name: filters.campaignName,
       state: filters.campaignStatus.join(","),
       service_status: filters.serviceStatus.join(","),
-      // 勾选“只查看超预算的”时，强制覆盖 service_status 为超预算状态
-      ...(onlyOverBudget.value ? { service_status: "CAMPAIGN_OUT_OF_BUDGET" } : {}),
+      // 勾选“只查看超预算的”时，追加超预算状态到筛选条件中
+      ...(onlyOverBudget.value
+        ? {
+            service_status: filters.serviceStatus.length
+              ? `${filters.serviceStatus.join(",")},CAMPAIGN_OUT_OF_BUDGET`
+              : "CAMPAIGN_OUT_OF_BUDGET",
+          }
+        : {}),
       sponsored_type: filters.adsTypes.join(","),
       portfolio_id: filters.portfolios.join(","),
       bidding_type: filters.biddingType,
+      tags: filters.tags.join(","),
       profiles: filters.profiles.join(","),
       countries: filters.countries.join(","),
       date_start: filters.range?.[0] || "",

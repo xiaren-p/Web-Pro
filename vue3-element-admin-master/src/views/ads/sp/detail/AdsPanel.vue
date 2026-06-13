@@ -669,7 +669,7 @@ onMounted(() => {
 :global(.product-thumb-popper.el-popper.is-light) {
   padding: var(--spacing-1) !important;
   background: var(--bg-card) !important;
-  border: 1px solid var(--color-gray-200) !important;
+  border: 1px solid var(--border-base) !important;
 }
 
 /* 通用筛选栏、表格、徽标、分页样式 → src/styles/ads-panel.scss → .ads-detail-panel */
@@ -692,7 +692,7 @@ onMounted(() => {
   height: 44px;
   margin: 0 auto;
   object-fit: cover;
-  border: 1px solid var(--color-gray-200);
+  border: 1px solid var(--border-base);
   border-radius: var(--radius-sm);
 }
 
@@ -701,7 +701,7 @@ onMounted(() => {
   width: 44px;
   height: 44px;
   margin: 0 auto;
-  background: var(--color-gray-100);
+  background: var(--surface-subtle);
   border-radius: var(--radius-sm);
 }
 
@@ -725,7 +725,7 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: var(--font-size-xs);
-  color: var(--color-gray-800);
+  color: var(--text-primary);
   white-space: nowrap;
 }
 

@@ -559,8 +559,8 @@ onMounted(() => {
 /* 图标按钮（列配置触发器） */
 .btn-icon-only {
   padding: 0 9px;
-  color: #606266;
-  border-color: #dcdfe6;
+  color: var(--text-secondary);
+  border-color: var(--border-base);
 }
 
 /* 单元格行高 */
@@ -579,7 +579,7 @@ onMounted(() => {
     flex-shrink: 0;
     font-size: 12px;
     line-height: 1;
-    color: #606266;
+    color: var(--text-secondary);
   }
 
   .bid-input {
@@ -603,7 +603,7 @@ onMounted(() => {
 /* 建议竞价文字 */
 .recommended-bid {
   font-size: 13px;
-  color: #409eff;
+  color: var(--color-primary-500);
   cursor: default;
 }
 </style>

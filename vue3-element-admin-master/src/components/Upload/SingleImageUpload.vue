@@ -188,13 +188,13 @@ const onError = (error: any) => {
     top: 1px;
     right: 1px;
     font-size: 16px;
-    color: #ff7901;
+    color: var(--color-warning-500);
     cursor: pointer;
-    background: #fff;
+    background: var(--surface-base);
     border-radius: 100%;
 
     :hover {
-      color: #ff4500;
+      color: var(--color-danger-500);
     }
   }
 }

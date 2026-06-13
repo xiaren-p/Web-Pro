@@ -19,6 +19,7 @@ html {
   line-height: 1.5;
   tab-size: 4;
   text-size-adjust: 100%;
+  background: var(--app-bg);
 }
 
 body {
@@ -26,10 +27,20 @@ body {
   height: 100%;
   margin: 0;
   font-family:
-    "PingFang SC", "Inter", "Helvetica Neue", Helvetica, "Hiragino Sans GB", "Microsoft YaHei",
-    "微软雅黑", Arial, sans-serif;
+    "PingFang SC",
+    "Microsoft YaHei",
+    "Helvetica Neue",
+    Arial,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   font-size: 14px;
+  font-variant-numeric: tabular-nums;
   line-height: inherit;
+  color: var(--text-primary);
+  background: var(--app-bg);
   -moz-osx-font-smoothing: grayscale;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizelegibility;
@@ -75,4 +86,14 @@ a:focus,
 a:active,
 div:focus {
   outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary-400);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: inherit;
+  background: rgb(59 130 246 / 16%);
 }

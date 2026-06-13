@@ -26,7 +26,7 @@ export const defaultSettings: AppSettings = {
   // 语言
   language: LanguageEnum.ZH_CN,
   // 主题颜色 - 修改此值时需同步修改 src/styles/variables.scss
-  themeColor: "#4080FF",
+  themeColor: "#3b82f6",
   // 是否显示水印
   showWatermark: false,
   // 水印内容
@@ -56,7 +56,7 @@ export const authConfig = {
 // 主题色预设 - 经典配色方案
 // 注意：修改默认主题色时，需要同步修改 src/styles/variables.scss 中的 primary.base 值
 export const themeColorPresets = [
-  "#4080FF", // Arco Design 蓝 - 现代感强
+  "#3b82f6", // Tailwind 蓝 - 现代简约
   "#1890FF", // Ant Design 蓝 - 经典商务
   "#409EFF", // Element Plus 蓝 - 清新自然
   "#FA8C16", // 活力橙 - 温暖友好

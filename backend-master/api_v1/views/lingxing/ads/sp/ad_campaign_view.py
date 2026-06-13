@@ -99,6 +99,16 @@ class AdCampaignViewSet(viewsets.ViewSet):
             # bidding 为 JSONField，内部结构为 {"strategy": "manual", "adjustments": []}
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
+        # 标签筛选：tags 是后端 LxSpAd→LxProductInfo 计算出品的扁平去重列表
+        # 前端传逗号分隔标签值，后端通过已计算好的 tags 字段 JSON 重叠匹配
+        tags = data.get("tags")
+        if tags:
+            tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+            tag_q = Q()
+            for t in tag_list:
+                tag_q |= Q(tags__icontains=t)
+            qs = qs.filter(tag_q)
+
         portfolio_id = data.get("portfolio_id")
         if portfolio_id:
             p_ids = [p for p in portfolio_id.split(",") if p]
@@ -178,24 +188,22 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 pass
         else:
             # 无排序参数时默认按曝光量降序
-            route = resolve("ad_campaign_list")
             date_start = data.get("date_start")
             date_end = data.get("date_end")
-            if date_start and date_end and route:
-                from django.db.models import Sum, Q as DQ, OuterRef, Subquery, IntegerField, Value
+            from django.db.models import Sum, Q as DQ, OuterRef, Subquery, IntegerField
+            report_filter = DQ()
+            if date_start and date_end:
                 report_filter = DQ(report_date__gte=date_start, report_date__lte=date_end)
-                imp_sub = LxSpCampaignReport.objects.filter(
-                    DQ(campaign_id=OuterRef("campaign_id")),
-                    DQ(profile_id=OuterRef("profile_id")),
-                    report_filter,
-                ).values("campaign_id", "profile_id").annotate(
-                    total_imp=Sum("impressions")
-                ).values("total_imp")
-                qs = qs.annotate(_total_impressions=Subquery(imp_sub, output_field=IntegerField())).order_by(
-                    "-_total_impressions"
-                )
-            else:
-                qs = qs.order_by("-start_date")
+            imp_sub = LxSpCampaignReport.objects.filter(
+                DQ(campaign_id=OuterRef("campaign_id")),
+                DQ(profile_id=OuterRef("profile_id")),
+                report_filter,
+            ).values("campaign_id", "profile_id").annotate(
+                total_imp=Sum("impressions")
+            ).values("total_imp")
+            qs = qs.annotate(_total_impressions=Subquery(imp_sub, output_field=IntegerField())).order_by(
+                "-_total_impressions"
+            )
 
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
@@ -231,7 +239,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         _default_ccy: dict[str, Any] = {"icon": "￥", "code": "CNY", "rate": 1.0}
 
         # 收集完整筛选集的所有 profile_id 与 currency_code
-        all_profile_ids_in_qs = list(qs.values_list("profile_id", flat=True).distinct())
+        all_profile_ids_in_qs = list(qs.order_by().values_list("profile_id", flat=True).distinct())
         all_profiles_in_qs = list(LxAdsProfile.objects.filter(profile_id__in=all_profile_ids_in_qs))
         all_currency_codes = {p.currency_code for p in all_profiles_in_qs if p.currency_code}
 

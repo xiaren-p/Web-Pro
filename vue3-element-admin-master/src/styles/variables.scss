@@ -116,19 +116,19 @@
   --spacing-16: 64px;
 
   // ─── 设计系统：圆角 (Border Radius) ─────────────────────────────────
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
   --radius-xl: 12px;
   --radius-2xl: 16px;
   --radius-full: 9999px;
 
   // ─── 设计系统：阴影 (Shadow) ────────────────────────────────────────
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 4%);
+  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 6%);
+  --shadow-md: 0 8px 24px rgb(15 23 42 / 6%);
+  --shadow-lg: 0 16px 40px rgb(15 23 42 / 10%);
+  --shadow-xl: 0 24px 64px rgb(15 23 42 / 14%);
 
   // ─── 设计系统：字体 (Typography) ────────────────────────────────────
   --font-size-xs: 12px;
@@ -151,14 +151,29 @@
   --transition-slow: 300ms ease;
 
   // ─── 设计系统：布局 (Layout) ───────────────────────────────────────
-  --border-color: var(--color-gray-200);
-  --border-color-light: var(--color-gray-100);
+  --app-bg: #f6f8fb;
+  --app-bg-muted: #eef2f7;
+  --surface-base: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-subtle: #f8fafc;
+  --surface-hover: #eff6ff;
+  --border-base: #e2e8f0;
+  --border-subtle: #edf2f7;
+  --border-strong: #cbd5e1;
+  --focus-ring: rgb(59 130 246 / 18%);
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 4%), 0 8px 24px rgb(15 23 42 / 4%);
+  --shadow-popover: 0 16px 40px rgb(15 23 42 / 10%);
+  --shadow-dialog: 0 24px 64px rgb(15 23 42 / 14%);
+  --transition-ui: 160ms ease;
+
+  --border-color: var(--border-base);
+  --border-color-light: var(--border-subtle);
   --border-color-lighter: var(--color-gray-50);
 
   // 背景色
-  --bg-page: var(--color-gray-50);
-  --bg-card: #ffffff;
-  --bg-hover: var(--color-gray-50);
+  --bg-page: var(--app-bg);
+  --bg-card: var(--surface-base);
+  --bg-hover: var(--surface-hover);
 
   // 文字色
   --text-primary: var(--color-gray-900);
@@ -188,11 +203,29 @@ html.dark {
   --sidebar-logo-text-color: #fff;
 
   // 深色主题下的设计系统调整
-  --bg-page: #0f172a;
-  --bg-card: #1e293b;
-  --border-color: #334155;
-  --text-primary: #f1f5f9;
+  --app-bg: #0b1120;
+  --app-bg-muted: #111827;
+  --surface-base: #111827;
+  --surface-raised: #172033;
+  --surface-subtle: #1e293b;
+  --surface-hover: #1d4ed8;
+  --border-base: #334155;
+  --border-subtle: #243244;
+  --border-strong: #475569;
+  --focus-ring: rgb(96 165 250 / 24%);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 20%), 0 8px 24px rgb(0 0 0 / 16%);
+  --shadow-popover: 0 16px 40px rgb(0 0 0 / 32%);
+  --shadow-dialog: 0 24px 64px rgb(0 0 0 / 40%);
+  --bg-page: var(--app-bg);
+  --bg-card: var(--surface-base);
+  --bg-hover: var(--surface-subtle);
+  --border-color: var(--border-base);
+  --border-color-light: var(--border-subtle);
+  --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --text-disabled: #64748b;
+  --text-placeholder: #64748b;
 
   /** WangEditor Dark */
   /* Textarea - css vars */

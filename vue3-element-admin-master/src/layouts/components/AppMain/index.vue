@@ -72,7 +72,9 @@ const appMainHeight = computed(() => {
 .app-main {
   position: relative;
   overflow-y: auto;
-  background-color: var(--el-bg-color-page);
+  scrollbar-gutter: stable;
+  color: var(--text-primary);
+  background: var(--app-bg);
 
   /* 布局切换动画优化 */
   &.animate__animated {

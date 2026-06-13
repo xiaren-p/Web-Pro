@@ -46,6 +46,7 @@ from api_v1.models.lingxing.ads.basic.lx_sp_negative_target import LxSpNegativeT
 from api_v1.models.lingxing.ads.report.lx_sp_keyword_report import LxSpKeywordReport
 from api_v1.models.shop.lx_sellers import LxSellers
 from api_v1.models.lingxing.basic.lx_shops import HasAdsSetting, LxShops, ShopStatus
+from api_v1.models.lingxing.basic.lx_user import LxUser, UserStatus, IsMaster
 from api_v1.models.lingxing.sales.listing.lx_listing_data import LxListingData, ListingStatus, ListingDeleteFlag, ListingStoreType
 from api_v1.models.lingxing.sales.listing.lx_listing_info import LxListingInfo
 from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
@@ -77,6 +78,7 @@ __all__ = [
     'LxExchangeRate',
     'LxSellers',
     'LxShops', 'ShopStatus', 'HasAdsSetting',
+    'LxUser', 'UserStatus', 'IsMaster',
     'LxListingInfo', 'LxListingData', 'ListingStatus', 'ListingDeleteFlag', 'ListingStoreType', 'LxProductInfo', 'LxListingRemark', 'LxOrderProfit', 'LxListingMetrics',
     # 分时调价策略
     'LxTimePricingStrategy', 'StrategyStatus', 'BaseValueType', 'ExecutionResultType',

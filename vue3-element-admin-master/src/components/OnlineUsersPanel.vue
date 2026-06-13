@@ -2,10 +2,12 @@
   <el-card class="online-users-panel" shadow="hover">
     <div class="flex-x-between flex-y-center">
       <div>
-        <el-icon v-if="isConnected" color="#67C23A"><CircleCheck /></el-icon>
-        <el-icon v-else color="#F56C6C"><CircleClose /></el-icon>
+        <el-icon v-if="isConnected" color="var(--color-success-500)"><CircleCheck /></el-icon>
+        <el-icon v-else color="var(--color-danger-500)"><CircleClose /></el-icon>
         <span class="ml-2">WebSocket连接状态：</span>
-        <span :style="{ color: isConnected ? '#67C23A' : '#F56C6C' }">
+        <span
+          :style="{ color: isConnected ? 'var(--color-success-500)' : 'var(--color-danger-500)' }"
+        >
           {{ isConnected ? "已连接" : "断开" }}
         </span>
       </div>
