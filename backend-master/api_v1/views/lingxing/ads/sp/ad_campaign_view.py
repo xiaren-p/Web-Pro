@@ -13,6 +13,9 @@ from api_v1.models import (
     LxAdsPortfolio,
     LxAdsProfile,
     LxExchangeRate,
+    LxListingData,
+    LxProductInfo,
+    LxSpAd,
     LxSpCampaign,
     LxSpCampaignReport,
 )
@@ -21,6 +24,8 @@ from api_v1.utils.ad_status import resolve_service_status
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_ok
 from api_v1.views.lingxing.ads._helpers import (
+    BIDDING_STRATEGY_LABEL,
+    CAMPAIGN_TYPE_SHORT,
     COUNTRY_MAP,
     build_campaign_profile_key,
     build_campaign_profile_query,
@@ -117,6 +122,48 @@ class AdCampaignViewSet(viewsets.ViewSet):
             ).values_list("profile_id", flat=True)
             qs = qs.filter(profile_id__in=profile_ids)
 
+        # ── ASIN / MSKU 搜索：通过 LxListingData 反查 sku/asin → LxSpAd → 广告活动/广告组 ──
+        skus = data.get("skus")
+        asin_search_type = data.get("asinSearchType", "sku")
+        if skus:
+            sku_list = [s.strip() for s in skus.split(",") if s.strip()]
+            if sku_list:
+                listing_filter = Q()
+                if asin_search_type == "parent_asin":
+                    # 父 ASIN → 查出所有子 ASIN → 子 MSKU
+                    listing_filter |= Q(sku__in=sku_list)
+                    child_skus = list(
+                        LxListingData.objects.filter(parent_asin__in=sku_list)
+                        .exclude(seller_sku="")
+                        .exclude(asin="")
+                        .values_list("seller_sku", flat=True)
+                        .distinct()
+                    )
+                    if child_skus:
+                        listing_filter |= Q(sku__in=child_skus)
+                else:
+                    # 按 MSKU 或 ASIN 查询 → 先通过 LxListingData 补全 ASIN
+                    listing_filter |= Q(sku__in=sku_list)
+                    related_asins = list(
+                        LxListingData.objects.filter(seller_sku__in=sku_list)
+                        .exclude(asin="")
+                        .values_list("asin", flat=True)
+                        .distinct()
+                    )
+                    if related_asins:
+                        listing_filter |= Q(asin__in=related_asins)
+
+                # 通过 LxSpAd 的 sku/asin 字段反查 campaign_id + profile_id
+                matched_ads = LxSpAd.objects.filter(listing_filter).values(
+                    "campaign_id", "profile_id"
+                ).distinct()
+                campaign_pairs = {(a["campaign_id"], a["profile_id"]) for a in matched_ads}
+                if campaign_pairs:
+                    pair_q = Q()
+                    for cid, pid in campaign_pairs:
+                        pair_q |= Q(campaign_id=cid, profile_id=pid)
+                    qs = qs.filter(pair_q)
+
         sort_prop = data.get("sort_prop")
         sort_order = data.get("sort_order")
         if sort_prop and sort_order in ["asc", "desc"]:
@@ -129,6 +176,26 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 qs = qs.order_by(f"{order_prefix}{db_field}")
             except Exception:
                 pass
+        else:
+            # 无排序参数时默认按曝光量降序
+            route = resolve("ad_campaign_list")
+            date_start = data.get("date_start")
+            date_end = data.get("date_end")
+            if date_start and date_end and route:
+                from django.db.models import Sum, Q as DQ, OuterRef, Subquery, IntegerField, Value
+                report_filter = DQ(report_date__gte=date_start, report_date__lte=date_end)
+                imp_sub = LxSpCampaignReport.objects.filter(
+                    DQ(campaign_id=OuterRef("campaign_id")),
+                    DQ(profile_id=OuterRef("profile_id")),
+                    report_filter,
+                ).values("campaign_id", "profile_id").annotate(
+                    total_imp=Sum("impressions")
+                ).values("total_imp")
+                qs = qs.annotate(_total_impressions=Subquery(imp_sub, output_field=IntegerField())).order_by(
+                    "-_total_impressions"
+                )
+            else:
+                qs = qs.order_by("-start_date")
 
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
@@ -271,12 +338,19 @@ class AdCampaignViewSet(viewsets.ViewSet):
             # 兼容前端驼峰命名的列字段配置
             dic["startDate"] = dic.get("start_date")
 
-            # 兼容前端旧字段名：sponsored_type 映射到新字段 campaign_type
-            dic["sponsored_type"] = dic.get("campaign_type", "")
+            # 预算字段：序列化器已带 daily_budget，补充驼峰别名
+            dic["budget"] = dic.get("daily_budget")
 
-            # 兼容前端旧字段名 bidding_type，从 bidding JSONField 中提取 strategy
+            # 广告类型简写映射：sponsoredProducts → SP, sponsoredBrands → SB, sponsoredDisplay → SD
+            raw_type = dic.get("campaign_type", "")
+            dic["sponsored_type"] = CAMPAIGN_TYPE_SHORT.get(raw_type, raw_type)
+            dic["sponsored_type_raw"] = raw_type
+
+            # 竞价策略：从 bidding JSONField 中提取 strategy 并映射为中文 label
             bidding_val = dic.get("bidding")
-            dic["bidding_type"] = bidding_val.get("strategy", "") if isinstance(bidding_val, dict) else ""
+            raw_strategy = bidding_val.get("strategy", "") if isinstance(bidding_val, dict) else ""
+            dic["bidding_type"] = BIDDING_STRATEGY_LABEL.get(raw_strategy, raw_strategy)
+            dic["bidding_type_raw"] = raw_strategy
 
             # 使用 portfolio_id + profile_id 联合键映射出 portfolio_name
             if item.portfolio_id and item.profile_id:
@@ -302,6 +376,57 @@ class AdCampaignViewSet(viewsets.ViewSet):
             dic["store_id"] = p_info.get("sid", "")
 
             res_list.append(dic)
+
+        # ── 批量补充标签和负责人数据 ──
+        # 通过 LxSpAd 的 campaign_id+profile_id → asin → LxProductInfo.label / principal_list
+        item_keys = [(str(item.campaign_id), str(item.profile_id)) for item in items]
+        ad_rows = LxSpAd.objects.filter(
+            build_campaign_profile_query(item_keys)
+        ).values("campaign_id", "profile_id", "asin").distinct()
+        asin_by_key: dict[str, set[str]] = {}
+        for a in ad_rows:
+            key = build_campaign_profile_key(a["campaign_id"], a["profile_id"])
+            if a["asin"]:
+                asin_by_key.setdefault(key, set()).add(a["asin"])
+        all_asins = {a for aset in asin_by_key.values() for a in aset}
+        # 标签映射 asin → label 列表
+        asin_label_map: dict[str, list[str]] = {}
+        asin_principal_map: dict[str, list[str]] = {}
+        if all_asins:
+            product_rows = LxProductInfo.objects.filter(asin__in=all_asins).values(
+                "asin", "label", "principal_list"
+            )
+            for p in product_rows:
+                asin_label_map.setdefault(p["asin"], [])
+                asin_principal_map.setdefault(p["asin"], [])
+                # label 是逗号拼接字符串
+                raw_label = (p["label"] or "").strip()
+                if raw_label:
+                    asin_label_map[p["asin"]].extend(
+                        [t.strip() for t in raw_label.split(",") if t.strip()]
+                    )
+                # principal_list 是 JSON 数组 [{"uid":..., "realname":...}, ...]
+                pl = p["principal_list"]
+                if isinstance(pl, list):
+                    names = [x.get("realname", "") for x in pl if isinstance(x, dict) and x.get("realname")]
+                    asin_principal_map[p["asin"]].extend(names)
+        for dic in res_list:
+            if dic.get("_isSummary"):
+                continue
+            key = build_campaign_profile_key(
+                dic.get("campaign_id"), dic.get("profile_id")
+            )
+            asins = asin_by_key.get(key, set())
+            # 标签：扁平化去重
+            tags_set: set[str] = set()
+            for a in asins:
+                tags_set.update(asin_label_map.get(a, []))
+            dic["tags"] = sorted(tags_set)
+            # 负责人：扁平化去重
+            principals_set: set[str] = set()
+            for a in asins:
+                principals_set.update(asin_principal_map.get(a, []))
+            dic["owners"] = sorted(principals_set)
 
         result = {
             "total": total,
@@ -356,26 +481,26 @@ class AdCampaignViewSet(viewsets.ViewSet):
     def _empty_metrics() -> dict[str, Any]:
         """返回指标字段的空默认值，供无指标数据的广告活动填充占位。"""
         return {
-            "adsSales": "-",
-            "adsSalesPercent": "-",
-            "directSales": "-",
-            "adsOrders": "-",
-            "directOrders": "-",
-            "adsVolume": "-",
-            "adsOrderPrice": "-",
-            "is": "-",
-            "acos": "-",
-            "roas": "-",
-            "cvr": "-",
-            "impressions": "-",
-            "impressionsPercent": "-",
-            "clicks": "-",
-            "clicksPercent": "-",
-            "ctr": "-",
-            "cpc": "-",
-            "spends": "-",
-            "spendsPercent": "-",
-            "cpa": "-",
+            "adsSales": 0,
+            "adsSalesPercent": 0,
+            "directSales": 0,
+            "adsOrders": 0,
+            "directOrders": 0,
+            "adsVolume": 0,
+            "adsOrderPrice": 0,
+            "is": "---",
+            "acos": 0,
+            "roas": 0,
+            "cvr": 0,
+            "impressions": 0,
+            "impressionsPercent": 0,
+            "clicks": 0,
+            "clicksPercent": 0,
+            "ctr": 0,
+            "cpc": 0,
+            "spends": 0,
+            "spendsPercent": 0,
+            "cpa": 0,
         }
 
     @staticmethod
@@ -454,17 +579,17 @@ class AdCampaignViewSet(viewsets.ViewSet):
             ref_sales = row_sales * rate
             ref_spends = row_cost * rate
 
-            acos = f"{round(row_cost / row_sales * 100, 2)}%" if row_sales > 0 else "-"
-            roas = round(row_sales / row_cost, 2) if row_cost > 0 else "-"
-            cvr = f"{round(row_orders / row_clicks * 100, 2)}%" if row_clicks > 0 else "-"
+            acos = f"{round(row_cost / row_sales * 100, 2)}%" if row_sales > 0 else "0"
+            roas = round(row_sales / row_cost, 2) if row_cost > 0 else 0
+            cvr = f"{round(row_orders / row_clicks * 100, 2)}%" if row_clicks > 0 else "0"
             ads_sales_percent = (
                 f"{round(ref_sales / total_ads_sales_ref * 100, 2)}%"
                 if total_ads_sales_ref > 0
-                else "-"
+                else "0"
             )
-            cpc_raw = round(row_cost / row_clicks, 2) if row_clicks > 0 else None
-            ctr = f"{round(row_clicks / row_impressions * 100, 2)}%" if row_impressions > 0 else "-"
-            cpa_raw = round(row_cost / row_orders, 2) if row_orders > 0 else None
+            cpc_raw = round(row_cost / row_clicks, 2) if row_clicks > 0 else 0
+            ctr = f"{round(row_clicks / row_impressions * 100, 2)}%" if row_impressions > 0 else "0"
+            cpa_raw = round(row_cost / row_orders, 2) if row_orders > 0 else 0
 
             result[row_key] = {
                 "adsSales": fmt_money(row_sales, icon),
@@ -473,7 +598,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 "adsOrders": row_orders,
                 "directOrders": int(row["total_same_orders"] or 0),
                 "adsVolume": int(row["total_units"] or 0),
-                "adsOrderPrice": fmt_money(round(row_sales / row_orders, 2), icon) if row_orders > 0 else "-",
+                "adsOrderPrice": fmt_money(round(row_sales / row_orders, 2), icon) if row_orders > 0 else "0",
                 "is": "---",
                 "acos": acos,
                 "roas": roas,
@@ -482,23 +607,23 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 "impressionsPercent": (
                     f"{round(row_impressions / total_impressions_all * 100, 2)}%"
                     if total_impressions_all > 0
-                    else "-"
+                    else "0"
                 ),
                 "clicks": row_clicks,
                 "clicksPercent": (
                     f"{round(row_clicks / total_clicks_all * 100, 2)}%"
                     if total_clicks_all > 0
-                    else "-"
+                    else "0"
                 ),
                 "ctr": ctr,
-                "cpc": fmt_money(cpc_raw, icon) if cpc_raw is not None else "-",
+                "cpc": fmt_money(cpc_raw, icon) if cpc_raw != 0 else "0",
                 "spends": fmt_money(row_cost, icon),
                 "spendsPercent": (
                     f"{round(ref_spends / total_spends_ref * 100, 2)}%"
                     if total_spends_ref > 0
-                    else "-"
+                    else "0"
                 ),
-                "cpa": fmt_money(cpa_raw, icon) if cpa_raw is not None else "-",
+                "cpa": fmt_money(cpa_raw, icon) if cpa_raw != 0 else "0",
             }
 
         return result
@@ -541,26 +666,26 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         if not all_pairs_set:
             return {
-                "adsSales": "-",
-                "adsSalesPercent": "-",
-                "directSales": "-",
+                "adsSales": "0",
+                "adsSalesPercent": "0",
+                "directSales": "0",
                 "adsOrders": 0,
                 "directOrders": 0,
                 "adsVolume": 0,
-                "adsOrderPrice": "-",
+                "adsOrderPrice": "0",
                 "is": "---",
-                "acos": "-",
-                "roas": "-",
-                "cvr": "-",
+                "acos": "0",
+                "roas": "0",
+                "cvr": "0",
                 "impressions": 0,
-                "impressionsPercent": "-",
+                "impressionsPercent": "0",
                 "clicks": 0,
-                "clicksPercent": "-",
-                "ctr": "-",
-                "cpc": "-",
-                "spends": "-",
-                "spendsPercent": "-",
-                "cpa": "-",
+                "clicksPercent": "0",
+                "ctr": "0",
+                "cpc": "0",
+                "spends": "0",
+                "spendsPercent": "0",
+                "cpa": "0",
                 "_meta": {
                     "ads_sales_ref": 0.0,
                     "spends_ref": 0.0,
@@ -624,34 +749,34 @@ class AdCampaignViewSet(viewsets.ViewSet):
             t_impressions += int(row["s_impressions"] or 0)
 
         # 衍生指标计算（与货币无关的公式对单/多货币均适用）
-        acos = f"{round(t_cost / t_sales * 100, 2)}%" if t_sales > 0 else "-"
-        roas = round(t_sales / t_cost, 2) if t_cost > 0 else "-"
-        cvr = f"{round(t_orders / t_clicks * 100, 2)}%" if t_clicks > 0 else "-"
-        ctr = f"{round(t_clicks / t_impressions * 100, 2)}%" if t_impressions > 0 else "-"
-        cpc_raw = round(t_cost / t_clicks, 2) if t_clicks > 0 else None
-        cpa_raw = round(t_cost / t_orders, 2) if t_orders > 0 else None
+        acos = f"{round(t_cost / t_sales * 100, 2)}%" if t_sales > 0 else "0"
+        roas = round(t_sales / t_cost, 2) if t_cost > 0 else 0
+        cvr = f"{round(t_orders / t_clicks * 100, 2)}%" if t_clicks > 0 else "0"
+        ctr = f"{round(t_clicks / t_impressions * 100, 2)}%" if t_impressions > 0 else "0"
+        cpc_raw = round(t_cost / t_clicks, 2) if t_clicks > 0 else 0
+        cpa_raw = round(t_cost / t_orders, 2) if t_orders > 0 else 0
 
         return {
             "adsSales": fmt_money(t_sales, icon),
-            "adsSalesPercent": "100%" if t_sales > 0 else "-",
+            "adsSalesPercent": "100%" if t_sales > 0 else "0",
             "directSales": fmt_money(t_same_sales, icon),
             "adsOrders": t_orders,
             "directOrders": t_same_orders,
             "adsVolume": t_units,
-            "adsOrderPrice": fmt_money(round(t_sales / t_orders, 2), icon) if t_orders > 0 else "-",
+            "adsOrderPrice": fmt_money(round(t_sales / t_orders, 2), icon) if t_orders > 0 else "0",
             "is": "---",
             "acos": acos,
             "roas": roas,
             "cvr": cvr,
             "impressions": t_impressions,
-            "impressionsPercent": "100%" if t_impressions > 0 else "-",
+            "impressionsPercent": "100%" if t_impressions > 0 else "0",
             "clicks": t_clicks,
-            "clicksPercent": "100%" if t_clicks > 0 else "-",
+            "clicksPercent": "100%" if t_clicks > 0 else "0",
             "ctr": ctr,
-            "cpc": fmt_money(cpc_raw, icon) if cpc_raw is not None else "-",
+            "cpc": fmt_money(cpc_raw, icon) if cpc_raw != 0 else "0",
             "spends": fmt_money(t_cost, icon),
-            "spendsPercent": "100%" if t_cost > 0 else "-",
-            "cpa": fmt_money(cpa_raw, icon) if cpa_raw is not None else "-",
+            "spendsPercent": "100%" if t_cost > 0 else "0",
+            "cpa": fmt_money(cpa_raw, icon) if cpa_raw != 0 else "0",
             # 内部原始数值，在 list 方法中弹出，不发往前端
             "_meta": {
                 "ads_sales_ref": round(t_sales, 6),
