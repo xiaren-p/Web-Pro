@@ -30,6 +30,13 @@ BIDDING_STRATEGY_LABEL: dict[str, str] = {
     "ruleBased": "基于规则的竞价",
 }
 
+# 广告活动类型简写映射（campaign_type / sponsored_type → 前端展示简写）
+CAMPAIGN_TYPE_SHORT: dict[str, str] = {
+    "sponsoredProducts": "SP",
+    "sponsoredBrands": "SB",
+    "sponsoredDisplay": "SD",
+}
+
 # 否定关键词匹配方式 label（negative_match_type → 中文）
 NEGATIVE_MATCH_TYPE_LABEL: dict[str, str] = {
     "negativeExact": "否定精准",

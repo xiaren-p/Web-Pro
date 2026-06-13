@@ -76,59 +76,114 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+/**
+ * 广告指标展示组件：从汇总数据中读取真实值，支持用户自选 4 个置顶指标。
+ */
+import { ref, computed, watch } from "vue";
 import { ElMessage } from "element-plus";
 
+const props = defineProps<{
+  summary: Record<string, unknown> | null;
+}>();
+
+/** 所有指标的定义：key 对应 summary 字段名，label 为中文标签 */
+const METRIC_DEFS: { key: string; label: string }[] = [
+  { key: "clicks", label: "点击（总和）" },
+  { key: "spends", label: "花费（总和）" },
+  { key: "adsSales", label: "广告销售额（总和）" },
+  { key: "acos", label: "ACoS（平均）" },
+  { key: "impressions", label: "曝光量（总和）" },
+  { key: "ctr", label: "CTR（平均）" },
+  { key: "cpc", label: "CPC（平均）" },
+  { key: "cvr", label: "CVR（平均）" },
+  { key: "roas", label: "ROAS（总和）" },
+  { key: "directSales", label: "直接销售额（总和）" },
+  { key: "indirectSales", label: "间接销售额（总和）" },
+  { key: "adsOrders", label: "广告订单（总和）" },
+  { key: "directOrders", label: "直接订单（总和）" },
+  { key: "indirectOrders", label: "间接订单（总和）" },
+  { key: "cpa", label: "CPA（平均）" },
+  { key: "adsOrderPrice", label: "广告笔单价（平均）" },
+  { key: "adsVolume", label: "广告销量（总和）" },
+  { key: "impressionsPercent", label: "曝光占比（总和）" },
+  { key: "clicksPercent", label: "点击占比（总和）" },
+  { key: "spendsPercent", label: "花费占比（总和）" },
+  { key: "adsSalesPercent", label: "广告销售额占比（总和）" },
+  { key: "dpv", label: "DPV（总和）" },
+  { key: "brandedSearch", label: "品牌搜索次数（总和）" },
+];
+
+/** 从 summary 中取字段值，null 兜底为 "-" */
+function getMetricValue(key: string): string {
+  if (!props.summary) return "-";
+  const val = props.summary[key];
+  if (val == null) return "-";
+  return String(val);
+}
+
+/**
+ * 根据 summary 动态计算所有指标的当前值。
+ * 返回带 label/value 的完整对象，key 不变。
+ */
+const computedMetrics = computed(() => {
+  return METRIC_DEFS.map((def) => ({
+    key: def.key,
+    label: def.label,
+    value: getMetricValue(def.key),
+  }));
+});
+
 const expanded = ref(false);
-
-const topIndicators = ref([
-  { key: "clicks", label: "点击（总和）", value: "4394" },
-  { key: "spends", label: "花费（总和）", value: "$594.1", type: 0 },
-  { key: "sales", label: "广告销售额（总和）", value: "$1563.72" },
-  { key: "acos", label: "ACoS（平均）", value: "37.99%", type: 1 },
-]);
-
-const otherIndicators = ref([
-  { key: "impressions", label: "曝光量（总和）", value: "726095" },
-  { key: "view_impressions", label: "可见次数（总和）", value: "0" },
-  { key: "vcpm", label: "vCPM（平均）", value: "0" },
-  { key: "ctr", label: "CTR（平均）", value: "0.61%" },
-  { key: "cpc", label: "CPC（平均）", value: "$0.14" },
-  { key: "direct_sales", label: "直接销售额（总和）", value: "$622.72" },
-  { key: "indirect_sales", label: "间接销售额（总和）", value: "$941" },
-  { key: "roas", label: "ROAS（总和）", value: "2.63" },
-  { key: "orders", label: "广告订单（总和）", value: "112" },
-  { key: "direct_orders", label: "直接订单（总和）", value: "55" },
-  { key: "indirect_orders", label: "间接订单（总和）", value: "57" },
-  { key: "indirect_orders_of_orders_percent", label: "间接订单占比（总和）", value: "50.89%" },
-  { key: "cpa", label: "CPA（平均）", value: "$5.3" },
-  { key: "cvr", label: "CVR（平均）", value: "2.55%" },
-  { key: "unit_price", label: "广告笔单价（平均）", value: "$13.96" },
-  { key: "direct_unit_price", label: "直接笔单价（平均）", value: "$11.32" },
-  { key: "indirect_unit_price", label: "间接笔单价（平均）", value: "$16.51" },
-  { key: "ad_units", label: "广告销量（总和）", value: "116" },
-  { key: "direct_units", label: "直接销量（总和）", value: "58" },
-  { key: "indirect_units", label: "间接销量（总和）", value: "58" },
-  { key: "dpv", label: "DPV（总和）", value: "0" },
-  { key: "video_5second_views", label: "5秒观看次数（总和）", value: "0" },
-  { key: "video_5second_views_rate", label: "5秒观看率（平均）", value: "0%" },
-  { key: "fist_quartile_views", label: "视频播1/4的次数（总和）", value: "0" },
-  { key: "midpoint_views", label: "视频播一半的次数（总和）", value: "0" },
-  { key: "third_quartile_views", label: "视频播3/4的次数（总和）", value: "0" },
-  { key: "complete_views", label: "视频完播的次数（总和）", value: "0" },
-  { key: "unmutes", label: "视频取消静音的次数（总和）", value: "0" },
-  { key: "branded_search", label: "品牌搜索次数（总和）", value: "0" },
-]);
-
 const showAddDialog = ref(false);
 const selectedKeys = ref<string[]>([]);
 const searchTerm = ref("");
+
+/** 默认置顶 4 个核心指标 */
+const DEFAULT_TOP_KEYS = ["clicks", "spends", "adsSales", "acos"];
+
+const topIndicators = ref<{ key: string; label: string; value: string; type?: number }[]>([]);
+const otherIndicators = ref<{ key: string; label: string; value: string }[]>([]);
+
+/**
+ * 初始化时从 computedMetrics 中拆出 top 和 other 两部分。
+ * 每次 summary 变化时同步刷新数值而不重置用户选择。
+ */
+function syncMetricsFromSummary() {
+  const all = computedMetrics.value;
+
+  // 首次加载用默认置顶
+  if (topIndicators.value.length === 0 && otherIndicators.value.length === 0) {
+    for (const m of all) {
+      if (DEFAULT_TOP_KEYS.includes(m.key)) {
+        topIndicators.value.push({ ...m, type: m.key === "acos" ? 1 : 0 });
+      } else {
+        otherIndicators.value.push({ ...m });
+      }
+    }
+    return;
+  }
+
+  // 已有选择的：只刷新值
+  for (const m of all) {
+    const topItem = topIndicators.value.find((t) => t.key === m.key);
+    if (topItem) {
+      topItem.value = m.value;
+      continue;
+    }
+    const otherItem = otherIndicators.value.find((o) => o.key === m.key);
+    if (otherItem) {
+      otherItem.value = m.value;
+    }
+  }
+}
+
+watch(() => props.summary, syncMetricsFromSummary, { immediate: true });
 
 const filteredOtherIndicators = computed(() => {
   const q = searchTerm.value.trim().toLowerCase();
   if (!q) return otherIndicators.value;
   return otherIndicators.value.filter(
-    (o: any) => o.label.toLowerCase().includes(q) || o.key.toLowerCase().includes(q)
+    (o) => o.label.toLowerCase().includes(q) || o.key.toLowerCase().includes(q)
   );
 });
 
@@ -136,11 +191,11 @@ const allDisplayIndicators = computed(() => {
   return [...topIndicators.value, ...otherIndicators.value];
 });
 
-function isTopIndicator(item: any) {
-  return topIndicators.value.some((t: any) => t.key === item.key);
+function isTopIndicator(item: { key: string }) {
+  return topIndicators.value.some((t) => t.key === item.key);
 }
 
-function handleCardClick(item: any) {
+function handleCardClick(item: { key: string; label: string; value: string }) {
   if (isTopIndicator(item)) return;
   promoteToTop(item);
 }
@@ -149,44 +204,40 @@ function addClicked() {
   expanded.value = !expanded.value;
 }
 
-function promoteToTop(item: any) {
-  // if exists in top -> move to front
-  const idx = topIndicators.value.findIndex((t: any) => t.key === item.key);
+function promoteToTop(item: { key: string; label: string; value: string }) {
+  // 已在置顶则移到首位
+  const idx = topIndicators.value.findIndex((t) => t.key === item.key);
   if (idx >= 0) {
     const [found] = topIndicators.value.splice(idx, 1);
     topIndicators.value.unshift(found);
     return;
   }
-  // otherwise remove from other
-  otherIndicators.value = otherIndicators.value.filter((o: any) => o.key !== item.key);
-  // if top is full (4), move last one back to other
+  // 从 other 中移除
+  otherIndicators.value = otherIndicators.value.filter((o) => o.key !== item.key);
+  // 置顶最多 4 个
   if (topIndicators.value.length >= 4) {
     const moved = topIndicators.value.pop();
     if (moved) otherIndicators.value.unshift(moved);
   }
-  // add new to front
-  topIndicators.value.unshift(item);
+  topIndicators.value.unshift({ ...item });
 }
 
-function removeTop(item: any) {
-  topIndicators.value = topIndicators.value.filter((t: any) => t.key !== item.key);
-  // avoid duplicates in other
-  if (!otherIndicators.value.find((o: any) => o.key === item.key))
-    otherIndicators.value.unshift(item);
+function removeTop(item: { key: string; label: string; value: string }) {
+  topIndicators.value = topIndicators.value.filter((t) => t.key !== item.key);
+  if (!otherIndicators.value.find((o) => o.key === item.key))
+    otherIndicators.value.unshift({ ...item });
 }
 
 function confirmAdd() {
   if (!selectedKeys.value.length) return;
-  // preserve selection order
   const toAdd = selectedKeys.value
-    .map((k: string) => otherIndicators.value.find((o: any) => o.key === k))
-    .filter(Boolean);
+    .map((k) => otherIndicators.value.find((o) => o.key === k))
+    .filter(Boolean) as { key: string; label: string; value: string }[];
   for (const item of toAdd) {
     promoteToTop(item);
   }
-  // remove added from otherIndicators
   const keys = new Set(selectedKeys.value);
-  otherIndicators.value = otherIndicators.value.filter((o: any) => !keys.has(o.key));
+  otherIndicators.value = otherIndicators.value.filter((o) => !keys.has(o.key));
   selectedKeys.value = [];
   showAddDialog.value = false;
   ElMessage.success("已添加指标");

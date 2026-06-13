@@ -45,12 +45,13 @@ class ShopProfileViewSet(viewsets.ViewSet):
             countries.append({"value": c, "label": c_name})
 
         # ── 竞价策略列表（从 LxSpCampaign.bidding JSONField 中提取 strategy 字段去重）──
-        raw_bidding_types = (
-            LxSpCampaign.objects
-            .filter(bidding__isnull=False)
-            .exclude(bidding={})
-            .values_list("bidding__strategy", flat=True)
-            .distinct()
+        raw_bidding_types = list(
+            set(
+                LxSpCampaign.objects
+                .filter(bidding__isnull=False)
+                .exclude(bidding={})
+                .values_list("bidding__strategy", flat=True)
+            )
         )
         bidding_types = [
             {"value": bt, "label": BIDDING_STRATEGY_LABEL.get(bt, bt)}

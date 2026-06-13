@@ -58,7 +58,7 @@
         show-overflow-tooltip
       >
         <template #default="{ row }">
-          <span v-if="row._isSummary" class="summary-label">汇总</span>
+          <span v-if="row._isSummary" class="summary-dash">--</span>
           <router-link
             v-else
             class="campaign-name-link"

@@ -124,10 +124,10 @@ urlpatterns = [
     path('menus/tree', views.MenuViewSet.as_view({'get': 'tree'}), name='menus-tree'),
     path('menus', views.MenuViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='menus-list-create'),
     path('menus/options', views.MenuViewSet.as_view({'get': 'options'}), name='menus-options'),
-    # 店铺下拉（通过 LingXing OpenAPI 获取）
-    path('shops/options', views.SellerViewSet.as_view({'get': 'options'}), name='shops-options'),
-    # Listing 负责人下拉（通过 LingXing OpenAPI 获取账号列表）
-    path('shops/owners', views.SellerViewSet.as_view({'get': 'owners'}), name='shops-owners'),
+    # 店铺下拉（LxShops + LxUser 模型，shop_options_view）
+    path('shops/options', views.ShopOptionsViewSet.as_view({'get': 'shops'}), name='shops-options'),
+    # 负责人下拉（LxUser 模型）
+    path('shops/owners', views.ShopOptionsViewSet.as_view({'get': 'owners'}), name='shops-owners'),
     # 亏损报表（使用 LingXing OpenAPI 获取并筛选毛利润为负的数据）
     # 迁移为两步缓存模型：先同步/触发刷新 -> 再按 cache key 读取数据
     path('statistics/lossmakingorders_sync', views.StatisticsViewSet.as_view({'post': 'lossmaking_orders_sync'}), name='statistics-lossmaking-orders-sync'),

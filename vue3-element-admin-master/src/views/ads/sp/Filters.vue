@@ -32,14 +32,6 @@
         unlink-panels
       />
       <FsSelect
-        v-model="local.adsTypes"
-        size="small"
-        class="filter-item w-100"
-        :options="adsTypes"
-        multiple
-        placeholder="广告类型"
-      />
-      <FsSelect
         v-model="local.portfolios"
         size="small"
         class="filter-item w-100"

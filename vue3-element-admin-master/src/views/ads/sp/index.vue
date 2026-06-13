@@ -5,7 +5,6 @@
         :filters="filters"
         :countries="countries"
         :profiles="profiles"
-        :ads-types="adsTypes"
         :portfolios="portfolios"
         :sku-options="skuOptions"
         :tags-list="tagsList"
@@ -23,7 +22,7 @@
     </section>
 
     <section class="content-block indicators-panel-block">
-      <Indicators />
+      <Indicators :summary="summary" />
     </section>
 
     <section class="content-block data-table-block">
@@ -143,8 +142,6 @@ onMounted(() => {
   remoteSearchPortfolio("");
   loadOwners();
 });
-
-const adsTypes = [{ value: "sp", label: "SP" }];
 
 const tagsList = [
   { value: "unset", label: "未添加标签" },
@@ -327,8 +324,14 @@ async function loadTableData() {
       name: filters.campaignName,
       state: filters.campaignStatus.join(","),
       service_status: filters.serviceStatus.join(","),
-      // 勾选“只查看超预算的”时，强制覆盖 service_status 为超预算状态
-      ...(onlyOverBudget.value ? { service_status: "CAMPAIGN_OUT_OF_BUDGET" } : {}),
+      // 勾选“只查看超预算的”时，追加超预算状态到筛选条件中
+      ...(onlyOverBudget.value
+        ? {
+            service_status: filters.serviceStatus.length
+              ? `${filters.serviceStatus.join(",")},CAMPAIGN_OUT_OF_BUDGET`
+              : "CAMPAIGN_OUT_OF_BUDGET",
+          }
+        : {}),
       sponsored_type: filters.adsTypes.join(","),
       portfolio_id: filters.portfolios.join(","),
       bidding_type: filters.biddingType,
