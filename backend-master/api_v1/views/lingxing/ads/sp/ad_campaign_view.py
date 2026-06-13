@@ -187,25 +187,59 @@ class AdCampaignViewSet(viewsets.ViewSet):
             except Exception:
                 pass
         else:
-            # 无排序参数时默认按曝光量降序
+            # 无排序参数时默认按曝光量降序。
+            # 性能关键：对全量筛选集做一次批量 GROUP BY 聚合后 Python 内存排序，
+            # 避免原 Subquery + annotate 逐行子查询导致 6000+ 次独立 SQL。
             date_start = data.get("date_start")
             date_end = data.get("date_end")
-            from django.db.models import Sum, Q as DQ, OuterRef, Subquery, IntegerField
-            report_filter = DQ()
-            if date_start and date_end:
-                report_filter = DQ(report_date__gte=date_start, report_date__lte=date_end)
-            imp_sub = LxSpCampaignReport.objects.filter(
-                DQ(campaign_id=OuterRef("campaign_id")),
-                DQ(profile_id=OuterRef("profile_id")),
-                report_filter,
-            ).values("campaign_id", "profile_id").annotate(
-                total_imp=Sum("impressions")
-            ).values("total_imp")
-            qs = qs.annotate(_total_impressions=Subquery(imp_sub, output_field=IntegerField())).order_by(
-                "-_total_impressions"
+            imp_map: dict[str, int] = {}
+            filtered_ids = list(
+                qs.values_list("campaign_id", "profile_id").distinct()
             )
+            if filtered_ids:
+                all_cids_set = {cid for cid, _ in filtered_ids}
+                all_pids_set = {pid for _, pid in filtered_ids}
+                imp_qs = LxSpCampaignReport.objects.filter(
+                    campaign_id__in=all_cids_set,
+                    profile_id__in=all_pids_set,
+                )
+                if date_start:
+                    imp_qs = imp_qs.filter(report_date__gte=date_start)
+                if date_end:
+                    imp_qs = imp_qs.filter(report_date__lte=date_end)
+                imp_qs = (
+                    imp_qs.values("campaign_id", "profile_id")
+                    .annotate(total_imp=Sum("impressions"))
+                )
+                for row in imp_qs.values("campaign_id", "profile_id", "total_imp"):
+                    cp_key = f"{row['campaign_id']}::{row['profile_id']}"
+                    imp_map[cp_key] = int(row["total_imp"] or 0)
+                for cid_val, pid_val in filtered_ids:
+                    cp_key = f"{cid_val}::{pid_val}"
+                    imp_map.setdefault(cp_key, 0)
+            # 按曝光量降序排序（纯内存，无额外 DB 查询）
+            qs = qs.only(
+                "id", "campaign_id", "profile_id", "name", "campaign_type",
+                "targeting_type", "daily_budget", "start_date", "end_date",
+                "state", "serving_status", "bidding", "portfolio_id", "tags",
+                "creation_date", "last_updated_date",
+            )
+            campaign_list = list(qs)
+            campaign_list.sort(
+                key=lambda obj: imp_map.get(
+                    f"{obj.campaign_id}::{obj.profile_id}", 0
+                ),
+                reverse=True,
+            )
+            total = len(campaign_list)
+            p_num, p_size = self._get_page_params(data)
+            start_idx = (p_num - 1) * p_size
+            end_idx = start_idx + p_size
+            items = campaign_list[start_idx:end_idx]
 
-        total, items, p_num, p_size = paginate_queryset(request, qs)
+        # 有自定义排序时走标准分页
+        if sort_prop and sort_order in ["asc", "desc"]:
+            total, items, p_num, p_size = paginate_queryset(request, qs)
 
         # ── 组装店铺与国家数据 ──
         item_profile_ids = [item.profile_id for item in items if item.profile_id]
@@ -444,6 +478,30 @@ class AdCampaignViewSet(viewsets.ViewSet):
             "pageSize": p_size,
         }
         return drf_ok(result)
+
+    @staticmethod
+    def _get_page_params(data: dict) -> tuple[int, int]:
+        """从请求 data 中解析分页参数。
+
+        Args:
+            data (dict): 请求 POST 数据。
+
+        Returns:
+            tuple[int, int]: (pageNum, pageSize)。
+        """
+        try:
+            p_num = int(data.get("pageNum", 1))
+        except (ValueError, TypeError):
+            p_num = 1
+        try:
+            p_size = int(data.get("pageSize", 25))
+        except (ValueError, TypeError):
+            p_size = 25
+        if p_num < 1:
+            p_num = 1
+        if p_size < 1:
+            p_size = 25
+        return p_num, p_size
 
     @action(detail=False, methods=["get"], url_path="campaign-info")
     def campaign_info(self, request: Request) -> Response:
