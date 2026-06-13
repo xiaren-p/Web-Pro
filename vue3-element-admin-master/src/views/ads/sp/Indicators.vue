@@ -221,10 +221,10 @@ function confirmAdd() {
   height: 76px;
   padding: 16px 20px 16px 24px;
   overflow: hidden;
-  background: #fff;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  background: var(--surface-base);
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
 }
 
 .metric-card::before {
@@ -234,20 +234,20 @@ function confirmAdd() {
   left: 0;
   width: 6px;
   content: "";
-  background: linear-gradient(180deg, #409eff 0%, #a0cfff 100%);
-  border-radius: 8px 0 0 8px;
+  background: linear-gradient(180deg, var(--color-primary-500) 0%, var(--color-primary-300) 100%);
+  border-radius: var(--radius-xl) 0 0 var(--radius-xl);
 }
 .metric-card.card-acos::before {
-  background: linear-gradient(180deg, #e6a23c 0%, #f3d19e 100%);
+  background: linear-gradient(180deg, var(--color-warning-500) 0%, var(--color-warning-300) 100%);
 }
 .metric-card.card-sales::before {
-  background: linear-gradient(180deg, #67c23a 0%, #b3e19d 100%);
+  background: linear-gradient(180deg, var(--color-success-500) 0%, var(--color-success-300) 100%);
 }
 .metric-card.card-spends::before {
-  background: linear-gradient(180deg, #f56c6c 0%, #fab6b6 100%);
+  background: linear-gradient(180deg, var(--color-danger-500) 0%, var(--color-danger-300) 100%);
 }
 .metric-card.card-clicks::before {
-  background: linear-gradient(180deg, #909399 0%, #c8c9cc 100%);
+  background: linear-gradient(180deg, var(--text-tertiary) 0%, var(--border-base) 100%);
 }
 
 .metric-inner {
@@ -268,14 +268,14 @@ function confirmAdd() {
   margin: 0;
   font-size: 14px;
   font-weight: 500;
-  color: #606266;
+  color: var(--text-secondary);
 }
 .metric-value {
   margin: 0;
   font-size: 26px;
   font-weight: bold;
   line-height: 1.2;
-  color: #303133;
+  color: var(--text-primary);
 }
 
 .metric-close {
@@ -284,7 +284,7 @@ function confirmAdd() {
   right: 12px;
   z-index: 2;
   font-size: 16px;
-  color: #909399;
+  color: var(--text-tertiary);
   cursor: pointer;
   background: transparent;
   border: none;
@@ -292,7 +292,7 @@ function confirmAdd() {
   transition: opacity 0.12s ease;
 }
 .metric-card:hover .metric-close {
-  color: #f56c6c;
+  color: var(--color-danger-500);
   opacity: 1;
 }
 
@@ -305,20 +305,20 @@ function confirmAdd() {
   height: 76px;
   padding: 10px;
   font-weight: 500;
-  color: #409eff;
+  color: var(--color-primary-500);
   cursor: pointer;
-  background: #fafcff;
-  border: 1px dashed #d9ecff;
-  border-radius: 8px;
-  transition: all 0.2s;
+  background: var(--surface-subtle);
+  border: 1px dashed var(--color-primary-200);
+  border-radius: var(--radius-xl);
+  transition: all var(--transition-ui);
 }
 .add-indicators:hover {
-  background: #ecf5ff;
-  border-color: #409eff;
+  background: var(--surface-hover);
+  border-color: var(--color-primary-500);
 }
 .add-indicators.expanded {
-  background: #ecf5ff;
-  border-color: #409eff;
+  background: var(--surface-hover);
+  border-color: var(--color-primary-500);
 }
 
 .indicators-list-con {
@@ -333,26 +333,26 @@ function confirmAdd() {
   padding: 4px;
   padding-top: 16px;
   overflow: auto;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid var(--border-subtle);
 }
 .indicators-list > li.indicator-card {
   padding: 14px 16px;
   cursor: pointer;
-  background: #fff;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
+  background: var(--surface-base);
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-xl);
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+    border-color var(--transition-ui),
+    box-shadow var(--transition-ui);
 }
 .indicators-list > li.indicator-card:not(.is-disabled):hover {
-  border-color: #c0c4cc;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
 }
 .indicators-list > li.indicator-card.is-disabled {
   cursor: not-allowed;
-  background: #f5f7fa;
-  border-color: #e4e7ed;
+  background: var(--surface-subtle);
+  border-color: var(--border-base);
   box-shadow: none;
   opacity: 0.6;
 }
@@ -363,14 +363,14 @@ function confirmAdd() {
 }
 .indicator-label {
   font-size: 13px;
-  color: #606266;
+  color: var(--text-secondary);
 }
 .indicator-value {
   margin-top: 2px;
   font-size: 22px;
   font-weight: bold;
   line-height: 1.1;
-  color: #303133;
+  color: var(--text-primary);
 }
 
 .add-grid {
@@ -381,13 +381,11 @@ function confirmAdd() {
   overflow: auto;
 }
 
-/* charts area adjustments */
-/* charts removed */
 .add-item {
   padding: 8px;
-  background: #fff;
-  border: 1px solid #f0f2f5;
-  border-radius: 6px;
+  background: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
 }
 .add-item-label {
   display: flex;
@@ -397,11 +395,11 @@ function confirmAdd() {
 }
 .add-item-name {
   font-size: 13px;
-  color: #333;
+  color: var(--text-primary);
 }
 .add-item-value {
   font-size: 13px;
-  color: #888;
+  color: var(--text-tertiary);
 }
 
 .dialog-search {

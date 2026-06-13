@@ -95,7 +95,7 @@
             <span
               v-else
               class="status-badge"
-              :class="`status-${row.service_status_type || 'default'}`"
+              :class="`status-badge--${row.service_status_type || 'info'}`"
             >
               {{ row.service_status_label || row.service_status || "-" }}
             </span>
@@ -333,7 +333,7 @@ function formatValue(val: any): string {
 
 <style scoped>
 .data-table-container {
-  background: #ffffff;
+  background: var(--surface-base);
 }
 
 :deep(.el-table__header-wrapper th.el-table__cell),
@@ -341,14 +341,7 @@ function formatValue(val: any): string {
   position: sticky;
   top: 0;
   z-index: 10;
-  padding: 12px 0 !important;
-  font-size: 12px;
-  font-weight: 700 !important;
-  color: #475569 !important;
   text-align: center;
-  background-color: #f8fafc !important;
-  border-bottom: 1px solid #e2e8f0 !important;
-  box-shadow: none;
 }
 
 :deep(.el-table__header th .caret-wrapper) {
@@ -357,11 +350,11 @@ function formatValue(val: any): string {
 }
 
 :deep(.el-table__header th .el-icon) {
-  color: #94a3b8;
+  color: var(--text-tertiary);
 }
 
 :deep(.el-table__header th .is-active .el-icon) {
-  color: #2563eb;
+  color: var(--color-primary-600);
 }
 
 :deep(.el-table__header th .cell) {
@@ -375,16 +368,10 @@ function formatValue(val: any): string {
   border-right: none !important;
 }
 
-:deep(.el-table::before),
-:deep(.el-table--border::after),
-:deep(.el-table--group::after) {
-  display: none;
-}
-
 :deep(.el-table .el-table__cell) {
   padding: 11px 0 !important;
   font-size: 13px;
-  color: #334155;
+  color: var(--text-primary);
   border-right: none !important;
 }
 
@@ -395,7 +382,7 @@ function formatValue(val: any): string {
 }
 
 :deep(.el-table__body td.el-table__cell) {
-  border-bottom: 1px solid #edf2f7 !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
 }
 
 .data-value {
@@ -410,17 +397,17 @@ function formatValue(val: any): string {
 }
 
 .data-null {
-  color: #cbd5e1;
+  color: var(--border-strong);
 }
 
 .data-up {
   font-weight: 700;
-  color: #16a34a;
+  color: var(--color-success-600);
 }
 
 .data-down {
   font-weight: 700;
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 .trend-icon {
@@ -435,7 +422,7 @@ function formatValue(val: any): string {
 }
 
 :deep(.zebra-row > td.el-table__cell) {
-  background-color: #fbfdff;
+  background-color: var(--surface-subtle);
 }
 
 :deep(.el-table .el-table__row) {
@@ -445,7 +432,7 @@ function formatValue(val: any): string {
 }
 
 :deep(.el-table .el-table__row:hover > td.el-table__cell) {
-  background-color: #eff6ff !important;
+  background-color: var(--surface-hover) !important;
 }
 
 :deep(.el-table__body-wrapper .el-table__row) {
@@ -459,16 +446,16 @@ function formatValue(val: any): string {
   width: 3px;
   height: 100%;
   content: "";
-  background: #2563eb;
+  background: var(--color-primary-600);
   border-radius: 0 2px 2px 0;
 }
 
 :deep(.summary-row > td.el-table__cell) {
   position: relative;
   font-weight: 700;
-  color: #0f172a;
-  background: #eff6ff !important;
-  box-shadow: 0 1px 0 #bfdbfe inset;
+  color: var(--text-primary);
+  background: var(--surface-hover) !important;
+  box-shadow: 0 1px 0 var(--color-primary-200) inset;
 }
 
 :deep(.summary-row > td.el-table__cell:first-child::before) {
@@ -478,12 +465,12 @@ function formatValue(val: any): string {
   width: 3px;
   height: 76%;
   content: "";
-  background: #2563eb;
+  background: var(--color-primary-600);
   border-radius: 0 3px 3px 0;
 }
 
 :deep(.summary-row:hover > td.el-table__cell) {
-  background: #dbeafe !important;
+  background: var(--color-primary-100) !important;
 }
 
 .summary-indicator {
@@ -492,47 +479,15 @@ function formatValue(val: any): string {
   align-items: center;
   font-size: 13px;
   font-weight: 700;
-  color: #1d4ed8;
+  color: var(--color-primary-700);
 }
 
 .summary-icon {
   font-size: 16px;
-  color: #2563eb;
+  color: var(--color-primary-600);
 }
 
-.status-badge {
-  display: inline-block;
-  padding: 2px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 18px;
-  white-space: nowrap;
-  border-radius: 999px;
-}
-
-.status-badge.status-success {
-  color: #166534;
-  background: #dcfce7;
-  border: 1px solid #bbf7d0;
-}
-
-.status-badge.status-danger {
-  color: #991b1b;
-  background: #fee2e2;
-  border: 1px solid #fecaca;
-}
-
-.status-badge.status-warning {
-  color: #92400e;
-  background: #fef3c7;
-  border: 1px solid #fde68a;
-}
-
-.status-badge.status-default {
-  color: #475569;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-}
+/* 状态徽标使用全局 index.scss 的 status-badge--success / --warning / --danger / --info */
 
 :deep(.el-table .el-switch) {
   height: 20px;
@@ -542,7 +497,7 @@ function formatValue(val: any): string {
   width: 36px !important;
   min-width: 36px !important;
   height: 20px !important;
-  border: 2px solid #cbd5e1;
+  border: 2px solid var(--border-strong);
   border-radius: 999px !important;
   transition: all 160ms ease;
 }
@@ -552,7 +507,7 @@ function formatValue(val: any): string {
   left: 1px;
   width: 14px !important;
   height: 14px !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 14%);
 }
 
 :deep(.el-table .el-switch.is-checked .el-switch__core .el-switch__action) {
@@ -560,8 +515,8 @@ function formatValue(val: any): string {
 }
 
 :deep(.el-table .el-switch.is-checked .el-switch__core) {
-  background-color: #16a34a !important;
-  border-color: #16a34a !important;
+  background-color: var(--color-success-500) !important;
+  border-color: var(--color-success-500) !important;
 }
 
 :deep(.el-table .el-switch.is-disabled .el-switch__core) {
@@ -571,7 +526,7 @@ function formatValue(val: any): string {
 .profile-name {
   font-size: 13px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .country-tag {
@@ -580,9 +535,9 @@ function formatValue(val: any): string {
   margin-top: 3px;
   font-size: 11px;
   font-weight: 600;
-  color: #475569;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  color: var(--text-secondary);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-base);
   border-radius: 999px;
 }
 
@@ -590,24 +545,24 @@ function formatValue(val: any): string {
   margin-top: 2px;
   font-size: 11px;
   line-height: 1.4;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .summary-dash {
   font-size: 13px;
-  color: #cbd5e1;
+  color: var(--border-strong);
 }
 
 .summary-label {
   font-size: 13px;
   font-weight: 700;
-  color: #1d4ed8;
+  color: var(--color-primary-700);
   letter-spacing: 0.04em;
 }
 
 .campaign-name-link {
   font-weight: 700;
-  color: #2563eb;
+  color: var(--color-primary-600);
   text-decoration: none;
   transition:
     color 160ms ease,
@@ -615,18 +570,18 @@ function formatValue(val: any): string {
 }
 
 .campaign-name-link:hover {
-  color: #1d4ed8;
+  color: var(--color-primary-700);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
 .analyze-btn {
   font-weight: 700;
-  color: #2563eb;
+  color: var(--color-primary-600);
 }
 
 .analyze-btn:hover {
-  color: #1d4ed8;
+  color: var(--color-primary-700);
 }
 
 .pager-row {
@@ -634,8 +589,8 @@ function formatValue(val: any): string {
   align-items: center;
   justify-content: space-between;
   padding: 14px 18px;
-  background: #ffffff;
-  border-top: 1px solid #e2e8f0;
+  background: var(--surface-base);
+  border-top: 1px solid var(--border-base);
 }
 
 .pager-left {
@@ -661,18 +616,18 @@ function formatValue(val: any): string {
   gap: 6px;
   align-items: center;
   font-size: 13px;
-  color: #64748b;
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .count-icon {
-  color: #94a3b8;
+  color: var(--text-tertiary);
 }
 
 .page-size-label,
 .page-size-suffix {
   font-size: 13px;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .page-size-select {
@@ -682,8 +637,8 @@ function formatValue(val: any): string {
 .pager-row :deep(.el-select .el-input__wrapper) {
   height: 32px !important;
   min-height: 32px !important;
-  border-color: #cbd5e1;
-  border-radius: 10px;
+  border-color: var(--border-strong);
+  border-radius: var(--radius-md);
   box-shadow: none;
 }
 
@@ -694,7 +649,7 @@ function formatValue(val: any): string {
 
 .pager-row :deep(.el-pager li) {
   font-weight: 600;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .data-table__content {

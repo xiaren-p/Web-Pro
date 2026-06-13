@@ -57,12 +57,12 @@
   }
 
   .btn-template {
-    color: var(--color-gray-600);
-    border-color: var(--color-gray-300);
+    color: var(--text-secondary);
+    border-color: var(--border-strong);
 
     &:hover {
       color: var(--color-primary-600);
-      background: var(--color-primary-50);
+      background: var(--surface-hover);
       border-color: var(--color-primary-300);
     }
   }
@@ -70,9 +70,9 @@
   /* ═══ 表格容器 ═══════════════════════════════════════ */
   .data-table-container {
     overflow: hidden;
-    background: var(--bg-card);
-    border: 1px solid var(--color-gray-200);
-    border-radius: var(--radius-lg);
+    background: var(--surface-base);
+    border: 1px solid var(--border-base);
+    border-radius: var(--radius-xl);
   }
 
   .data-table__content {
@@ -96,70 +96,35 @@
     color: var(--color-danger-500);
   }
 
-  /* ═══ 服务状态徽标 ═══════════════════════════════════ */
-  .status-badge {
-    display: inline-block;
-    padding: 3px 10px;
-    font-size: 11px;
-    font-weight: var(--font-weight-semibold);
-    line-height: 18px;
-    white-space: nowrap;
-    border-radius: var(--radius-full);
-
-    &.status-success {
-      color: #166534;
-      background: #dcfce7;
-      border: 1px solid #bbf7d0;
-    }
-
-    &.status-danger {
-      color: #991b1b;
-      background: #fee2e2;
-      border: 1px solid #fecaca;
-    }
-
-    &.status-warning {
-      color: #92400e;
-      background: #fef3c7;
-      border: 1px solid #fde68a;
-    }
-
-    &.status-default {
-      color: var(--color-gray-600);
-      background: var(--color-gray-100);
-      border: 1px solid var(--color-gray-200);
-    }
-  }
+  /* 状态徽标使用全局 index.scss 的 status-badge--success / --warning / --danger / --info */
 
   /* ═══ 表头 ════════════════════════════════════════════ */
   .el-table__header-wrapper th.el-table__cell,
   .el-table__header th {
-    padding: 12px 0 !important;
-    font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold) !important;
-    color: var(--color-gray-700) !important;
+    color: var(--text-secondary) !important;
     text-align: center;
-    background-color: #ffffff !important;
-    border-bottom: 2px solid var(--color-gray-200) !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    background-color: var(--surface-subtle) !important;
+    border-bottom: 1px solid var(--border-base) !important;
+    box-shadow: none;
   }
 
   .el-table__body td.el-table__cell {
     padding: 10px 0 !important;
-    border-bottom: 1px solid var(--color-gray-100) !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
   }
 
   .el-table__header th.el-table__cell {
-    border-right: 1px solid var(--color-gray-200) !important;
+    border-right: 1px solid var(--border-base) !important;
 
     &:hover {
-      border-right-color: var(--color-gray-400) !important;
+      border-right-color: var(--border-strong) !important;
     }
   }
 
   .el-table .el-table__cell {
     font-size: var(--font-size-sm);
-    color: var(--color-gray-800);
+    color: var(--text-primary);
     border-right: none !important;
   }
 
@@ -178,7 +143,7 @@
     width: 36px !important;
     min-width: 36px !important;
     height: 20px !important;
-    border: 2px solid var(--color-gray-300);
+    border: 2px solid var(--border-strong);
     border-radius: var(--radius-full) !important;
   }
 
@@ -200,15 +165,15 @@
 
   /* ═══ 斑马纹 (排前面，避免与汇总行/hover冲突) ═══════ */
   .el-table__body .zebra-row > td.el-table__cell {
-    background-color: #fafbfc;
+    background-color: var(--surface-subtle);
   }
 
   /* ═══ 汇总行 ═════════════════════════════════════════ */
   .el-table .is-summary-row > td.el-table__cell {
     padding: 12px 0 !important;
     font-weight: var(--font-weight-bold);
-    color: var(--color-gray-800);
-    background: linear-gradient(135deg, #f0f7ff 0%, #e8f3ff 100%) !important;
+    color: var(--text-primary);
+    background: var(--surface-hover) !important;
     border-top: 1px solid var(--color-primary-200) !important;
     border-bottom: 1px solid var(--color-primary-200) !important;
   }
@@ -223,7 +188,7 @@
   }
 
   .el-table .el-table__row:hover > td.el-table__cell {
-    background-color: var(--color-primary-50) !important;
+    background-color: var(--surface-hover) !important;
   }
 
   /* ═══ 分页栏 ══════════════════════════════════════════ */
@@ -233,8 +198,8 @@
     align-items: center;
     justify-content: flex-end;
     padding: var(--spacing-2) var(--spacing-4);
-    background: #ffffff;
-    border-top: 1px solid var(--color-gray-200);
+    background: var(--surface-base);
+    border-top: 1px solid var(--border-base);
 
     .el-select .el-input__wrapper {
       height: 32px !important;
@@ -249,7 +214,7 @@
 
   .total-count {
     font-size: var(--font-size-sm);
-    color: var(--color-gray-500);
+    color: var(--text-tertiary);
     white-space: nowrap;
   }
 

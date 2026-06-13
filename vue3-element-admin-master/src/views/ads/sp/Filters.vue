@@ -447,37 +447,37 @@ function openTemplates() {
 .filter-row :deep(.el-select__wrapper),
 .filter-row :deep(.el-input__wrapper) {
   min-height: 34px;
-  background: #f8fafc;
-  border: 1px solid #dbe4ef;
-  border-radius: 10px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-md);
   box-shadow: none;
   transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    background var(--transition-ui),
+    border-color var(--transition-ui),
+    box-shadow var(--transition-ui);
 }
 
 .filter-row :deep(.el-select__wrapper:hover),
 .filter-row :deep(.el-input__wrapper:hover) {
-  background: #ffffff;
-  border-color: #bfdbfe;
+  background: var(--surface-base);
+  border-color: var(--color-primary-200);
 }
 
 .filter-row :deep(.el-select__wrapper.is-focused),
 .filter-row :deep(.el-input__wrapper.is-focus) {
-  background: #ffffff;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+  background: var(--surface-base);
+  border-color: var(--color-primary-600);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .filter-row :deep(.el-input__inner),
 .filter-row :deep(.el-select__placeholder) {
   font-size: 13px;
-  color: #334155;
+  color: var(--text-primary);
 }
 
 .filter-row :deep(.el-input__inner::placeholder) {
-  color: #94a3b8;
+  color: var(--text-tertiary);
 }
 
 .filter-row :deep(.el-range-editor.el-input__wrapper) {
@@ -552,16 +552,16 @@ function openTemplates() {
   height: 34px;
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
+  color: var(--text-secondary);
+  background: var(--surface-base);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
 }
 
 .btn-template:hover {
-  color: #2563eb;
-  background: #eff6ff;
-  border-color: #93c5fd;
+  color: var(--color-primary-600);
+  background: var(--surface-hover);
+  border-color: var(--color-primary-300);
 }
 
 /* 图标独立按钮 */
@@ -578,7 +578,7 @@ function openTemplates() {
   gap: 8px;
   align-items: center;
   padding: 12px 0 0;
-  border-top: 1px solid #edf2f7;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .filter-tag {
@@ -590,9 +590,9 @@ function openTemplates() {
   font-size: 12px;
   font-weight: 500;
   line-height: 24px;
-  color: #1d4ed8;
-  background: #eff6ff;
-  border-color: #bfdbfe;
+  color: var(--color-primary-700);
+  background: var(--surface-hover);
+  border-color: var(--color-primary-200);
   border-radius: 999px;
   transition:
     background 160ms ease,
@@ -600,8 +600,8 @@ function openTemplates() {
 }
 
 .filter-tag:hover {
-  background: #dbeafe;
-  border-color: #93c5fd;
+  background: var(--color-primary-100);
+  border-color: var(--color-primary-300);
 }
 
 .filter-tag :deep(.el-tag__close) {
@@ -612,27 +612,27 @@ function openTemplates() {
   height: 16px;
   margin-top: 1px;
   font-size: 12px;
-  color: #60a5fa;
+  color: var(--color-primary-400);
   border-radius: 999px;
   transition: all 160ms ease;
 }
 
 .filter-tag :deep(.el-tag__close:hover) {
   color: #ffffff;
-  background-color: #2563eb;
+  background-color: var(--color-primary-600);
   transform: scale(1.08);
 }
 
 .clear-all-icon {
   margin-left: 2px;
   font-size: 14px;
-  color: #94a3b8;
+  color: var(--text-tertiary);
   cursor: pointer;
   transition: color 160ms ease;
 }
 
 .clear-all-icon:hover {
-  color: #dc2626;
+  color: var(--color-danger-600);
 }
 
 @media (max-width: 1400px) {

@@ -216,7 +216,7 @@ const containerStyle = computed((): Record<string, string> => {
 :deep(.el-select__selection .el-select__selected-item:first-child .el-tag),
 :deep(.el-select__tags > span .el-tag) {
   padding-right: 2px !important;
-  color: #303133 !important;
+  color: var(--text-primary) !important;
   background-color: transparent !important;
   border-color: transparent !important;
 }
@@ -229,9 +229,9 @@ const containerStyle = computed((): Record<string, string> => {
 :deep(.el-select__selection .el-select__selected-item:not(:first-child) .el-tag),
 :deep(.el-select__tags > .el-tag) {
   padding: 0 6px !important;
-  color: #606266 !important;
-  background-color: #e4e7ed !important;
-  border-color: #e4e7ed !important;
+  color: var(--text-secondary) !important;
+  background-color: var(--surface-subtle) !important;
+  border-color: var(--border-base) !important;
   border-radius: 4px !important;
 }
 
@@ -251,6 +251,6 @@ const containerStyle = computed((): Record<string, string> => {
 }
 .sku-code {
   margin-left: 6px;
-  color: #999;
+  color: var(--text-tertiary);
 }
 </style>

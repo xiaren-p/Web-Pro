@@ -253,14 +253,14 @@ function resetToDefault() {
   font-size: 14px;
   border: 1px solid var(--el-border-color-light);
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--shadow-card);
 }
 
 .config-left {
   display: flex;
   flex-direction: column;
   width: 62%;
-  background-color: #fff;
+  background: var(--surface-base);
 }
 
 .search-box {
@@ -348,7 +348,7 @@ function resetToDefault() {
   font-size: 14px;
   font-weight: bold;
   color: var(--el-text-color-primary);
-  background-color: #fff;
+  background: var(--surface-base);
   border-bottom: 1px solid var(--el-border-color-light);
 }
 
@@ -374,15 +374,15 @@ function resetToDefault() {
   justify-content: space-between;
   padding: 12px 16px;
   margin-bottom: 10px;
-  background-color: #fff;
+  background: var(--surface-base);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--shadow-card);
   transition: all 0.2s ease;
 }
 .sort-item:hover {
   border-color: var(--el-color-primary-light-5);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
   transform: translateY(-2px);
 }
 
@@ -459,14 +459,14 @@ function resetToDefault() {
 .action-icon.active {
   color: #fff;
   background-color: var(--el-color-primary);
-  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
+  box-shadow: var(--focus-ring);
   opacity: 1;
 }
 
 .delete-icon:hover {
   color: #fff !important;
   background-color: var(--el-color-danger) !important;
-  box-shadow: 0 2px 6px rgba(245, 108, 108, 0.3);
+  box-shadow: var(--focus-ring);
 }
 
 .drawer-footer {

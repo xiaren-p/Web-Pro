@@ -409,21 +409,21 @@ onMounted(fetchData);
     border-radius: 3px;
 
     &.match-exact {
-      color: #67c23a;
-      background: #f0f9eb;
-      border: 1px solid #c2e7b0;
+      color: var(--color-success-500);
+      background: var(--color-success-50);
+      border: 1px solid var(--color-success-200);
     }
 
     &.match-phrase {
-      color: #e6a23c;
-      background: #fdf6ec;
-      border: 1px solid #f5dab1;
+      color: var(--color-warning-600);
+      background: var(--color-warning-50);
+      border: 1px solid var(--color-warning-200);
     }
 
     &.match-broad {
-      color: #409eff;
-      background: #ecf5ff;
-      border: 1px solid #b3d8ff;
+      color: var(--color-primary-500);
+      background: var(--color-primary-50);
+      border: 1px solid var(--color-primary-200);
     }
   }
 
@@ -437,7 +437,7 @@ onMounted(fetchData);
   .summary-label {
     font-size: 13px;
     font-weight: 600;
-    color: #606266;
+    color: var(--text-secondary);
   }
 
   .msku-cell {
@@ -448,7 +448,7 @@ onMounted(fetchData);
 
   .msku-text {
     font-size: 13px;
-    color: #303133;
+    color: var(--text-primary);
   }
 
   .dot-circle {
@@ -456,7 +456,7 @@ onMounted(fetchData);
     flex-shrink: 0;
     width: 8px;
     height: 8px;
-    background: #67c23a;
+    background: var(--color-success-500);
     border-radius: 50%;
   }
 
@@ -476,7 +476,7 @@ onMounted(fetchData);
     .drawer-left {
       flex: 0 0 260px;
       padding-right: 16px;
-      border-right: 1px solid #ebeef5;
+      border-right: 1px solid var(--border-subtle);
     }
 
     .drawer-right {
@@ -487,7 +487,7 @@ onMounted(fetchData);
       margin-bottom: 12px;
       font-size: 14px;
       font-weight: 600;
-      color: #303133;
+      color: var(--text-primary);
     }
 
     .keyword-info-card {
@@ -495,14 +495,14 @@ onMounted(fetchData);
       flex-direction: column;
       gap: 10px;
       padding: 14px;
-      background: #f5f7fa;
+      background: var(--surface-subtle);
       border-radius: 6px;
 
       .keyword-text {
         font-size: 14px;
         font-weight: 500;
         line-height: 1.5;
-        color: #303133;
+        color: var(--text-primary);
         word-break: break-all;
       }
 
@@ -518,9 +518,9 @@ onMounted(fetchData);
         border-radius: 3px;
 
         &.state-tag-enabled {
-          color: #67c23a;
-          background: #f0f9eb;
-          border: 1px solid #c2e7b0;
+          color: var(--color-success-500);
+          background: var(--color-success-50);
+          border: 1px solid var(--color-success-200);
         }
 
         &.state-tag-paused {
@@ -530,7 +530,7 @@ onMounted(fetchData);
         }
 
         &.state-tag-archived {
-          color: #909399;
+          color: var(--text-tertiary);
           background: #f4f4f5;
           border: 1px solid #d3d4d6;
         }
@@ -544,11 +544,11 @@ onMounted(fetchData);
         .detail-label {
           flex-shrink: 0;
           width: 60px;
-          color: #909399;
+          color: var(--text-tertiary);
         }
 
         .detail-value {
-          color: #606266;
+          color: var(--text-secondary);
         }
       }
     }
@@ -560,19 +560,19 @@ onMounted(fetchData);
 
       .metric-card {
         padding: 14px 16px;
-        background: #f5f7fa;
+        background: var(--surface-subtle);
         border-radius: 6px;
 
         .metric-label {
           margin-bottom: 6px;
           font-size: 12px;
-          color: #909399;
+          color: var(--text-tertiary);
         }
 
         .metric-value {
           font-size: 18px;
           font-weight: 600;
-          color: #303133;
+          color: var(--text-primary);
         }
       }
     }

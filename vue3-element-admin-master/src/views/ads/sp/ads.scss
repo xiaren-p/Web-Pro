@@ -159,54 +159,6 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   指标面板（暂未启用，预定义样式）
-   ═══════════════════════════════════════════════════════════════ */
-
-.charts-indicators-panel {
-  margin-top: var(--spacing-1);
-}
-
-.indicators-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-3);
-}
-
-.indicator-card {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--spacing-1);
-  min-width: 160px;
-  padding: var(--spacing-4);
-  background: var(--color-gray-50);
-  border: 1px solid var(--color-gray-200);
-  border-radius: var(--radius-lg);
-  transition:
-    box-shadow var(--transition-base),
-    border-color var(--transition-base),
-    transform var(--transition-base);
-}
-
-.indicator-card:hover {
-  background: #ffffff;
-  border-color: var(--color-primary-300);
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
-}
-
-.indicator-card__label {
-  font-size: var(--font-size-sm);
-  color: var(--color-gray-600);
-}
-
-.indicator-card__value {
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-gray-900);
-}
-
-/* ═══════════════════════════════════════════════════════════════
    上传结果
    ═══════════════════════════════════════════════════════════════ */
 
