@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.core.cache import cache
 from django.db.models import Q, Sum
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -172,65 +173,100 @@ class AdCampaignViewSet(viewsets.ViewSet):
         sort_prop = data.get("sort_prop")
         sort_order = data.get("sort_order")
 
-        # ── 收集筛选集全体 campaign / profile 对 ──
+        # ── 筛选集全体 campaign / profile 对 ──
         p_num, p_size = self._get_page_params(data)
-        all_pairs_list = list(
-            qs.values_list("campaign_id", "profile_id").distinct()
-        )
-        all_pairs_set: set[tuple[str, str]] = {
-            (str(cid), str(pid)) for cid, pid in all_pairs_list
-        }
-        all_profile_ids = sorted({pid for _, pid in all_pairs_list if pid})
-        all_campaign_pairs = [
-            (cid, pid) for cid, pid in all_pairs_list if cid and pid
+
+        date_start = data.get("date_start")
+        date_end = data.get("date_end")
+
+        # ── 拼接筛选特征参数用于 Redis 缓存键 ──
+        cache_key_parts = [
+            date_start or "_",
+            date_end or "_",
+            data.get("keyword") or "_",
+            data.get("state") or "_",
+            data.get("serving_status") or "_",
+            data.get("sponsored_type") or "_",
+            data.get("bidding_type") or "_",
+            data.get("profiles") or "_",
+            data.get("countries") or "_",
+            data.get("portfolio_id") or "_",
+            data.get("tags") or "_",
+            data.get("skus") or "_",
+            data.get("asinSearchType") or "_",
         ]
+        cache_key = f"sp_campaign_agg:{'|'.join(cache_key_parts)}"
 
-        # ── 一次大型聚合：排序 + 汇总行 + 占比基准共用同一批 GROUP BY 结果 ──
-        agg_map: dict[str, dict[str, Any]] = {}
-        if all_pairs_set:
-            all_cids = list({cid for cid, _ in all_pairs_set})
-            all_pids = list({pid for _, pid in all_pairs_set})
-
-            agg_qs = LxSpCampaignReport.objects.filter(
-                campaign_id__in=all_cids,
-                profile_id__in=all_pids,
+        # ── 先查缓存 ──
+        agg_map = cache.get(cache_key)
+        if isinstance(agg_map, dict):
+            # 缓存命中：需要同时构造 all_pairs_list / set / profile_ids
+            all_pairs_list = list(
+                qs.values_list("campaign_id", "profile_id").distinct()
             )
-            if date_start:
-                agg_qs = agg_qs.filter(report_date__gte=date_start)
-            if date_end:
-                agg_qs = agg_qs.filter(report_date__lte=date_end)
-
-            agg_qs = agg_qs.values("campaign_id", "profile_id").annotate(
-                s_sales=Sum("sales"),
-                s_same_sales=Sum("same_sales"),
-                s_orders=Sum("orders"),
-                s_same_orders=Sum("same_orders"),
-                s_units=Sum("units"),
-                s_cost=Sum("cost"),
-                s_clicks=Sum("clicks"),
-                s_impressions=Sum("impressions"),
+            all_pairs_set = {(str(c), str(p)) for c, p in all_pairs_list}
+            all_profile_ids = sorted({p for _, p in all_pairs_list if p})
+            all_campaign_pairs = [(c, p) for c, p in all_pairs_list if c and p]
+        else:
+            # ── 缓存未命中：执行完整聚合查询 ──
+            all_pairs_list = list(
+                qs.values_list("campaign_id", "profile_id").distinct()
             )
-            for row in agg_qs:
-                cp_key = f"{row['campaign_id']}::{row['profile_id']}"
-                agg_map[cp_key] = {
-                    "sales": float(row["s_sales"] or 0),
-                    "same_sales": float(row["s_same_sales"] or 0),
-                    "orders": int(row["s_orders"] or 0),
-                    "same_orders": int(row["s_same_orders"] or 0),
-                    "units": int(row["s_units"] or 0),
-                    "cost": float(row["s_cost"] or 0),
-                    "clicks": int(row["s_clicks"] or 0),
-                    "impressions": int(row["s_impressions"] or 0),
-                }
-            # 给无数据的 campaign 补齐空值
-            for cid_val, pid_val in all_pairs_list:
-                cp_key = f"{cid_val}::{pid_val}"
-                if cp_key not in agg_map:
+            all_pairs_set = {(str(c), str(p)) for c, p in all_pairs_list}
+            all_profile_ids = sorted({p for _, p in all_pairs_list if p})
+            all_campaign_pairs = [(c, p) for c, p in all_pairs_list if c and p]
+
+            agg_map: dict[str, dict[str, Any]] = {}
+            if all_pairs_set:
+                all_cids = list({cid for cid, _ in all_pairs_set})
+                all_pids = list({pid for _, pid in all_pairs_set})
+
+                agg_qs = LxSpCampaignReport.objects.filter(
+                    campaign_id__in=all_cids,
+                    profile_id__in=all_pids,
+                )
+                if date_start:
+                    agg_qs = agg_qs.filter(report_date__gte=date_start)
+                if date_end:
+                    agg_qs = agg_qs.filter(report_date__lte=date_end)
+
+                agg_qs = agg_qs.values("campaign_id", "profile_id").annotate(
+                    s_sales=Sum("sales"),
+                    s_same_sales=Sum("same_sales"),
+                    s_orders=Sum("orders"),
+                    s_same_orders=Sum("same_orders"),
+                    s_units=Sum("units"),
+                    s_cost=Sum("cost"),
+                    s_clicks=Sum("clicks"),
+                    s_impressions=Sum("impressions"),
+                )
+                for row in agg_qs:
+                    cp_key = f"{row['campaign_id']}::{row['profile_id']}"
                     agg_map[cp_key] = {
-                        "sales": 0.0, "same_sales": 0.0, "orders": 0,
-                        "same_orders": 0, "units": 0, "cost": 0.0,
-                        "clicks": 0, "impressions": 0,
+                        "sales": float(row["s_sales"] or 0),
+                        "same_sales": float(row["s_same_sales"] or 0),
+                        "orders": int(row["s_orders"] or 0),
+                        "same_orders": int(row["s_same_orders"] or 0),
+                        "units": int(row["s_units"] or 0),
+                        "cost": float(row["s_cost"] or 0),
+                        "clicks": int(row["s_clicks"] or 0),
+                        "impressions": int(row["s_impressions"] or 0),
                     }
+                # 给无数据的 campaign 补齐空值
+                for cid_val, pid_val in all_pairs_list:
+                    cp_key = f"{cid_val}::{pid_val}"
+                    if cp_key not in agg_map:
+                        agg_map[cp_key] = {
+                            "sales": 0.0, "same_sales": 0.0, "orders": 0,
+                            "same_orders": 0, "units": 0, "cost": 0.0,
+                            "clicks": 0, "impressions": 0,
+                        }
+                # 写入缓存
+                ttl = 120 if date_start and date_end else 60
+                try:
+                    cache.set(cache_key, agg_map, ttl)
+                except Exception:
+                    pass
 
         # ── 排序 ──
         if sort_prop and sort_order in ["asc", "desc"]:

@@ -259,6 +259,7 @@ DATABASES = {
         'PASSWORD': env('DB_PASSWORD', default=''),
         'HOST':     env('DB_HOST',     default='127.0.0.1'),
         'PORT':     env('DB_PORT',     default='3306'),
+        'CONN_MAX_AGE': 600,
         'OPTIONS':  _db_options,
     }
 }
@@ -398,9 +399,13 @@ try:
             'default': {
                 'BACKEND': 'django_redis.cache.RedisCache',
                 'LOCATION': REDIS_URL,
+                'TIMEOUT': 300,
                 'OPTIONS': {
                     'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-                }
+                    'CONNECTION_POOL_KWARGS': {'max_connections': 50},
+                    'SOCKET_CONNECT_TIMEOUT': 5,
+                    'SOCKET_TIMEOUT': 5,
+                },
             }
         }
 except Exception:
