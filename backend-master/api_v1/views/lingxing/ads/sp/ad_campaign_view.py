@@ -218,13 +218,13 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
             agg_map: dict[str, dict[str, Any]] = {}
             if all_pairs_set:
-                all_cids = list({cid for cid, _ in all_pairs_set})
-                all_pids = list({pid for _, pid in all_pairs_set})
+                # 性能：将笛卡尔积 IN×IN 替换为精确 pair OR 条件，
+                # 确保 MySQL 走 (campaign_id, profile_id, report_date) 复合索引
+                pair_q = Q()
+                for cid_val, pid_val in all_pairs_list:
+                    pair_q |= Q(campaign_id=cid_val, profile_id=pid_val)
 
-                agg_qs = LxSpCampaignReport.objects.filter(
-                    campaign_id__in=all_cids,
-                    profile_id__in=all_pids,
-                )
+                agg_qs = LxSpCampaignReport.objects.filter(pair_q)
                 if date_start:
                     agg_qs = agg_qs.filter(report_date__gte=date_start)
                 if date_end:
