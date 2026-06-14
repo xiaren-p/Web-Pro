@@ -672,22 +672,26 @@ function formatValue(val: any): string {
   gap: 12px;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 18px;
+  padding: 6px 18px 10px;
   overflow-x: auto;
   overflow-y: hidden;
-  white-space: nowrap;
   background: var(--surface-base);
   border-top: 1px solid #e2e8f0;
   border-radius: 0 0 18px 18px;
 }
 
-/* 窄屏时翻页栏允许水平滚动 */
+.pager-row > * {
+  flex-shrink: 0;
+}
+
+/* 窄屏时翻页栏显示水平滚动滑块 */
 .pager-row::-webkit-scrollbar {
   height: 6px;
 }
 
 .pager-row::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--border-subtle);
+  border-radius: 3px;
 }
 
 .pager-row::-webkit-scrollbar-thumb {
@@ -698,19 +702,22 @@ function formatValue(val: any): string {
 .pager-row::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
 }
+
+/* Firefox 滚动条样式 */
+.pager-row {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) var(--border-subtle);
+}
 .pager-center,
 .pager-right {
   display: flex;
   align-items: center;
-}
-
-.pager-center,
-.pager-right {
   flex-shrink: 0;
 }
 
 .pager-left {
   flex: 1;
+  flex-shrink: 0;
 }
 
 .pager-center {
