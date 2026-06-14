@@ -346,7 +346,26 @@ function formatValue(val: any): string {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.data-table__scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.data-table__scroll::-webkit-scrollbar-track {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+
+.data-table__scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+.data-table__scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
 }
 
 /* el-table 撑满整个 data-table__scroll */
@@ -672,9 +691,7 @@ function formatValue(val: any): string {
   gap: 12px;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 18px 10px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  padding: 10px 18px;
   background: var(--surface-base);
   border-top: 1px solid #e2e8f0;
   border-radius: 0 0 18px 18px;
@@ -682,31 +699,6 @@ function formatValue(val: any): string {
 
 .pager-row > * {
   flex-shrink: 0;
-}
-
-/* 窄屏时翻页栏显示水平滚动滑块 */
-.pager-row::-webkit-scrollbar {
-  height: 6px;
-}
-
-.pager-row::-webkit-scrollbar-track {
-  background: var(--border-subtle);
-  border-radius: 3px;
-}
-
-.pager-row::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 3px;
-}
-
-.pager-row::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
-}
-
-/* Firefox 滚动条样式 */
-.pager-row {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) var(--border-subtle);
 }
 .pager-center,
 .pager-right {
