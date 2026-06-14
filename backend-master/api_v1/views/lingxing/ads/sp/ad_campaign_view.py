@@ -131,21 +131,16 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if bidding_strategy:
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
-        tags = data.get("tags")
-        owner_ids = data.get("owners")
+        tags_input = data.get("tags")
+        owner_input = data.get("owners")
 
-        # ── 把标签和负责人字段提前拉到全量 campaign 列表上 ──
-        # 不在 qs 上做反向筛选（不走 LxProductInfo → ASIN → LxSpAd → campaign 的链路），
-        # 而是先查出所有 campaign，一次性从 LxProductInfo 取标签和负责人，
-        # 挂到每行上，再在 Python 侧按 tags/owners 筛选全量数据。
+        # ── 标签+负责人筛选值解析 ──
         tags_list_filter: list[str] = []
         owner_list_filter: list[str] = []
-        if tags:
-            tags_list_filter = [t.strip() for t in tags.split(",") if t.strip()]
-        if owner_ids:
-            owner_list_filter = [str(o).strip() for o in owner_ids.split(",") if str(o).strip()]
-
-        need_tags_owners = bool(tags_list_filter) or bool(owner_list_filter)
+        if tags_input:
+            tags_list_filter = [t.strip() for t in tags_input.split(",") if t.strip()]
+        if owner_input:
+            owner_list_filter = [str(o).strip() for o in owner_input.split(",") if str(o).strip()]
 
         portfolio_id = data.get("portfolio_id")
         if portfolio_id:
@@ -349,63 +344,72 @@ class AdCampaignViewSet(viewsets.ViewSet):
         )
 
         # ── 全量标签+负责人（from LxProductInfo）──
-        # 一次性查出所有 campaign 对应的 ASIN → LxProductInfo，
-        # 把标签和负责人挂到全量数据上，后续排序、分页、筛选都可以直接走 Python
+        # 一次查 LxSpAd 拿到全量 (campaign_id, profile_id) → asin 映射，
+        # 再批量查 LxProductInfo 拿 label + principal_list，挂到每个 campaign 上
         _all_campaign_keys = [
             (str(c.campaign_id), str(c.profile_id)) for c in campaigns
             if c.campaign_id and c.profile_id
         ]
-        _all_ad_rows = LxSpAd.objects.filter(
-            build_campaign_profile_query(_all_campaign_keys) if _all_campaign_keys else Q()
-        ).values("campaign_id", "profile_id", "asin").distinct()
+        if _all_campaign_keys:
+            _all_ad_rows = LxSpAd.objects.filter(
+                build_campaign_profile_query(_all_campaign_keys)
+            ).values("campaign_id", "profile_id", "asin").distinct()
 
-        asin_by_campaign: dict[str, set[str]] = {}
-        for a in _all_ad_rows:
-            key = build_campaign_profile_key(a["campaign_id"], a["profile_id"])
-            if a["asin"]:
-                asin_by_campaign.setdefault(key, set()).add(a["asin"])
+            asin_by_campaign: dict[str, set[str]] = {}
+            for a in _all_ad_rows:
+                key = build_campaign_profile_key(a["campaign_id"], a["profile_id"])
+                if a["asin"]:
+                    asin_by_campaign.setdefault(key, set()).add(a["asin"])
 
-        _all_asins = {a for aset in asin_by_campaign.values() for a in aset}
-        asin_label_map: dict[str, list[str]] = {}
-        asin_principal_map: dict[str, list[str]] = {}
-        if _all_asins:
-            product_rows = LxProductInfo.objects.filter(asin__in=_all_asins).values(
-                "asin", "label", "principal_list"
-            )
-            for p in product_rows:
-                asin_label_map.setdefault(p["asin"], [])
-                asin_principal_map.setdefault(p["asin"], [])
-                raw_label = (p["label"] or "").strip()
-                if raw_label:
-                    _parsed = _flat_parse_label(raw_label)
-                    asin_label_map[p["asin"]].extend(_parsed)
-                pl = p["principal_list"]
-                if isinstance(pl, list):
-                    names = [x.get("realname", "") for x in pl if isinstance(x, dict) and x.get("realname")]
-                    asin_principal_map[p["asin"]].extend(names)
+            _all_asins = {a for aset in asin_by_campaign.values() for a in aset}
+            if _all_asins:
+                asin_label_map: dict[str, list[str]] = {}
+                asin_principal_map: dict[str, list[str]] = {}
+                product_rows = LxProductInfo.objects.filter(asin__in=_all_asins).values(
+                    "asin", "label", "principal_list"
+                )
+                for p in product_rows:
+                    asin_label_map.setdefault(p["asin"], [])
+                    asin_principal_map.setdefault(p["asin"], [])
+                    raw_label = (p["label"] or "").strip()
+                    if raw_label:
+                        asin_label_map[p["asin"]].extend(_flat_parse_label(raw_label))
+                    pl = p["principal_list"]
+                    if isinstance(pl, list):
+                        asin_principal_map[p["asin"]].extend(
+                            [x.get("realname", "") for x in pl
+                             if isinstance(x, dict) and x.get("realname")]
+                        )
 
-        # 给每个 campaign 挂上 tags 和 owners
-        for c in campaigns:
-            asins = asin_by_campaign.get(
-                build_campaign_profile_key(c.campaign_id, c.profile_id), set()
-            )
-            tags_set: set[str] = set()
-            owners_set: set[str] = set()
-            for a in asins:
-                tags_set.update(asin_label_map.get(a, []))
-                owners_set.update(asin_principal_map.get(a, []))
-            c._computed_tags = sorted(tags_set)
-            c._computed_owners = sorted(owners_set)
+                for c in campaigns:
+                    asins = asin_by_campaign.get(
+                        build_campaign_profile_key(c.campaign_id, c.profile_id), set()
+                    )
+                    tags_set: set[str] = set()
+                    owners_set: set[str] = set()
+                    for a in asins:
+                        tags_set.update(asin_label_map.get(a, []))
+                        owners_set.update(asin_principal_map.get(a, []))
+                    c._computed_tags = sorted(tags_set)       # type: ignore[attr-defined]
+                    c._computed_owners = sorted(owners_set)   # type: ignore[attr-defined]
+            else:
+                for c in campaigns:
+                    c._computed_tags = []    # type: ignore[attr-defined]
+                    c._computed_owners = []  # type: ignore[attr-defined]
+        else:
+            for c in campaigns:
+                c._computed_tags = []        # type: ignore[attr-defined]
+                c._computed_owners = []      # type: ignore[attr-defined]
 
-        # ── 标签 / 负责人筛选（Python 侧全量数据筛选）──
+        # ── 标签 / 负责人筛选 ──
         if tags_list_filter or owner_list_filter:
             campaigns = [
                 c for c in campaigns
                 if (
                     (not tags_list_filter
-                     or any(t in c._computed_tags for t in tags_list_filter))
+                     or any(t in c._computed_tags for t in tags_list_filter))   # type: ignore[attr-defined]
                     and (not owner_list_filter
-                         or any(o in c._computed_owners for o in owner_list_filter))
+                         or any(o in c._computed_owners for o in owner_list_filter))  # type: ignore[attr-defined]
                 )
             ]
 
@@ -610,16 +614,17 @@ class AdCampaignViewSet(viewsets.ViewSet):
             res_list.append(dic)
 
         # ── 标签和负责人数据（直接取已计算好的 _computed 字段）──
+        _item_index: dict[tuple, Any] = {
+            (c.campaign_id, c.profile_id): c for c in items
+            if c.campaign_id and c.profile_id
+        }
         for dic in res_list:
             if dic.get("_isSummary"):
                 continue
-            cid = dic.get("campaign_id")
-            pid = dic.get("profile_id")
-            # 找到对应的 campaign 对象
-            matched = [c for c in items if c.campaign_id == cid and c.profile_id == pid]
-            if matched:
-                dic["tags"] = getattr(matched[0], "_computed_tags", [])
-                dic["owners"] = getattr(matched[0], "_computed_owners", [])
+            key = (dic.get("campaign_id"), dic.get("profile_id"))
+            c = _item_index.get(key)
+            dic["tags"] = getattr(c, "_computed_tags", []) if c else []
+            dic["owners"] = getattr(c, "_computed_owners", []) if c else []
 
         result = {
             "total": total,
