@@ -145,8 +145,7 @@
       </el-table>
     </div>
 
-    <div class="pager-sentinel" ref="pagerSentinelRef" />
-    <div class="pager-row" :class="{ 'is-floating': isFloating }">
+    <div class="pager-row">
       <div class="pager-left">
         <span class="total-count">
           <el-icon class="count-icon"><List /></el-icon>
@@ -178,7 +177,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, watch, computed } from "vue";
 import { TrendCharts, List } from "@element-plus/icons-vue";
 
 const props = withDefaults(
@@ -242,36 +241,6 @@ watch(
 function onPageSizeChange(v: number) {
   emit("page-size-change", v);
 }
-
-// ── 翻页栏吸附可见性 ──────────────────────────────────────────────────────────
-const pagerSentinelRef = ref<HTMLElement | null>(null);
-const isFloating = ref(false);
-let pagerObserver: IntersectionObserver | null = null;
-
-/**
- * 初始化翻页栏哨兵观察器。
- *
- * 哨兵位于翻页栏之后。当翻页栏处于自然位置时，哨兵在视口内 -> 显示圆角。
- * 当翻页栏被 sticky 悬浮时，其后的哨兵会滚出视口 -> 隐藏圆角。
- */
-function setupPagerObserver(): void {
-  const root = document.querySelector(".app-main");
-  if (!pagerSentinelRef.value || !root) return;
-  pagerObserver = new IntersectionObserver(
-    ([entry]) => {
-      isFloating.value = !entry.isIntersecting;
-    },
-    { root }
-  );
-  pagerObserver.observe(pagerSentinelRef.value);
-}
-
-onMounted(setupPagerObserver);
-
-onBeforeUnmount(() => {
-  pagerObserver?.disconnect();
-  pagerObserver = null;
-});
 
 /**
  * 将投放类型字段值格式化为中文显示。
@@ -369,7 +338,7 @@ function formatValue(val: any): string {
   flex-direction: column;
   min-height: 0;
   overflow: visible;
-  background: var(--surface-base);
+  background: var(--table-bg, #fafbfc);
 }
 
 .data-table__scroll {
@@ -384,17 +353,23 @@ function formatValue(val: any): string {
   border-top: none;
   border-right: none;
   border-left: none;
+  background: var(--table-bg);
 }
 
 :deep(.el-table__body-wrapper) {
   overflow: visible !important;
+  background: var(--table-bg);
+}
+
+:deep(.el-table__inner-wrapper) {
+  background: var(--table-bg);
 }
 
 :deep(.el-table__header-wrapper) {
   position: sticky;
   top: 74px;
   z-index: 10;
-  background: var(--surface-base);
+  background: var(--table-bg);
 }
 
 :deep(.el-table thead) {
@@ -406,6 +381,7 @@ function formatValue(val: any): string {
 :deep(.el-table__header-wrapper th.el-table__cell),
 :deep(.el-table__header th) {
   text-align: center;
+  background: var(--table-bg);
 }
 
 :deep(.el-table__header th .caret-wrapper) {
@@ -672,31 +648,10 @@ function formatValue(val: any): string {
   align-items: center;
   justify-content: space-between;
   padding: 10px 18px;
+  overflow-x: auto;
   background: var(--surface-base);
   border-top: 1px solid #e2e8f0;
-  border-right: 1px solid #e2e8f0;
-  border-left: 1px solid #e2e8f0;
-  border-bottom: 1px solid #e2e8f0;
-  border-radius: 0 0 18px 18px;
-  box-shadow:
-    0 -1px 2px rgba(15, 23, 42, 0.04),
-    0 -8px 24px rgba(15, 23, 42, 0.04);
-  transition:
-    border-color 0.2s ease,
-    border-radius 0.2s ease,
-    box-shadow 0.2s ease;
 }
-
-.pager-row.is-floating {
-  border-top-color: transparent;
-  border-right-color: transparent;
-  border-left-color: transparent;
-  border-bottom-color: #e2e8f0;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.pager-left,
 .pager-center,
 .pager-right {
   display: flex;

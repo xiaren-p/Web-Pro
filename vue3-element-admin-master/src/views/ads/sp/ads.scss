@@ -48,11 +48,7 @@
   flex-direction: column;
   min-height: 420px;
   padding: 0;
-}
-
-/* 吸附哨兵：贴靠操作栏底部，当它滚出视口时触发悬浮状态 */
-.sticky-sentinel--top {
-  height: 1px;
+  --table-bg: #fafbfc;
 }
 
 .table-controls {
@@ -64,25 +60,7 @@
   justify-content: space-between;
   padding: 18px 20px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  border-top: 1px solid #e2e8f0;
-  border-right: 1px solid #e2e8f0;
-  border-left: 1px solid #e2e8f0;
-  border-radius: 18px 18px 0 0;
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 8px 24px rgba(15, 23, 42, 0.06);
-  transition:
-    border-color 0.2s ease,
-    border-radius 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.table-controls.is-floating {
-  border-top-color: transparent;
-  border-right-color: transparent;
-  border-left-color: transparent;
-  border-radius: 0;
-  box-shadow: none;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .table-controls .left-controls,
