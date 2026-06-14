@@ -1,7 +1,10 @@
 <template>
   <div ref="stickyTrackRef" class="data-table-sticky-track" :style="stickyTrackStyle">
     <div ref="containerRef" class="data-table-container">
-    <div class="data-table__scroll">
+      <div ref="toolbarRef" class="data-table__toolbar">
+        <slot name="toolbar" />
+      </div>
+      <div class="data-table__scroll">
       <el-table
         ref="tableRef"
         v-loading="loading"
@@ -232,13 +235,15 @@ const emit = defineEmits(["current-change", "view-row", "page-size-change", "sor
 
 const stickyTrackRef = ref<HTMLElement | null>(null);
 const containerRef = ref<HTMLElement | null>(null);
+const toolbarRef = ref<HTMLElement | null>(null);
 const tableRef = ref<any>(null);
 const localPageSize = ref(props.pageSize || 25);
 const tableHeight = ref(520);
+const toolbarHeight = ref(72);
 const pagerHeight = ref(48);
 const virtualScrollHeight = ref(0);
 const stickyTrackStyle = computed(() => ({
-  height: `${tableHeight.value + pagerHeight.value + virtualScrollHeight.value}px`,
+  height: `${toolbarHeight.value + tableHeight.value + pagerHeight.value + virtualScrollHeight.value}px`,
 }));
 
 /**
@@ -251,9 +256,13 @@ function updateStickyMetrics(): void {
 
   const rect = container.getBoundingClientRect();
   const pager = container.querySelector<HTMLElement>(".pager-row");
+  toolbarHeight.value = toolbarRef.value?.offsetHeight ?? 72;
   pagerHeight.value = pager?.offsetHeight ?? 48;
   const viewportHeight = window.innerHeight;
-  tableHeight.value = Math.max(260, viewportHeight - Math.max(rect.top, 0) - pagerHeight.value);
+  tableHeight.value = Math.max(
+    260,
+    viewportHeight - Math.max(rect.top, 0) - toolbarHeight.value - pagerHeight.value
+  );
 
   nextTick(() => {
     const bodyWrapper = table.querySelector<HTMLElement>(".el-scrollbar__wrap");
@@ -420,7 +429,17 @@ function formatValue(val: any): string {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
   background: var(--surface-base);
+  border-radius: 18px;
+}
+
+.data-table__toolbar {
+  flex-shrink: 0;
+}
+
+.data-table__toolbar :deep(.table-controls) {
+  border-radius: 18px 18px 0 0;
 }
 
 .data-table__scroll {
