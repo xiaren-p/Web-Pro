@@ -131,16 +131,13 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if bidding_strategy:
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
-        tags_input = data.get("tags")
-        owner_input = data.get("owners")
-
-        # ── 标签+负责人筛选值解析 ──
-        tags_list_filter: list[str] = []
-        owner_list_filter: list[str] = []
-        if tags_input:
-            tags_list_filter = [t.strip() for t in tags_input.split(",") if t.strip()]
-        if owner_input:
-            owner_list_filter = [str(o).strip() for o in owner_input.split(",") if str(o).strip()]
+        tags = data.get("tags")
+        if tags:
+            tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+            tag_q = Q()
+            for t in tag_list:
+                tag_q |= Q(tags__icontains=t)
+            qs = qs.filter(tag_q)
 
         portfolio_id = data.get("portfolio_id")
         if portfolio_id:
@@ -206,6 +203,16 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         date_start = data.get("date_start")
         date_end = data.get("date_end")
+
+        # ── 标签+负责人筛选值解析 ──
+        tags_input = data.get("tags")
+        owner_input = data.get("owners")
+        tags_list_filter: list[str] = []
+        owner_list_filter: list[str] = []
+        if tags_input:
+            tags_list_filter = [t.strip() for t in tags_input.split(",") if t.strip()]
+        if owner_input:
+            owner_list_filter = [str(o).strip() for o in owner_input.split(",") if str(o).strip()]
 
         sort_prop = data.get("sort_prop")
         sort_order = data.get("sort_order")
@@ -343,9 +350,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             )
         )
 
-        # ── 全量标签+负责人（from LxProductInfo）──
-        # 一次查 LxSpAd 拿到全量 (campaign_id, profile_id) → asin 映射，
-        # 再批量查 LxProductInfo 拿 label + principal_list，挂到每个 campaign 上
+        # ── 全量标签+负责人（一次性查 LxSpAd → LxProductInfo，挂到每个 campaign 上）──
         _all_campaign_keys = [
             (str(c.campaign_id), str(c.profile_id)) for c in campaigns
             if c.campaign_id and c.profile_id
@@ -355,53 +360,53 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 build_campaign_profile_query(_all_campaign_keys)
             ).values("campaign_id", "profile_id", "asin").distinct()
 
-            asin_by_campaign: dict[str, set[str]] = {}
+            _asin_by_campaign: dict[str, set[str]] = {}
             for a in _all_ad_rows:
                 key = build_campaign_profile_key(a["campaign_id"], a["profile_id"])
                 if a["asin"]:
-                    asin_by_campaign.setdefault(key, set()).add(a["asin"])
+                    _asin_by_campaign.setdefault(key, set()).add(a["asin"])
 
-            _all_asins = {a for aset in asin_by_campaign.values() for a in aset}
+            _all_asins = {a for aset in _asin_by_campaign.values() for a in aset}
             if _all_asins:
-                asin_label_map: dict[str, list[str]] = {}
-                asin_principal_map: dict[str, list[str]] = {}
                 product_rows = LxProductInfo.objects.filter(asin__in=_all_asins).values(
                     "asin", "label", "principal_list"
                 )
+                _label_map: dict[str, list[str]] = {}
+                _principal_map: dict[str, list[str]] = {}
                 for p in product_rows:
-                    asin_label_map.setdefault(p["asin"], [])
-                    asin_principal_map.setdefault(p["asin"], [])
+                    _label_map.setdefault(p["asin"], [])
+                    _principal_map.setdefault(p["asin"], [])
                     raw_label = (p["label"] or "").strip()
                     if raw_label:
-                        asin_label_map[p["asin"]].extend(_flat_parse_label(raw_label))
+                        _label_map[p["asin"]].extend(_flat_parse_label(raw_label))
                     pl = p["principal_list"]
                     if isinstance(pl, list):
-                        asin_principal_map[p["asin"]].extend(
-                            [x.get("realname", "") for x in pl
-                             if isinstance(x, dict) and x.get("realname")]
-                        )
+                        _principal_map[p["asin"]].extend([
+                            x.get("realname", "") for x in pl
+                            if isinstance(x, dict) and x.get("realname")
+                        ])
 
                 for c in campaigns:
-                    asins = asin_by_campaign.get(
+                    asins = _asin_by_campaign.get(
                         build_campaign_profile_key(c.campaign_id, c.profile_id), set()
                     )
-                    tags_set: set[str] = set()
-                    owners_set: set[str] = set()
+                    t_set: set[str] = set()
+                    o_set: set[str] = set()
                     for a in asins:
-                        tags_set.update(asin_label_map.get(a, []))
-                        owners_set.update(asin_principal_map.get(a, []))
-                    c._computed_tags = sorted(tags_set)       # type: ignore[attr-defined]
-                    c._computed_owners = sorted(owners_set)   # type: ignore[attr-defined]
+                        t_set.update(_label_map.get(a, []))
+                        o_set.update(_principal_map.get(a, []))
+                    c._computed_tags = sorted(t_set)      # type: ignore[attr-defined]
+                    c._computed_owners = sorted(o_set)    # type: ignore[attr-defined]
             else:
                 for c in campaigns:
-                    c._computed_tags = []    # type: ignore[attr-defined]
-                    c._computed_owners = []  # type: ignore[attr-defined]
+                    c._computed_tags = []     # type: ignore[attr-defined]
+                    c._computed_owners = []   # type: ignore[attr-defined]
         else:
             for c in campaigns:
-                c._computed_tags = []        # type: ignore[attr-defined]
-                c._computed_owners = []      # type: ignore[attr-defined]
+                c._computed_tags = []         # type: ignore[attr-defined]
+                c._computed_owners = []       # type: ignore[attr-defined]
 
-        # ── 标签 / 负责人筛选 ──
+        # ── 标签 / 负责人筛选（在全量数据上按已取到的 _computed 字段过滤）──
         if tags_list_filter or owner_list_filter:
             campaigns = [
                 c for c in campaigns
@@ -613,7 +618,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
             res_list.append(dic)
 
-        # ── 标签和负责人数据（直接取已计算好的 _computed 字段）──
+        # ── 标签和负责人数据（直接取全量查询时已计算好的 _computed 字段）──
         _item_index: dict[tuple, Any] = {
             (c.campaign_id, c.profile_id): c for c in items
             if c.campaign_id and c.profile_id
