@@ -1,15 +1,55 @@
 <template>
-  <div ref="tableRoot" class="ads-table-root">
-    <div class="ads-table-body">
+  <div class="ads-table-root" ref="rootEl">
+
+    <!-- 表头吸顶区（页面滚动时自动吸在 top:12px） -->
+    <div class="ads-table-head" ref="headEl">
+      <slot name="toolbar" />
+      <div class="ads-table-cols">
+        <el-table
+          :data="[]"
+          :border="false"
+          style="width: 100%"
+        >
+          <el-table-column type="selection" width="48" fixed="left" align="center" />
+          <el-table-column label="有效" width="80" fixed="left" align="center" />
+          <el-table-column label="类型" width="100" fixed="left" align="center" />
+          <el-table-column label="店铺/国家" width="120" fixed="left" align="center" />
+          <el-table-column label="广告活动" min-width="180" fixed="left" align="center" />
+          <el-table-column v-for="col in columns" :key="col.prop" :label="col.label" min-width="120" align="center" />
+          <el-table-column label="分析" width="80" fixed="right" align="center" />
+        </el-table>
+      </div>
+    </div>
+
+    <!-- 翻页区始终吸附在视口底部 -->
+    <div class="ads-table-foot" ref="footEl">
+      <div class="pager-row">
+        <div class="pager-left">
+          <span class="total-count"><el-icon class="count-icon"><List /></el-icon>共 {{ total.toLocaleString() }} 条</span>
+        </div>
+        <div class="pager-mid">
+          <el-pagination background :current-page="currentPage" :page-size="localPageSize" :total="total" layout="prev, pager, next" @current-change="$emit('current-change', $event)" />
+        </div>
+        <div class="pager-right">
+          <span class="page-size-label">每页</span>
+          <el-select v-model="localPageSize" class="page-size-select" @change="onPageSizeChange">
+            <el-option label="25条" :value="25" /><el-option label="50条" :value="50" /><el-option label="100条" :value="100" /><el-option label="250条" :value="250" />
+          </el-select>
+          <span class="page-size-suffix">条/页</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据体：跟着页面自然滚动 -->
+    <div class="ads-table-data">
       <el-table
-        ref="tableRef"
         v-loading="loading"
         :data="displayData"
         :row-class-name="getRowClass"
         :border="false"
-        :height="tableH"
         style="width: 100%"
         @sort-change="$emit('sort-change', $event)"
+        :show-header="$props.tableData.length === 0"
       >
         <el-table-column type="selection" width="48" fixed="left" align="center" />
         <el-table-column label="有效" width="80" fixed="left" align="center">
@@ -68,22 +108,6 @@
         </el-table-column>
       </el-table>
     </div>
-
-    <div class="pager-row">
-      <div class="pager-left">
-        <span class="total-count"><el-icon class="count-icon"><List /></el-icon>共 {{ total.toLocaleString() }} 条</span>
-      </div>
-      <div class="pager-mid">
-        <el-pagination background :current-page="currentPage" :page-size="localPageSize" :total="total" layout="prev, pager, next" @current-change="$emit('current-change', $event)" />
-      </div>
-      <div class="pager-right">
-        <span class="page-size-label">每页</span>
-        <el-select v-model="localPageSize" class="page-size-select" @change="onPageSizeChange">
-          <el-option label="25条" :value="25" /><el-option label="50条" :value="50" /><el-option label="100条" :value="100" /><el-option label="250条" :value="250" />
-        </el-select>
-        <span class="page-size-suffix">条/页</span>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -104,75 +128,26 @@ const props = withDefaults(
 const emit = defineEmits(["current-change", "view-row", "page-size-change", "sort-change"]);
 const localPageSize = ref(props.pageSize || 25);
 
-// -- sticky 联动 --
-const tableRoot = ref<HTMLElement | null>(null);
-const tableRef = ref<any>(null);
-const tableH = ref<number | undefined>(undefined);
-const spacerH = ref(0);
+const rootEl = ref<HTMLElement | null>(null);
+const headEl = ref<HTMLElement | null>(null);
+const footEl = ref<HTMLElement | null>(null);
 
-function getBodyWrap(): HTMLElement | null {
-  const el = tableRef.value?.$el as HTMLElement | undefined;
-  return el?.querySelector(".el-scrollbar__wrap") ?? null;
+// 让 head/foot sticky 时能留出正确边距
+function layout() {
+  const head = headEl.value;
+  const foot = footEl.value;
+  if (!head || !foot) return;
+  head.style.top = `${STICKY_TOP}px`;
+  foot.style.bottom = "0px";
 }
-
-function measure() {
-  const root = tableRoot.value;
-  if (!root) return;
-  const parentBlock = root.closest<HTMLElement>(".data-table-block");
-  const controls = parentBlock?.querySelector<HTMLElement>(".table-controls");
-  const toolsH = controls?.offsetHeight ?? 72;
-  const pager = root.querySelector<HTMLElement>(".pager-row");
-  const pagerH = pager?.offsetHeight ?? 48;
-  const vh = window.innerHeight;
-  // 表格可用高度 = 视口 - 顶部粘性偏移 - 工具栏 - 翻页
-  const avail = Math.max(200, vh - STICKY_TOP - toolsH - pagerH);
-  tableH.value = avail;
-  // 给出 tableH 后等 layout，再算内部可滚高度
-  nextTick(() => {
-    const body = getBodyWrap();
-    if (body) spacerH.value = Math.max(0, body.scrollHeight - body.clientHeight);
-    scrollTo(0, window.scrollY); // 重算后重设滚动偏移
-  });
-}
-
-function syncScroll() {
-  const root = tableRoot.value;
-  const body = getBodyWrap();
-  if (!root || !body) return;
-  const rect = root.getBoundingClientRect();
-  const rootAbsTop = rect.top + window.scrollY;
-  const progress = Math.max(0, window.scrollY - rootAbsTop + STICKY_TOP);
-  body.scrollTop = Math.min(progress, spacerH.value);
-}
-
-function onWheel(e: WheelEvent) {
-  const body = getBodyWrap();
-  if (!body) return;
-  const atTop = body.scrollTop <= 1 && e.deltaY < 0;
-  const atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 2 && e.deltaY > 0;
-  if (atTop || atBottom) return;
-  e.preventDefault();
-  window.scrollBy({ top: e.deltaY, behavior: "auto" });
-}
-
-onMounted(() => {
-  measure();
-  window.addEventListener("resize", measure);
-  window.addEventListener("scroll", syncScroll);
-  nextTick(() => getBodyWrap()?.addEventListener("wheel", onWheel, { passive: false }));
-});
-onBeforeUnmount(() => {
-  window.removeEventListener("resize", measure);
-  window.removeEventListener("scroll", syncScroll);
-  getBodyWrap()?.removeEventListener("wheel", onWheel);
-});
+onMounted(layout);
+watch(() => props.columns, () => nextTick(layout));
 
 const displayData = computed<any[]>(() => {
   if (!props.summary) return props.tableData;
   return [{ _isSummary: true, name: "汇总", ...props.summary }, ...props.tableData];
 });
 
-watch(displayData, () => nextTick(measure));
 watch(() => props.pageSize, (v) => { localPageSize.value = v; });
 function onPageSizeChange(v: number) { emit("page-size-change", v); }
 function getRowClass({ row, rowIndex }: { row: any; rowIndex: number }): string {
@@ -206,24 +181,30 @@ function formatValue(val: any): string {
 </script>
 
 <style scoped>
-.ads-table-root {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  background: var(--surface-base);
-  border-radius: 0 0 18px 18px;
-}
+.ads-table-root { position: relative; }
 
-.ads-table-body {
-  flex: 1;
-  min-height: 0;
+/* 表头区 sticky */
+.ads-table-head {
+  position: sticky;
+  top: 12px;
+  z-index: 20;
+  border-radius: 18px 18px 0 0;
   overflow: hidden;
 }
+/* 让表头区背景不透明 */
+.ads-table-head :deep(.table-controls) {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-bottom: 1px solid #e2e8f0;
+}
+.ads-table-head .ads-table-cols {
+  background: var(--surface-subtle);
+}
 
-/* 关键：让 el-table 自身产生内部滚动条 */
-.ads-table-body :deep(.el-scrollbar__wrap) {
-  overflow-y: auto !important;
+/* 翻页区 sticky bottom */
+.ads-table-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
 }
 
 .pager-row {
@@ -233,7 +214,6 @@ function formatValue(val: any): string {
   background: var(--surface-base);
   border-top: 1px solid var(--border-base);
   border-radius: 0 0 18px 18px;
-  flex-shrink: 0;
 }
 .pager-left { flex: 1; }
 .pager-mid { display: flex; justify-content: flex-end; padding-right: 12px; }
@@ -251,6 +231,12 @@ function formatValue(val: any): string {
 .pager-row :deep(.el-pagination button) { min-width: 28px; height: 28px; font-size: 12px; }
 .pager-row :deep(.el-pagination .btn-prev),.pager-row :deep(.el-pagination .btn-next) { font-size: 13px; }
 
+/* 数据体无内部滚动 */
+.ads-table-data :deep(.el-table__body-wrapper) { overflow-y: visible !important; }
+.ads-table-data :deep(.el-scrollbar__wrap) { overflow-y: visible !important; }
+
+/* 表头列样式 (在 head table 中) */
+.ads-table-cols :deep(th) { background: #f8fafc !important; }
 :deep(.el-table__header-wrapper th.el-table__cell),:deep(.el-table__header th) { text-align: center; }
 :deep(.el-table__header th .caret-wrapper) { margin-left: 6px; transform: scale(1.04); }
 :deep(.el-table__header th .el-icon) { color: var(--text-tertiary); }
@@ -293,5 +279,4 @@ function formatValue(val: any): string {
 .campaign-name-link:hover { color: var(--color-primary-700); text-decoration: underline; text-underline-offset: 3px; }
 .analyze-btn { font-weight: 700; color: var(--color-primary-600); }
 .analyze-btn:hover { color: var(--color-primary-700); }
-.data-table__content { border-top: none; border-right: none; border-left: none; }
 </style>
