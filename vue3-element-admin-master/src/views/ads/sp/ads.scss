@@ -3,9 +3,9 @@
  */
 
 .ads-text-container {
-  height: calc(100vh - 50px);
-  overflow-y: auto;
+  min-height: 100vh;
   padding: 24px;
+  padding-bottom: 0;
   font-family:
     "Geist",
     "PingFang SC",
@@ -41,31 +41,26 @@
 }
 
 .data-table-block {
-  position: sticky;
-  top: 12px;
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100vh - 12px);
   padding: 0;
-  overflow: hidden;
-}
+  overflow: visible;
 
-.table-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 20px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  border-bottom: 1px solid #e2e8f0;
-  border-radius: 18px 18px 0 0;
-  flex-shrink: 0;
-}
+  .table-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border-bottom: 1px solid #e2e8f0;
+    border-radius: 18px 18px 0 0;
+    flex-shrink: 0;
 
-.table-controls .left-controls,
-.table-controls .right-controls {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+    .left-controls,
+    .right-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+  }
 }
 
 .table-controls__title-group {
@@ -205,7 +200,7 @@
     padding: var(--spacing-3);
   }
 
-  .table-controls {
+  .data-table-block .table-controls {
     flex-direction: column;
     gap: var(--spacing-2);
     align-items: stretch;
