@@ -35,7 +35,11 @@ class ShopProfileViewSet(viewsets.ViewSet):
         for item in LxAdsProfile.objects.filter(status=1):
             if item.profile_id:
                 label = item.name if item.name else str(item.profile_id)
-                profiles.append({"value": str(item.profile_id), "label": label})
+                profiles.append({
+                    "value": str(item.profile_id),
+                    "label": label,
+                    "country": item.country_code or "",
+                })
             if item.country_code:
                 countries_set.add(item.country_code)
 

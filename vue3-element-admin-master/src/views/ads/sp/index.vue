@@ -4,7 +4,7 @@
       <Filters
         :filters="filters"
         :countries="countries"
-        :profiles="profiles"
+        :profiles="filteredProfiles"
         :portfolios="portfolios"
         :sku-options="skuOptions"
         :tags-list="tagsList"
@@ -125,8 +125,52 @@ watch(onlyOverBudget, () => {
   loadTableData();
 });
 
+/**
+ * 国家变更时联动清空不匹配的店铺，并自动触发查询。
+ */
+watch(
+  () => filters.countries,
+  (newCountries) => {
+    if (!filters.profiles || filters.profiles.length === 0) return;
+    if (newCountries.length === 0) return;
+    const countrySet = new Set(newCountries);
+    const validProfiles = filters.profiles.filter((pid: string) => {
+      const profile = profiles.value.find((p) => p.value === pid);
+      return profile ? countrySet.has(profile.country ?? "") : true;
+    });
+    if (validProfiles.length !== filters.profiles.length) {
+      filters.profiles = validProfiles;
+    }
+  }
+);
+
+/**
+ * 任何筛选条件变更后自动执行查询。
+ */
+watch(
+  () => [
+    filters.countries,
+    filters.profiles,
+    filters.range,
+    filters.adsTypes,
+    filters.portfolios,
+    filters.skus,
+    filters.biddingType,
+    filters.tags,
+    filters.owners,
+    filters.campaignName,
+    filters.campaignStatus,
+    filters.serviceStatus,
+  ],
+  () => {
+    currentPage.value = 1;
+    loadTableData();
+  },
+  { deep: true }
+);
+
 const countries = ref<{ value: string; label: string }[]>([]);
-const profiles = ref<{ value: string; label: string }[]>([]);
+const profiles = ref<{ value: string; label: string; country?: string }[]>([]);
 const portfolios = ref<{ value: string; label: string }[]>([]);
 const biddingTypes = ref<{ value: string; label: string }[]>([]);
 const owners = ref<{ value: string; label: string }[]>([]);
@@ -213,6 +257,15 @@ const filters = reactive({
 });
 
 const columnConfigVisible = ref(false);
+
+/**
+ * 根据已选国家过滤店铺列表：未选国家时展示全部，选择国家后仅展示匹配的店铺。
+ */
+const filteredProfiles = computed(() => {
+  if (!filters.countries || filters.countries.length === 0) return profiles.value;
+  const selectedSet = new Set(filters.countries);
+  return profiles.value.filter((p) => selectedSet.has(p.country ?? ""));
+});
 
 const defaultColumns = [
   // 设置

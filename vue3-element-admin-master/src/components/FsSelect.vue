@@ -351,8 +351,14 @@ const containerStyle = computed((): Record<string, string> => {
   .el-select-dropdown__item {
     display: flex;
     align-items: center;
+    gap: 8px;
     padding: 8px 12px;
     transition: background-color var(--transition-fast);
+
+    // 隐藏 Element Plus 默认的选中勾号
+    &.is-selected::after {
+      content: none;
+    }
 
     &.is-hovering {
       background-color: var(--surface-hover) !important;
@@ -365,11 +371,12 @@ const containerStyle = computed((): Record<string, string> => {
     }
   }
 
-  // 复选框样式覆盖
+  // 复选框样式覆盖 - 仅覆盖颜色和尺寸，不覆盖定位
   .el-checkbox {
     height: auto;
     margin-right: 0;
     line-height: 1;
+    flex-shrink: 0;
 
     .el-checkbox__inner {
       width: 16px;
@@ -387,24 +394,11 @@ const containerStyle = computed((): Record<string, string> => {
     &.is-checked .el-checkbox__inner {
       background-color: var(--color-primary-500);
       border-color: var(--color-primary-500);
-      &::after {
-        border-width: 2px;
-        height: 8px;
-        left: 5px;
-        top: 1px;
-        width: 4px;
-      }
     }
 
     &.is-indeterminate .el-checkbox__inner {
       background-color: var(--color-primary-500);
       border-color: var(--color-primary-500);
-      &::before {
-        height: 2px;
-        left: 3px;
-        right: 3px;
-        top: 6px;
-      }
     }
 
     .el-checkbox__label {
