@@ -224,7 +224,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 for cid_val, pid_val in all_pairs_list:
                     pair_q |= Q(campaign_id=cid_val, profile_id=pid_val)
 
-                agg_qs = LxSpCampaignReport.objects.filter(pair_q)
+                agg_qs = LxSpCampaignReport.objects.using("analytics").filter(pair_q)
                 if date_start:
                     agg_qs = agg_qs.filter(report_date__gte=date_start)
                 if date_end:

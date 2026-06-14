@@ -261,8 +261,25 @@ DATABASES = {
         'PORT':     env('DB_PORT',     default='3306'),
         'CONN_MAX_AGE': 600,
         'OPTIONS':  _db_options,
-    }
+    },
+    'analytics': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': env('DORIS_DB_NAME', default='webpro_analytics'),
+        'USER': env('DORIS_DB_USER', default='root'),
+        'PASSWORD': env('DORIS_DB_PASSWORD', default=''),
+        'HOST': env('DORIS_DB_HOST', default='127.0.0.1'),
+        'PORT': env('DORIS_DB_PORT', default='9030'),
+        'CONN_MAX_AGE': 600,
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'connect_timeout': 10,
+        },
+    },
 }
+
+DATABASE_ROUTERS = [
+    'backend_master.analytics_database_router.AnalyticsDatabaseRouter',
+]
 
 
 # Password validation
