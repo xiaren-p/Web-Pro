@@ -10,6 +10,14 @@
         style="width: 100%"
         @sort-change="$emit('sort-change', $event)"
       >
+        <template #empty>
+          <div class="table-empty">
+            <div class="table-empty__icon">
+              <el-icon :size="48"><List /></el-icon>
+            </div>
+            <p class="table-empty__text">暂无数据</p>
+          </div>
+        </template>
         <el-table-column type="selection" width="48" fixed="left" align="center" />
 
         <el-table-column label="有效" width="80" fixed="left" align="center">
@@ -196,10 +204,12 @@ const localPageSize = ref(props.pageSize || 25);
 
 /**
  * 将汇总行置于列表首位，与当前页数据合并展示。
+ * 无行数据时不展示汇总行，交由 empty 插槽处理。
  *
- * @returns {any[]} 以汇总行开头的完整表格数据
+ * @returns {any[]} 以汇总行开头的完整表格数据；无数据时返回空数组
  */
 const displayData = computed<any[]>(() => {
+  if (!props.tableData || props.tableData.length === 0) return [];
   if (!props.summary) return props.tableData;
   const summaryRow: Record<string, unknown> = {
     _isSummary: true,
@@ -351,14 +361,14 @@ function formatValue(val: any): string {
 
 :deep(.el-table__header-wrapper) {
   position: sticky;
-  top: 72px;
+  top: 90px;
   z-index: 10;
   background: var(--surface-base);
 }
 
 :deep(.el-table thead) {
   position: sticky;
-  top: 72px;
+  top: 90px;
   z-index: 10;
 }
 
@@ -598,17 +608,42 @@ function formatValue(val: any): string {
   color: var(--color-primary-700);
 }
 
+.table-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+}
+
+.table-empty__icon {
+  color: var(--text-tertiary);
+  opacity: 0.4;
+}
+
+.table-empty__text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
 .pager-row {
   position: sticky;
-  bottom: 0;
+  bottom: 8px;
   z-index: 11;
   display: flex;
   gap: 12px;
   align-items: center;
   justify-content: space-between;
   padding: 10px 18px;
-  background: var(--surface-base);
-  border-top: 1px solid var(--border-base);
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow:
+    0 -1px 2px rgba(15, 23, 42, 0.04),
+    0 -8px 24px rgba(15, 23, 42, 0.04);
 }
 
 .pager-left,
