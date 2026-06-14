@@ -7,7 +7,8 @@
   flex-direction: column;
   height: calc(100vh - 50px);
   padding: 24px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   font-family:
     "Geist",
     "PingFang SC",
