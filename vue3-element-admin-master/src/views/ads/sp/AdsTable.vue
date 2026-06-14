@@ -20,7 +20,7 @@
         </template>
         <el-table-column type="selection" width="48" fixed="left" align="center">
           <template #default="{ row }">
-            <span v-if="row._isSummary" class="summary-dash">--</span>
+            <span v-if="row._isSummary" />
           </template>
         </el-table-column>
 
@@ -177,7 +177,7 @@
       />
     </div>
 
-    <div class="pager-row">
+    <div class="pager-row" :style="{ bottom: showHorizontalScroll ? '12px' : '0px' }">
       <div class="pager-left">
         <span class="total-count">
           <el-icon class="count-icon"><List /></el-icon>
@@ -387,27 +387,31 @@ function formatTargetingType(val: string): string {
 function getColumnMinWidth(prop: string): number {
   const widthMap: Record<string, number> = {
     is: 80,
-    acos: 100,
-    roas: 100,
-    cvr: 80,
+    acos: 120,
+    roas: 120,
+    cvr: 100,
     ctr: 80,
     cpc: 80,
     cpa: 80,
     budget: 100,
     startDate: 110,
+    service_status: 120,
+    bidding_type: 100,
+    portfolio_name: 120,
+    tags: 100,
     impressions: 110,
     impressionsPercent: 90,
     clicks: 90,
     clicksPercent: 90,
     spends: 100,
     spendsPercent: 90,
-    adsSales: 110,
-    adsSalesPercent: 100,
-    directSales: 110,
-    adsOrders: 100,
-    directOrders: 100,
-    adsOrderPrice: 110,
-    adsVolume: 100,
+    adsSales: 120,
+    adsSalesPercent: 110,
+    directSales: 120,
+    adsOrders: 110,
+    directOrders: 110,
+    adsOrderPrice: 120,
+    adsVolume: 110,
   };
   return widthMap[prop] ?? 120;
 }
@@ -566,7 +570,7 @@ function formatValue(val: any): string {
   position: sticky;
   top: 74px;
   z-index: 10;
-  background: var(--table-bg);
+  background: #eef1f6;
 }
 
 :deep(.el-table thead) {
@@ -578,7 +582,7 @@ function formatValue(val: any): string {
 :deep(.el-table__header-wrapper th.el-table__cell),
 :deep(.el-table__header th) {
   text-align: center;
-  background: var(--table-bg);
+  background: #f0f2f5;
 }
 
 :deep(.el-table__header th .caret-wrapper) {
@@ -725,14 +729,14 @@ function formatValue(val: any): string {
 }
 
 :deep(.el-table .el-switch) {
-  height: 20px;
+  height: 16px;
 }
 
 :deep(.el-table .el-switch .el-switch__core) {
-  width: 36px !important;
-  min-width: 36px !important;
-  height: 20px !important;
-  border: 2px solid var(--border-strong);
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 16px !important;
+  border: 1.5px solid var(--border-strong);
   border-radius: 999px !important;
   transition: all 160ms ease;
 }
@@ -740,13 +744,13 @@ function formatValue(val: any): string {
 :deep(.el-table .el-switch .el-switch__core .el-switch__action) {
   top: 1px;
   left: 1px;
-  width: 14px !important;
-  height: 14px !important;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 14%);
+  width: 10px !important;
+  height: 10px !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 14%);
 }
 
 :deep(.el-table .el-switch.is-checked .el-switch__core .el-switch__action) {
-  left: 19px !important;
+  left: 15px !important;
 }
 
 :deep(.el-table .el-switch.is-checked .el-switch__core) {
@@ -877,7 +881,7 @@ function formatValue(val: any): string {
 .pager-row {
   position: sticky;
   bottom: 0;
-  z-index: 12;
+  z-index: 13;
   display: flex;
   gap: 12px;
   align-items: center;
