@@ -38,6 +38,37 @@ from api_v1.views.lingxing.ads._helpers import (
 _DORIS_PAIR_BATCH_SIZE = 500
 
 
+def _flat_parse_label(raw_label: str) -> list[str]:
+    """解析 LxProductInfo.label 字段，将其扁平化为标签字符串列表。
+
+    label 字段存在两种格式：
+    1. JSON 数组字符串，如 ``'["清仓", "夏季"]'`` 或 ``'["促销"]'``。
+    2. 逗号分隔字符串，如 ``"清仓,夏季"``。
+
+    本函数依次尝试 JSON 解析和逗号分隔解析，确保无论哪种存储格式
+    都能正确扁平化为 ``["清仓", "夏季"]``。
+
+    Args:
+        raw_label (str): LxProductInfo.label 原始值。
+
+    Returns:
+        list[str]: 扁平化后的标签字符串列表。
+    """
+    import json
+
+    if not raw_label:
+        return []
+    s = raw_label.strip()
+    if s.startswith("[") and s.endswith("]"):
+        try:
+            parsed = json.loads(s)
+            if isinstance(parsed, list):
+                return [str(x).strip() for x in parsed if str(x).strip()]
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return [t.strip() for t in s.split(",") if t.strip()]
+
+
 class AdCampaignViewSet(viewsets.ViewSet):
     """SP 广告活动基础数据视图（只提供查询）。"""
 
@@ -172,6 +203,38 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         date_start = data.get("date_start")
         date_end = data.get("date_end")
+
+        # ── 负责人筛选 ──
+        owner_ids = data.get("owners")
+        if owner_ids:
+            owner_id_list = [str(o).strip() for o in owner_ids.split(",") if str(o).strip()]
+            # 负责人数据从 LxProductInfo.principal_list 中提取，
+            # 该字段为 JSON 数组，每项含 principal_uid（整数）字段
+            if owner_id_list:
+                product_asins = set()
+                # 通过 JSON 字段内 principal_uid 匹配到 ASIN
+                for row in LxProductInfo.objects.filter(
+                    principal_list__contains=[{}]
+                ).values("asin", "principal_list"):
+                    pl = row["principal_list"]
+                    if isinstance(pl, list):
+                        for item in pl:
+                            if isinstance(item, dict):
+                                uid = str(item.get("principal_uid") or "")
+                                if uid in owner_id_list:
+                                    product_asins.add(row["asin"])
+                                    break
+                if product_asins:
+                    ad_campaign_pairs = set(
+                        LxSpAd.objects.filter(asin__in=product_asins)
+                        .values_list("campaign_id", "profile_id")
+                        .distinct()
+                    )
+                    if ad_campaign_pairs:
+                        owner_q = Q()
+                        for cid, pid in ad_campaign_pairs:
+                            owner_q |= Q(campaign_id=cid, profile_id=pid)
+                        qs = qs.filter(owner_q)
 
         sort_prop = data.get("sort_prop")
         sort_order = data.get("sort_order")
@@ -530,9 +593,10 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 asin_principal_map.setdefault(p["asin"], [])
                 raw_label = (p["label"] or "").strip()
                 if raw_label:
-                    asin_label_map[p["asin"]].extend(
-                        [t.strip() for t in raw_label.split(",") if t.strip()]
-                    )
+                    # label 字段可能包含 JSON 数组字符串如 '["清仓","夏季"]'，
+                    # 也可能是逗号分隔字符串如 "清仓,夏季"，统一解析后扁平化
+                    _parsed = _flat_parse_label(raw_label)
+                    asin_label_map[p["asin"]].extend(_parsed)
                 pl = p["principal_list"]
                 if isinstance(pl, list):
                     names = [x.get("realname", "") for x in pl if isinstance(x, dict) and x.get("realname")]

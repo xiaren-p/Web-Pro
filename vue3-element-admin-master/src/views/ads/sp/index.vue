@@ -97,7 +97,13 @@ import AdQueueDrawer from "./AdQueueDrawer.vue";
 import AdUploadDialog from "./AdUploadDialog.vue";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import { ElMessage } from "element-plus";
-import { getAdCampaigns, getAdOptions, getAdPortfolioOptions } from "@/api/ads";
+import {
+  getAdCampaigns,
+  getAdEnumLabels,
+  getAdOptions,
+  getAdPortfolioOptions,
+  getAdSkuOptions,
+} from "@/api/ads";
 import { ShopsAPI } from "@/api/shops";
 
 defineOptions({ name: "AdsText" });
@@ -141,60 +147,59 @@ onMounted(() => {
 
   remoteSearchPortfolio("");
   loadOwners();
+  loadSkuOptions();
+  loadAllEnumLabels();
 });
 
-const tagsList = [
-  { value: "unset", label: "未添加标签" },
-  { value: "promo", label: "促销" },
-  { value: "new", label: "新品" },
-  { value: "clearance", label: "清仓" },
-];
+const tagsList = ref<any[]>([]);
 
-const campaignStatuses = [
-  { value: "enabled", label: "已启用" },
-  { value: "paused", label: "已暂停" },
-  { value: "archived", label: "已归档" },
-];
+const campaignStatuses = ref<any[]>([]);
+const serviceStatuses = ref<any[]>([]);
 
-const serviceStatuses = [
-  { value: "CAMPAIGN_STATUS_ENABLED", label: "投放中" },
-  { value: "CAMPAIGN_PAUSED", label: "广告活动已暂停" },
-  { value: "CAMPAIGN_ARCHIVED", label: "广告活动已归档" },
-  { value: "CAMPAIGN_INCOMPLETE", label: "不完整" },
-  { value: "CAMPAIGN_OUT_OF_BUDGET", label: "超预算" },
-  { value: "ADVERTISER_PAYMENT_FAILURE", label: "广告账号付款失败" },
-  { value: "LANDING_PAGE_NOT_AVAILABLE", label: "着陆页失效" },
-  { value: "OTHER", label: "未知" },
-];
+async function loadEnumLabels(module: string): Promise<any[]> {
+  try {
+    const res = await getAdEnumLabels({ module });
+    return res.labels || [];
+  } catch (error) {
+    console.error(`加载枚举 ${module} 失败`, error);
+    return [];
+  }
+}
 
-const allSkus = [
-  {
-    value: "C-ZY-MZ03-BG",
-    label: "C-ZY-MZ03-BG",
-    title: "HEOXIN Baby Kinder Schalmütze (示例)",
-    code: "B0DNDM458S",
-    img: "https://images-cn.ssl-images-amazon.cn/images/I/51zo6Dtu3vL._SL75_.jpg",
-    parent: "B0PARENT001",
-  },
-  {
-    value: "C-ZY-MZ04-2PCS-S",
-    label: "C-ZY-MZ04-2PCS-S",
-    title: "HEOXIN Gorro de Bebé (示例)",
-    code: "B0DNDLSQTX",
-    img: "https://images-cn.ssl-images-amazon.cn/images/I/51PyS4uMXWL._SL75_.jpg",
-    parent: "B0PARENT002",
-  },
-  {
-    value: "K-HLS-BD001",
-    label: "K-HLS-BD001",
-    title: "KONFEN CPAP Nasenpolster (示例)",
-    code: "B0GK1CCDY8",
-    img: "https://images-cn.ssl-images-amazon.cn/images/I/31Zq3GnOUVL._SS60_.jpg",
-    parent: "B0PARENT001",
-  },
-];
+async function loadAllEnumLabels(): Promise<void> {
+  const [campaignLabels, serviceLabels, tagLabels] = await Promise.all([
+    loadEnumLabels("campaign_status"),
+    loadEnumLabels("service_status"),
+    loadEnumLabels("tags"),
+  ]);
+  campaignStatuses.value = campaignLabels;
+  serviceStatuses.value = serviceLabels;
+  tagsList.value = tagLabels;
+}
 
-const skuOptions = ref(allSkus.slice());
+const allSkus = ref<any[]>([]);
+const skuOptions = ref<any[]>([]);
+
+async function loadSkuOptions(): Promise<void> {
+  try {
+    const res = await getAdSkuOptions({});
+    allSkus.value = res.skus || [];
+    skuOptions.value = allSkus.value.slice();
+  } catch (error) {
+    console.error("加载 SKU 下拉失败", error);
+  }
+}
+
+function remoteSearchSku(query: string) {
+  if (!query) {
+    skuOptions.value = allSkus.value.slice();
+    return;
+  }
+  const q = query.toLowerCase();
+  skuOptions.value = allSkus.value.filter((s: any) =>
+    (s.title + s.code + s.value).toLowerCase().includes(q)
+  );
+}
 
 const filters = reactive({
   countries: [] as string[],
@@ -304,15 +309,6 @@ function onColumnConfigSave(columns: any[]) {
   ElMessage.success("列配置已保存");
 }
 
-function remoteSearchSku(query: string) {
-  if (!query) {
-    skuOptions.value = allSkus.slice();
-    return;
-  }
-  const q = query.toLowerCase();
-  skuOptions.value = allSkus.filter((s) => (s.title + s.code + s.value).toLowerCase().includes(q));
-}
-
 function remoteSearchPortfolio(query: string = "") {
   getAdPortfolioOptions({ keyword: query }).then((res: any) => {
     portfolios.value = [{ value: "-1", label: "未设置广告组合" }, ...(res.portfolios || [])];
@@ -382,6 +378,7 @@ async function loadTableData() {
       portfolio_id: filters.portfolios.join(","),
       bidding_type: filters.biddingType,
       tags: filters.tags.join(","),
+      owners: filters.owners.join(","),
       profiles: filters.profiles.join(","),
       countries: filters.countries.join(","),
       date_start: filters.range?.[0] || "",

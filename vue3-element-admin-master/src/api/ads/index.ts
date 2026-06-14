@@ -22,6 +22,22 @@ export function getAdOptions(): Promise<any> {
   });
 }
 
+export function getAdSkuOptions(data?: any): Promise<any> {
+  return request({
+    url: "/ads/sku-options",
+    method: "post",
+    data,
+  });
+}
+
+export function getAdEnumLabels(data?: any): Promise<any> {
+  return request({
+    url: "/ads/enum-labels",
+    method: "post",
+    data,
+  });
+}
+
 export function getAdPortfolioOptions(data?: any): Promise<any> {
   return request({
     url: "/ads/portfolios/options",
