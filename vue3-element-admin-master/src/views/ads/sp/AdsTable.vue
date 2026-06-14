@@ -478,10 +478,14 @@ function formatValue(val: any): string {
   scrollbar-width: none;
 }
 
-:deep(.el-table__body-wrapper::-webkit-scrollbar) {
-  display: none;
-  width: 0;
-  height: 0;
+:deep(.el-table__body-wrapper::-webkit-scrollbar),
+:deep(.el-table__body-wrapper .el-scrollbar__bar),
+:deep(.el-table__body-wrapper .el-scrollbar__bar.is-horizontal),
+:deep(.el-table__body-wrapper .el-scrollbar__bar.is-vertical) {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
 }
 
 :deep(.el-table__inner-wrapper) {
