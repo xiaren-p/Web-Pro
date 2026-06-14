@@ -40,8 +40,14 @@
 }
 
 .data-table-block {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 12px);
   padding: 0;
-  overflow: visible;
+  overflow: hidden;
+  border-radius: 18px;
 }
 
 .table-controls {
@@ -51,6 +57,8 @@
   padding: 18px 20px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border-bottom: 1px solid #e2e8f0;
+  border-radius: 18px 18px 0 0;
+  flex-shrink: 0;
 }
 
 .table-controls .left-controls,

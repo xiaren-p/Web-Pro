@@ -1,99 +1,95 @@
 <template>
-  <div ref="trackRoot" class="ads-table-track" :style="trackStyle">
-    <div class="ads-table-sticky">
-      <div class="ads-table-body-wrap">
-        <el-table
-          ref="tableRef"
-          v-loading="loading"
-          class="data-table__content"
-          :data="displayData"
-          :row-class-name="getRowClass"
-          :border="false"
-          height="100%"
-          style="width: 100%"
-          @sort-change="$emit('sort-change', $event)"
-        >
-          <el-table-column type="selection" width="48" fixed="left" align="center" />
-          <el-table-column label="有效" width="80" fixed="left" align="center">
-            <template #default="{ row }">
-              <span v-if="row._isSummary" class="summary-dash">--</span>
-              <el-switch v-else v-model="row.state" active-value="enabled" inactive-value="paused" disabled />
+  <div class="data-table-container">
+    <div class="data-table__scroll">
+      <el-table
+        v-loading="loading"
+        class="data-table__content"
+        :data="displayData"
+        :row-class-name="getRowClass"
+        :border="false"
+        height="100%"
+        style="width: 100%"
+        @sort-change="$emit('sort-change', $event)"
+      >
+        <el-table-column type="selection" width="48" fixed="left" align="center" />
+        <el-table-column label="有效" width="80" fixed="left" align="center">
+          <template #default="{ row }">
+            <span v-if="row._isSummary" class="summary-dash">--</span>
+            <el-switch v-else v-model="row.state" active-value="enabled" inactive-value="paused" disabled />
+          </template>
+        </el-table-column>
+        <el-table-column label="类型" width="100" fixed="left" align="center">
+          <template #default="{ row }">
+            <template v-if="row._isSummary"><span class="summary-dash">--</span></template>
+            <template v-else>
+              <div>{{ row.sponsored_type }}</div>
+              <div v-if="row.targeting_type" class="targeting-type-line">[{{ formatTargetingType(row.targeting_type) }}]</div>
             </template>
-          </el-table-column>
-          <el-table-column label="类型" width="100" fixed="left" align="center">
-            <template #default="{ row }">
-              <template v-if="row._isSummary"><span class="summary-dash">--</span></template>
-              <template v-else>
-                <div>{{ row.sponsored_type }}</div>
-                <div v-if="row.targeting_type" class="targeting-type-line">[{{ formatTargetingType(row.targeting_type) }}]</div>
-              </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="店铺/国家" width="120" fixed="left" align="center">
+          <template #default="{ row }">
+            <template v-if="row._isSummary">
+              <span class="summary-indicator"><el-icon class="summary-icon"><TrendCharts /></el-icon>汇总</span>
             </template>
-          </el-table-column>
-          <el-table-column label="店铺/国家" width="120" fixed="left" align="center">
-            <template #default="{ row }">
-              <template v-if="row._isSummary">
-                <span class="summary-indicator"><el-icon class="summary-icon"><TrendCharts /></el-icon>汇总</span>
-              </template>
-              <template v-else>
-                <div class="profile-name">{{ row.profile_alias || row.profile_id }}</div>
-                <div class="country-tag">{{ row.country_name || "-" }}</div>
-              </template>
+            <template v-else>
+              <div class="profile-name">{{ row.profile_alias || row.profile_id }}</div>
+              <div class="country-tag">{{ row.country_name || "-" }}</div>
             </template>
-          </el-table-column>
-          <el-table-column label="广告活动" min-width="180" fixed="left" align="center" show-overflow-tooltip>
-            <template #default="{ row }">
-              <span v-if="row._isSummary" class="summary-dash">--</span>
-              <router-link v-else class="campaign-name-link" :to="{ name: 'AdCampaignDetail', query: { campaign_id: row.campaign_id, profile_id: row.profile_id, date_start: props.dateRange?.[0] || '', date_end: props.dateRange?.[1] || '' } }">{{ row.name }}</router-link>
+          </template>
+        </el-table-column>
+        <el-table-column label="广告活动" min-width="180" fixed="left" align="center" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span v-if="row._isSummary" class="summary-dash">--</span>
+            <router-link v-else class="campaign-name-link" :to="{ name: 'AdCampaignDetail', query: { campaign_id: row.campaign_id, profile_id: row.profile_id, date_start: props.dateRange?.[0] || '', date_end: props.dateRange?.[1] || '' } }">{{ row.name }}</router-link>
+          </template>
+        </el-table-column>
+        <el-table-column v-for="col in columns" :key="col.prop" :prop="col.prop" :label="col.label" :fixed="col.fixed" :sortable="col.sortable" min-width="120" align="center" show-overflow-tooltip>
+          <template #default="{ row }">
+            <template v-if="col.prop === 'service_status'">
+              <template v-if="row._isSummary">--</template>
+              <span v-else class="status-badge" :class="`status-badge--${row.service_status_type || 'info'}`">{{ row.service_status_label || row.service_status || "-" }}</span>
             </template>
-          </el-table-column>
-          <el-table-column v-for="col in columns" :key="col.prop" :prop="col.prop" :label="col.label" :fixed="col.fixed" :sortable="col.sortable" min-width="120" align="center" show-overflow-tooltip>
-            <template #default="{ row }">
-              <template v-if="col.prop === 'service_status'">
-                <template v-if="row._isSummary">--</template>
-                <span v-else class="status-badge" :class="`status-badge--${row.service_status_type || 'info'}`">{{ row.service_status_label || row.service_status || "-" }}</span>
-              </template>
-              <template v-else>
-                <span v-if="row._isSummary && row[col.prop] == null" class="data-null">--</span>
-                <span v-else class="data-value" :class="getDataValueClass(row, col.prop)">
-                  <span v-if="!row._isSummary && shouldShowTrend(col.prop, row[col.prop])" class="trend-icon" :class="getDataValueClass(row, col.prop)">
-                    <el-icon><TrendCharts v-if="getDataValueClass(row, col.prop) === 'data-up'" /><TrendCharts v-else-if="getDataValueClass(row, col.prop) === 'data-down'" class="trend-icon-down" /></el-icon>
-                  </span>
-                  {{ formatValue(row[col.prop]) }}
+            <template v-else>
+              <span v-if="row._isSummary && row[col.prop] == null" class="data-null">--</span>
+              <span v-else class="data-value" :class="getDataValueClass(row, col.prop)">
+                <span v-if="!row._isSummary && shouldShowTrend(col.prop, row[col.prop])" class="trend-icon" :class="getDataValueClass(row, col.prop)">
+                  <el-icon><TrendCharts v-if="getDataValueClass(row, col.prop) === 'data-up'" /><TrendCharts v-else-if="getDataValueClass(row, col.prop) === 'data-down'" class="trend-icon-down" /></el-icon>
                 </span>
-              </template>
+                {{ formatValue(row[col.prop]) }}
+              </span>
             </template>
-          </el-table-column>
-          <el-table-column label="分析" width="80" fixed="right" align="center">
-            <template #default="{ row }">
-              <el-button v-if="!row._isSummary" type="primary" link size="small" class="analyze-btn" @click="$emit('view-row', row)">分析</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+          </template>
+        </el-table-column>
+        <el-table-column label="分析" width="80" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button v-if="!row._isSummary" type="primary" link size="small" class="analyze-btn" @click="$emit('view-row', row)">分析</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <div class="pager-row">
+      <div class="pager-left">
+        <span class="total-count"><el-icon class="count-icon"><List /></el-icon>共 {{ total.toLocaleString() }} 条</span>
       </div>
-      <div class="ads-table-pager">
-        <div class="pager-left">
-          <span class="total-count"><el-icon class="count-icon"><List /></el-icon>共 {{ total.toLocaleString() }} 条</span>
-        </div>
-        <div class="pager-mid">
-          <el-pagination background :current-page="currentPage" :page-size="localPageSize" :total="total" layout="prev, pager, next" @current-change="$emit('current-change', $event)" />
-        </div>
-        <div class="pager-right">
-          <span class="page-size-label">每页</span>
-          <el-select v-model="localPageSize" class="page-size-select" @change="onPageSizeChange">
-            <el-option label="25条" :value="25" /><el-option label="50条" :value="50" /><el-option label="100条" :value="100" /><el-option label="250条" :value="250" />
-          </el-select>
-          <span class="page-size-suffix">条/页</span>
-        </div>
+      <div class="pager-mid">
+        <el-pagination background :current-page="currentPage" :page-size="localPageSize" :total="total" layout="prev, pager, next" @current-change="$emit('current-change', $event)" />
+      </div>
+      <div class="pager-right">
+        <span class="page-size-label">每页</span>
+        <el-select v-model="localPageSize" class="page-size-select" @change="onPageSizeChange">
+          <el-option label="25条" :value="25" /><el-option label="50条" :value="50" /><el-option label="100条" :value="100" /><el-option label="250条" :value="250" />
+        </el-select>
+        <span class="page-size-suffix">条/页</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
+import { ref, watch, computed } from "vue";
 import { TrendCharts, List } from "@element-plus/icons-vue";
-
-const STICKY_TOP = 12;
 
 const props = withDefaults(
   defineProps<{
@@ -106,80 +102,11 @@ const props = withDefaults(
 const emit = defineEmits(["current-change", "view-row", "page-size-change", "sort-change"]);
 const localPageSize = ref(props.pageSize || 25);
 
-const trackRoot = ref<HTMLElement | null>(null);
-const tableRef = ref<any>(null);
-const extraScroll = ref(0);
-const naturalH = ref(0);
-const trackStyle = computed(() => {
-  const h = naturalH.value + extraScroll.value;
-  return h > 0 ? { minHeight: `${h}px` } : {};
-});
-
-function bodyEl(): HTMLElement | null {
-  const el = tableRef.value?.$el as HTMLElement | undefined;
-  return el?.querySelector<HTMLElement>(".el-scrollbar__wrap") ?? null;
-}
-
-function sync() {
-  const track = trackRoot.value;
-  const body = bodyEl();
-  if (!track || !body) return;
-  const r = track.getBoundingClientRect();
-  const trackY = r.top + window.scrollY;
-  const pxIntoSticky = Math.max(0, window.scrollY - trackY + STICKY_TOP);
-  const max = Math.max(0, body.scrollHeight - body.clientHeight);
-  body.scrollTop = Math.min(pxIntoSticky, max);
-}
-
-function measure() {
-  const track = trackRoot.value;
-  const body = bodyEl();
-  if (!track) return;
-  naturalH.value = track.querySelector<HTMLElement>(".ads-table-sticky")?.offsetHeight ?? 0;
-  if (body) {
-    const clientH = body.clientHeight;
-    // 用 requestAnimationFrame 确保布局稳定后再读
-    requestAnimationFrame(() => {
-      extraScroll.value = Math.max(0, body.scrollHeight - clientH);
-      sync();
-    });
-  }
-}
-
-function onWheel(e: WheelEvent) {
-  const body = bodyEl();
-  if (!body) return;
-  const atTop = body.scrollTop <= 1 && e.deltaY < 0;
-  const atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 2 && e.deltaY > 0;
-  if (atTop || atBottom) return;
-  e.preventDefault();
-  window.scrollBy({ top: e.deltaY, behavior: "auto" });
-}
-
-let raf = 0;
-function onScroll() {
-  cancelAnimationFrame(raf);
-  raf = requestAnimationFrame(sync);
-}
-
-onMounted(() => {
-  measure();
-  window.addEventListener("resize", measure, { passive: true });
-  window.addEventListener("scroll", onScroll, { passive: true });
-  nextTick(() => bodyEl()?.addEventListener("wheel", onWheel, { passive: false }));
-});
-onBeforeUnmount(() => {
-  window.removeEventListener("resize", measure);
-  window.removeEventListener("scroll", onScroll);
-  bodyEl()?.removeEventListener("wheel", onWheel);
-  cancelAnimationFrame(raf);
-});
-
 const displayData = computed<any[]>(() => {
   if (!props.summary) return props.tableData;
   return [{ _isSummary: true, name: "汇总", ...props.summary }, ...props.tableData];
 });
-watch(displayData, () => nextTick(measure));
+
 watch(() => props.pageSize, (v) => { localPageSize.value = v; });
 
 function onPageSizeChange(v: number) { emit("page-size-change", v); }
@@ -214,24 +141,22 @@ function formatValue(val: any): string {
 </script>
 
 <style scoped>
-.ads-table-track {
-  /* 仅撑高，不做 clip */
-}
-.ads-table-sticky {
-  position: sticky;
-  top: 12px;
+.data-table-container {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 12px);
+  flex: 1;
+  min-height: 0;
   background: var(--surface-base);
   border-radius: 0 0 18px 18px;
 }
-.ads-table-body-wrap {
+
+.data-table__scroll {
   flex: 1;
   min-height: 200px;
   overflow: hidden;
 }
-.ads-table-pager {
+
+.pager-row {
   display: flex;
   align-items: center;
   padding: 10px 18px;
@@ -248,12 +173,12 @@ function formatValue(val: any): string {
 .page-size-label,.page-size-suffix { font-size: 12px; color: var(--text-secondary); }
 .page-size-select { width: 88px; }
 
-.ads-table-pager :deep(.el-select .el-input__wrapper) { height: 30px !important; min-height: 30px !important; border-color: var(--border-strong); border-radius: var(--radius-md); box-shadow: none; }
-.ads-table-pager :deep(.el-select .el-input__inner) { height: 28px !important; font-size: 12px; line-height: 28px !important; }
-.ads-table-pager :deep(.el-pagination) { font-size: 12px; }
-.ads-table-pager :deep(.el-pager li) { min-width: 28px; height: 28px; font-size: 12px; font-weight: 600; line-height: 28px; border-radius: var(--radius-md); }
-.ads-table-pager :deep(.el-pagination button) { min-width: 28px; height: 28px; font-size: 12px; }
-.ads-table-pager :deep(.el-pagination .btn-prev),.ads-table-pager :deep(.el-pagination .btn-next) { font-size: 13px; }
+.pager-row :deep(.el-select .el-input__wrapper) { height: 30px !important; min-height: 30px !important; border-color: var(--border-strong); border-radius: var(--radius-md); box-shadow: none; }
+.pager-row :deep(.el-select .el-input__inner) { height: 28px !important; font-size: 12px; line-height: 28px !important; }
+.pager-row :deep(.el-pagination) { font-size: 12px; }
+.pager-row :deep(.el-pager li) { min-width: 28px; height: 28px; font-size: 12px; font-weight: 600; line-height: 28px; border-radius: var(--radius-md); }
+.pager-row :deep(.el-pagination button) { min-width: 28px; height: 28px; font-size: 12px; }
+.pager-row :deep(.el-pagination .btn-prev),.pager-row :deep(.el-pagination .btn-next) { font-size: 13px; }
 
 :deep(.el-table__header-wrapper th.el-table__cell),:deep(.el-table__header th) { text-align: center; }
 :deep(.el-table__header th .caret-wrapper) { margin-left: 6px; transform: scale(1.04); }
