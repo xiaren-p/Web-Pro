@@ -131,13 +131,15 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if bidding_strategy:
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
-        tags = data.get("tags")
-        if tags:
-            tag_list = [t.strip() for t in tags.split(",") if t.strip()]
-            tag_q = Q()
-            for t in tag_list:
-                tag_q |= Q(tags__icontains=t)
-            qs = qs.filter(tag_q)
+        # ── 标签+负责人筛选值解析 ──
+        tags_input = data.get("tags")
+        owner_input = data.get("owners")
+        tags_list_filter: list[str] = []
+        owner_list_filter: list[str] = []
+        if tags_input:
+            tags_list_filter = [t.strip() for t in tags_input.split(",") if t.strip()]
+        if owner_input:
+            owner_list_filter = [str(o).strip() for o in owner_input.split(",") if str(o).strip()]
 
         portfolio_id = data.get("portfolio_id")
         if portfolio_id:
@@ -203,16 +205,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         date_start = data.get("date_start")
         date_end = data.get("date_end")
-
-        # ── 标签+负责人筛选值解析 ──
-        tags_input = data.get("tags")
-        owner_input = data.get("owners")
-        tags_list_filter: list[str] = []
-        owner_list_filter: list[str] = []
-        if tags_input:
-            tags_list_filter = [t.strip() for t in tags_input.split(",") if t.strip()]
-        if owner_input:
-            owner_list_filter = [str(o).strip() for o in owner_input.split(",") if str(o).strip()]
 
         sort_prop = data.get("sort_prop")
         sort_order = data.get("sort_order")
