@@ -134,9 +134,12 @@ class AdCampaignViewSet(viewsets.ViewSet):
         tags = data.get("tags")
         if tags:
             tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+            # LxSpCampaign.tags 为 JSON 数组 [{parent, child}, ...]，
+            # 标签值分布在 parent 或 child 字段上
             tag_q = Q()
             for t in tag_list:
-                tag_q |= Q(tags__icontains=t)
+                tag_q |= Q(tags__contains=[{"parent": t}])
+                tag_q |= Q(tags__contains=[{"child": t}])
             qs = qs.filter(tag_q)
 
         portfolio_id = data.get("portfolio_id")
@@ -208,33 +211,29 @@ class AdCampaignViewSet(viewsets.ViewSet):
         owner_ids = data.get("owners")
         if owner_ids:
             owner_id_list = [str(o).strip() for o in owner_ids.split(",") if str(o).strip()]
-            # 负责人数据从 LxProductInfo.principal_list 中提取，
-            # 该字段为 JSON 数组，每项含 principal_uid（整数）字段
             if owner_id_list:
-                product_asins = set()
-                # 通过 JSON 字段内 principal_uid 匹配到 ASIN
-                for row in LxProductInfo.objects.filter(
-                    principal_list__contains=[{}]
-                ).values("asin", "principal_list"):
-                    pl = row["principal_list"]
-                    if isinstance(pl, list):
-                        for item in pl:
-                            if isinstance(item, dict):
-                                uid = str(item.get("principal_uid") or "")
-                                if uid in owner_id_list:
-                                    product_asins.add(row["asin"])
-                                    break
-                if product_asins:
+                # JSON_CONTAINS 逐个 uid 匹配，找到包含该负责人 uid 的 ASIN 集合
+                owner_q_parts = Q()
+                for uid in owner_id_list:
+                    owner_q_parts |= Q(
+                        principal_list__contains=[{"principal_uid": int(uid)}]
+                    )
+                owner_asins = set(
+                    LxProductInfo.objects.filter(owner_q_parts)
+                    .values_list("asin", flat=True)
+                    .distinct()
+                )
+                if owner_asins:
                     ad_campaign_pairs = set(
-                        LxSpAd.objects.filter(asin__in=product_asins)
+                        LxSpAd.objects.filter(asin__in=owner_asins)
                         .values_list("campaign_id", "profile_id")
                         .distinct()
                     )
                     if ad_campaign_pairs:
-                        owner_q = Q()
+                        pair_q = Q()
                         for cid, pid in ad_campaign_pairs:
-                            owner_q |= Q(campaign_id=cid, profile_id=pid)
-                        qs = qs.filter(owner_q)
+                            pair_q |= Q(campaign_id=cid, profile_id=pid)
+                        qs = qs.filter(pair_q)
 
         sort_prop = data.get("sort_prop")
         sort_order = data.get("sort_order")
