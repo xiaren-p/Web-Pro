@@ -344,7 +344,26 @@ function formatValue(val: any): string {
 .data-table__scroll {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: visible;
+}
+
+/* el-table 撑满整个 data-table__scroll */
+.data-table__scroll :deep(.el-table) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.data-table__scroll :deep(.el-table__inner-wrapper) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.data-table__scroll :deep(.el-table__body-wrapper) {
+  flex: 1;
 }
 
 /* 解除表格默认 overflow 裁剪，让 sticky 元素定位到外层页面滚动容器 */
@@ -621,11 +640,13 @@ function formatValue(val: any): string {
 
 .table-empty {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 16px;
   align-items: center;
   justify-content: center;
-  padding: 120px 0 140px;
+  min-height: 200px;
+  height: 100%;
 }
 
 .table-empty__icon {
@@ -653,6 +674,7 @@ function formatValue(val: any): string {
   justify-content: space-between;
   padding: 10px 18px;
   overflow-x: auto;
+  overflow-y: hidden;
   white-space: nowrap;
   background: var(--surface-base);
   border-top: 1px solid #e2e8f0;
@@ -661,12 +683,20 @@ function formatValue(val: any): string {
 
 /* 窄屏时翻页栏允许水平滚动 */
 .pager-row::-webkit-scrollbar {
-  height: 4px;
+  height: 6px;
+}
+
+.pager-row::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .pager-row::-webkit-scrollbar-thumb {
   background: var(--border-strong);
-  border-radius: 2px;
+  border-radius: 3px;
+}
+
+.pager-row::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
 }
 .pager-center,
 .pager-right {
@@ -674,18 +704,23 @@ function formatValue(val: any): string {
   align-items: center;
 }
 
+.pager-center,
+.pager-right {
+  flex-shrink: 0;
+}
+
 .pager-left {
   flex: 1;
 }
 
 .pager-center {
-  flex: 0;
-  margin-right: 20px;
+  margin-right: 12px;
 }
 
 .pager-right {
   gap: 8px;
   justify-content: flex-end;
+  white-space: nowrap;
 }
 
 .total-count {
