@@ -475,6 +475,13 @@ function formatValue(val: any): string {
   overflow-x: auto !important;
   overflow-y: visible !important;
   background: var(--table-bg);
+  scrollbar-width: none;
+}
+
+:deep(.el-table__body-wrapper::-webkit-scrollbar) {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 :deep(.el-table__inner-wrapper) {
@@ -744,6 +751,7 @@ function formatValue(val: any): string {
   justify-content: center;
   min-height: 200px;
   height: 100%;
+  padding-top: 72px;
 }
 
 .table-empty__icon {
@@ -810,6 +818,9 @@ function formatValue(val: any): string {
   padding: 10px 18px;
   background: var(--surface-base);
   border-top: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  border-left: 1px solid #e2e8f0;
   border-radius: 0 0 18px 18px;
 }
 
