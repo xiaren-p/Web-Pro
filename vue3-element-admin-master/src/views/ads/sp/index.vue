@@ -337,6 +337,25 @@ const total = ref(0);
 const pageSize = ref(25);
 const currentPage = ref(1);
 
+
+/**
+ * 监听表格区块高度变化，为页面容器设置对应的 padding-bottom，
+ * 确保表格区块固定在底部时不会遮挡上方内容。
+ */
+let _tableBlock: HTMLElement | null = null;
+function syncPagePadding() {
+  const block = document.querySelector<HTMLElement>(".data-table-block");
+  if (!block) return;
+  const h = block.offsetHeight;
+  document.documentElement.style.setProperty("--table-block-height", h + "px");
+}
+onMounted(() => {
+  syncPagePadding();
+  window.addEventListener("resize", syncPagePadding);
+  setTimeout(syncPagePadding, 600);
+  setTimeout(syncPagePadding, 1500);
+});
+
 const loading = ref(false);
 const sortParams = reactive({
   prop: "",
