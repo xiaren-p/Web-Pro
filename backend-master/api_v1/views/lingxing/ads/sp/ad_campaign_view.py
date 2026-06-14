@@ -29,7 +29,6 @@ from api_v1.views.lingxing.ads._helpers import (
     BIDDING_STRATEGY_LABEL,
     CAMPAIGN_TYPE_SHORT,
     build_campaign_profile_key,
-    build_campaign_profile_query,
     fmt_money,
     parse_exchange_rate,
 )
@@ -342,21 +341,30 @@ class AdCampaignViewSet(viewsets.ViewSet):
             )
         )
 
-        # ── 全量标签+负责人（一次性查 LxSpAd → LxProductInfo，挂到每个 campaign 上）──
+        # ── 全量标签+负责人（通过 LxSpAd 的 campaign_id+profile_id 批量取 asin，
+        # 再 IN 查 LxProductInfo 拿 label + principal_list，挂到每个 campaign 上）──
         _all_campaign_keys = [
             (str(c.campaign_id), str(c.profile_id)) for c in campaigns
             if c.campaign_id and c.profile_id
         ]
+        _asin_by_campaign: dict[str, set[str]] = {}
         if _all_campaign_keys:
-            _all_ad_rows = LxSpAd.objects.filter(
-                build_campaign_profile_query(_all_campaign_keys)
-            ).values("campaign_id", "profile_id", "asin").distinct()
-
-            _asin_by_campaign: dict[str, set[str]] = {}
-            for a in _all_ad_rows:
-                key = build_campaign_profile_key(a["campaign_id"], a["profile_id"])
-                if a["asin"]:
-                    _asin_by_campaign.setdefault(key, set()).add(a["asin"])
+            # 分批构建 OR 条件，每批 1000 对，避免超长 OR 链
+            _BATCH = 1000
+            for _i in range(0, len(_all_campaign_keys), _BATCH):
+                _batch = _all_campaign_keys[_i:_i + _BATCH]
+                _pair_q = Q()
+                for _cid, _pid in _batch:
+                    _pair_q |= Q(campaign_id=_cid, profile_id=_pid)
+                _ad_rows = (
+                    LxSpAd.objects.filter(_pair_q)
+                    .values("campaign_id", "profile_id", "asin")
+                    .distinct()
+                )
+                for a in _ad_rows:
+                    key = build_campaign_profile_key(a["campaign_id"], a["profile_id"])
+                    if a["asin"]:
+                        _asin_by_campaign.setdefault(key, set()).add(a["asin"])
 
             _all_asins = {a for aset in _asin_by_campaign.values() for a in aset}
             if _all_asins:
@@ -389,14 +397,10 @@ class AdCampaignViewSet(viewsets.ViewSet):
                         o_set.update(_principal_map.get(a, []))
                     c._computed_tags = sorted(t_set)      # type: ignore[attr-defined]
                     c._computed_owners = sorted(o_set)    # type: ignore[attr-defined]
-            else:
-                for c in campaigns:
-                    c._computed_tags = []     # type: ignore[attr-defined]
-                    c._computed_owners = []   # type: ignore[attr-defined]
-        else:
-            for c in campaigns:
-                c._computed_tags = []         # type: ignore[attr-defined]
-                c._computed_owners = []       # type: ignore[attr-defined]
+
+        for c in campaigns:
+            c._computed_tags = getattr(c, "_computed_tags", [])       # type: ignore[attr-defined]
+            c._computed_owners = getattr(c, "_computed_owners", [])   # type: ignore[attr-defined]
 
         # ── 标签 / 负责人筛选（在全量数据上按已取到的 _computed 字段过滤）──
         if tags_list_filter or owner_list_filter:
