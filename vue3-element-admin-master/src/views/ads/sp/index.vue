@@ -122,16 +122,25 @@ const topSentinelRef = ref<HTMLElement | null>(null);
 const isFloating = ref(false);
 let topObserver: IntersectionObserver | null = null;
 
-onMounted(() => {
-  if (!topSentinelRef.value) return;
+/**
+ * 初始化顶部哨兵观察器。
+ *
+ * 使用 .app-main（页面级滚动容器）作为 root，精确判断操作栏是否
+ * 已脱离其自然位置进入吸附态。悬浮态显示圆角，自然态隐藏。
+ */
+function setupTopObserver(): void {
+  const root = document.querySelector(".app-main");
+  if (!topSentinelRef.value || !root) return;
   topObserver = new IntersectionObserver(
     ([entry]) => {
       isFloating.value = !entry.isIntersecting;
     },
-    { rootMargin: "0px 0px 0px 0px" }
+    { root }
   );
   topObserver.observe(topSentinelRef.value);
-});
+}
+
+onMounted(setupTopObserver);
 
 onBeforeUnmount(() => {
   topObserver?.disconnect();

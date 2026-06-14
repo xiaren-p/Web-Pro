@@ -248,16 +248,25 @@ const pagerSentinelRef = ref<HTMLElement | null>(null);
 const isFloating = ref(false);
 let pagerObserver: IntersectionObserver | null = null;
 
-onMounted(() => {
-  if (!pagerSentinelRef.value) return;
+/**
+ * 初始化翻页栏哨兵观察器。
+ *
+ * 哨兵位于翻页栏之后。当翻页栏处于自然位置时，哨兵在视口内 -> 显示圆角。
+ * 当翻页栏被 sticky 悬浮时，其后的哨兵会滚出视口 -> 隐藏圆角。
+ */
+function setupPagerObserver(): void {
+  const root = document.querySelector(".app-main");
+  if (!pagerSentinelRef.value || !root) return;
   pagerObserver = new IntersectionObserver(
     ([entry]) => {
       isFloating.value = !entry.isIntersecting;
     },
-    { rootMargin: "0px 0px 0px 0px" }
+    { root }
   );
   pagerObserver.observe(pagerSentinelRef.value);
-});
+}
+
+onMounted(setupPagerObserver);
 
 onBeforeUnmount(() => {
   pagerObserver?.disconnect();
@@ -636,7 +645,7 @@ function formatValue(val: any): string {
   gap: 16px;
   align-items: center;
   justify-content: center;
-  padding: 80px 0;
+  padding: 120px 0 140px;
 }
 
 .table-empty__icon {
@@ -673,10 +682,12 @@ function formatValue(val: any): string {
     0 -8px 24px rgba(15, 23, 42, 0.04);
   transition:
     opacity 0.2s ease,
-    transform 0.2s ease;
+    background 0.2s ease,
+    border-color 0.2s ease,
+    border-radius 0.2s ease;
 }
 
-.pager-row:not(.is-floating) {
+.pager-row.is-floating {
   background: transparent;
   border-color: transparent;
   border-radius: 0;
@@ -687,12 +698,16 @@ function formatValue(val: any): string {
 .pager-center,
 .pager-right {
   display: flex;
-  flex: 1;
   align-items: center;
 }
 
+.pager-left {
+  flex: 1;
+}
+
 .pager-center {
-  justify-content: center;
+  flex: 0;
+  margin-right: 20px;
 }
 
 .pager-right {
