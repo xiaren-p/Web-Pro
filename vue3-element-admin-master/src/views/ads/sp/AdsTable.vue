@@ -47,7 +47,14 @@
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="店铺/国家" width="120" fixed="left" align="center">
+        <el-table-column
+          label="店铺/国家"
+          width="120"
+          prop="profile_alias"
+          fixed="left"
+          align="center"
+          sortable="custom"
+        >
           <template #default="{ row }">
             <template v-if="row._isSummary">
               <span class="summary-indicator">
@@ -64,9 +71,12 @@
         <el-table-column
           label="广告活动"
           min-width="180"
+          prop="name"
           fixed="left"
           align="center"
+          sortable="custom"
           show-overflow-tooltip
+          :show-overflow-tooltip-delay="500"
         >
           <template #default="{ row }">
             <span v-if="row._isSummary" class="summary-dash">--</span>
@@ -94,10 +104,11 @@
           :prop="col.prop"
           :label="col.label"
           :fixed="col.fixed"
-          :sortable="col.sortable"
-          min-width="120"
+          :sortable="col.sortable ? 'custom' : false"
+          :min-width="getColumnMinWidth(col.prop)"
           align="center"
           show-overflow-tooltip
+          :show-overflow-tooltip-delay="500"
         >
           <template #default="{ row }">
             <template v-if="col.prop === 'service_status'">
@@ -126,7 +137,12 @@
                     />
                   </el-icon>
                 </span>
-                {{ formatValue(row[col.prop]) }}
+                <template v-if="col.prop === 'startDate'">
+                  {{ formatDateValue(row[col.prop]) }}
+                </template>
+                <template v-else>
+                  {{ formatValue(row[col.prop]) }}
+                </template>
               </span>
             </template>
           </template>
@@ -361,16 +377,45 @@ function formatTargetingType(val: string): string {
   return map[val.toUpperCase()] ?? val;
 }
 
-const POSITIVE_RATE_COLS = new Set([
-  "impressionsPercent",
-  "clicksPercent",
-  "spendsPercent",
-  "adsSalesPercent",
-  "ctr",
-  "cvr",
-  "roas",
-]);
-const NEGATIVE_RATE_COLS = new Set(["acos", "cpa", "cpc"]);
+/** 需要染色的正向指标（值越高越好） */
+/**
+ * 根据列 prop 返回合理的列宽。
+ *
+ * @param {string} prop - 列字段名
+ * @returns {number} 最小列宽（px）
+ */
+function getColumnMinWidth(prop: string): number {
+  const widthMap: Record<string, number> = {
+    is: 80,
+    acos: 100,
+    roas: 100,
+    cvr: 80,
+    ctr: 80,
+    cpc: 80,
+    cpa: 80,
+    budget: 100,
+    startDate: 110,
+    impressions: 110,
+    impressionsPercent: 90,
+    clicks: 90,
+    clicksPercent: 90,
+    spends: 100,
+    spendsPercent: 90,
+    adsSales: 110,
+    adsSalesPercent: 100,
+    directSales: 110,
+    adsOrders: 100,
+    directOrders: 100,
+    adsOrderPrice: 110,
+    adsVolume: 100,
+  };
+  return widthMap[prop] ?? 120;
+}
+
+/** 需要染色的正向指标（值越高越好） */
+const POSITIVE_COLS = new Set(["roas", "cvr"]);
+/** 需要染色的负向指标（值越低越好） */
+const NEGATIVE_COLS = new Set(["acos"]);
 
 /**
  * 判断是否应该显示趋势箭头。
@@ -382,11 +427,7 @@ const NEGATIVE_RATE_COLS = new Set(["acos", "cpa", "cpc"]);
 function shouldShowTrend(prop: string, value: any): boolean {
   const val = parseFloat(value);
   if (isNaN(val)) return false;
-
-  if (POSITIVE_RATE_COLS.has(prop)) {
-    return Math.abs(val) > 0.01;
-  }
-  if (NEGATIVE_RATE_COLS.has(prop)) {
+  if (POSITIVE_COLS.has(prop) || NEGATIVE_COLS.has(prop)) {
     return true;
   }
   return false;
@@ -394,6 +435,9 @@ function shouldShowTrend(prop: string, value: any): boolean {
 
 /**
  * 根据列 prop 和数值返回数据染色类名。
+ *
+ * ACoS: < 10 绿色，10-30 不变，> 30 红色
+ * ROAS / CVR: > 0 绿色，< 0 红色
  *
  * @param {*} row - 表格行数据
  * @param {string} prop - 列 prop 名
@@ -403,18 +447,29 @@ function getDataValueClass(row: any, prop: string): string {
   if (row._isSummary) return "data-bold";
   const val = parseFloat(row[prop]);
   if (isNaN(val)) return "";
-
-  if (POSITIVE_RATE_COLS.has(prop)) {
-    if (val > 0) return "data-up";
-    if (val < 0) return "data-down";
-    return "";
-  }
-  if (NEGATIVE_RATE_COLS.has(prop)) {
+  if (prop === "acos") {
     if (val > 30) return "data-down";
     if (val < 10) return "data-up";
     return "";
   }
+  if (POSITIVE_COLS.has(prop)) {
+    if (val > 0) return "data-up";
+    if (val < 0) return "data-down";
+    return "";
+  }
   return "";
+}
+
+/**
+ * 格式化日期值：仅保留年月日部分。
+ *
+ * @param {*} val - 原始日期字符串（可能含时分秒）
+ * @returns {string} 格式化后的日期字符串
+ */
+function formatDateValue(val: any): string {
+  if (val == null) return "-";
+  const str = String(val);
+  return str.slice(0, 10);
 }
 
 /**
