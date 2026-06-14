@@ -220,15 +220,26 @@ class AdCampaignViewSet(viewsets.ViewSet):
             if all_pairs_set:
                 # 性能：将笛卡尔积 IN×IN 替换为精确 pair OR 条件，
                 # 确保 MySQL 走 (campaign_id, profile_id, report_date) 复合索引
-                pair_q = Q()
-                for cid_val, pid_val in all_pairs_list:
-                    pair_q |= Q(campaign_id=cid_val, profile_id=pid_val)
+                # Doris 不支持超 3000 个 OR 节点的表达式树，
+                # 当 pair 数量较大时改用 raw SQL 的 (a, b) IN ((...), ...) 语法
+                from django.db import connections
 
-                agg_qs = LxSpCampaignReport.objects.using("analytics").filter(pair_q)
+                agg_qs = LxSpCampaignReport.objects.using("analytics").all()
                 if date_start:
                     agg_qs = agg_qs.filter(report_date__gte=date_start)
                 if date_end:
                     agg_qs = agg_qs.filter(report_date__lte=date_end)
+
+                if len(all_pairs_list) <= 100:
+                    pair_q = Q()
+                    for cid_val, pid_val in all_pairs_list:
+                        pair_q |= Q(campaign_id=cid_val, profile_id=pid_val)
+                    agg_qs = agg_qs.filter(pair_q)
+                else:
+                    placeholders = ", ".join(["(%s, %s)"] * len(all_pairs_list))
+                    flat_params = [v for pair in all_pairs_list for v in pair]
+                    raw_where = f"lx_sp_campaign_report.campaign_id, lx_sp_campaign_report.profile_id IN ({placeholders})"
+                    agg_qs = agg_qs.extra(where=[raw_where], params=flat_params)
 
                 agg_qs = agg_qs.values("campaign_id", "profile_id").annotate(
                     s_sales=Sum("sales"),
