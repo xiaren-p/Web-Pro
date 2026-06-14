@@ -504,6 +504,15 @@ function formatValue(val: any): string {
   flex: 1;
 }
 
+/* 表格数据区的横向滚动来自悬浮代理条，隐藏原生横向滚动 */
+.data-table__scroll :deep(.el-table__body-wrapper)::-webkit-scrollbar,
+.data-table__scroll :deep(.el-table__body-wrapper .el-scrollbar__bar.is-horizontal) {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+}
+
 /* 解除表格默认 overflow 裁剪，让 sticky 元素定位到外层页面滚动容器 */
 .data-table__content {
   overflow: visible !important;
