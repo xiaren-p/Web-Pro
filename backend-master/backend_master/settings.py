@@ -263,7 +263,7 @@ DATABASES = {
         'OPTIONS':  _db_options,
     },
     'analytics': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'backend_master.doris_backend',
         'NAME': env('DORIS_DB_NAME', default='webpro_db'),
         'USER': env('DORIS_DB_USER', default='root'),
         'PASSWORD': env('DORIS_DB_PASSWORD', default=''),
