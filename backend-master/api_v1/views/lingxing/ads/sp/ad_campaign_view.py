@@ -212,11 +212,12 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if owner_ids:
             owner_id_list = [str(o).strip() for o in owner_ids.split(",") if str(o).strip()]
             if owner_id_list:
-                # JSON_CONTAINS 逐个 uid 匹配，找到包含该负责人 uid 的 ASIN 集合
+                # LxProductInfo.principal_list 为 JSON 数组 [{uid, realname}, ...]
+                # 字段名为 uid，不是 principal_uid
                 owner_q_parts = Q()
                 for uid in owner_id_list:
                     owner_q_parts |= Q(
-                        principal_list__contains=[{"principal_uid": int(uid)}]
+                        principal_list__contains=[{"uid": int(uid)}]
                     )
                 owner_asins = set(
                     LxProductInfo.objects.filter(owner_q_parts)
