@@ -132,52 +132,20 @@ class AdCampaignViewSet(viewsets.ViewSet):
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
         tags = data.get("tags")
-        if tags:
-            tag_list = [t.strip() for t in tags.split(",") if t.strip()]
-            if tag_list:
-                # LxSpCampaign.tags 为 JSON 数组 [{parent, child}, ...]，
-                # 标签值分布在 parent 或 child 字段上
-                tag_q = Q()
-                for t in tag_list:
-                    tag_q |= Q(tags__contains=[{"parent": t}])
-                    tag_q |= Q(tags__contains=[{"child": t}])
-                # 注意：如果 LxSpCampaign.tags 全部为 null/[]，
-                # 则 JSON_CONTAINS 匹配不到任何行，筛选自然返回空集
-                qs = qs.filter(tag_q)
-
-        # ── 负责人筛选 ──
-        # 标签和负责人数据来源相同：LxProductInfo（label + principal_list）。
-        # 既然前端展示的标签和负责人字段就是在 ad_campaign_view 的展示层
-        # 从 LxProductInfo 取的，那么筛选也应该用同一张表、同一条链路：
-        #   前端选择负责人 → LxProductInfo.principal_list 匹配 uid
-        #                  → 得到 ASIN → LxSpAd 匹配 asin
-        #                  → 得到 (campaign_id, profile_id) → 过滤 campaign
-        # 这条链路不依赖 LxSpCampaign.tags（那个字段是另一套数据），
-        # 保证了"筛选结果 = 展示字段"的一致性。
         owner_ids = data.get("owners")
+
+        # ── 把标签和负责人字段提前拉到全量 campaign 列表上 ──
+        # 不在 qs 上做反向筛选（不走 LxProductInfo → ASIN → LxSpAd → campaign 的链路），
+        # 而是先查出所有 campaign，一次性从 LxProductInfo 取标签和负责人，
+        # 挂到每行上，再在 Python 侧按 tags/owners 筛选全量数据。
+        tags_list_filter: list[str] = []
+        owner_list_filter: list[str] = []
+        if tags:
+            tags_list_filter = [t.strip() for t in tags.split(",") if t.strip()]
         if owner_ids:
-            owner_list = [str(o).strip() for o in owner_ids.split(",") if str(o).strip()]
-            if owner_list:
-                # LxProductInfo.principal_list 为 [{uid, realname}, ...]
-                owner_q = Q()
-                for uid in owner_list:
-                    owner_q |= Q(principal_list__contains=[{"uid": int(uid)}])
-                owner_asins = set(
-                    LxProductInfo.objects.filter(owner_q)
-                    .values_list("asin", flat=True)
-                    .distinct()
-                )
-                if owner_asins:
-                    owner_ad_pairs = set(
-                        LxSpAd.objects.filter(asin__in=owner_asins)
-                        .values_list("campaign_id", "profile_id")
-                        .distinct()
-                    )
-                    if owner_ad_pairs:
-                        owner_pair_q = Q()
-                        for cid, pid in owner_ad_pairs:
-                            owner_pair_q |= Q(campaign_id=cid, profile_id=pid)
-                        qs = qs.filter(owner_pair_q)
+            owner_list_filter = [str(o).strip() for o in owner_ids.split(",") if str(o).strip()]
+
+        need_tags_owners = bool(tags_list_filter) or bool(owner_list_filter)
 
         portfolio_id = data.get("portfolio_id")
         if portfolio_id:
@@ -379,6 +347,68 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 "creation_date", "last_updated_date",
             )
         )
+
+        # ── 全量标签+负责人（from LxProductInfo）──
+        # 一次性查出所有 campaign 对应的 ASIN → LxProductInfo，
+        # 把标签和负责人挂到全量数据上，后续排序、分页、筛选都可以直接走 Python
+        _all_campaign_keys = [
+            (str(c.campaign_id), str(c.profile_id)) for c in campaigns
+            if c.campaign_id and c.profile_id
+        ]
+        _all_ad_rows = LxSpAd.objects.filter(
+            build_campaign_profile_query(_all_campaign_keys) if _all_campaign_keys else Q()
+        ).values("campaign_id", "profile_id", "asin").distinct()
+
+        asin_by_campaign: dict[str, set[str]] = {}
+        for a in _all_ad_rows:
+            key = build_campaign_profile_key(a["campaign_id"], a["profile_id"])
+            if a["asin"]:
+                asin_by_campaign.setdefault(key, set()).add(a["asin"])
+
+        _all_asins = {a for aset in asin_by_campaign.values() for a in aset}
+        asin_label_map: dict[str, list[str]] = {}
+        asin_principal_map: dict[str, list[str]] = {}
+        if _all_asins:
+            product_rows = LxProductInfo.objects.filter(asin__in=_all_asins).values(
+                "asin", "label", "principal_list"
+            )
+            for p in product_rows:
+                asin_label_map.setdefault(p["asin"], [])
+                asin_principal_map.setdefault(p["asin"], [])
+                raw_label = (p["label"] or "").strip()
+                if raw_label:
+                    _parsed = _flat_parse_label(raw_label)
+                    asin_label_map[p["asin"]].extend(_parsed)
+                pl = p["principal_list"]
+                if isinstance(pl, list):
+                    names = [x.get("realname", "") for x in pl if isinstance(x, dict) and x.get("realname")]
+                    asin_principal_map[p["asin"]].extend(names)
+
+        # 给每个 campaign 挂上 tags 和 owners
+        for c in campaigns:
+            asins = asin_by_campaign.get(
+                build_campaign_profile_key(c.campaign_id, c.profile_id), set()
+            )
+            tags_set: set[str] = set()
+            owners_set: set[str] = set()
+            for a in asins:
+                tags_set.update(asin_label_map.get(a, []))
+                owners_set.update(asin_principal_map.get(a, []))
+            c._computed_tags = sorted(tags_set)
+            c._computed_owners = sorted(owners_set)
+
+        # ── 标签 / 负责人筛选（Python 侧全量数据筛选）──
+        if tags_list_filter or owner_list_filter:
+            campaigns = [
+                c for c in campaigns
+                if (
+                    (not tags_list_filter
+                     or any(t in c._computed_tags for t in tags_list_filter))
+                    and (not owner_list_filter
+                         or any(o in c._computed_owners for o in owner_list_filter))
+                )
+            ]
+
         total = len(campaigns)
 
         reverse = sort_order == "desc"
@@ -579,51 +609,17 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
             res_list.append(dic)
 
-        # ── 标签和负责人数据 ──
-        item_keys = [(str(item.campaign_id), str(item.profile_id)) for item in items]
-        ad_rows = LxSpAd.objects.filter(
-            build_campaign_profile_query(item_keys)
-        ).values("campaign_id", "profile_id", "asin").distinct()
-        asin_by_key: dict[str, set[str]] = {}
-        for a in ad_rows:
-            key = build_campaign_profile_key(a["campaign_id"], a["profile_id"])
-            if a["asin"]:
-                asin_by_key.setdefault(key, set()).add(a["asin"])
-        all_asins = {a for aset in asin_by_key.values() for a in aset}
-        asin_label_map: dict[str, list[str]] = {}
-        asin_principal_map: dict[str, list[str]] = {}
-        if all_asins:
-            product_rows = LxProductInfo.objects.filter(asin__in=all_asins).values(
-                "asin", "label", "principal_list"
-            )
-            for p in product_rows:
-                asin_label_map.setdefault(p["asin"], [])
-                asin_principal_map.setdefault(p["asin"], [])
-                raw_label = (p["label"] or "").strip()
-                if raw_label:
-                    # label 字段可能包含 JSON 数组字符串如 '["清仓","夏季"]'，
-                    # 也可能是逗号分隔字符串如 "清仓,夏季"，统一解析后扁平化
-                    _parsed = _flat_parse_label(raw_label)
-                    asin_label_map[p["asin"]].extend(_parsed)
-                pl = p["principal_list"]
-                if isinstance(pl, list):
-                    names = [x.get("realname", "") for x in pl if isinstance(x, dict) and x.get("realname")]
-                    asin_principal_map[p["asin"]].extend(names)
+        # ── 标签和负责人数据（直接取已计算好的 _computed 字段）──
         for dic in res_list:
             if dic.get("_isSummary"):
                 continue
-            key = build_campaign_profile_key(
-                dic.get("campaign_id"), dic.get("profile_id")
-            )
-            asins = asin_by_key.get(key, set())
-            tags_set: set[str] = set()
-            for a in asins:
-                tags_set.update(asin_label_map.get(a, []))
-            dic["tags"] = sorted(tags_set)
-            principals_set: set[str] = set()
-            for a in asins:
-                principals_set.update(asin_principal_map.get(a, []))
-            dic["owners"] = sorted(principals_set)
+            cid = dic.get("campaign_id")
+            pid = dic.get("profile_id")
+            # 找到对应的 campaign 对象
+            matched = [c for c in items if c.campaign_id == cid and c.profile_id == pid]
+            if matched:
+                dic["tags"] = getattr(matched[0], "_computed_tags", [])
+                dic["owners"] = getattr(matched[0], "_computed_owners", [])
 
         result = {
             "total": total,
