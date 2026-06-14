@@ -1,5 +1,5 @@
 <template>
-  <div class="data-table-container" ref="tableContainerRef">
+  <div ref="tableContainerRef" class="data-table-container">
     <div class="data-table__scroll">
       <el-table
         v-loading="loading"
@@ -151,11 +151,14 @@
 
     <div
       v-show="showHorizontalScroll"
-      class="table-horizontal-scroll"
       ref="horizontalScrollRef"
+      class="table-horizontal-scroll"
       @scroll="handleProxyScroll"
     >
-      <div class="table-horizontal-scroll__inner" :style="{ width: `${horizontalScrollWidth}px` }" />
+      <div
+        class="table-horizontal-scroll__inner"
+        :style="{ width: `${horizontalScrollWidth}px` }"
+      />
     </div>
 
     <div class="pager-row">
@@ -251,7 +254,11 @@ async function updateHorizontalScrollState(): Promise<void> {
   }
   const bodyTable = tableContainerRef.value?.querySelector(".el-table__body") as HTMLElement | null;
   const estimatedWidth = 608 + props.columns.length * 120;
-  const scrollWidth = Math.max(bodyTable?.scrollWidth ?? 0, bodyWrapperElement.scrollWidth, estimatedWidth);
+  const scrollWidth = Math.max(
+    bodyTable?.scrollWidth ?? 0,
+    bodyWrapperElement.scrollWidth,
+    estimatedWidth
+  );
   horizontalScrollWidth.value = scrollWidth;
   showHorizontalScroll.value = scrollWidth > bodyWrapperElement.clientWidth;
 }
@@ -442,23 +449,23 @@ function formatValue(val: any): string {
 }
 
 .data-table__scroll {
-  flex: 1;
-  min-height: 0;
   display: flex;
+  flex: 1;
   flex-direction: column;
+  min-height: 0;
   overflow: visible;
 }
 
 /* el-table 撑满整个 data-table__scroll */
 .data-table__scroll :deep(.el-table) {
-  flex: 1;
   display: flex;
+  flex: 1;
   flex-direction: column;
 }
 
 .data-table__scroll :deep(.el-table__inner-wrapper) {
-  flex: 1;
   display: flex;
+  flex: 1;
   flex-direction: column;
 }
 
@@ -469,17 +476,17 @@ function formatValue(val: any): string {
 /* 解除表格默认 overflow 裁剪，让 sticky 元素定位到外层页面滚动容器 */
 .data-table__content {
   overflow: visible !important;
+  background: var(--table-bg);
   border-top: none;
   border-right: none;
   border-left: none;
-  background: var(--table-bg);
 }
 
 :deep(.el-table__body-wrapper) {
   overflow-x: auto !important;
   overflow-y: visible !important;
-  background: var(--table-bg);
   scrollbar-width: none;
+  background: var(--table-bg);
 }
 
 :deep(.el-table__body-wrapper::-webkit-scrollbar),
@@ -757,8 +764,8 @@ function formatValue(val: any): string {
   gap: 16px;
   align-items: center;
   justify-content: center;
-  min-height: 200px;
   height: 100%;
+  min-height: 200px;
   padding-top: 72px;
 }
 
@@ -779,11 +786,13 @@ function formatValue(val: any): string {
 
 .table-horizontal-scroll {
   position: sticky;
-  bottom: 49px;
+  bottom: 0;
   z-index: 12;
   height: 12px;
   overflow-x: auto;
   overflow-y: hidden;
+  scrollbar-color: var(--border-strong) var(--border-subtle);
+  scrollbar-width: thin;
   background: var(--surface-base);
   border-top: 1px solid #e2e8f0;
 }
@@ -810,11 +819,6 @@ function formatValue(val: any): string {
   background: var(--text-tertiary);
 }
 
-.table-horizontal-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) var(--border-subtle);
-}
-
 .pager-row {
   position: sticky;
   bottom: 0;
@@ -838,8 +842,8 @@ function formatValue(val: any): string {
 .pager-center,
 .pager-right {
   display: flex;
-  align-items: center;
   flex-shrink: 0;
+  align-items: center;
 }
 
 .pager-left {
@@ -917,5 +921,4 @@ function formatValue(val: any): string {
 .pager-row :deep(.el-pagination .btn-next) {
   font-size: 13px;
 }
-
 </style>
