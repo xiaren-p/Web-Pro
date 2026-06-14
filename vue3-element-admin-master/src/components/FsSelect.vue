@@ -333,8 +333,8 @@ const containerStyle = computed((): Record<string, string> => {
 
   // 全选行
   &__all-option {
-    border-bottom: 1px solid var(--border-subtle);
     font-weight: var(--font-weight-medium);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   // 复选框
@@ -350,8 +350,8 @@ const containerStyle = computed((): Record<string, string> => {
 
   .el-select-dropdown__item {
     display: flex;
-    align-items: center;
     gap: 8px;
+    align-items: center;
     padding: 8px 12px;
     transition: background-color var(--transition-fast);
 
@@ -373,17 +373,17 @@ const containerStyle = computed((): Record<string, string> => {
 
   // 复选框样式覆盖 - 仅覆盖颜色和尺寸，不覆盖定位
   .el-checkbox {
+    flex-shrink: 0;
     height: auto;
     margin-right: 0;
     line-height: 1;
-    flex-shrink: 0;
 
     .el-checkbox__inner {
       width: 16px;
       height: 16px;
-      border-radius: var(--radius-sm);
-      border-color: var(--border-strong);
       background-color: var(--surface-base);
+      border-color: var(--border-strong);
+      border-radius: var(--radius-sm);
       transition: all var(--transition-fast);
 
       &:hover {

@@ -681,7 +681,13 @@
             </div>
             <!-- 定位组 + 投放对象（adType=all 时同时显示） -->
             <el-form-item
-              :label="form.adType === 'all' ? '定位组 / 投放对象' : form.adType === 'manual' ? '投放对象' : '定位组'"
+              :label="
+                form.adType === 'all'
+                  ? '定位组 / 投放对象'
+                  : form.adType === 'manual'
+                    ? '投放对象'
+                    : '定位组'
+              "
               label-width="80px"
             >
               <div class="field-setting-row">
@@ -696,9 +702,11 @@
                   tag-effect="dark"
                   style="flex: 1"
                   :placeholder="
-                    form.adType === 'manual' ? '选择投放对象' :
-                    form.adType === 'auto' ? '选择定位组类型' :
-                    '选择定位组 / 投放对象'
+                    form.adType === 'manual'
+                      ? '选择投放对象'
+                      : form.adType === 'auto'
+                        ? '选择定位组类型'
+                        : '选择定位组 / 投放对象'
                   "
                   :disabled="tba.unlimitedTargeting"
                 >
