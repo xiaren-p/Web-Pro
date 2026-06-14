@@ -1,5 +1,5 @@
 <template>
-  <div class="data-table-container">
+  <div ref="containerRef" class="data-table-container">
     <div class="data-table__scroll">
       <el-table
         v-loading="loading"
@@ -7,7 +7,7 @@
         :data="displayData"
         :row-class-name="getRowClass"
         :border="false"
-        height="100%"
+        :height="tableContentHeight"
         style="width: 100%"
         @sort-change="$emit('sort-change', $event)"
       >
@@ -88,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, onMounted, nextTick } from "vue";
 import { TrendCharts, List } from "@element-plus/icons-vue";
 
 const props = withDefaults(
@@ -102,11 +102,28 @@ const props = withDefaults(
 const emit = defineEmits(["current-change", "view-row", "page-size-change", "sort-change"]);
 const localPageSize = ref(props.pageSize || 25);
 
+const containerRef = ref<HTMLElement | null>(null);
+const tableContentHeight = ref<number | undefined>(undefined);
+
+function measureHeight() {
+  const el = containerRef.value;
+  if (!el) return;
+  const pagerEl = el.querySelector<HTMLElement>(".pager-row");
+  const pagerH = pagerEl?.offsetHeight ?? 50;
+  // 用 scroll 区域的实际可用高度减去翻页栏
+  tableContentHeight.value = el.offsetHeight - pagerH;
+}
+
+onMounted(() => {
+  nextTick(measureHeight);
+  window.addEventListener("resize", measureHeight, { passive: true });
+});
+
 const displayData = computed<any[]>(() => {
   if (!props.summary) return props.tableData;
   return [{ _isSummary: true, name: "汇总", ...props.summary }, ...props.tableData];
 });
-
+watch(displayData, () => nextTick(measureHeight));
 watch(() => props.pageSize, (v) => { localPageSize.value = v; });
 
 function onPageSizeChange(v: number) { emit("page-size-change", v); }
