@@ -324,12 +324,21 @@ function formatValue(val: any): string {
 <style scoped>
 .data-table-container {
   display: flex;
+  flex: 1;
   flex-direction: column;
+  min-height: 0;
   background: var(--surface-base);
 }
 
 .data-table__scroll {
+  flex: 1;
   min-height: 0;
+}
+
+.el-table__header-wrapper {
+  position: sticky;
+  top: 72px;
+  z-index: 10;
 }
 
 :deep(.el-table__header-wrapper) {

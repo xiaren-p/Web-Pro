@@ -3,6 +3,8 @@
  */
 
 .ads-text-container {
+  display: flex;
+  flex-direction: column;
   min-height: calc(100vh - 50px);
   padding: 24px;
   font-family:
@@ -21,6 +23,7 @@
 }
 
 .content-block {
+  flex-shrink: 0;
   padding: 22px 24px;
   margin-bottom: 20px;
   background: rgba(255, 255, 255, 0.96);
@@ -41,6 +44,7 @@
 
 .data-table-block {
   display: flex;
+  flex: 1;
   flex-direction: column;
   min-height: 420px;
   padding: 0;
