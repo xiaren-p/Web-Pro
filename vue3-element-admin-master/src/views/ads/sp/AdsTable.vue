@@ -1,5 +1,5 @@
 <template>
-  <div class="data-table-container">
+  <div class="data-table-container" ref="tableContainerRef">
     <div class="data-table__scroll">
       <el-table
         v-loading="loading"
@@ -145,6 +145,15 @@
       </el-table>
     </div>
 
+    <div
+      v-show="showHorizontalScroll"
+      class="table-horizontal-scroll"
+      ref="horizontalScrollRef"
+      @scroll="handleProxyScroll"
+    >
+      <div class="table-horizontal-scroll__inner" :style="{ width: `${horizontalScrollWidth}px` }" />
+    </div>
+
     <div class="pager-row">
       <div class="pager-left">
         <span class="total-count">
@@ -177,7 +186,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { TrendCharts, List } from "@element-plus/icons-vue";
 
 const props = withDefaults(
@@ -201,6 +210,93 @@ const props = withDefaults(
 
 const emit = defineEmits(["current-change", "view-row", "page-size-change", "sort-change"]);
 const localPageSize = ref(props.pageSize || 25);
+const tableContainerRef = ref<HTMLElement | null>(null);
+const horizontalScrollRef = ref<HTMLElement | null>(null);
+const horizontalScrollWidth = ref(0);
+const showHorizontalScroll = ref(false);
+let bodyWrapperElement: HTMLElement | null = null;
+let isSyncingScroll = false;
+
+/**
+ * 获取 Element Plus 表格横向滚动容器。
+ *
+ * @returns {HTMLElement | null} 表格主体滚动容器
+ */
+function getBodyWrapperElement(): HTMLElement | null {
+  const table = tableContainerRef.value;
+  if (!table) return null;
+  return (
+    table.querySelector(".el-table__body-wrapper .el-scrollbar__wrap") ??
+    table.querySelector(".el-table__body-wrapper")
+  );
+}
+
+/**
+ * 同步悬浮横向滚动条尺寸。
+ *
+ * @returns {Promise<void>} 完成 DOM 尺寸读取后返回
+ */
+async function updateHorizontalScrollState(): Promise<void> {
+  await nextTick();
+  const nextBodyWrapperElement = getBodyWrapperElement();
+  if (!nextBodyWrapperElement) return;
+  if (bodyWrapperElement !== nextBodyWrapperElement) {
+    bodyWrapperElement?.removeEventListener("scroll", handleBodyScroll);
+    bodyWrapperElement = nextBodyWrapperElement;
+    bodyWrapperElement.addEventListener("scroll", handleBodyScroll, { passive: true });
+  }
+  const bodyTable = tableContainerRef.value?.querySelector(".el-table__body") as HTMLElement | null;
+  const estimatedWidth = 608 + props.columns.length * 120;
+  const scrollWidth = Math.max(bodyTable?.scrollWidth ?? 0, bodyWrapperElement.scrollWidth, estimatedWidth);
+  horizontalScrollWidth.value = scrollWidth;
+  showHorizontalScroll.value = scrollWidth > bodyWrapperElement.clientWidth;
+}
+
+/**
+ * 代理滚动条滚动时同步表格主体横向位置。
+ *
+ * @returns {void} 无返回值
+ */
+function handleProxyScroll(): void {
+  if (!horizontalScrollRef.value || !bodyWrapperElement || isSyncingScroll) return;
+  isSyncingScroll = true;
+  bodyWrapperElement.scrollLeft = horizontalScrollRef.value.scrollLeft;
+  requestAnimationFrame(() => {
+    isSyncingScroll = false;
+  });
+}
+
+/**
+ * 表格主体横向滚动时同步代理滚动条位置。
+ *
+ * @returns {void} 无返回值
+ */
+function handleBodyScroll(): void {
+  if (!horizontalScrollRef.value || !bodyWrapperElement || isSyncingScroll) return;
+  isSyncingScroll = true;
+  horizontalScrollRef.value.scrollLeft = bodyWrapperElement.scrollLeft;
+  requestAnimationFrame(() => {
+    isSyncingScroll = false;
+  });
+}
+
+onMounted(async () => {
+  await updateHorizontalScrollState();
+  window.addEventListener("resize", updateHorizontalScrollState);
+});
+
+onBeforeUnmount(() => {
+  bodyWrapperElement?.removeEventListener("scroll", handleBodyScroll);
+  window.removeEventListener("resize", updateHorizontalScrollState);
+});
+
+watch(
+  () => [props.tableData, props.columns],
+  () => {
+    updateHorizontalScrollState();
+  },
+  { deep: true }
+);
 
 /**
  * 将汇总行置于列表首位，与当前页数据合并展示。
@@ -346,26 +442,7 @@ function formatValue(val: any): string {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow-x: auto;
-  overflow-y: visible;
-}
-
-.data-table__scroll::-webkit-scrollbar {
-  height: 6px;
-}
-
-.data-table__scroll::-webkit-scrollbar-track {
-  background: var(--border-subtle);
-  border-radius: 3px;
-}
-
-.data-table__scroll::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 3px;
-}
-
-.data-table__scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
+  overflow: visible;
 }
 
 /* el-table 撑满整个 data-table__scroll */
@@ -395,7 +472,8 @@ function formatValue(val: any): string {
 }
 
 :deep(.el-table__body-wrapper) {
-  overflow: visible !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
   background: var(--table-bg);
 }
 
@@ -681,6 +759,44 @@ function formatValue(val: any): string {
 
 .pager-sentinel {
   height: 1px;
+}
+
+.table-horizontal-scroll {
+  position: sticky;
+  bottom: 49px;
+  z-index: 12;
+  height: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--surface-base);
+  border-top: 1px solid #e2e8f0;
+}
+
+.table-horizontal-scroll__inner {
+  height: 1px;
+}
+
+.table-horizontal-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-horizontal-scroll::-webkit-scrollbar-track {
+  background: var(--border-subtle);
+  border-radius: 4px;
+}
+
+.table-horizontal-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+.table-horizontal-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+.table-horizontal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) var(--border-subtle);
 }
 
 .pager-row {
