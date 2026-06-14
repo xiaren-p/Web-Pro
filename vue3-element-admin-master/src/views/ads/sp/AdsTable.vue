@@ -1,17 +1,20 @@
 <template>
-  <div class="data-table-container">
+  <div ref="stickyTrackRef" class="data-table-sticky-track" :style="stickyTrackStyle">
+    <div ref="containerRef" class="data-table-container">
     <div class="data-table__scroll">
-    <el-table
-      v-loading="loading"
-      class="data-table__content"
-      :data="displayData"
-      :row-class-name="getRowClass"
-      :border="false"
-      height="100%"
-      style="width: 100%"
-      @sort-change="$emit('sort-change', $event)"
-    >
-      <el-table-column type="selection" width="48" fixed="left" align="center" />
+      <el-table
+        ref="tableRef"
+        v-loading="loading"
+        class="data-table__content"
+        :data="displayData"
+        :row-class-name="getRowClass"
+        :border="false"
+        :height="tableHeight"
+        style="width: 100%"
+        @sort-change="$emit('sort-change', $event)"
+        @wheel.prevent="handleTableWheel"
+      >
+        <el-table-column type="selection" width="48" fixed="left" align="center" />
 
       <!-- 固定的基础业务列 -->
       <el-table-column label="有效" width="80" fixed="left" align="center">
@@ -171,10 +174,11 @@
       </div>
     </div>
   </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, nextTick, onBeforeUnmount, onMounted } from "vue";
 import { TrendCharts, List } from "@element-plus/icons-vue";
 
 const props = withDefaults(
@@ -226,7 +230,78 @@ function getRowClass({ row, rowIndex }: { row: any; rowIndex: number }): string 
 
 const emit = defineEmits(["current-change", "view-row", "page-size-change", "sort-change"]);
 
+const stickyTrackRef = ref<HTMLElement | null>(null);
+const containerRef = ref<HTMLElement | null>(null);
+const tableRef = ref<any>(null);
 const localPageSize = ref(props.pageSize || 25);
+const tableHeight = ref(520);
+const pagerHeight = ref(48);
+const virtualScrollHeight = ref(0);
+const stickyTrackStyle = computed(() => ({
+  height: `${tableHeight.value + pagerHeight.value + virtualScrollHeight.value}px`,
+}));
+
+/**
+ * 重新计算表格可视高度与虚拟页面滚动距离。
+ */
+function updateStickyMetrics(): void {
+  const container = containerRef.value;
+  const table = tableRef.value?.$el as HTMLElement | undefined;
+  if (!container || !table) return;
+
+  const rect = container.getBoundingClientRect();
+  const pager = container.querySelector<HTMLElement>(".pager-row");
+  pagerHeight.value = pager?.offsetHeight ?? 48;
+  const viewportHeight = window.innerHeight;
+  tableHeight.value = Math.max(260, viewportHeight - Math.max(rect.top, 0) - pagerHeight.value);
+
+  nextTick(() => {
+    const bodyWrapper = table.querySelector<HTMLElement>(".el-scrollbar__wrap");
+    if (!bodyWrapper) return;
+    virtualScrollHeight.value = Math.max(0, bodyWrapper.scrollHeight - bodyWrapper.clientHeight);
+    syncPageScrollToTable();
+  });
+}
+
+/**
+ * 将页面滚动距离同步到 Element Plus 表格内部滚动条。
+ */
+function syncPageScrollToTable(): void {
+  const track = stickyTrackRef.value;
+  const table = tableRef.value?.$el as HTMLElement | undefined;
+  if (!track || !table) return;
+
+  const bodyWrapper = table.querySelector<HTMLElement>(".el-scrollbar__wrap");
+  if (!bodyWrapper) return;
+
+  const trackTop = track.getBoundingClientRect().top + window.scrollY;
+  const offset = Math.max(0, Math.min(window.scrollY - trackTop, virtualScrollHeight.value));
+  bodyWrapper.scrollTop = offset;
+}
+
+/**
+ * 表格区域滚轮统一转换为页面滚动，保证页面滑块和表格内部滑块联动。
+ *
+ * @param {WheelEvent} event - 表格区域滚轮事件
+ */
+function handleTableWheel(event: WheelEvent): void {
+  window.scrollBy({ top: event.deltaY, behavior: "auto" });
+}
+
+onMounted(() => {
+  nextTick(updateStickyMetrics);
+  window.addEventListener("resize", updateStickyMetrics, { passive: true });
+  window.addEventListener("scroll", syncPageScrollToTable, { passive: true });
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", updateStickyMetrics);
+  window.removeEventListener("scroll", syncPageScrollToTable);
+});
+
+watch(displayData, () => {
+  nextTick(updateStickyMetrics);
+});
 
 watch(
   () => props.pageSize,
@@ -334,7 +409,13 @@ function formatValue(val: any): string {
 </script>
 
 <style scoped>
+.data-table-sticky-track {
+  position: relative;
+}
+
 .data-table-container {
+  position: sticky;
+  top: 0;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -598,6 +679,7 @@ function formatValue(val: any): string {
 
 .pager-row {
   display: flex;
+  gap: 12px;
   align-items: center;
   justify-content: flex-end;
   padding: 10px 18px;
@@ -635,60 +717,51 @@ function formatValue(val: any): string {
 
 .page-size-label,
 .page-size-suffix {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
 .page-size-select {
-  width: 90px;
+  width: 88px;
 }
 
 .pager-row :deep(.el-select .el-input__wrapper) {
-  height: 32px !important;
-  min-height: 32px !important;
+  height: 30px !important;
+  min-height: 30px !important;
   border-color: var(--border-strong);
   border-radius: var(--radius-md);
   box-shadow: none;
 }
 
 .pager-row :deep(.el-select .el-input__inner) {
-  height: 30px !important;
-  line-height: 30px !important;
+  height: 28px !important;
+  font-size: 12px;
+  line-height: 28px !important;
 }
 
-t.pager-row :deep(.el-pagination) {
-		font-size: 12px;
-	}
+.pager-row :deep(.el-pagination) {
+  font-size: 12px;
+}
 
-	.pager-row :deep(.el-pager li) {
-		min-width: 28px;
-		height: 28px;
-		font-size: 12px;
-		font-weight: 600;
-		line-height: 28px;
-		border-radius: var(--radius-md);
-	}
+.pager-row :deep(.el-pager li) {
+  min-width: 28px;
+  height: 28px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 28px;
+  border-radius: var(--radius-md);
+}
 
-	.pager-row :deep(.el-pagination button) {
-		min-width: 28px;
-		height: 28px;
-		font-size: 12px;
-	}
+.pager-row :deep(.el-pagination button) {
+  min-width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
 
-	.pager-row :deep(.el-pagination .btn-prev),
-	.pager-row :deep(.el-pagination .btn-next) {
-		font-size: 13px;
-	}
-
-	.page-size-label,
-	.page-size-suffix {
-		font-size: 12px;
-		color: var(--text-secondary);
-	}
-
-	.page-size-select :deep(.el-input__inner) {
-		font-size: 12px;
-	}
+.pager-row :deep(.el-pagination .btn-prev),
+.pager-row :deep(.el-pagination .btn-next) {
+  font-size: 13px;
+}
 
 .data-table__content {
   border-top: none;
