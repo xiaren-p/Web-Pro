@@ -34,6 +34,9 @@ from api_v1.views.lingxing.ads._helpers import (
     parse_exchange_rate,
 )
 
+# Doris 表达式树深度限制为 3000，因此分 batch 查询，每批最多 500 对 (campaign_id, profile_id)。
+_DORIS_PAIR_BATCH_SIZE = 500
+
 
 class AdCampaignViewSet(viewsets.ViewSet):
     """SP 广告活动基础数据视图（只提供查询）。"""
@@ -176,9 +179,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
         # ── 筛选集全体 campaign / profile 对 ──
         p_num, p_size = self._get_page_params(data)
 
-        date_start = data.get("date_start")
-        date_end = data.get("date_end")
-
         # ── 拼接筛选特征参数用于 Redis 缓存键 ──
         cache_key_parts = [
             date_start or "_",
@@ -199,36 +199,25 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         # ── 先查缓存 ──
         agg_map = cache.get(cache_key)
-        if isinstance(agg_map, dict):
-            # 缓存命中：需要同时构造 all_pairs_list / set / profile_ids
-            all_pairs_list = list(
-                qs.values_list("campaign_id", "profile_id").distinct()
-            )
-            all_pairs_set = {(str(c), str(p)) for c, p in all_pairs_list}
-            all_profile_ids = sorted({p for _, p in all_pairs_list if p})
-            all_campaign_pairs = [(c, p) for c, p in all_pairs_list if c and p]
-        else:
+        all_pairs_list = list(
+            qs.values_list("campaign_id", "profile_id").distinct()
+        )
+        all_pairs_set = {(str(c), str(p)) for c, p in all_pairs_list}
+        all_profile_ids = sorted({p for _, p in all_pairs_list if p})
+        all_campaign_pairs = [(c, p) for c, p in all_pairs_list if c and p]
+
+        if not isinstance(agg_map, dict):
             # ── 缓存未命中：执行完整聚合查询 ──
-            all_pairs_list = list(
-                qs.values_list("campaign_id", "profile_id").distinct()
-            )
-            all_pairs_set = {(str(c), str(p)) for c, p in all_pairs_list}
-            all_profile_ids = sorted({p for _, p in all_pairs_list if p})
-            all_campaign_pairs = [(c, p) for c, p in all_pairs_list if c and p]
 
             agg_map: dict[str, dict[str, Any]] = {}
             if all_pairs_set:
                 # 性能：将笛卡尔积 IN×IN 替换为精确 pair OR 条件，
-                # 确保 MySQL 走 (campaign_id, profile_id, report_date) 复合索引
+                # 确保 MySQL 走 (campaign_id, profile_id, report_date) 复合索引。
                 # Doris 不支持超 3000 个 OR 节点，也不支持 (a,b) IN (...)
-                # 元组语法，因此分 batch 走 OR 查询，每批最多 500 对
-                from django.db import connections
-
-                BATCH_SIZE = 500
-                agg_map = {}
+                # 元组语法，因此分 batch 走 OR 查询，每批最多 500 对。
                 pairs_sorted = sorted(all_pairs_list)
-                for i in range(0, len(pairs_sorted), BATCH_SIZE):
-                    batch = pairs_sorted[i:i + BATCH_SIZE]
+                for i in range(0, len(pairs_sorted), _DORIS_PAIR_BATCH_SIZE):
+                    batch = pairs_sorted[i:i + _DORIS_PAIR_BATCH_SIZE]
                     pair_q = Q()
                     for cid_val, pid_val in batch:
                         pair_q |= Q(campaign_id=cid_val, profile_id=pid_val)
