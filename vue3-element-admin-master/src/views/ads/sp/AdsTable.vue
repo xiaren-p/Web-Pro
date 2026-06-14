@@ -1,12 +1,13 @@
 <template>
   <div class="data-table-container">
+    <div class="data-table__scroll">
     <el-table
       v-loading="loading"
       class="data-table__content"
       :data="displayData"
       :row-class-name="getRowClass"
       :border="false"
-      height="calc(100vh - 280px)"
+      height="100%"
       style="width: 100%"
       @sort-change="$emit('sort-change', $event)"
     >
@@ -139,6 +140,7 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <div class="pager-row">
       <div class="pager-left">
@@ -333,7 +335,17 @@ function formatValue(val: any): string {
 
 <style scoped>
 .data-table-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   background: var(--surface-base);
+}
+
+.data-table__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 :deep(.el-table__header-wrapper th.el-table__cell),
@@ -587,28 +599,25 @@ function formatValue(val: any): string {
 .pager-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
+  justify-content: flex-end;
+  padding: 10px 18px;
   background: var(--surface-base);
   border-top: 1px solid var(--border-base);
 }
 
 .pager-left {
-  flex: 1;
+  display: none;
 }
 
 .pager-center {
   display: flex;
-  flex: 1;
   justify-content: center;
 }
 
 .pager-right {
   display: flex;
-  flex: 1;
   gap: 8px;
   align-items: center;
-  justify-content: flex-end;
 }
 
 .total-count {
@@ -647,10 +656,39 @@ function formatValue(val: any): string {
   line-height: 30px !important;
 }
 
-.pager-row :deep(.el-pager li) {
-  font-weight: 600;
-  border-radius: var(--radius-md);
-}
+t.pager-row :deep(.el-pagination) {
+		font-size: 12px;
+	}
+
+	.pager-row :deep(.el-pager li) {
+		min-width: 28px;
+		height: 28px;
+		font-size: 12px;
+		font-weight: 600;
+		line-height: 28px;
+		border-radius: var(--radius-md);
+	}
+
+	.pager-row :deep(.el-pagination button) {
+		min-width: 28px;
+		height: 28px;
+		font-size: 12px;
+	}
+
+	.pager-row :deep(.el-pagination .btn-prev),
+	.pager-row :deep(.el-pagination .btn-next) {
+		font-size: 13px;
+	}
+
+	.page-size-label,
+	.page-size-suffix {
+		font-size: 12px;
+		color: var(--text-secondary);
+	}
+
+	.page-size-select :deep(.el-input__inner) {
+		font-size: 12px;
+	}
 
 .data-table__content {
   border-top: none;
