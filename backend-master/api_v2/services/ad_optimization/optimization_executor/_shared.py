@@ -521,20 +521,6 @@ def execute_pause_archive_action(
     }
 
 
-# 保留旧签名兼容占位版本（供 executor 内部包装使用）
-def execute_other_action(rule: dict[str, Any]) -> dict[str, Any]:
-    """规则级其他操作——暂停/归档（占位，仅返回状态不写表）。"""
-    other_action = rule.get("other_action") or {}
-    action_type = (other_action or {}).get("type", "") if isinstance(other_action, dict) else ""
-    if not action_type or action_type == "no_other":
-        return {"操作": "其他操作", "状态": "跳过", "原因": "无操作"}
-    return {
-        "操作": "其他操作", "状态": "占位",
-        "类型": action_type,
-        "通知": other_action.get("notify", False),
-    }
-
-
 # ============================================================
 # 竞价调整状态解析 & 实体 bid 更新
 # ============================================================

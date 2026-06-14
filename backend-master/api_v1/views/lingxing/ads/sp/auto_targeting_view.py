@@ -234,7 +234,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             summary["is"] = "---"
             return {}, summary
 
-        qs = LxSpTargetReport.objects.filter(
+        qs = LxSpTargetReport.objects.using("analytics").filter(
             target_id__in=target_ids,
             campaign_id=campaign_id,
             profile_id=profile_id,

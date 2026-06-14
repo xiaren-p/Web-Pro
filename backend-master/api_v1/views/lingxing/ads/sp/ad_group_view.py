@@ -216,7 +216,7 @@ class AdGroupViewSet(viewsets.ViewSet):
         Returns:
             tuple[dict, dict]: (metrics_map, summary) 指标映射与汇总行。
         """
-        qs = LxSpAdGroupReport.objects.filter(
+        qs = LxSpAdGroupReport.objects.using("analytics").filter(
             campaign_id=campaign_id, profile_id=profile_id
         )
         if date_start:

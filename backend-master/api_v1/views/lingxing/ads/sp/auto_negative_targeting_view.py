@@ -235,7 +235,7 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
         if not target_ids:
             return {}, _build_negative_summary_row(0.0, 0, 0.0, currency_icon)
 
-        qs = LxSpKeywordReport.objects.filter(
+        qs = LxSpKeywordReport.objects.using("analytics").filter(
             keyword_id__in=target_ids,
             campaign_id=campaign_id,
             profile_id=profile_id,

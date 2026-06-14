@@ -358,7 +358,7 @@ def build_ad_metrics_map(
     if not ad_ids:
         return {}, _build_summary_row(0.0, 0.0, 0, 0, 0, 0.0, 0, 0, currency_icon)
 
-    qs = LxSpAdReport.objects.filter(
+    qs = LxSpAdReport.objects.using("analytics").filter(
         ad_id__in=ad_ids,
         campaign_id=campaign_id,
         profile_id=profile_id,
@@ -519,7 +519,7 @@ def build_auto_targeting_metrics_map(
         summary["is"] = "-"
         return {}, summary
 
-    qs = LxSpTargetReport.objects.filter(
+    qs = LxSpTargetReport.objects.using("analytics").filter(
         target_id__in=target_ids,
         campaign_id=campaign_id,
         profile_id=profile_id,
@@ -739,7 +739,7 @@ def build_auto_negative_targeting_metrics_map(
     if not target_ids:
         return {}, _build_negative_summary_row(0.0, 0, 0.0, currency_icon)
 
-    qs = LxSpKeywordReport.objects.filter(
+    qs = LxSpKeywordReport.objects.using("analytics").filter(
         keyword_id__in=target_ids,
         campaign_id=campaign_id,
         profile_id=profile_id,
@@ -809,7 +809,7 @@ def build_negative_keyword_metrics_map(
     if not keyword_ids:
         return {}, _build_negative_summary_row(0.0, 0, 0.0, currency_icon)
 
-    qs = LxSpKeywordReport.objects.filter(
+    qs = LxSpKeywordReport.objects.using("analytics").filter(
         keyword_id__in=keyword_ids,
         campaign_id=campaign_id,
         profile_id=profile_id,
