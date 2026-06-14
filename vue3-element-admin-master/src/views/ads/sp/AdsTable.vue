@@ -327,18 +327,26 @@ function formatValue(val: any): string {
   flex: 1;
   flex-direction: column;
   min-height: 0;
+  overflow: visible;
   background: var(--surface-base);
 }
 
 .data-table__scroll {
   flex: 1;
   min-height: 0;
+  overflow: visible;
 }
 
-.el-table__header-wrapper {
-  position: sticky;
-  top: 72px;
-  z-index: 10;
+/* 解除表格默认 overflow 裁剪，让 sticky 元素定位到外层页面滚动容器 */
+.data-table__content {
+  overflow: visible !important;
+  border-top: none;
+  border-right: none;
+  border-left: none;
+}
+
+:deep(.el-table__body-wrapper) {
+  overflow: visible !important;
 }
 
 :deep(.el-table__header-wrapper) {
@@ -681,9 +689,4 @@ function formatValue(val: any): string {
   font-size: 13px;
 }
 
-.data-table__content {
-  border-top: none;
-  border-right: none;
-  border-left: none;
-}
 </style>
