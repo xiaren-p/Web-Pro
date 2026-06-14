@@ -154,20 +154,8 @@ watch(internalValue, (newV, oldV) => {
   // 内容相同时跳过，避免因引用变化形成 emit→接收→emit 死循环
   if (JSON.stringify(oldV) === JSON.stringify(newV)) return;
 
-  // Handle select all
   if (props.multiple && Array.isArray(newV) && newV.includes(ALL_OPTION)) {
-    const all = props.options.map((o: any) => o.value);
-    const wasAllSelected = oldV && Array.isArray(oldV) && oldV.length === all.length;
-
-    if (wasAllSelected) {
-      internalValue.value = [];
-      emit("update:modelValue", []);
-      emit("change", []);
-    } else {
-      internalValue.value = all;
-      emit("update:modelValue", all);
-      emit("change", all);
-    }
+    toggleAll();
     return;
   }
   emit("update:modelValue", newV);
@@ -207,30 +195,35 @@ function isChecked(val: any): boolean {
 const isAllSelected = computed((): boolean => {
   if (!props.multiple) return false;
   const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
-  const all = props.options.map((o: any) => o.value);
-  return all.length > 0 && all.every((v) => vals.includes(v));
+  const visibleValues = filteredOptions.value.map((o: any) => o.value);
+  return visibleValues.length > 0 && visibleValues.every((v) => vals.includes(v));
 });
 
 /**
- * 是否半选：至少选中一项但非全选。
+ * 是否半选：当前可见结果中至少选中一项但非全选。
  */
 const isIndeterminate = computed((): boolean => {
   if (!props.multiple) return false;
   const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
-  const all = props.options.map((o: any) => o.value);
-  return vals.length > 0 && vals.length < all.length;
+  const visibleValues = filteredOptions.value.map((o: any) => o.value);
+  const selectedVisibleCount = visibleValues.filter((v) => vals.includes(v)).length;
+  return selectedVisibleCount > 0 && selectedVisibleCount < visibleValues.length;
 });
 
 /**
- * 全选/取消全选切换。
+ * 全选/取消全选切换：只作用于当前搜索过滤后的可见结果。
  */
 function toggleAll(): void {
-  const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
-  const all = props.options.map((o: any) => o.value);
-  if (all.every((v) => vals.includes(v))) {
-    internalValue.value = [];
+  const vals = Array.isArray(internalValue.value)
+    ? (internalValue.value as any[]).filter((v) => v !== ALL_OPTION)
+    : [];
+  const visibleValues = filteredOptions.value.map((o: any) => o.value);
+  if (visibleValues.length === 0) return;
+
+  if (visibleValues.every((v) => vals.includes(v))) {
+    internalValue.value = vals.filter((v) => !visibleValues.includes(v));
   } else {
-    internalValue.value = [...all];
+    internalValue.value = Array.from(new Set([...vals, ...visibleValues]));
   }
 }
 

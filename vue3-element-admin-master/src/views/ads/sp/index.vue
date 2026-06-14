@@ -26,6 +26,39 @@
     </section>
 
     <section class="content-block data-table-block">
+      <div class="table-controls">
+        <div class="left-controls">
+          <div class="table-controls__title-group">
+            <h2 class="table-controls__title">广告活动列表</h2>
+            <span class="table-controls__summary">{{ tableColumns.length }} 个显示字段</span>
+          </div>
+          <el-dropdown @command="handleNewAdCommand">
+            <el-button type="primary" class="primary-action-button">
+              新建广告
+              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="upload">文件上传</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <el-button class="queue-action-button" @click="queueDrawerVisible = true">
+            查看队列
+          </el-button>
+        </div>
+
+        <div class="right-controls">
+          <el-checkbox v-model="onlyOverBudget" class="risk-switch">只查看超预算</el-checkbox>
+          <el-tooltip content="列配置" placement="top">
+            <el-button class="column-config-btn" @click="restoreDefaultColumns">
+              <el-icon><Operation /></el-icon>
+              列配置
+            </el-button>
+          </el-tooltip>
+        </div>
+      </div>
+
       <AdsTable
         :loading="loading"
         :table-data="tableData"
@@ -38,42 +71,7 @@
         @current-change="handlePageChange"
         @page-size-change="handlePageSizeChange"
         @sort-change="handleSortChange"
-      >
-        <template #toolbar>
-          <div class="table-controls">
-            <div class="left-controls">
-              <div class="table-controls__title-group">
-                <h2 class="table-controls__title">广告活动列表</h2>
-                <span class="table-controls__summary">{{ tableColumns.length }} 个显示字段</span>
-              </div>
-              <el-dropdown @command="handleNewAdCommand">
-                <el-button type="primary" class="primary-action-button">
-                  新建广告
-                  <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="upload">文件上传</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-              <el-button class="queue-action-button" @click="queueDrawerVisible = true">
-                查看队列
-              </el-button>
-            </div>
-
-            <div class="right-controls">
-              <el-checkbox v-model="onlyOverBudget" class="risk-switch">只查看超预算</el-checkbox>
-              <el-tooltip content="列配置" placement="top">
-                <el-button class="column-config-btn" @click="restoreDefaultColumns">
-                  <el-icon><Operation /></el-icon>
-                  列配置
-                </el-button>
-              </el-tooltip>
-            </div>
-          </div>
-        </template>
-      </AdsTable>
+      />
     </section>
 
     <ColumnManager
@@ -126,25 +124,6 @@ watch(onlyOverBudget, () => {
   currentPage.value = 1;
   loadTableData();
 });
-
-/**
- * 国家变更时联动清空不匹配的店铺，并自动触发查询。
- */
-watch(
-  () => filters.countries,
-  (newCountries) => {
-    if (!filters.profiles || filters.profiles.length === 0) return;
-    if (newCountries.length === 0) return;
-    const countrySet = new Set(newCountries);
-    const validProfiles = filters.profiles.filter((pid: string) => {
-      const profile = profiles.value.find((p) => p.value === pid);
-      return profile ? countrySet.has(profile.country ?? "") : true;
-    });
-    if (validProfiles.length !== filters.profiles.length) {
-      filters.profiles = validProfiles;
-    }
-  }
-);
 
 const countries = ref<{ value: string; label: string }[]>([]);
 const profiles = ref<{ value: string; label: string; country?: string }[]>([]);
@@ -232,6 +211,25 @@ const filters = reactive({
   campaignStatus: [] as string[],
   serviceStatus: [] as string[],
 });
+
+/**
+ * 国家变更时联动清空不匹配的店铺。
+ */
+watch(
+  () => filters.countries,
+  (newCountries) => {
+    if (!filters.profiles || filters.profiles.length === 0) return;
+    if (newCountries.length === 0) return;
+    const countrySet = new Set(newCountries);
+    const validProfiles = filters.profiles.filter((pid: string) => {
+      const profile = profiles.value.find((p) => p.value === pid);
+      return profile ? countrySet.has(profile.country ?? "") : true;
+    });
+    if (validProfiles.length !== filters.profiles.length) {
+      filters.profiles = validProfiles;
+    }
+  }
+);
 
 const columnConfigVisible = ref(false);
 

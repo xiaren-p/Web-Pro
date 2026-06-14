@@ -15,7 +15,6 @@
         size="small"
         class="filter-item w-160"
         :options="profiles"
-        :show-select-all="false"
         multiple
         filterable
         placeholder="选择店铺"
