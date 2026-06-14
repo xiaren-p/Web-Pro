@@ -13,15 +13,6 @@ from django.db.models import Q
 
 # ── 枚举值 → 中文 label 映射（统一出口，前端不做映射）──
 
-# 国家代码 → 中文名称
-COUNTRY_MAP: dict[str, str] = {
-    "FR": "法国", "IT": "意大利", "BE": "比利时", "UK": "英国",
-    "PL": "波兰", "NL": "荷兰", "SE": "瑞典", "ES": "西班牙",
-    "DE": "德国", "US": "美国", "CA": "加拿大", "JP": "日本",
-    "MX": "墨西哥", "AU": "澳大利亚", "SG": "新加坡", "TR": "土耳其",
-    "IN": "印度", "AE": "阿联酋", "SA": "沙特", "BR": "巴西",
-}
-
 # 竞价策略 label（bidding.strategy → 中文），shop_profile_view 与 Filters.vue 共用
 BIDDING_STRATEGY_LABEL: dict[str, str] = {
     "legacyForSales": "动态竞价-只降低",

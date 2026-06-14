@@ -44,7 +44,6 @@ from api_v1.models.lingxing.ads.basic.lx_sp_target import LxSpTarget, SpTargetEx
 from api_v1.models.lingxing.ads.report.lx_sp_target_report import LxSpTargetReport
 from api_v1.models.lingxing.ads.basic.lx_sp_negative_target import LxSpNegativeTarget, NegativeTargetType
 from api_v1.models.lingxing.ads.report.lx_sp_keyword_report import LxSpKeywordReport
-from api_v1.models.shop.lx_sellers import LxSellers
 from api_v1.models.lingxing.basic.lx_shops import HasAdsSetting, LxShops, ShopStatus
 from api_v1.models.lingxing.basic.lx_user import LxUser, UserStatus, IsMaster
 from api_v1.models.lingxing.sales.listing.lx_listing_data import LxListingData, ListingStatus, ListingDeleteFlag, ListingStoreType
@@ -76,7 +75,6 @@ __all__ = [
     'LxSpKeyword', 'SpKeywordMatchType', 'LxSpKeywordReport',
     'LxSpNegativeTarget', 'NegativeTargetType', 'LxSpKeywordReport',
     'LxExchangeRate',
-    'LxSellers',
     'LxShops', 'ShopStatus', 'HasAdsSetting',
     'LxUser', 'UserStatus', 'IsMaster',
     'LxListingInfo', 'LxListingData', 'ListingStatus', 'ListingDeleteFlag', 'ListingStoreType', 'LxProductInfo', 'LxListingRemark', 'LxOrderProfit', 'LxListingMetrics',

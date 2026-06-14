@@ -16,6 +16,7 @@ from api_v1.models import (
     LxExchangeRate,
     LxListingData,
     LxProductInfo,
+    LxShops,
     LxSpAd,
     LxSpCampaign,
     LxSpCampaignReport,
@@ -27,7 +28,6 @@ from api_v1.utils.responses import drf_ok
 from api_v1.views.lingxing.ads._helpers import (
     BIDDING_STRATEGY_LABEL,
     CAMPAIGN_TYPE_SHORT,
-    COUNTRY_MAP,
     build_campaign_profile_key,
     build_campaign_profile_query,
     fmt_money,
@@ -310,10 +310,17 @@ class AdCampaignViewSet(viewsets.ViewSet):
         item_profile_ids = [item.profile_id for item in items if item.profile_id]
         profiles_page = list(LxAdsProfile.objects.filter(profile_id__in=item_profile_ids))
 
+        # ── 从 LxShops 拉取国家中文名，不再依赖硬编码 COUNTRY_MAP ──
+        all_sids = {sp.sid for sp in profiles_page if sp.sid}
+        sid_to_country: dict[int, str] = {}
+        if all_sids:
+            for shop in LxShops.objects.filter(sid__in=all_sids).only("sid", "country"):
+                sid_to_country[shop.sid] = shop.country or ""
+
         profile_map: dict[str, dict[str, str]] = {}
         for sp in profiles_page:
-            country = sp.country_code or ""
-            c_name = COUNTRY_MAP.get(country.upper(), country)
+            country_code = sp.country_code or ""
+            c_name = sid_to_country.get(sp.sid, country_code)
             profile_map[str(sp.profile_id)] = {
                 "profile_alias": sp.name if sp.name else str(sp.profile_id),
                 "country_name": c_name,

@@ -47,12 +47,12 @@ class LxListingInfo(models.Model):
     )
 
     shop_link = models.ForeignKey(
-        "LxSellers",
+        "LxShops",
         on_delete=models.DO_NOTHING,
         null=True,
         blank=True,
         db_column="store_id",
-        to_field="id",
+        to_field="sid",
         related_name="listings",
         verbose_name="关联店铺",
     )

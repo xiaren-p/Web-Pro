@@ -6,9 +6,9 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from api_v1.models import LxAdsProfile, LxSpCampaign
+from api_v1.models import LxAdsProfile, LxShops, LxSpCampaign
 from api_v1.utils.responses import drf_ok
-from api_v1.views.lingxing.ads._helpers import BIDDING_STRATEGY_LABEL, COUNTRY_MAP
+from api_v1.views.lingxing.ads._helpers import BIDDING_STRATEGY_LABEL
 
 
 class ShopProfileViewSet(viewsets.ViewSet):
@@ -18,35 +18,51 @@ class ShopProfileViewSet(viewsets.ViewSet):
     def options(self, request: Request) -> Response:
         """获取店铺、国家、竞价策略下拉选项数据。
 
+        国家中文名不再使用硬编码 COUNTRY_MAP，改为从 LxShops.country 字段取值，
+        通过 LxAdsProfile.sid → LxShops.sid 关联得到每条 profile 对应的国家中文名称。
+
         Args:
             request (Request): DRF 原始请求对象。
 
         Returns:
             Response: 包含以下字段：
 
-            - countries: 去重后的国家映射列表。
+            - countries: 去重后的国家列表（value 为 country_code，label 为 LxShops.country 中文名）。
             - profiles: 店铺名称列表。
             - bidding_types: 广告活动表中实际出现过的竞价策略列表（label 由后端统一映射）。
         """
         # ── 店铺列表（启用状态的账号）──
+        sid_set: set[int] = set()
         profiles: list[dict[str, str]] = []
-        countries_set: set[str] = set()
 
         for item in LxAdsProfile.objects.filter(status=1):
-            if item.profile_id:
-                label = item.name if item.name else str(item.profile_id)
-                profiles.append({
-                    "value": str(item.profile_id),
-                    "label": label,
-                    "country": item.country_code or "",
-                })
-            if item.country_code:
-                countries_set.add(item.country_code)
+            if not item.profile_id:
+                continue
+            label = item.name if item.name else str(item.profile_id)
+            profiles.append({
+                "value": str(item.profile_id),
+                "label": label,
+                "country_code": item.country_code or "",
+                "sid": item.sid or 0,
+            })
+            if item.sid:
+                sid_set.add(item.sid)
 
-        countries = []
-        for c in countries_set:
-            c_name = COUNTRY_MAP.get(c.upper(), c)
-            countries.append({"value": c, "label": c_name})
+        # ── 通过 LxAdsProfile.sid → LxShops.sid 关联到 LxShops.country ──
+        sid_to_country: dict[int, str] = {}
+        if sid_set:
+            for shop in LxShops.objects.filter(sid__in=sid_set).only("sid", "country"):
+                sid_to_country[shop.sid] = shop.country or ""
+
+        # ── 为每个 profile 补上国家中文名 ──
+        seen_countries: set[str] = set()
+        countries: list[dict[str, str]] = []
+        for sp in profiles:
+            c_code = sp["country_code"]
+            country_name = sid_to_country.get(sp["sid"], c_code)
+            if c_code and c_code not in seen_countries:
+                seen_countries.add(c_code)
+                countries.append({"value": c_code, "label": country_name})
 
         # ── 竞价策略列表（从 LxSpCampaign.bidding JSONField 中提取 strategy 字段去重）──
         raw_bidding_types = list(
@@ -65,6 +81,9 @@ class ShopProfileViewSet(viewsets.ViewSet):
 
         return drf_ok({
             "countries": countries,
-            "profiles": profiles,
+            "profiles": [
+                {"value": sp["value"], "label": sp["label"], "country": sp["country_code"]}
+                for sp in profiles
+            ],
             "bidding_types": bidding_types,
         })
