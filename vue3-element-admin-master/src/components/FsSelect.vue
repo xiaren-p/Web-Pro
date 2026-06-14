@@ -13,36 +13,50 @@
       collapse-tags
       style="width: 100%"
       :remote-show-suffix="true"
+      popper-class="fs-select-popper"
       @change="onChange"
       @visible-change="onVisibleChange"
     >
       <template v-if="remote || filterable" #header>
-        <div style="padding: 4px 8px">
+        <div class="fs-select-popper__header" @click.stop>
           <el-input
             v-model="searchKeyword"
             placeholder="输入关键字进行搜索..."
             size="small"
             clearable
             @input="handleHeaderSearch"
-            @click.stop
           />
         </div>
       </template>
 
       <el-option
-        v-if="showSelectAll"
+        v-if="multiple && showSelectAll"
         :key="ALL_OPTION"
         :label="selectAllLabel"
         :value="ALL_OPTION"
-      />
+        class="fs-select-popper__all-option"
+      >
+        <el-checkbox
+          :model-value="isAllSelected"
+          :indeterminate="isIndeterminate"
+          @click.stop.prevent="toggleAll"
+        />
+        <span class="fs-select-popper__label">{{ selectAllLabel }}</span>
+      </el-option>
 
       <el-option
         v-for="option in filteredOptions"
         :key="option.value"
         :label="option.label || option.title || option.value"
         :value="option.value"
+        :class="{ 'fs-select-popper__check-option': multiple }"
       >
         <template #default>
+          <el-checkbox
+            v-if="multiple"
+            :model-value="isChecked(option.value)"
+            class="fs-select-popper__check"
+          />
           <img v-if="option.img" :src="option.img" class="fs-option-img" />
           <span class="fs-option-title">{{ option.title || option.label }}</span>
           <small v-if="option.code" class="sku-code">{{ option.code }}</small>
@@ -177,6 +191,50 @@ function selectOnly(value: any) {
 }
 
 /**
+ * 判断传入值是否在当前多选列表中。
+ *
+ * @param {any} val - 待判断的选项值
+ * @returns {boolean} 若已选中返回 true
+ */
+function isChecked(val: any): boolean {
+  const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
+  return vals.includes(val);
+}
+
+/**
+ * 是否全选：所有选项值都在已选列表中。
+ */
+const isAllSelected = computed((): boolean => {
+  if (!props.multiple) return false;
+  const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
+  const all = props.options.map((o: any) => o.value);
+  return all.length > 0 && all.every((v) => vals.includes(v));
+});
+
+/**
+ * 是否半选：至少选中一项但非全选。
+ */
+const isIndeterminate = computed((): boolean => {
+  if (!props.multiple) return false;
+  const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
+  const all = props.options.map((o: any) => o.value);
+  return vals.length > 0 && vals.length < all.length;
+});
+
+/**
+ * 全选/取消全选切换。
+ */
+function toggleAll(): void {
+  const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
+  const all = props.options.map((o: any) => o.value);
+  if (all.every((v) => vals.includes(v))) {
+    internalValue.value = [];
+  } else {
+    internalValue.value = [...all];
+  }
+}
+
+/**
  * 计算组件容器宽度：
  * 多选且已选中时，根据“首项文本 + +N”估算最小宽度，
  * 并使用 width=max(100%, Xpx) 让外层容器真正变宽，推动后续筛选项重新排布。
@@ -252,5 +310,106 @@ const containerStyle = computed((): Record<string, string> => {
 .sku-code {
   margin-left: 6px;
   color: var(--text-tertiary);
+}
+</style>
+
+<style lang="scss">
+/**
+ * FsSelect 下拉面板全局样式
+ * 必须用不带 scoped 的 <style> 块，因为 el-select 的下拉面板 teleport 到 body 下。
+ */
+.fs-select-popper {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-popover) !important;
+
+  .el-select-dropdown__header {
+    padding: 8px 8px 4px;
+  }
+
+  // 搜索框
+  &__header {
+    padding: 8px 8px 4px;
+  }
+
+  // 全选行
+  &__all-option {
+    border-bottom: 1px solid var(--border-subtle);
+    font-weight: var(--font-weight-medium);
+  }
+
+  // 复选框
+  &__check {
+    margin-right: 8px;
+    pointer-events: none; // 点击由 el-option 处理
+  }
+
+  // 选项内 label 文本
+  &__label {
+    margin-left: 8px;
+  }
+
+  .el-select-dropdown__item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    transition: background-color var(--transition-fast);
+
+    &.is-hovering {
+      background-color: var(--surface-hover) !important;
+    }
+
+    &.is-selected {
+      font-weight: var(--font-weight-normal);
+      color: var(--text-primary);
+      background-color: var(--surface-base);
+    }
+  }
+
+  // 复选框样式覆盖
+  .el-checkbox {
+    height: auto;
+    margin-right: 0;
+    line-height: 1;
+
+    .el-checkbox__inner {
+      width: 16px;
+      height: 16px;
+      border-radius: var(--radius-sm);
+      border-color: var(--border-strong);
+      background-color: var(--surface-base);
+      transition: all var(--transition-fast);
+
+      &:hover {
+        border-color: var(--color-primary-400);
+      }
+    }
+
+    &.is-checked .el-checkbox__inner {
+      background-color: var(--color-primary-500);
+      border-color: var(--color-primary-500);
+      &::after {
+        border-width: 2px;
+        height: 8px;
+        left: 5px;
+        top: 1px;
+        width: 4px;
+      }
+    }
+
+    &.is-indeterminate .el-checkbox__inner {
+      background-color: var(--color-primary-500);
+      border-color: var(--color-primary-500);
+      &::before {
+        height: 2px;
+        left: 3px;
+        right: 3px;
+        top: 6px;
+      }
+    }
+
+    .el-checkbox__label {
+      display: none;
+    }
+  }
 }
 </style>
