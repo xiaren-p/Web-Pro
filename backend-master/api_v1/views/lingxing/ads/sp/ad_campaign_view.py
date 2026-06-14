@@ -136,26 +136,34 @@ class AdCampaignViewSet(viewsets.ViewSet):
             tag_list = [t.strip() for t in tags.split(",") if t.strip()]
             if tag_list:
                 # LxSpCampaign.tags 为 JSON 数组 [{parent, child}, ...]，
-                # 标签值分布在 parent 或 child 字段上，直接用 JSON_CONTAINS 匹配
+                # 标签值分布在 parent 或 child 字段上
                 tag_q = Q()
                 for t in tag_list:
                     tag_q |= Q(tags__contains=[{"parent": t}])
                     tag_q |= Q(tags__contains=[{"child": t}])
+                # 注意：如果 LxSpCampaign.tags 全部为 null/[]，
+                # 则 JSON_CONTAINS 匹配不到任何行，筛选自然返回空集
                 qs = qs.filter(tag_q)
 
         # ── 负责人筛选 ──
-        # 标签和负责人数据来源相同：LxProductInfo（label + principal_list），
-        # 因此负责人筛选复用 ASIN → LxSpAd → campaign 的链路，直接做筛选而不依赖展示层的二次查询。
+        # 标签和负责人数据来源相同：LxProductInfo（label + principal_list）。
+        # 既然前端展示的标签和负责人字段就是在 ad_campaign_view 的展示层
+        # 从 LxProductInfo 取的，那么筛选也应该用同一张表、同一条链路：
+        #   前端选择负责人 → LxProductInfo.principal_list 匹配 uid
+        #                  → 得到 ASIN → LxSpAd 匹配 asin
+        #                  → 得到 (campaign_id, profile_id) → 过滤 campaign
+        # 这条链路不依赖 LxSpCampaign.tags（那个字段是另一套数据），
+        # 保证了"筛选结果 = 展示字段"的一致性。
         owner_ids = data.get("owners")
         if owner_ids:
             owner_list = [str(o).strip() for o in owner_ids.split(",") if str(o).strip()]
             if owner_list:
                 # LxProductInfo.principal_list 为 [{uid, realname}, ...]
-                owner_q_parts = Q()
+                owner_q = Q()
                 for uid in owner_list:
-                    owner_q_parts |= Q(principal_list__contains=[{"uid": int(uid)}])
+                    owner_q |= Q(principal_list__contains=[{"uid": int(uid)}])
                 owner_asins = set(
-                    LxProductInfo.objects.filter(owner_q_parts)
+                    LxProductInfo.objects.filter(owner_q)
                     .values_list("asin", flat=True)
                     .distinct()
                 )
@@ -166,10 +174,10 @@ class AdCampaignViewSet(viewsets.ViewSet):
                         .distinct()
                     )
                     if owner_ad_pairs:
-                        owner_q = Q()
+                        owner_pair_q = Q()
                         for cid, pid in owner_ad_pairs:
-                            owner_q |= Q(campaign_id=cid, profile_id=pid)
-                        qs = qs.filter(owner_q)
+                            owner_pair_q |= Q(campaign_id=cid, profile_id=pid)
+                        qs = qs.filter(owner_pair_q)
 
         portfolio_id = data.get("portfolio_id")
         if portfolio_id:
