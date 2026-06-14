@@ -1,13 +1,15 @@
 <template>
-  <div class="data-table-container">
+  <div ref="trackRef" class="data-table-sticky">
+  <div ref="containerRef" class="data-table-container">
     <div class="data-table__scroll">
       <el-table
+        ref="tableRef"
         v-loading="loading"
         class="data-table__content"
         :data="displayData"
         :row-class-name="getRowClass"
         :border="false"
-        height="100%"
+        :height="tableBodyHeight"
         style="width: 100%"
         @sort-change="$emit('sort-change', $event)"
       >
@@ -145,7 +147,7 @@
           共 {{ total.toLocaleString() }} 条
         </span>
       </div>
-      <div class="pager-center">
+      <div class="pager-mid">
         <el-pagination
           background
           :current-page="currentPage"
@@ -167,11 +169,14 @@
       </div>
     </div>
   </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { TrendCharts, List } from "@element-plus/icons-vue";
+
+const TOP_GAP = 12;
 
 const props = withDefaults(
   defineProps<{
@@ -182,7 +187,6 @@ const props = withDefaults(
     columns: any[];
     loading?: boolean;
     summary?: Record<string, unknown> | null;
-    /** 父页面当前选中的日期范围，透传给详情页作为默认值 */
     dateRange?: string[];
   }>(),
   {
@@ -195,50 +199,102 @@ const props = withDefaults(
 const emit = defineEmits(["current-change", "view-row", "page-size-change", "sort-change"]);
 const localPageSize = ref(props.pageSize || 25);
 
-/**
- * 将汇总行置于列表首位，与当前页数据合并展示。
- *
- * @returns {any[]} 以汇总行开头的完整表格数据
- */
+const trackRef = ref<HTMLElement | null>(null);
+const containerRef = ref<HTMLElement | null>(null);
+const tableRef = ref<any>(null);
+const tableBodyHeight = ref<number | undefined>(undefined);
+const trackPushHeight = ref(0);
+
+function getTableBodyEl(): HTMLElement | null {
+  const el = tableRef.value?.$el as HTMLElement | undefined;
+  return el?.querySelector(".el-scrollbar__wrap") ?? null;
+}
+
+function measure(): void {
+  const container = containerRef.value;
+  if (!container) return;
+
+  const toolbar = container.closest<HTMLElement>(".data-table-block")?.querySelector<HTMLElement>(".table-controls");
+  const toolbarH = toolbar?.offsetHeight ?? 72;
+  const pager = container.querySelector<HTMLElement>(".pager-row");
+  const pagerH = pager?.offsetHeight ?? 48;
+  const vh = window.innerHeight;
+
+  // 表格体可用高度 = 视口 - 顶部间隙 - 工具栏 - 翻页栏
+  const available = Math.max(200, vh - TOP_GAP - toolbarH - pagerH);
+  tableBodyHeight.value = available;
+
+  nextTick(() => {
+    const body = getTableBodyEl();
+    if (!body) return;
+    const extra = Math.max(0, body.scrollHeight - body.clientHeight);
+    // sticky 轨道需要撑出额外高度让页面可以继续滚
+    trackPushHeight.value = extra;
+    syncScroll();
+  });
+}
+
+function syncScroll(): void {
+  const track = trackRef.value;
+  const body = getTableBodyEl();
+  if (!track || !body) return;
+
+  const rect = track.getBoundingClientRect();
+  // sticky 已触发时 rect.top === TOP_GAP，页面已滚过的距离 = 轨道顶部绝对位置
+  const trackAbsTop = rect.top + window.scrollY;
+  const scrolledPast = Math.max(0, window.scrollY - trackAbsTop + TOP_GAP);
+  const clamped = Math.min(scrolledPast, trackPushHeight.value);
+  body.scrollTop = clamped;
+}
+
+function onScroll(): void {
+  syncScroll();
+}
+
+function onWheel(e: WheelEvent): void {
+  // 把表格区域的滚轮事件转成页面滚动
+  const body = getTableBodyEl();
+  if (!body) return;
+  const atTop = body.scrollTop <= 0 && e.deltaY < 0;
+  const atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 1 && e.deltaY > 0;
+  if (atTop || atBottom) return; // 让页面自然处理
+  e.preventDefault();
+  window.scrollBy({ top: e.deltaY, behavior: "auto" });
+}
+
+onMounted(() => {
+  measure();
+  window.addEventListener("resize", measure, { passive: true });
+  window.addEventListener("scroll", onScroll, { passive: true });
+  // 给内部滚动容器绑定 wheel
+  nextTick(() => {
+    getTableBodyEl()?.addEventListener("wheel", onWheel, { passive: false });
+  });
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", measure);
+  window.removeEventListener("scroll", onScroll);
+  getTableBodyEl()?.removeEventListener("wheel", onWheel);
+});
+
 const displayData = computed<any[]>(() => {
   if (!props.summary) return props.tableData;
-  const summaryRow: Record<string, unknown> = {
-    _isSummary: true,
-    name: "汇总",
-    ...props.summary,
-  };
+  const summaryRow: Record<string, unknown> = { _isSummary: true, name: "汇总", ...props.summary };
   return [summaryRow, ...props.tableData];
 });
 
-/**
- * 为汇总行附加专属 CSS 类名，用于高亮显示。
- *
- * @param {{ row: any; rowIndex: number }} param0 - 当前行数据对象
- * @returns {string} 汇总行返回 "summary-row"，偶数行返回 "zebra-row"
- */
+watch(displayData, () => nextTick(measure));
+watch(() => props.pageSize, (v) => { localPageSize.value = v; });
+
+function onPageSizeChange(v: number) { emit("page-size-change", v); }
+
 function getRowClass({ row, rowIndex }: { row: any; rowIndex: number }): string {
   if (row._isSummary) return "summary-row";
   const dataIndex = rowIndex - (props.summary ? 1 : 0);
   return dataIndex % 2 === 1 ? "zebra-row" : "";
 }
 
-watch(
-  () => props.pageSize,
-  (v) => {
-    localPageSize.value = v;
-  }
-);
-
-function onPageSizeChange(v: number) {
-  emit("page-size-change", v);
-}
-
-/**
- * 将投放类型字段值格式化为中文显示。
- *
- * @param {string} val - targeting_type 原始值（AUTO / MANUAL）
- * @returns {string} 中文显示文字；无法识别则原样返回
- */
 function formatTargetingType(val: string): string {
   if (!val) return "";
   const map: Record<string, string> = { AUTO: "自动", MANUAL: "手动" };
@@ -246,48 +302,23 @@ function formatTargetingType(val: string): string {
 }
 
 const POSITIVE_RATE_COLS = new Set([
-  "impressionsPercent",
-  "clicksPercent",
-  "spendsPercent",
-  "adsSalesPercent",
-  "ctr",
-  "cvr",
-  "roas",
+  "impressionsPercent", "clicksPercent", "spendsPercent",
+  "adsSalesPercent", "ctr", "cvr", "roas",
 ]);
 const NEGATIVE_RATE_COLS = new Set(["acos", "cpa", "cpc"]);
 
-/**
- * 判断是否应该显示趋势箭头。
- *
- * @param {string} prop - 当前列字段名
- * @param {*} value - 当前单元格原始值
- * @returns {boolean} 需要展示趋势箭头时返回 true
- */
 function shouldShowTrend(prop: string, value: any): boolean {
   const val = parseFloat(value);
   if (isNaN(val)) return false;
-
-  if (POSITIVE_RATE_COLS.has(prop)) {
-    return Math.abs(val) > 0.01;
-  }
-  if (NEGATIVE_RATE_COLS.has(prop)) {
-    return true;
-  }
+  if (POSITIVE_RATE_COLS.has(prop)) return Math.abs(val) > 0.01;
+  if (NEGATIVE_RATE_COLS.has(prop)) return true;
   return false;
 }
 
-/**
- * 根据列 prop 和数值返回数据染色类名。
- *
- * @param {*} row - 表格行数据
- * @param {string} prop - 列 prop 名
- * @returns {string} CSS 类名
- */
 function getDataValueClass(row: any, prop: string): string {
   if (row._isSummary) return "data-bold";
   const val = parseFloat(row[prop]);
   if (isNaN(val)) return "";
-
   if (POSITIVE_RATE_COLS.has(prop)) {
     if (val > 0) return "data-up";
     if (val < 0) return "data-down";
@@ -301,59 +332,126 @@ function getDataValueClass(row: any, prop: string): string {
   return "";
 }
 
-/**
- * 格式化表格数值展示：千分位处理。
- *
- * @param {*} val - 原始值
- * @returns {string} 格式化后的字符串
- */
 function formatValue(val: any): string {
   if (val == null) return "-";
   const num = Number(val);
   if (isNaN(num)) return String(val);
   if (Math.abs(num) < 0.01 && Math.abs(num) > 0) return String(val);
-  if (Math.abs(num) >= 1000) {
-    return num.toLocaleString("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    });
-  }
+  if (Math.abs(num) >= 1000) return num.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   return String(val);
 }
 </script>
 
 <style scoped>
-.data-table-container {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-  background: var(--surface-base);
-}
-
-.data-table__scroll {
-  flex: 1;
-  min-height: 0;
+.data-table-sticky {
+  position: relative;
   overflow: hidden;
 }
 
-:deep(.el-table__header-wrapper th.el-table__cell),
-:deep(.el-table__header th) {
-  text-align: center;
+.data-table-container {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-base);
+  min-height: 300px;
 }
+
+.data-table__scroll {
+  flex: 1 1 auto;
+  min-height: 200px;
+  overflow: hidden;
+}
+
+.pager-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 18px;
+  background: var(--surface-base);
+  border-top: 1px solid var(--border-base);
+  flex-shrink: 0;
+}
+
+.pager-left {
+  flex: 1;
+}
+
+.pager-mid {
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 12px;
+}
+
+.pager-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.total-count {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.count-icon { color: var(--text-tertiary); }
+
+.page-size-label,
+.page-size-suffix {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.page-size-select { width: 88px; }
+
+.pager-row :deep(.el-select .el-input__wrapper) {
+  height: 30px !important;
+  min-height: 30px !important;
+  border-color: var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+.pager-row :deep(.el-select .el-input__inner) {
+  height: 28px !important;
+  font-size: 12px;
+  line-height: 28px !important;
+}
+
+.pager-row :deep(.el-pagination) { font-size: 12px; }
+
+.pager-row :deep(.el-pager li) {
+  min-width: 28px;
+  height: 28px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 28px;
+  border-radius: var(--radius-md);
+}
+
+.pager-row :deep(.el-pagination button) {
+  min-width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.pager-row :deep(.el-pagination .btn-prev),
+.pager-row :deep(.el-pagination .btn-next) { font-size: 13px; }
+
+/* ---- 以下为表格视觉样式 ---- */
+:deep(.el-table__header-wrapper th.el-table__cell),
+:deep(.el-table__header th) { text-align: center; }
 
 :deep(.el-table__header th .caret-wrapper) {
   margin-left: 6px;
   transform: scale(1.04);
 }
 
-:deep(.el-table__header th .el-icon) {
-  color: var(--text-tertiary);
-}
-
-:deep(.el-table__header th .is-active .el-icon) {
-  color: var(--color-primary-600);
-}
+:deep(.el-table__header th .el-icon) { color: var(--text-tertiary); }
+:deep(.el-table__header th .is-active .el-icon) { color: var(--color-primary-600); }
 
 :deep(.el-table__header th .cell) {
   display: flex;
@@ -362,9 +460,7 @@ function formatValue(val: any): string {
   width: 100%;
 }
 
-:deep(.el-table__header th.el-table__cell) {
-  border-right: none !important;
-}
+:deep(.el-table__header th.el-table__cell) { border-right: none !important; }
 
 :deep(.el-table .el-table__cell) {
   padding: 11px 0 !important;
@@ -389,24 +485,10 @@ function formatValue(val: any): string {
   align-items: center;
   font-variant-numeric: tabular-nums;
 }
-
-.data-bold {
-  font-weight: 700;
-}
-
-.data-null {
-  color: var(--border-strong);
-}
-
-.data-up {
-  font-weight: 700;
-  color: var(--color-success-600);
-}
-
-.data-down {
-  font-weight: 700;
-  color: var(--color-danger-600);
-}
+.data-bold { font-weight: 700; }
+.data-null { color: var(--border-strong); }
+.data-up { font-weight: 700; color: var(--color-success-600); }
+.data-down { font-weight: 700; color: var(--color-danger-600); }
 
 .trend-icon {
   display: inline-flex;
@@ -414,28 +496,19 @@ function formatValue(val: any): string {
   margin-right: 2px;
   font-size: 12px;
 }
+.trend-icon-down { transform: rotate(180deg); }
 
-.trend-icon-down {
-  transform: rotate(180deg);
-}
-
-:deep(.zebra-row > td.el-table__cell) {
-  background-color: var(--surface-subtle);
-}
+:deep(.zebra-row > td.el-table__cell) { background-color: var(--surface-subtle); }
 
 :deep(.el-table .el-table__row) {
-  transition:
-    background 160ms ease,
-    box-shadow 160ms ease;
+  transition: background 160ms ease, box-shadow 160ms ease;
 }
 
 :deep(.el-table .el-table__row:hover > td.el-table__cell) {
   background-color: var(--surface-hover) !important;
 }
 
-:deep(.el-table__body-wrapper .el-table__row) {
-  position: relative;
-}
+:deep(.el-table__body-wrapper .el-table__row) { position: relative; }
 
 :deep(.el-table__body-wrapper .el-table__row:hover td:first-child::before) {
   position: absolute;
@@ -467,9 +540,7 @@ function formatValue(val: any): string {
   border-radius: 0 3px 3px 0;
 }
 
-:deep(.summary-row:hover > td.el-table__cell) {
-  background: var(--color-primary-100) !important;
-}
+:deep(.summary-row:hover > td.el-table__cell) { background: var(--color-primary-100) !important; }
 
 .summary-indicator {
   display: inline-flex;
@@ -480,14 +551,9 @@ function formatValue(val: any): string {
   color: var(--color-primary-700);
 }
 
-.summary-icon {
-  font-size: 16px;
-  color: var(--color-primary-600);
-}
+.summary-icon { font-size: 16px; color: var(--color-primary-600); }
 
-:deep(.el-table .el-switch) {
-  height: 20px;
-}
+:deep(.el-table .el-switch) { height: 20px; }
 
 :deep(.el-table .el-switch .el-switch__core) {
   width: 36px !important;
@@ -506,24 +572,16 @@ function formatValue(val: any): string {
   box-shadow: 0 1px 3px rgb(15 23 42 / 14%);
 }
 
-:deep(.el-table .el-switch.is-checked .el-switch__core .el-switch__action) {
-  left: 19px !important;
-}
+:deep(.el-table .el-switch.is-checked .el-switch__core .el-switch__action) { left: 19px !important; }
 
 :deep(.el-table .el-switch.is-checked .el-switch__core) {
   background-color: var(--color-success-500) !important;
   border-color: var(--color-success-500) !important;
 }
 
-:deep(.el-table .el-switch.is-disabled .el-switch__core) {
-  opacity: 0.72;
-}
+:deep(.el-table .el-switch.is-disabled .el-switch__core) { opacity: 0.72; }
 
-.profile-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
+.profile-name { font-size: 13px; font-weight: 700; color: var(--text-primary); }
 
 .country-tag {
   display: inline-block;
@@ -537,25 +595,14 @@ function formatValue(val: any): string {
   border-radius: 999px;
 }
 
-.targeting-type-line {
-  margin-top: 2px;
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--text-secondary);
-}
-
-.summary-dash {
-  font-size: 13px;
-  color: var(--border-strong);
-}
+.targeting-type-line { margin-top: 2px; font-size: 11px; line-height: 1.4; color: var(--text-secondary); }
+.summary-dash { font-size: 13px; color: var(--border-strong); }
 
 .campaign-name-link {
   font-weight: 700;
   color: var(--color-primary-600);
   text-decoration: none;
-  transition:
-    color 160ms ease,
-    text-decoration-color 160ms ease;
+  transition: color 160ms ease, text-decoration-color 160ms ease;
 }
 
 .campaign-name-link:hover {
@@ -564,102 +611,8 @@ function formatValue(val: any): string {
   text-underline-offset: 3px;
 }
 
-.analyze-btn {
-  font-weight: 700;
-  color: var(--color-primary-600);
-}
-
-.analyze-btn:hover {
-  color: var(--color-primary-700);
-}
-
-.pager-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 18px;
-  background: var(--surface-base);
-  border-top: 1px solid var(--border-base);
-}
-
-.pager-left,
-.pager-center,
-.pager-right {
-  display: flex;
-  flex: 1;
-  align-items: center;
-}
-
-.pager-center {
-  justify-content: center;
-}
-
-.pager-right {
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.total-count {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  font-size: 12px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.count-icon {
-  color: var(--text-tertiary);
-}
-
-.page-size-label,
-.page-size-suffix {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.page-size-select {
-  width: 88px;
-}
-
-.pager-row :deep(.el-select .el-input__wrapper) {
-  height: 30px !important;
-  min-height: 30px !important;
-  border-color: var(--border-strong);
-  border-radius: var(--radius-md);
-  box-shadow: none;
-}
-
-.pager-row :deep(.el-select .el-input__inner) {
-  height: 28px !important;
-  font-size: 12px;
-  line-height: 28px !important;
-}
-
-.pager-row :deep(.el-pagination) {
-  font-size: 12px;
-}
-
-.pager-row :deep(.el-pager li) {
-  min-width: 28px;
-  height: 28px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 28px;
-  border-radius: var(--radius-md);
-}
-
-.pager-row :deep(.el-pagination button) {
-  min-width: 28px;
-  height: 28px;
-  font-size: 12px;
-}
-
-.pager-row :deep(.el-pagination .btn-prev),
-.pager-row :deep(.el-pagination .btn-next) {
-  font-size: 13px;
-}
+.analyze-btn { font-weight: 700; color: var(--color-primary-600); }
+.analyze-btn:hover { color: var(--color-primary-700); }
 
 .data-table__content {
   border-top: none;

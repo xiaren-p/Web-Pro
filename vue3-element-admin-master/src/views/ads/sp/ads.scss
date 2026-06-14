@@ -40,14 +40,8 @@
 }
 
 .data-table-block {
-  position: sticky;
-  top: 12px;
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 24px);
-  min-height: 420px;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .table-controls {
