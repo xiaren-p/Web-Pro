@@ -365,6 +365,10 @@ function formatValue(val: any): string {
   background: var(--table-bg);
 }
 
+:deep(.el-table) {
+  background: var(--table-bg);
+}
+
 :deep(.el-table__header-wrapper) {
   position: sticky;
   top: 74px;
@@ -649,8 +653,20 @@ function formatValue(val: any): string {
   justify-content: space-between;
   padding: 10px 18px;
   overflow-x: auto;
+  white-space: nowrap;
   background: var(--surface-base);
   border-top: 1px solid #e2e8f0;
+  border-radius: 0 0 18px 18px;
+}
+
+/* 窄屏时翻页栏允许水平滚动 */
+.pager-row::-webkit-scrollbar {
+  height: 4px;
+}
+
+.pager-row::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 2px;
 }
 .pager-center,
 .pager-right {

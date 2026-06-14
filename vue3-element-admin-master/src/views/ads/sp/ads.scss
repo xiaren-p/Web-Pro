@@ -48,7 +48,9 @@
   flex-direction: column;
   min-height: 420px;
   padding: 0;
-  --table-bg: #fafbfc;
+  border-radius: 18px;
+  overflow: hidden;
+  --table-bg: #f8f9fb;
 }
 
 .table-controls {
@@ -61,6 +63,7 @@
   padding: 18px 20px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border-bottom: 1px solid #e2e8f0;
+  border-radius: 18px 18px 0 0;
 }
 
 .table-controls .left-controls,
