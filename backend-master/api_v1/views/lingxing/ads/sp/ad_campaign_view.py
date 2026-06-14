@@ -220,49 +220,57 @@ class AdCampaignViewSet(viewsets.ViewSet):
             if all_pairs_set:
                 # 性能：将笛卡尔积 IN×IN 替换为精确 pair OR 条件，
                 # 确保 MySQL 走 (campaign_id, profile_id, report_date) 复合索引
-                # Doris 不支持超 3000 个 OR 节点的表达式树，
-                # 当 pair 数量较大时改用 raw SQL 的 (a, b) IN ((...), ...) 语法
+                # Doris 不支持超 3000 个 OR 节点，也不支持 (a,b) IN (...)
+                # 元组语法，因此分 batch 走 OR 查询，每批最多 500 对
                 from django.db import connections
 
-                agg_qs = LxSpCampaignReport.objects.using("analytics").all()
-                if date_start:
-                    agg_qs = agg_qs.filter(report_date__gte=date_start)
-                if date_end:
-                    agg_qs = agg_qs.filter(report_date__lte=date_end)
-
-                if len(all_pairs_list) <= 100:
+                BATCH_SIZE = 500
+                agg_map = {}
+                pairs_sorted = sorted(all_pairs_list)
+                for i in range(0, len(pairs_sorted), BATCH_SIZE):
+                    batch = pairs_sorted[i:i + BATCH_SIZE]
                     pair_q = Q()
-                    for cid_val, pid_val in all_pairs_list:
+                    for cid_val, pid_val in batch:
                         pair_q |= Q(campaign_id=cid_val, profile_id=pid_val)
-                    agg_qs = agg_qs.filter(pair_q)
-                else:
-                    placeholders = ", ".join(["(%s, %s)"] * len(all_pairs_list))
-                    flat_params = [v for pair in all_pairs_list for v in pair]
-                    raw_where = f"lx_sp_campaign_report.campaign_id, lx_sp_campaign_report.profile_id IN ({placeholders})"
-                    agg_qs = agg_qs.extra(where=[raw_where], params=flat_params)
 
-                agg_qs = agg_qs.values("campaign_id", "profile_id").annotate(
-                    s_sales=Sum("sales"),
-                    s_same_sales=Sum("same_sales"),
-                    s_orders=Sum("orders"),
-                    s_same_orders=Sum("same_orders"),
-                    s_units=Sum("units"),
-                    s_cost=Sum("cost"),
-                    s_clicks=Sum("clicks"),
-                    s_impressions=Sum("impressions"),
-                )
-                for row in agg_qs:
-                    cp_key = f"{row['campaign_id']}::{row['profile_id']}"
-                    agg_map[cp_key] = {
-                        "sales": float(row["s_sales"] or 0),
-                        "same_sales": float(row["s_same_sales"] or 0),
-                        "orders": int(row["s_orders"] or 0),
-                        "same_orders": int(row["s_same_orders"] or 0),
-                        "units": int(row["s_units"] or 0),
-                        "cost": float(row["s_cost"] or 0),
-                        "clicks": int(row["s_clicks"] or 0),
-                        "impressions": int(row["s_impressions"] or 0),
-                    }
+                    agg_qs = LxSpCampaignReport.objects.using("analytics").filter(pair_q)
+                    if date_start:
+                        agg_qs = agg_qs.filter(report_date__gte=date_start)
+                    if date_end:
+                        agg_qs = agg_qs.filter(report_date__lte=date_end)
+
+                    agg_qs = agg_qs.values("campaign_id", "profile_id").annotate(
+                        s_sales=Sum("sales"),
+                        s_same_sales=Sum("same_sales"),
+                        s_orders=Sum("orders"),
+                        s_same_orders=Sum("same_orders"),
+                        s_units=Sum("units"),
+                        s_cost=Sum("cost"),
+                        s_clicks=Sum("clicks"),
+                        s_impressions=Sum("impressions"),
+                    )
+                    for row in agg_qs:
+                        cp_key = f"{row['campaign_id']}::{row['profile_id']}"
+                        if cp_key in agg_map:
+                            agg_map[cp_key]["sales"] += float(row["s_sales"] or 0)
+                            agg_map[cp_key]["same_sales"] += float(row["s_same_sales"] or 0)
+                            agg_map[cp_key]["orders"] += int(row["s_orders"] or 0)
+                            agg_map[cp_key]["same_orders"] += int(row["s_same_orders"] or 0)
+                            agg_map[cp_key]["units"] += int(row["s_units"] or 0)
+                            agg_map[cp_key]["cost"] += float(row["s_cost"] or 0)
+                            agg_map[cp_key]["clicks"] += int(row["s_clicks"] or 0)
+                            agg_map[cp_key]["impressions"] += int(row["s_impressions"] or 0)
+                        else:
+                            agg_map[cp_key] = {
+                                "sales": float(row["s_sales"] or 0),
+                                "same_sales": float(row["s_same_sales"] or 0),
+                                "orders": int(row["s_orders"] or 0),
+                                "same_orders": int(row["s_same_orders"] or 0),
+                                "units": int(row["s_units"] or 0),
+                                "cost": float(row["s_cost"] or 0),
+                                "clicks": int(row["s_clicks"] or 0),
+                                "impressions": int(row["s_impressions"] or 0),
+                            }
                 # 给无数据的 campaign 补齐空值
                 for cid_val, pid_val in all_pairs_list:
                     cp_key = f"{cid_val}::{pid_val}"
