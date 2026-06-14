@@ -26,7 +26,7 @@
     </section>
 
     <section class="content-block data-table-block">
-      <div class="table-controls">
+      <div class="table-controls" :class="{ 'is-floating': isFloating }">
         <div class="left-controls">
           <div class="table-controls__title-group">
             <h2 class="table-controls__title">广告活动列表</h2>
@@ -58,6 +58,7 @@
           </el-tooltip>
         </div>
       </div>
+      <div class="sticky-sentinel sticky-sentinel--top" ref="topSentinelRef" />
 
       <AdsTable
         :loading="loading"
@@ -88,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed, onMounted, watch } from "vue";
+import { reactive, ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { ArrowDown, Operation } from "@element-plus/icons-vue";
 import Filters from "./Filters.vue";
 import Indicators from "./Indicators.vue";
@@ -115,6 +116,27 @@ function handleNewAdCommand(command: string): void {
     uploadDialogVisible.value = true;
   }
 }
+
+// ── 吸附元素的可见性控制 ──────────────────────────────────────────────────────
+const topSentinelRef = ref<HTMLElement | null>(null);
+const isFloating = ref(false);
+let topObserver: IntersectionObserver | null = null;
+
+onMounted(() => {
+  if (!topSentinelRef.value) return;
+  topObserver = new IntersectionObserver(
+    ([entry]) => {
+      isFloating.value = !entry.isIntersecting;
+    },
+    { rootMargin: "0px 0px 0px 0px" }
+  );
+  topObserver.observe(topSentinelRef.value);
+});
+
+onBeforeUnmount(() => {
+  topObserver?.disconnect();
+  topObserver = null;
+});
 
 // ── 广告列表 ──────────────────────────────────────────────────────────────────
 const onlyOverBudget = ref(false);

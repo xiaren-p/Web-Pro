@@ -145,7 +145,8 @@
       </el-table>
     </div>
 
-    <div class="pager-row">
+    <div class="pager-sentinel" ref="pagerSentinelRef" />
+    <div class="pager-row" :class="{ 'is-floating': isFloating }">
       <div class="pager-left">
         <span class="total-count">
           <el-icon class="count-icon"><List /></el-icon>
@@ -177,7 +178,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, onMounted, onBeforeUnmount } from "vue";
 import { TrendCharts, List } from "@element-plus/icons-vue";
 
 const props = withDefaults(
@@ -241,6 +242,27 @@ watch(
 function onPageSizeChange(v: number) {
   emit("page-size-change", v);
 }
+
+// ── 翻页栏吸附可见性 ──────────────────────────────────────────────────────────
+const pagerSentinelRef = ref<HTMLElement | null>(null);
+const isFloating = ref(false);
+let pagerObserver: IntersectionObserver | null = null;
+
+onMounted(() => {
+  if (!pagerSentinelRef.value) return;
+  pagerObserver = new IntersectionObserver(
+    ([entry]) => {
+      isFloating.value = !entry.isIntersecting;
+    },
+    { rootMargin: "0px 0px 0px 0px" }
+  );
+  pagerObserver.observe(pagerSentinelRef.value);
+});
+
+onBeforeUnmount(() => {
+  pagerObserver?.disconnect();
+  pagerObserver = null;
+});
 
 /**
  * 将投放类型字段值格式化为中文显示。
@@ -361,14 +383,14 @@ function formatValue(val: any): string {
 
 :deep(.el-table__header-wrapper) {
   position: sticky;
-  top: 90px;
+  top: 74px;
   z-index: 10;
   background: var(--surface-base);
 }
 
 :deep(.el-table thead) {
   position: sticky;
-  top: 90px;
+  top: 74px;
   z-index: 10;
 }
 
@@ -628,22 +650,37 @@ function formatValue(val: any): string {
   color: var(--text-secondary);
 }
 
+.pager-sentinel {
+  height: 1px;
+}
+
 .pager-row {
   position: sticky;
-  bottom: 8px;
-  z-index: 11;
+  bottom: 0;
+  z-index: 12;
   display: flex;
   gap: 12px;
   align-items: center;
   justify-content: space-between;
   padding: 10px 18px;
-  margin-top: 8px;
   background: rgba(255, 255, 255, 0.98);
-  border: 1px solid #e2e8f0;
-  border-radius: 18px;
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  border-left: 1px solid #e2e8f0;
+  border-radius: 0 0 18px 18px;
   box-shadow:
     0 -1px 2px rgba(15, 23, 42, 0.04),
     0 -8px 24px rgba(15, 23, 42, 0.04);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.pager-row:not(.is-floating) {
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .pager-left,
