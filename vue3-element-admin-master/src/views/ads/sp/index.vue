@@ -125,6 +125,25 @@ watch(onlyOverBudget, () => {
   loadTableData();
 });
 
+/**
+ * 国家变更时联动清空不匹配的店铺，并自动触发查询。
+ */
+watch(
+  () => filters.countries,
+  (newCountries) => {
+    if (!filters.profiles || filters.profiles.length === 0) return;
+    if (newCountries.length === 0) return;
+    const countrySet = new Set(newCountries);
+    const validProfiles = filters.profiles.filter((pid: string) => {
+      const profile = profiles.value.find((p) => p.value === pid);
+      return profile ? countrySet.has(profile.country ?? "") : true;
+    });
+    if (validProfiles.length !== filters.profiles.length) {
+      filters.profiles = validProfiles;
+    }
+  }
+);
+
 const countries = ref<{ value: string; label: string }[]>([]);
 const profiles = ref<{ value: string; label: string; country?: string }[]>([]);
 const portfolios = ref<{ value: string; label: string }[]>([]);
@@ -211,25 +230,6 @@ const filters = reactive({
   campaignStatus: [] as string[],
   serviceStatus: [] as string[],
 });
-
-/**
- * 国家变更时联动清空不匹配的店铺。
- */
-watch(
-  () => filters.countries,
-  (newCountries) => {
-    if (!filters.profiles || filters.profiles.length === 0) return;
-    if (newCountries.length === 0) return;
-    const countrySet = new Set(newCountries);
-    const validProfiles = filters.profiles.filter((pid: string) => {
-      const profile = profiles.value.find((p) => p.value === pid);
-      return profile ? countrySet.has(profile.country ?? "") : true;
-    });
-    if (validProfiles.length !== filters.profiles.length) {
-      filters.profiles = validProfiles;
-    }
-  }
-);
 
 const columnConfigVisible = ref(false);
 

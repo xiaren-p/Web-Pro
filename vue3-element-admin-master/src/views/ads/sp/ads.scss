@@ -3,8 +3,12 @@
  */
 
 .ads-text-container {
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 50px);
+  min-height: calc(100vh - 50px);
   padding: 24px;
+  overflow: hidden;
   font-family:
     "Geist",
     "PingFang SC",
@@ -21,6 +25,7 @@
 }
 
 .content-block {
+  flex-shrink: 0;
   padding: 22px 24px;
   margin-bottom: 20px;
   background: rgba(255, 255, 255, 0.96);
@@ -40,9 +45,12 @@
 }
 
 .data-table-block {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   padding: 0;
-  overflow: visible;
-  // sticky 由 JS 动态设置
+  overflow: hidden;
 }
 
 .table-controls {
