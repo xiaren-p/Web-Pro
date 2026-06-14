@@ -147,7 +147,6 @@ function formatValue(val: any): string {
   flex: 1;
   min-height: 0;
   background: var(--surface-base);
-  border-radius: 0 0 18px 18px;
 }
 
 .data-table__scroll {
