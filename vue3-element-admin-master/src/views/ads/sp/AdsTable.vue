@@ -379,7 +379,7 @@ function formatTargetingType(val: string): string {
 
 /** 需要染色的正向指标（值越高越好） */
 /**
- * 根据列 prop 返回合理的列宽。
+ * 根据列 prop 返回合理的列宽，以表头不折叠为原则。
  *
  * @param {string} prop - 列字段名
  * @returns {number} 最小列宽（px）
@@ -393,25 +393,25 @@ function getColumnMinWidth(prop: string): number {
     ctr: 80,
     cpc: 80,
     cpa: 80,
-    budget: 100,
-    startDate: 110,
+    budget: 110,
+    startDate: 120,
     service_status: 120,
     bidding_type: 100,
-    portfolio_name: 120,
+    portfolio_name: 130,
     tags: 100,
-    impressions: 110,
-    impressionsPercent: 90,
-    clicks: 90,
-    clicksPercent: 90,
-    spends: 100,
-    spendsPercent: 90,
-    adsSales: 120,
-    adsSalesPercent: 110,
-    directSales: 120,
-    adsOrders: 110,
-    directOrders: 110,
-    adsOrderPrice: 120,
-    adsVolume: 110,
+    impressions: 120,
+    impressionsPercent: 130,
+    clicks: 110,
+    clicksPercent: 130,
+    spends: 120,
+    spendsPercent: 130,
+    adsSales: 130,
+    adsSalesPercent: 140,
+    directSales: 130,
+    adsOrders: 120,
+    directOrders: 120,
+    adsOrderPrice: 140,
+    adsVolume: 120,
   };
   return widthMap[prop] ?? 120;
 }
