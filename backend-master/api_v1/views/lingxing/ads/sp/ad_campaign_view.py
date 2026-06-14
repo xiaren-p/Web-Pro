@@ -276,35 +276,74 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 except Exception:
                     pass
 
-        # ── 排序 ──
-        if sort_prop and sort_order in ["asc", "desc"]:
-            field_map = {"startDate": "start_date"}
-            db_field = field_map.get(sort_prop, sort_prop)
-            order_prefix = "-" if sort_order == "desc" else ""
-            try:
-                qs = qs.order_by(f"{order_prefix}{db_field}")
-            except Exception:
-                pass
-            total, items, p_num, p_size = paginate_queryset(request, qs)
-        else:
-            campaigns = list(
-                qs.only(
-                    "id", "campaign_id", "profile_id", "name", "campaign_type",
-                    "targeting_type", "daily_budget", "start_date", "end_date",
-                    "state", "serving_status", "bidding", "portfolio_id", "tags",
-                    "creation_date", "last_updated_date",
-                )
+        # ── 排序（全量数据按指标 / 模型字段排序后再分页）──
+        # 排序依赖的指标字段映射：前端 sort_prop → agg_map 内部的 key
+        _SORT_METRIC_MAP: dict[str, str] = {
+            "impressions": "impressions",
+            "clicks": "clicks",
+            "spends": "cost",
+            "cost": "cost",
+            "adsSales": "sales",
+            "sales": "sales",
+            "adsOrders": "orders",
+            "orders": "orders",
+            "directSales": "same_sales",
+            "directOrders": "same_orders",
+            "adsVolume": "units",
+            "units": "units",
+        }
+        # 模型字段映射：前端 sort_prop → LxSpCampaign 真实字段
+        _SORT_MODEL_MAP: dict[str, str] = {
+            "startDate": "start_date",
+            "name": "name",
+            "state": "state",
+            "profile_alias": "profile_id",
+        }
+
+        campaigns = list(
+            qs.only(
+                "id", "campaign_id", "profile_id", "name", "campaign_type",
+                "targeting_type", "daily_budget", "start_date", "end_date",
+                "state", "serving_status", "bidding", "portfolio_id", "tags",
+                "creation_date", "last_updated_date",
             )
-            total = len(campaigns)
+        )
+        total = len(campaigns)
+
+        reverse = sort_order == "desc"
+        metric_key = _SORT_METRIC_MAP.get(sort_prop) if sort_prop else None
+        model_key = _SORT_MODEL_MAP.get(sort_prop) if sort_prop else None
+
+        if metric_key:
             campaigns.sort(
-                key=lambda obj: agg_map.get(
-                    f"{obj.campaign_id}::{obj.profile_id}", {"impressions": 0}
-                ).get("impressions", 0),
+                key=lambda obj: float(
+                    agg_map.get(
+                        f"{obj.campaign_id}::{obj.profile_id}", {}
+                    ).get(metric_key, 0) or 0
+                ),
+                reverse=reverse,
+            )
+        elif model_key:
+            def _model_sort_key(obj: Any, field: str = model_key) -> Any:
+                val = getattr(obj, field, None)
+                if val is None:
+                    return ""
+                return val
+            campaigns.sort(key=_model_sort_key, reverse=reverse)
+        else:
+            # 默认按曝光量降序
+            campaigns.sort(
+                key=lambda obj: float(
+                    agg_map.get(
+                        f"{obj.campaign_id}::{obj.profile_id}", {}
+                    ).get("impressions", 0) or 0
+                ),
                 reverse=True,
             )
-            start_idx = (p_num - 1) * p_size
-            end_idx = start_idx + p_size
-            items = campaigns[start_idx:end_idx]
+
+        start_idx = (p_num - 1) * p_size
+        end_idx = start_idx + p_size
+        items = campaigns[start_idx:end_idx]
 
         # ── 店铺与国家数据 ──
         item_profile_ids = [item.profile_id for item in items if item.profile_id]
