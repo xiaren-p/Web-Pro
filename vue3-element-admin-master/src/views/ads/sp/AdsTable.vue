@@ -1,5 +1,5 @@
 <template>
-  <div ref="tableContainerRef" class="data-table-container">
+  <div class="data-table-container" ref="tableContainerRef">
     <div class="data-table__scroll">
       <el-table
         v-loading="loading"
@@ -18,13 +18,11 @@
             <p class="table-empty__text">暂无数据</p>
           </div>
         </template>
-        <el-table-column
-          type="selection"
-          width="48"
-          fixed="left"
-          align="center"
-          :selectable="isRowSelectable"
-        />
+        <el-table-column type="selection" width="48" fixed="left" align="center">
+          <template #default="{ row }">
+            <span v-if="row._isSummary" class="summary-dash">--</span>
+          </template>
+        </el-table-column>
 
         <el-table-column label="有效" width="80" fixed="left" align="center">
           <template #default="{ row }">
@@ -153,21 +151,14 @@
 
     <div
       v-show="showHorizontalScroll"
-      ref="horizontalScrollRef"
       class="table-horizontal-scroll"
+      ref="horizontalScrollRef"
       @scroll="handleProxyScroll"
     >
-      <div
-        class="table-horizontal-scroll__inner"
-        :style="{ width: `${horizontalScrollWidth}px` }"
-      />
+      <div class="table-horizontal-scroll__inner" :style="{ width: `${horizontalScrollWidth}px` }" />
     </div>
 
-    <div
-      class="pager-row"
-      :class="{ 'is-floating': isPagerFloating }"
-      :style="{ bottom: showHorizontalScroll ? '12px' : '0px' }"
-    >
+    <div class="pager-row">
       <div class="pager-left">
         <span class="total-count">
           <el-icon class="count-icon"><List /></el-icon>
@@ -195,7 +186,6 @@
         <span class="page-size-suffix">条/页</span>
       </div>
     </div>
-    <div ref="pagerNaturalSentinelRef" class="pager-natural-sentinel" />
   </div>
 </template>
 
@@ -228,10 +218,7 @@ const tableContainerRef = ref<HTMLElement | null>(null);
 const horizontalScrollRef = ref<HTMLElement | null>(null);
 const horizontalScrollWidth = ref(0);
 const showHorizontalScroll = ref(false);
-const pagerNaturalSentinelRef = ref<HTMLElement | null>(null);
-const isPagerFloating = ref(false);
 let bodyWrapperElement: HTMLElement | null = null;
-let pagerNaturalObserver: IntersectionObserver | null = null;
 let isSyncingScroll = false;
 
 /**
@@ -264,11 +251,7 @@ async function updateHorizontalScrollState(): Promise<void> {
   }
   const bodyTable = tableContainerRef.value?.querySelector(".el-table__body") as HTMLElement | null;
   const estimatedWidth = 608 + props.columns.length * 120;
-  const scrollWidth = Math.max(
-    bodyTable?.scrollWidth ?? 0,
-    bodyWrapperElement.scrollWidth,
-    estimatedWidth
-  );
+  const scrollWidth = Math.max(bodyTable?.scrollWidth ?? 0, bodyWrapperElement.scrollWidth, estimatedWidth);
   horizontalScrollWidth.value = scrollWidth;
   showHorizontalScroll.value = scrollWidth > bodyWrapperElement.clientWidth;
 }
@@ -304,22 +287,11 @@ function handleBodyScroll(): void {
 onMounted(async () => {
   await updateHorizontalScrollState();
   window.addEventListener("resize", updateHorizontalScrollState);
-  const root = document.querySelector(".app-main");
-  if (!pagerNaturalSentinelRef.value || !root) return;
-  pagerNaturalObserver = new IntersectionObserver(
-    ([entry]) => {
-      isPagerFloating.value = !entry.isIntersecting;
-    },
-    { root }
-  );
-  pagerNaturalObserver.observe(pagerNaturalSentinelRef.value);
 });
 
 onBeforeUnmount(() => {
   bodyWrapperElement?.removeEventListener("scroll", handleBodyScroll);
   window.removeEventListener("resize", updateHorizontalScrollState);
-  pagerNaturalObserver?.disconnect();
-  pagerNaturalObserver = null;
 });
 
 watch(
@@ -368,16 +340,6 @@ watch(
 
 function onPageSizeChange(v: number) {
   emit("page-size-change", v);
-}
-
-/**
- * 控制表格选择列是否允许选择当前行。
- *
- * @param {any} row - 当前行数据
- * @returns {boolean} 非汇总行允许选择
- */
-function isRowSelectable(row: any): boolean {
-  return !row._isSummary;
 }
 
 /**
@@ -480,23 +442,23 @@ function formatValue(val: any): string {
 }
 
 .data-table__scroll {
-  display: flex;
   flex: 1;
-  flex-direction: column;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: visible;
 }
 
 /* el-table 撑满整个 data-table__scroll */
 .data-table__scroll :deep(.el-table) {
-  display: flex;
   flex: 1;
+  display: flex;
   flex-direction: column;
 }
 
 .data-table__scroll :deep(.el-table__inner-wrapper) {
-  display: flex;
   flex: 1;
+  display: flex;
   flex-direction: column;
 }
 
@@ -504,29 +466,20 @@ function formatValue(val: any): string {
   flex: 1;
 }
 
-/* 表格数据区的横向滚动来自悬浮代理条，隐藏原生横向滚动 */
-.data-table__scroll :deep(.el-table__body-wrapper)::-webkit-scrollbar,
-.data-table__scroll :deep(.el-table__body-wrapper .el-scrollbar__bar.is-horizontal) {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  opacity: 0 !important;
-}
-
 /* 解除表格默认 overflow 裁剪，让 sticky 元素定位到外层页面滚动容器 */
 .data-table__content {
   overflow: visible !important;
-  background: var(--table-bg);
   border-top: none;
   border-right: none;
   border-left: none;
+  background: var(--table-bg);
 }
 
 :deep(.el-table__body-wrapper) {
   overflow-x: auto !important;
   overflow-y: visible !important;
-  scrollbar-width: none;
   background: var(--table-bg);
+  scrollbar-width: none;
 }
 
 :deep(.el-table__body-wrapper::-webkit-scrollbar),
@@ -672,11 +625,6 @@ function formatValue(val: any): string {
   border-radius: 0 2px 2px 0;
 }
 
-:deep(.summary-row .el-table-column--selection .el-checkbox),
-:deep(.summary-row td.el-table-column--selection .cell) {
-  visibility: hidden;
-}
-
 :deep(.summary-row > td.el-table__cell) {
   position: relative;
   font-weight: 700;
@@ -809,8 +757,8 @@ function formatValue(val: any): string {
   gap: 16px;
   align-items: center;
   justify-content: center;
-  height: 100%;
   min-height: 200px;
+  height: 100%;
   padding-top: 72px;
 }
 
@@ -825,19 +773,17 @@ function formatValue(val: any): string {
   color: var(--text-secondary);
 }
 
-.pager-natural-sentinel {
+.pager-sentinel {
   height: 1px;
 }
 
 .table-horizontal-scroll {
   position: sticky;
-  bottom: 0;
+  bottom: 49px;
   z-index: 12;
   height: 12px;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-color: var(--border-strong) var(--border-subtle);
-  scrollbar-width: thin;
   background: var(--surface-base);
   border-top: 1px solid #e2e8f0;
 }
@@ -864,24 +810,26 @@ function formatValue(val: any): string {
   background: var(--text-tertiary);
 }
 
+.table-horizontal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) var(--border-subtle);
+}
+
 .pager-row {
   position: sticky;
   bottom: 0;
-  z-index: 13;
+  z-index: 12;
   display: flex;
   gap: 12px;
   align-items: center;
   justify-content: space-between;
   padding: 10px 18px;
   background: var(--surface-base);
-  border: 1px solid #e2e8f0;
+  border-top: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  border-left: 1px solid #e2e8f0;
   border-radius: 0 0 18px 18px;
-}
-
-.pager-row.is-floating {
-  border-color: transparent;
-  border-top-color: #e2e8f0;
-  border-radius: 0;
 }
 
 .pager-row > * {
@@ -890,8 +838,8 @@ function formatValue(val: any): string {
 .pager-center,
 .pager-right {
   display: flex;
-  flex-shrink: 0;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .pager-left {
@@ -969,4 +917,5 @@ function formatValue(val: any): string {
 .pager-row :deep(.el-pagination .btn-next) {
   font-size: 13px;
 }
+
 </style>

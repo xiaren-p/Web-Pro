@@ -485,25 +485,14 @@ function openTemplates() {
 }
 
 .date-picker {
-  flex: 0 0 180px;
-  width: 180px;
+  flex: 0 0 210px;
+  width: 210px;
 }
 
 :deep(.date-picker .el-range-editor.el-input__wrapper),
 :deep(.date-picker.el-range-editor.el-input__wrapper) {
-  width: 180px !important;
+  width: 210px !important;
   padding: 0 8px;
-}
-
-:deep(.date-picker .el-range-input) {
-  width: 64px;
-  font-size: 12px;
-}
-
-:deep(.date-picker .el-range-separator) {
-  flex: 0 0 12px;
-  min-width: 12px;
-  padding: 0;
 }
 
 .input-group-seamless {

@@ -9,11 +9,6 @@
         </transition>
       </template>
     </router-view>
-
-    <!-- 返回顶部按钮 -->
-    <el-backtop target=".app-main">
-      <div class="i-svg:backtop w-6 h-6" />
-    </el-backtop>
   </section>
 </template>
 
@@ -75,19 +70,5 @@ const appMainHeight = computed(() => {
   scrollbar-gutter: stable;
   color: var(--text-primary);
   background: var(--app-bg);
-
-  /* 布局切换动画优化 */
-  &.animate__animated {
-    animation-duration: 0.4s;
-    animation-fill-mode: forwards;
-  }
-
-  &.animate__fadeOut {
-    animation-timing-function: ease-in;
-  }
-
-  &.animate__fadeIn {
-    animation-timing-function: ease-out;
-  }
 }
 </style>
