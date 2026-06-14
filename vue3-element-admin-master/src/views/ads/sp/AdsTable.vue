@@ -217,8 +217,13 @@ function formatValue(val: any): string {
 
 .ads-table-body {
   flex: 1;
-  min-height: 200px;
+  min-height: 0;
   overflow: hidden;
+}
+
+/* 关键：让 el-table 自身产生内部滚动条 */
+.ads-table-body :deep(.el-scrollbar__wrap) {
+  overflow-y: auto !important;
 }
 
 .pager-row {
