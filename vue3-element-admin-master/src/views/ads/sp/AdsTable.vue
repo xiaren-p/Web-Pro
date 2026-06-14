@@ -6,6 +6,7 @@
         :data="displayData"
         :row-class-name="getRowClass"
         :border="false"
+        height="100%"
         style="width: 100%"
         @sort-change="$emit('sort-change', $event)"
       >
@@ -139,27 +140,18 @@ function formatValue(val: any): string {
 
 <style scoped>
 .ads-table-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   background: var(--surface-base);
   border-radius: 0 0 18px 18px;
 }
 
-/* 表格体不做内部 overflow，自然撑高页面，使用页面滚动 */
-.ads-table-body :deep(.el-table__body-wrapper) {
-  overflow-y: visible !important;
-}
-.ads-table-body :deep(.el-scrollbar__wrap) {
-  overflow-y: visible !important;
-}
-.ads-table-body :deep(.el-scrollbar__view) {
-  overflow-y: visible !important;
-}
-
-/* 表头 sticky 吸在顶部，留 12px 间隙 */
-.ads-table-body :deep(.el-table__header-wrapper) {
-  position: sticky;
-  top: 12px;
-  z-index: 20;
-  background: var(--surface-base);
+.ads-table-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .pager-row {

@@ -6,7 +6,6 @@
   display: flex;
   flex-direction: column;
   height: calc(100vh - 50px);
-  min-height: calc(100vh - 50px);
   padding: 24px;
   overflow: hidden;
   font-family:
@@ -44,6 +43,7 @@
   padding: 18px 4px 10px;
 }
 
+/* 表格卡片：占据剩余全部高度，内部 flex 列布局，工具栏和翻页在两头，中间表格自动滚动 */
 .data-table-block {
   display: flex;
   flex-direction: column;
@@ -60,13 +60,14 @@
   padding: 18px 20px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border-bottom: 1px solid #e2e8f0;
-}
+  flex-shrink: 0;
 
-.table-controls .left-controls,
-.table-controls .right-controls {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+  .left-controls,
+  .right-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
 }
 
 .table-controls__title-group {
