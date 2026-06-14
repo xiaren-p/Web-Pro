@@ -1,12 +1,13 @@
 <template>
-  <div class="ads-table-root">
+  <div ref="tableRoot" class="ads-table-root">
     <div class="ads-table-body">
       <el-table
+        ref="tableRef"
         v-loading="loading"
         :data="displayData"
         :row-class-name="getRowClass"
         :border="false"
-        height="100%"
+        :height="tableH"
         style="width: 100%"
         @sort-change="$emit('sort-change', $event)"
       >
@@ -87,8 +88,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { TrendCharts, List } from "@element-plus/icons-vue";
+
+const STICKY_TOP = 12;
 
 const props = withDefaults(
   defineProps<{
@@ -101,11 +104,75 @@ const props = withDefaults(
 const emit = defineEmits(["current-change", "view-row", "page-size-change", "sort-change"]);
 const localPageSize = ref(props.pageSize || 25);
 
+// -- sticky 联动 --
+const tableRoot = ref<HTMLElement | null>(null);
+const tableRef = ref<any>(null);
+const tableH = ref<number | undefined>(undefined);
+const spacerH = ref(0);
+
+function getBodyWrap(): HTMLElement | null {
+  const el = tableRef.value?.$el as HTMLElement | undefined;
+  return el?.querySelector(".el-scrollbar__wrap") ?? null;
+}
+
+function measure() {
+  const root = tableRoot.value;
+  if (!root) return;
+  const parentBlock = root.closest<HTMLElement>(".data-table-block");
+  const controls = parentBlock?.querySelector<HTMLElement>(".table-controls");
+  const toolsH = controls?.offsetHeight ?? 72;
+  const pager = root.querySelector<HTMLElement>(".pager-row");
+  const pagerH = pager?.offsetHeight ?? 48;
+  const vh = window.innerHeight;
+  // 表格可用高度 = 视口 - 顶部粘性偏移 - 工具栏 - 翻页
+  const avail = Math.max(200, vh - STICKY_TOP - toolsH - pagerH);
+  tableH.value = avail;
+  // 给出 tableH 后等 layout，再算内部可滚高度
+  nextTick(() => {
+    const body = getBodyWrap();
+    if (body) spacerH.value = Math.max(0, body.scrollHeight - body.clientHeight);
+    scrollTo(0, window.scrollY); // 重算后重设滚动偏移
+  });
+}
+
+function syncScroll() {
+  const root = tableRoot.value;
+  const body = getBodyWrap();
+  if (!root || !body) return;
+  const rect = root.getBoundingClientRect();
+  const rootAbsTop = rect.top + window.scrollY;
+  const progress = Math.max(0, window.scrollY - rootAbsTop + STICKY_TOP);
+  body.scrollTop = Math.min(progress, spacerH.value);
+}
+
+function onWheel(e: WheelEvent) {
+  const body = getBodyWrap();
+  if (!body) return;
+  const atTop = body.scrollTop <= 1 && e.deltaY < 0;
+  const atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 2 && e.deltaY > 0;
+  if (atTop || atBottom) return;
+  e.preventDefault();
+  window.scrollBy({ top: e.deltaY, behavior: "auto" });
+}
+
+onMounted(() => {
+  measure();
+  window.addEventListener("resize", measure);
+  window.addEventListener("scroll", syncScroll);
+  nextTick(() => getBodyWrap()?.addEventListener("wheel", onWheel, { passive: false }));
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", measure);
+  window.removeEventListener("scroll", syncScroll);
+  getBodyWrap()?.removeEventListener("wheel", onWheel);
+});
+
 const displayData = computed<any[]>(() => {
   if (!props.summary) return props.tableData;
   return [{ _isSummary: true, name: "汇总", ...props.summary }, ...props.tableData];
 });
 
+watch(displayData, () => nextTick(measure));
 watch(() => props.pageSize, (v) => { localPageSize.value = v; });
 function onPageSizeChange(v: number) { emit("page-size-change", v); }
 function getRowClass({ row, rowIndex }: { row: any; rowIndex: number }): string {
@@ -150,7 +217,7 @@ function formatValue(val: any): string {
 
 .ads-table-body {
   flex: 1;
-  min-height: 0;
+  min-height: 200px;
   overflow: hidden;
 }
 
@@ -161,6 +228,7 @@ function formatValue(val: any): string {
   background: var(--surface-base);
   border-top: 1px solid var(--border-base);
   border-radius: 0 0 18px 18px;
+  flex-shrink: 0;
 }
 .pager-left { flex: 1; }
 .pager-mid { display: flex; justify-content: flex-end; padding-right: 12px; }
