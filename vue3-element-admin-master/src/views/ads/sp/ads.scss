@@ -5,7 +5,6 @@
 .ads-text-container {
   min-height: 100vh;
   padding: 24px;
-  padding-bottom: var(--table-block-height, 200px);
   font-family:
     "Geist",
     "PingFang SC",
@@ -40,22 +39,10 @@
   padding: 18px 4px 10px;
 }
 
-// 表格块始终固定在视口底部，内部滚动
 .data-table-block {
-  position: fixed;
-  bottom: 0;
-  left: 24px;
-  right: 24px;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100vh - 12px);
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid #e2e8f0;
-  border-bottom: none;
-  border-radius: 18px 18px 0 0;
-  box-shadow: 0 -4px 24px rgba(15, 23, 42, 0.08);
-  overflow: hidden;
+  padding: 0;
+  overflow: visible;
+  // sticky 由 JS 动态设置
 }
 
 .table-controls {
@@ -65,8 +52,6 @@
   padding: 18px 20px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border-bottom: 1px solid #e2e8f0;
-  border-radius: 18px 18px 0 0;
-  flex-shrink: 0;
 }
 
 .table-controls .left-controls,
@@ -207,14 +192,13 @@
 @media (max-width: 768px) {
   .ads-text-container {
     padding: var(--spacing-2);
-    padding-bottom: var(--table-block-height, 200px);
   }
 
   .content-block {
     padding: var(--spacing-3);
   }
 
-  .data-table-block .table-controls {
+  .table-controls {
     flex-direction: column;
     gap: var(--spacing-2);
     align-items: stretch;

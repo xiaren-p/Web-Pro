@@ -1,13 +1,11 @@
 <template>
-  <div ref="containerRef" class="data-table-container">
-    <div class="data-table__scroll">
+  <div class="data-table-container" ref="rootEl">
+    <div class="data-table__body" ref="bodyEl">
       <el-table
-        v-loading="loading"
-        class="data-table__content"
         :data="displayData"
         :row-class-name="getRowClass"
         :border="false"
-        :height="tableContentHeight"
+        max-height="100%"
         style="width: 100%"
         @sort-change="$emit('sort-change', $event)"
       >
@@ -23,7 +21,9 @@
             <template v-if="row._isSummary"><span class="summary-dash">--</span></template>
             <template v-else>
               <div>{{ row.sponsored_type }}</div>
-              <div v-if="row.targeting_type" class="targeting-type-line">[{{ formatTargetingType(row.targeting_type) }}]</div>
+              <div v-if="row.targeting_type" class="targeting-type-line">
+                [{{ formatTargetingType(row.targeting_type) }}]
+              </div>
             </template>
           </template>
         </el-table-column>
@@ -41,7 +41,11 @@
         <el-table-column label="广告活动" min-width="180" fixed="left" align="center" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="row._isSummary" class="summary-dash">--</span>
-            <router-link v-else class="campaign-name-link" :to="{ name: 'AdCampaignDetail', query: { campaign_id: row.campaign_id, profile_id: row.profile_id, date_start: props.dateRange?.[0] || '', date_end: props.dateRange?.[1] || '' } }">{{ row.name }}</router-link>
+            <router-link
+              v-else
+              class="campaign-name-link"
+              :to="{ name: 'AdCampaignDetail', query: { campaign_id: row.campaign_id, profile_id: row.profile_id, date_start: props.dateRange?.[0] || '', date_end: props.dateRange?.[1] || '' } }"
+            >{{ row.name }}</router-link>
           </template>
         </el-table-column>
         <el-table-column v-for="col in columns" :key="col.prop" :prop="col.prop" :label="col.label" :fixed="col.fixed" :sortable="col.sortable" min-width="120" align="center" show-overflow-tooltip>
@@ -88,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onMounted, nextTick } from "vue";
+import { ref, watch, computed } from "vue";
 import { TrendCharts, List } from "@element-plus/icons-vue";
 
 const props = withDefaults(
@@ -102,30 +106,12 @@ const props = withDefaults(
 const emit = defineEmits(["current-change", "view-row", "page-size-change", "sort-change"]);
 const localPageSize = ref(props.pageSize || 25);
 
-const containerRef = ref<HTMLElement | null>(null);
-const tableContentHeight = ref<number | undefined>(undefined);
-
-function measureHeight() {
-  const el = containerRef.value;
-  if (!el) return;
-  const pagerEl = el.querySelector<HTMLElement>(".pager-row");
-  const pagerH = pagerEl?.offsetHeight ?? 50;
-  // 用 scroll 区域的实际可用高度减去翻页栏
-  tableContentHeight.value = el.offsetHeight - pagerH;
-}
-
-onMounted(() => {
-  nextTick(measureHeight);
-  window.addEventListener("resize", measureHeight, { passive: true });
-});
-
 const displayData = computed<any[]>(() => {
   if (!props.summary) return props.tableData;
   return [{ _isSummary: true, name: "汇总", ...props.summary }, ...props.tableData];
 });
-watch(displayData, () => nextTick(measureHeight));
-watch(() => props.pageSize, (v) => { localPageSize.value = v; });
 
+watch(() => props.pageSize, (v) => { localPageSize.value = v; });
 function onPageSizeChange(v: number) { emit("page-size-change", v); }
 function getRowClass({ row, rowIndex }: { row: any; rowIndex: number }): string {
   if (row._isSummary) return "summary-row";
@@ -161,15 +147,26 @@ function formatValue(val: any): string {
 .data-table-container {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
   background: var(--surface-base);
+  border-radius: 0 0 18px 18px;
 }
 
-.data-table__scroll {
-  flex: 1;
-  min-height: 200px;
-  overflow: hidden;
+/* 表格 body 区域，始终完全铺开，不使用内部 overflow */
+.data-table__body {
+  flex-shrink: 0;
+}
+
+/* 关键：让 el-table 不要出现双滚动条，只用页面滚动 */
+.data-table__body :deep(.el-table__body-wrapper) {
+  overflow-y: visible !important;
+  max-height: none !important;
+}
+.data-table__body :deep(.el-scrollbar__wrap) {
+  overflow-y: visible !important;
+  max-height: none !important;
+}
+.data-table__body :deep(.el-scrollbar__view) {
+  overflow-y: visible !important;
 }
 
 .pager-row {
