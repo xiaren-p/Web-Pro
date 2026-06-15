@@ -46,11 +46,12 @@
         <el-select
           v-model="local.asinSearchType"
           size="small"
-          class="seamless-left w-110"
+          class="seamless-left asin-search-type-select"
+          popper-class="asin-search-type-popper"
           placeholder="ASIN查询"
         >
-          <el-option label="按ASIN/MSKU查询" value="sku" />
-          <el-option label="按父ASIN查询" value="parent_asin" />
+          <el-option label="按ASIN/MSKU查询" value="sku" title="按ASIN/MSKU查询" />
+          <el-option label="按父ASIN查询" value="parent_asin" title="按父ASIN查询" />
         </el-select>
         <FsSelect
           v-model="local.skus"
@@ -62,14 +63,6 @@
           placeholder="MSKU"
           :show-only="true"
           class="seamless-right w-110"
-        />
-        <el-button
-          v-if="local.skus?.length"
-          size="small"
-          :icon="Close"
-          class="btn-msku-clear"
-          title="清空MSKU"
-          @click="clearField('skus')"
         />
       </div>
       <FsSelect
@@ -250,7 +243,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
 import type { PropType } from "vue";
-import { Filter, Search, Brush, Close } from "@element-plus/icons-vue";
+import { Filter, Search, Brush } from "@element-plus/icons-vue";
 import FsSelect from "@/components/FsSelect.vue";
 
 const props = defineProps({
@@ -500,12 +493,23 @@ function openTemplates() {
   align-items: center;
 }
 
-.btn-msku-clear {
-  padding: 5px 6px;
-  color: var(--color-gray-500);
-  border-left: 0;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
+.asin-search-type-select {
+  width: 92px;
+}
+
+.asin-search-type-select :deep(.el-select__selected-item),
+.asin-search-type-select :deep(.el-select__placeholder),
+.asin-search-type-select :deep(.el-select__selected-item span) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:global(.asin-search-type-popper .el-select-dropdown__item) {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .input-group-seamless :deep(.seamless-left .el-input__wrapper) {
