@@ -244,7 +244,6 @@ function toggleAll(): void {
  * @returns {Record<string, string>} 容器样式对象
  */
 const containerStyle = computed((): Record<string, string> => {
-  if (props.fixedWidth) return {};
   if (!props.multiple) return {};
   const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
   if (vals.length === 0) return {};
