@@ -131,17 +131,36 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if bidding_strategy:
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
+        # ── 标签筛选 ──
+        # 标签数据来源与展示侧保持一致：LxProductInfo.label → LxSpAd → LxSpCampaign，
+        # 不再依赖 LxSpCampaign.tags（两者可能不同步）。
         tags = data.get("tags")
         if tags:
             tag_list = [t.strip() for t in tags.split(",") if t.strip()]
             if tag_list:
-                # LxSpCampaign.tags 为 JSON 数组 [{parent, child}, ...]，
-                # 标签值分布在 parent 或 child 字段上，直接用 JSON_CONTAINS 匹配
-                tag_q = Q()
+                tag_asin_q = Q()
                 for t in tag_list:
-                    tag_q |= Q(tags__contains=[{"parent": t}])
-                    tag_q |= Q(tags__contains=[{"child": t}])
-                qs = qs.filter(tag_q)
+                    tag_asin_q |= Q(label__icontains=t)
+                tag_asins = set(
+                    LxProductInfo.objects.filter(tag_asin_q)
+                    .values_list("asin", flat=True)
+                    .distinct()
+                )
+                if tag_asins:
+                    tag_ad_pairs = set(
+                        LxSpAd.objects.filter(asin__in=tag_asins)
+                        .values_list("campaign_id", "profile_id")
+                        .distinct()
+                    )
+                    if tag_ad_pairs:
+                        tag_q = Q()
+                        for cid, pid in tag_ad_pairs:
+                            tag_q |= Q(campaign_id=cid, profile_id=pid)
+                        qs = qs.filter(tag_q)
+                    else:
+                        qs = qs.filter(Q(pk__in=[]))
+                else:
+                    qs = qs.filter(Q(pk__in=[]))
 
         # ── 负责人筛选 ──
         # 标签和负责人数据来源相同：LxProductInfo（label + principal_list），
@@ -153,7 +172,10 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 # LxProductInfo.principal_list 为 [{uid, realname}, ...]
                 owner_q_parts = Q()
                 for uid in owner_list:
-                    owner_q_parts |= Q(principal_list__contains=[{"uid": int(uid)}])
+                    try:
+                        owner_q_parts |= Q(principal_list__contains=[{"uid": int(uid)}])
+                    except (ValueError, TypeError):
+                        continue
                 owner_asins = set(
                     LxProductInfo.objects.filter(owner_q_parts)
                     .values_list("asin", flat=True)
@@ -170,6 +192,10 @@ class AdCampaignViewSet(viewsets.ViewSet):
                         for cid, pid in owner_ad_pairs:
                             owner_q |= Q(campaign_id=cid, profile_id=pid)
                         qs = qs.filter(owner_q)
+                    else:
+                        qs = qs.filter(Q(pk__in=[]))
+                else:
+                    qs = qs.filter(Q(pk__in=[]))
 
         portfolio_id = data.get("portfolio_id")
         if portfolio_id:
@@ -248,13 +274,14 @@ class AdCampaignViewSet(viewsets.ViewSet):
             date_end or "_",
             data.get("keyword") or "_",
             data.get("state") or "_",
-            data.get("serving_status") or "_",
+            data.get("service_status") or "_",
             data.get("sponsored_type") or "_",
             data.get("bidding_type") or "_",
             data.get("profiles") or "_",
             data.get("countries") or "_",
             data.get("portfolio_id") or "_",
             data.get("tags") or "_",
+            data.get("owners") or "_",
             data.get("skus") or "_",
             data.get("asinSearchType") or "_",
         ]
