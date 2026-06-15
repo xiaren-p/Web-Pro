@@ -53,6 +53,12 @@ from api_v1.models.lingxing.sales.listing.lx_listing_remark import LxListingRema
 from api_v1.models.lingxing.sales.listing.lx_order_profit import LxOrderProfit
 from api_v1.models.lingxing.sales.listing.lx_listing_metrics import LxListingMetrics
 from api_v1.models.lingxing.sales.listing.lx_listing_meta import LxListingMeta
+from api_v1.models.lingxing.product.lx_local_product import (
+    ComboFlag, LxLocalProduct, ProductOpenStatus, ProductStatus,
+)
+from api_v1.models.lingxing.product.lx_product_tag import LxProductTag
+from api_v1.models.lingxing.product.lx_supplier_quote import LxSupplierQuote, PrimaryFlag
+from api_v1.models.lingxing.product.lx_product_custom_field import LxProductCustomField
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import (
     BaseValueType, ExecutionResultType,
     LxTimePricingStrategy, StrategyStatus,
@@ -78,7 +84,10 @@ __all__ = [
     'LxExchangeRate',
     'LxShops', 'ShopStatus', 'HasAdsSetting',
     'LxUser', 'UserStatus', 'IsMaster',
-    'LxListingInfo', 'LxListingData', 'ListingStatus', 'ListingDeleteFlag', 'ListingStoreType', 'LxProductInfo', 'LxListingRemark', 'LxOrderProfit', 'LxListingMetrics',
+    'LxListingInfo', 'LxListingData', 'ListingStatus', 'ListingDeleteFlag', 'ListingStoreType', 'LxProductInfo', 'LxListingRemark', 'LxOrderProfit', 'LxListingMetrics', 'LxListingMeta',
+    # 本地产品
+    'LxLocalProduct', 'ProductOpenStatus', 'ProductStatus', 'ComboFlag',
+    'LxProductTag', 'LxSupplierQuote', 'PrimaryFlag', 'LxProductCustomField',
     # 分时调价策略
     'LxTimePricingStrategy', 'StrategyStatus', 'BaseValueType', 'ExecutionResultType',
 ]
