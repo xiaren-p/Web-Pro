@@ -523,27 +523,28 @@ function openTemplates() {
 
 /* SKU / 父 ASIN 下拉：tag 截断 + 0.5s 延时完整提示 */
 .asin-search-sku-select {
-  max-width: 110px;
+  width: 110px !important;
+  max-width: 110px !important;
+}
+.asin-search-sku-select :deep(.el-select__wrapper) {
+  width: 110px !important;
+  max-width: 110px !important;
+}
+.asin-search-sku-select :deep(.el-select__selection) {
+  width: 110px !important;
+  max-width: 110px !important;
+  overflow: hidden;
+}
+.asin-search-sku-select :deep(.el-select__tags) {
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 .asin-search-sku-select :deep(.el-select__tags-text),
 .asin-search-sku-select :deep(.el-select__tags .el-tag) {
-  max-width: 76px;
+  max-width: 70px !important;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.asin-search-sku-select :deep(.el-select__tags .el-tag:first-child) {
-  max-width: 76px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.asin-search-sku-select :deep(.el-select__wrapper) {
-  max-width: 110px;
-}
-.asin-search-sku-select :deep(.el-select__selection) {
-  max-width: 100%;
-  overflow: hidden;
 }
 
 .filter-actions {

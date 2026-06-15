@@ -17,7 +17,68 @@
         popper-class="fs-select-popper"
         @change="onChange"
         @visible-change="onVisibleChange"
-      />
+      >
+        <template v-if="remote || filterable" #header>
+          <div class="fs-select-popper__header" @click.stop>
+            <el-input
+              v-model="searchKeyword"
+              placeholder="输入关键字进行搜索..."
+              size="small"
+              clearable
+              @input="handleHeaderSearch"
+            />
+          </div>
+        </template>
+        <el-option
+          v-if="multiple && showSelectAll"
+          :key="ALL_OPTION"
+          :label="selectAllLabel"
+          :value="ALL_OPTION"
+          class="fs-select-popper__all-option"
+        >
+          <el-checkbox
+            :model-value="isAllSelected"
+            :indeterminate="isIndeterminate"
+            @click.stop.prevent="toggleAll"
+          />
+          <span class="fs-select-popper__label">{{ selectAllLabel }}</span>
+        </el-option>
+
+        <el-option
+          v-for="option in filteredOptions"
+          :key="option.value"
+          :label="option.label || option.title || option.value"
+          :value="option.value"
+          :class="{ 'fs-select-popper__check-option': multiple }"
+        >
+          <template #default>
+            <el-checkbox
+              v-if="multiple"
+              :model-value="isChecked(option.value)"
+              class="fs-select-popper__check"
+            />
+            <img v-if="option.img" :src="option.img" class="fs-option-img" />
+            <span class="fs-option-content">
+              <span class="fs-option-title" :title="option.title || option.label">
+                {{ option.title || option.label }}
+              </span>
+              <small v-if="option.code" class="sku-code">
+                {{ option.code }}
+                <span v-if="option.value && option.value !== option.code">{{ option.value }}</span>
+              </small>
+            </span>
+            <el-button
+              v-if="showOnly"
+              class="only-btn"
+              type="text"
+              size="small"
+              @click.stop.prevent="selectOnly(option.value)"
+            >
+              仅筛选此项
+            </el-button>
+          </template>
+        </el-option>
+      </el-select>
     </el-tooltip>
     <el-select
       v-else
@@ -282,7 +343,10 @@ const containerStyle = computed((): Record<string, string> => {
   const opt = (props.options as any[]).find((o: any) => o.value === firstVal);
   const label: string = opt ? String(opt.label ?? opt.title ?? firstVal) : String(firstVal);
 
-  const charPx = [...label].reduce((acc, ch) => acc + (/[一-鿿＀-￯]/.test(ch) ? 14 : 8), 0);
+  const charPx = [...label].reduce(
+    (acc, ch) => acc + (/[一-鿿＀-￯]/.test(ch) ? 14 : 8),
+    0
+  );
   const countPx = vals.length > 1 ? 42 : 0;
   const total = Math.min(charPx + countPx + 56, 180);
   return { minWidth: `${total}px` };
@@ -327,12 +391,11 @@ const containerStyle = computed((): Record<string, string> => {
   overflow: hidden;
 }
 
-.fs-select-img {
+.fs-option-img {
   flex-shrink: 0;
   width: 36px;
   height: 36px;
   margin-right: 8px;
-  vertical-align: middle;
   object-fit: cover;
   border-radius: 4px;
 }
@@ -372,24 +435,20 @@ const containerStyle = computed((): Record<string, string> => {
     padding: 8px 8px 4px;
   }
 
-  // 搜索框
   &__header {
     padding: 8px 8px 4px;
   }
 
-  // 全选行
   &__all-option {
     font-weight: var(--font-weight-medium);
     border-bottom: 1px solid var(--border-subtle);
   }
 
-  // 复选框
   &__check {
     margin-right: 8px;
-    pointer-events: none; // 点击由 el-option 处理
+    pointer-events: none;
   }
 
-  // 选项内 label 文本
   &__label {
     margin-left: 8px;
   }
@@ -404,7 +463,6 @@ const containerStyle = computed((): Record<string, string> => {
     line-height: 1.35;
     transition: background-color var(--transition-fast);
 
-    // 隐藏 Element Plus 默认的选中勾号
     &.is-selected::after {
       content: none;
     }
@@ -420,7 +478,6 @@ const containerStyle = computed((): Record<string, string> => {
     }
   }
 
-  // 复选框样式覆盖 - 仅覆盖颜色和尺寸，不覆盖定位
   .el-checkbox {
     flex-shrink: 0;
     height: auto;
