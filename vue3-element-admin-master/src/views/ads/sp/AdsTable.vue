@@ -165,44 +165,46 @@
       </el-table>
     </div>
 
-    <div
-      v-show="showHorizontalScroll"
-      ref="horizontalScrollRef"
-      class="table-horizontal-scroll"
-      @scroll="handleProxyScroll"
-    >
+    <div class="table-footer-sticky">
       <div
-        class="table-horizontal-scroll__inner"
-        :style="{ width: `${horizontalScrollWidth}px` }"
-      />
-    </div>
-
-    <div class="pager-row">
-      <div class="pager-left">
-        <span class="total-count">
-          <el-icon class="count-icon"><List /></el-icon>
-          共 {{ total.toLocaleString() }} 条
-        </span>
-      </div>
-      <div class="pager-center">
-        <el-pagination
-          background
-          :current-page="currentPage"
-          :page-size="localPageSize"
-          :total="total"
-          layout="prev, pager, next"
-          @current-change="$emit('current-change', $event)"
+        v-show="showHorizontalScroll"
+        ref="horizontalScrollRef"
+        class="table-horizontal-scroll"
+        @scroll="handleProxyScroll"
+      >
+        <div
+          class="table-horizontal-scroll__inner"
+          :style="{ width: `${horizontalScrollWidth}px` }"
         />
       </div>
-      <div class="pager-right">
-        <span class="page-size-label">每页</span>
-        <el-select v-model="localPageSize" class="page-size-select" @change="onPageSizeChange">
-          <el-option label="25条" :value="25" />
-          <el-option label="50条" :value="50" />
-          <el-option label="100条" :value="100" />
-          <el-option label="250条" :value="250" />
-        </el-select>
-        <span class="page-size-suffix">条/页</span>
+
+      <div class="pager-row">
+        <div class="pager-left">
+          <span class="total-count">
+            <el-icon class="count-icon"><List /></el-icon>
+            共 {{ total.toLocaleString() }} 条
+          </span>
+        </div>
+        <div class="pager-center">
+          <el-pagination
+            background
+            :current-page="currentPage"
+            :page-size="localPageSize"
+            :total="total"
+            layout="prev, pager, next"
+            @current-change="$emit('current-change', $event)"
+          />
+        </div>
+        <div class="pager-right">
+          <span class="page-size-label">每页</span>
+          <el-select v-model="localPageSize" class="page-size-select" @change="onPageSizeChange">
+            <el-option label="25条" :value="25" />
+            <el-option label="50条" :value="50" />
+            <el-option label="100条" :value="100" />
+            <el-option label="250条" :value="250" />
+          </el-select>
+          <span class="page-size-suffix">条/页</span>
+        </div>
       </div>
     </div>
   </div>
@@ -843,12 +845,19 @@ function formatValue(val: any): string {
   height: 1px;
 }
 
-.table-horizontal-scroll {
+.table-footer-sticky {
   position: sticky;
   bottom: 0;
-  z-index: 14;
+  z-index: 13;
+  background: var(--surface-base);
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  border-left: 1px solid #e2e8f0;
+  border-radius: 0 0 18px 18px;
+}
+
+.table-horizontal-scroll {
   height: 12px;
-  margin-bottom: 52px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-color: var(--border-strong) var(--border-subtle);
@@ -880,9 +889,6 @@ function formatValue(val: any): string {
 }
 
 .pager-row {
-  position: sticky;
-  bottom: 0;
-  z-index: 13;
   display: flex;
   gap: 12px;
   align-items: center;
@@ -890,10 +896,6 @@ function formatValue(val: any): string {
   padding: 10px 18px;
   background: var(--surface-base);
   border-top: 1px solid #e2e8f0;
-  border-right: 1px solid #e2e8f0;
-  border-bottom: 1px solid #e2e8f0;
-  border-left: 1px solid #e2e8f0;
-  border-radius: 0 0 18px 18px;
 }
 
 .pager-row > * {
