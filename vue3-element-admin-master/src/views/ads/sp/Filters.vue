@@ -527,7 +527,23 @@ function openTemplates() {
   min-width: 110px !important;
   max-width: 110px !important;
   flex: 0 0 110px !important;
+}
+.asin-search-sku-select :deep(.el-select__wrapper) {
+  width: 110px !important;
+  min-width: 110px !important;
+  max-width: 110px !important;
+}
+.asin-search-sku-select :deep(.el-select__selection),
+.asin-search-sku-select :deep(.el-select__tags) {
+  max-width: 110px !important;
   overflow: hidden !important;
+}
+.asin-search-sku-select :deep(.el-select__tags .el-tag),
+.asin-search-sku-select :deep(.el-select__tags-text) {
+  max-width: 68px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
 .filter-actions {

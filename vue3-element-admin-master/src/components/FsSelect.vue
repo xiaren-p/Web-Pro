@@ -1,87 +1,6 @@
 <template>
-  <div class="fs-select" :class="{ 'fs-select--fixed': fixed }" :style="containerStyle">
-    <el-tooltip v-if="fixed && tagTooltip" :content="tagTooltip" placement="top" :show-after="500">
-      <el-select
-        v-model="internalValue"
-        :multiple="multiple"
-        :filterable="false"
-        :remote="remote"
-        :remote-method="onRemote"
-        :reserve-keyword="reserveKeyword"
-        :placeholder="placeholder"
-        :clearable="clearable"
-        :size="size"
-        collapse-tags
-        style="width: 100%"
-        :remote-show-suffix="true"
-        popper-class="fs-select-popper"
-        @change="onChange"
-        @visible-change="onVisibleChange"
-      >
-        <template v-if="remote || filterable" #header>
-          <div class="fs-select-popper__header" @click.stop>
-            <el-input
-              v-model="searchKeyword"
-              placeholder="输入关键字进行搜索..."
-              size="small"
-              clearable
-              @input="handleHeaderSearch"
-            />
-          </div>
-        </template>
-        <el-option
-          v-if="multiple && showSelectAll"
-          :key="ALL_OPTION"
-          :label="selectAllLabel"
-          :value="ALL_OPTION"
-          class="fs-select-popper__all-option"
-        >
-          <el-checkbox
-            :model-value="isAllSelected"
-            :indeterminate="isIndeterminate"
-            @click.stop.prevent="toggleAll"
-          />
-          <span class="fs-select-popper__label">{{ selectAllLabel }}</span>
-        </el-option>
-
-        <el-option
-          v-for="option in filteredOptions"
-          :key="option.value"
-          :label="option.label || option.title || option.value"
-          :value="option.value"
-          :class="{ 'fs-select-popper__check-option': multiple }"
-        >
-          <template #default>
-            <el-checkbox
-              v-if="multiple"
-              :model-value="isChecked(option.value)"
-              class="fs-select-popper__check"
-            />
-            <img v-if="option.img" :src="option.img" class="fs-option-img" />
-            <span class="fs-option-content">
-              <span class="fs-option-title" :title="option.title || option.label">
-                {{ option.title || option.label }}
-              </span>
-              <small v-if="option.code" class="sku-code">
-                {{ option.code }}
-                <span v-if="option.value && option.value !== option.code">{{ option.value }}</span>
-              </small>
-            </span>
-            <el-button
-              v-if="showOnly"
-              class="only-btn"
-              type="text"
-              size="small"
-              @click.stop.prevent="selectOnly(option.value)"
-            >
-              仅筛选此项
-            </el-button>
-          </template>
-        </el-option>
-      </el-select>
-    </el-tooltip>
+  <div ref="root" class="fs-select" :style="containerStyle">
     <el-select
-      v-else
       v-model="internalValue"
       :multiple="multiple"
       :filterable="false"
@@ -180,7 +99,6 @@ const props = defineProps({
   showSelectAll: { type: Boolean, default: true },
   selectAllLabel: { type: String, default: "全选" },
   showOnly: { type: Boolean, default: false },
-  fixed: { type: Boolean, default: false },
   size: { type: String as PropType<"large" | "default" | "small">, default: "default" },
 });
 
@@ -201,19 +119,6 @@ const filteredOptions = computed(() => {
     const parentAsin = (o.parent || o.parent_asin || "").toString().toLowerCase();
     return label.includes(kw) || code.includes(kw) || parentAsin.includes(kw);
   });
-});
-
-/**
- * 当前已选 tag 文本聚合（用于 tooltip 悬浮查看完整内容）。
- */
-const tagTooltip = computed((): string => {
-  const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
-  if (vals.length === 0) return "";
-  const labels = vals.map((val) => {
-    const option = (props.options as any[]).find((item: any) => item.value === val);
-    return String(option?.title ?? option?.label ?? option?.code ?? val);
-  });
-  return labels.join("，");
 });
 
 function handleHeaderSearch() {
@@ -330,12 +235,12 @@ function toggleAll(): void {
 
 /**
  * 计算组件容器宽度。
- * fixed 模式下不做自适应扩展；否则根据首项文本 + +N 估算最小宽度。
+ * 多选且已选中时，根据“首项文本 + +N”估算最小宽度，上限 160px。
  *
  * @returns {Record<string, string>} 容器样式对象
  */
 const containerStyle = computed((): Record<string, string> => {
-  if (props.fixed || !props.multiple) return {};
+  if (!props.multiple) return {};
   const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
   if (vals.length === 0) return {};
 
@@ -348,7 +253,7 @@ const containerStyle = computed((): Record<string, string> => {
     0
   );
   const countPx = vals.length > 1 ? 42 : 0;
-  const total = Math.min(charPx + countPx + 56, 180);
+  const total = Math.min(charPx + countPx + 56, 160);
   return { minWidth: `${total}px` };
 });
 </script>
@@ -383,24 +288,6 @@ const containerStyle = computed((): Record<string, string> => {
   background-color: var(--surface-subtle) !important;
   border-color: var(--border-base) !important;
   border-radius: 4px !important;
-}
-
-/* fixed 模式：强制截断显示 */
-.fs-select--fixed {
-  overflow: hidden;
-}
-.fs-select--fixed :deep(.el-select__wrapper),
-.fs-select--fixed :deep(.el-select__selection),
-.fs-select--fixed :deep(.el-select__tags) {
-  max-width: 100% !important;
-  overflow: hidden !important;
-}
-.fs-select--fixed :deep(.el-select__tags .el-tag),
-.fs-select--fixed :deep(.el-select__tags-text) {
-  max-width: 68px !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
 }
 
 .fs-option-img {
