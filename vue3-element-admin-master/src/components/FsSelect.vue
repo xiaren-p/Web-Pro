@@ -99,7 +99,6 @@ const props = defineProps({
   showSelectAll: { type: Boolean, default: true },
   selectAllLabel: { type: String, default: "全选" },
   showOnly: { type: Boolean, default: false },
-  maxTagWidth: { type: Number, default: 0 },
   size: { type: String as PropType<"large" | "default" | "small">, default: "default" },
 });
 
