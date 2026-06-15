@@ -386,9 +386,21 @@ const containerStyle = computed((): Record<string, string> => {
 }
 
 /* fixed 模式：强制截断显示 */
-.fs-select--fixed :deep(.el-select__tags) {
-  max-width: 100%;
+.fs-select--fixed {
   overflow: hidden;
+}
+.fs-select--fixed :deep(.el-select__wrapper),
+.fs-select--fixed :deep(.el-select__selection),
+.fs-select--fixed :deep(.el-select__tags) {
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+.fs-select--fixed :deep(.el-select__tags .el-tag),
+.fs-select--fixed :deep(.el-select__tags-text) {
+  max-width: 68px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
 .fs-option-img {
