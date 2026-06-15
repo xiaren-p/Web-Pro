@@ -99,6 +99,7 @@ const props = defineProps({
   showSelectAll: { type: Boolean, default: true },
   selectAllLabel: { type: String, default: "全选" },
   showOnly: { type: Boolean, default: false },
+  maxTagWidth: { type: Number, default: 0 },
   size: { type: String as PropType<"large" | "default" | "small">, default: "default" },
 });
 
@@ -243,6 +244,7 @@ function toggleAll(): void {
  * @returns {Record<string, string>} 容器样式对象
  */
 const containerStyle = computed((): Record<string, string> => {
+  if (props.fixedWidth) return {};
   if (!props.multiple) return {};
   const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
   if (vals.length === 0) return {};
