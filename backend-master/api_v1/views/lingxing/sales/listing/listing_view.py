@@ -3,10 +3,12 @@
 承载 Listing 的分页查询与标签/分类/备注的批量 upsert 接口。
 所有数据形态加工（货币符号映射、principal_info 字段补齐、状态码二值化等）
 均在后端定型，前端拿到字段直接渲染。
+
+自 LxListingInfo 迁移至 LxListingData 后，主查询集不再依赖 select_related，
+关联数据（店铺、元数据、利润）改为手动批量查询拼装。
 """
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from django.db.models import IntegerField, Q
@@ -18,10 +20,10 @@ from rest_framework.viewsets import ViewSet
 
 from api_v1.models import (
     LxExchangeRate,
-    LxListingInfo,
-    LxListingRemark,
+    LxListingData,
+    LxListingMeta,
     LxOrderProfit,
-    LxProductInfo,
+    LxShops,
 )
 from api_v1.utils.responses import drf_error, drf_ok
 
@@ -34,7 +36,7 @@ class SalesProductListingViewSet(ViewSet):
         """获取 Listing 列表分页数据。
 
         支持多维筛选（国家、店铺、配对状态、上架状态、负责人、关键字 / SKU / ASIN
-        等），并将商品/店铺/指标/备注/利润数据在后端拼装为前端可直接渲染的扁平结构。
+        等），并将店铺/元数据/利润数据在后端拼装为前端可直接渲染的扁平结构。
         """
         params = request.query_params
         page_num = int(params.get("pageNum", 1))
@@ -54,37 +56,52 @@ class SalesProductListingViewSet(ViewSet):
                     result.append(item.strip())
             return result
 
-        queryset = LxListingInfo.objects.select_related(
-            "product_link", "shop_link", "metrics", "remark"
-        ).all()
+        # 主查询集：LxListingData 替代 LxListingInfo
+        queryset = LxListingData.objects.all()
 
+        # 国家筛选：直接使用 LxListingData.marketplace
         countries = [c for c in get_param_list("country") if c != "__ALL__"]
         if countries:
-            queryset = queryset.filter(shop_link__country__in=countries)
+            queryset = queryset.filter(marketplace__in=countries)
 
+        # 店铺筛选：直接使用 LxListingData.sid
         shop_ids = [s for s in get_param_list("shopId") if s != "__ALL__"]
         if shop_ids:
-            queryset = queryset.filter(shop_link_id__in=shop_ids)
+            try:
+                int_shop_ids = [int(s) for s in shop_ids]
+            except ValueError:
+                int_shop_ids = []
+            if int_shop_ids:
+                queryset = queryset.filter(sid__in=int_shop_ids)
 
+        # 分类筛选：通过 LxListingMeta.assort 间接过滤
         cat_types = [c for c in get_param_list("categoryType") if c != "__ALL__"]
         if cat_types:
-            cat_q = Q()
+            meta_q = Q()
             for ct in cat_types:
                 if ct == "无":
-                    cat_q |= Q(product_link__assort__isnull=True) | Q(product_link__assort="")
+                    meta_q |= Q(assort__isnull=True) | Q(assort="")
                 else:
-                    cat_q |= Q(product_link__assort__icontains=ct)
-            queryset = queryset.filter(cat_q)
+                    meta_q |= Q(assort__icontains=ct)
+            matched_meta_ids = list(
+                LxListingMeta.objects.filter(meta_q).values_list("listing_data_id", flat=True)
+            )
+            if matched_meta_ids:
+                queryset = queryset.filter(id__in=matched_meta_ids)
+            else:
+                queryset = queryset.none()
 
+        # 配对状态筛选
         pair_status = [p for p in get_param_list("pairStatus") if p != "__ALL__"]
         if pair_status:
-            valid_msku = ~Q(msku__isnull=True) & ~Q(msku="")
+            valid_seller = ~Q(seller_sku__isnull=True) & ~Q(seller_sku="")
             valid_fnsku = ~Q(fnsku__isnull=True) & ~Q(fnsku="")
             if "paired" in pair_status and "unpaired" not in pair_status:
-                queryset = queryset.filter(valid_msku & valid_fnsku)
+                queryset = queryset.filter(valid_seller & valid_fnsku)
             elif "unpaired" in pair_status and "paired" not in pair_status:
-                queryset = queryset.filter(~(valid_msku & valid_fnsku))
+                queryset = queryset.filter(~(valid_seller & valid_fnsku))
 
+        # 上架状态筛选：status (0/1) + is_delete (0/1) 替代旧的三分法
         listing_status_filters = [
             s for s in get_param_list("listingStatus") if s != "__ALL__"
         ]
@@ -93,17 +110,18 @@ class SalesProductListingViewSet(ViewSet):
             status_q = Q()
             for st in listing_status_filters:
                 if st == "on":
-                    status_q |= Q(status=1)
+                    status_q |= Q(status=1, is_delete=0)
                 if st == "off":
-                    status_q |= Q(status=0)
+                    status_q |= Q(status=0, is_delete=0)
                 if st == "deleted":
-                    status_q |= Q(status=2)
+                    status_q |= Q(is_delete=1)
             queryset = queryset.filter(status_q)
             has_status_filter = True
 
         if not has_status_filter:
-            queryset = queryset.filter(status__in=[0, 1])
+            queryset = queryset.filter(is_delete=0)
 
+        # 时间范围筛选
         date_range = get_param_list("reportUpdatedAt")
         if date_range and len(date_range) >= 2:
             start_date, end_date = date_range[0], date_range[1]
@@ -111,16 +129,18 @@ class SalesProductListingViewSet(ViewSet):
                 if len(end_date) == 10:
                     end_date += " 23:59:59"
                 queryset = queryset.filter(
-                    open_date_time__gte=start_date, open_date_time__lte=end_date
+                    open_date_display__gte=start_date, open_date_display__lte=end_date
                 )
 
+        # 负责人筛选：直接使用 LxListingData.principal_info (JSONField)
         owners = [o for o in get_param_list("owner") if o != "__ALL__"]
         if owners:
             owner_q = Q()
             for owner_uid in owners:
-                owner_q |= Q(product_link__principal_list__icontains=owner_uid)
+                owner_q |= Q(principal_info__icontains=owner_uid)
             queryset = queryset.filter(owner_q)
 
+        # 关键词搜索
         if keyword:
             keywords_list = [
                 k.strip()
@@ -131,13 +151,13 @@ class SalesProductListingViewSet(ViewSet):
                 search_q = Q()
                 for key in keywords_list:
                     if search_type == "seller_sku":
-                        search_q |= Q(msku__icontains=key)
+                        search_q |= Q(seller_sku__icontains=key)
                     elif search_type == "asin":
-                        search_q |= Q(product_link_id__icontains=key)
+                        search_q |= Q(asin__icontains=key)
                     elif search_type == "sku":
-                        search_q |= Q(product_link__local_sku__icontains=key)
+                        search_q |= Q(local_sku__icontains=key)
                     elif search_type == "tag":
-                        search_q |= Q(product_link__label__icontains=key)
+                        search_q |= Q(global_tags__icontains=key)
                 queryset = queryset.filter(search_q)
 
         # 排序
@@ -146,18 +166,18 @@ class SalesProductListingViewSet(ViewSet):
         if sort_prop and sort_order:
             prefix = "" if sort_order == "ascending" else "-"
             if sort_prop == "createTime":
-                queryset = queryset.order_by(f"{prefix}open_date_time", "-id")
+                queryset = queryset.order_by(f"{prefix}open_date_display", "-id")
             elif sort_prop == "msku":
-                queryset = queryset.order_by(f"{prefix}msku", "-id")
+                queryset = queryset.order_by(f"{prefix}seller_sku", "-id")
             elif sort_prop == "skuName":
                 queryset = queryset.order_by(
-                    f"{prefix}product_link__local_sku",
-                    f"{prefix}product_link__local_name",
+                    f"{prefix}local_sku",
+                    f"{prefix}local_name",
                     "-id",
                 )
             elif sort_prop == "salesYesterday":
                 queryset = queryset.annotate(
-                    sorted_yesterday_vol=Cast("metrics__yesterday_volume", IntegerField())
+                    sorted_yesterday_vol=Cast("yesterday_volume", IntegerField())
                 ).order_by(f"{prefix}sorted_yesterday_vol", "-id")
             elif sort_prop == "rank":
                 queryset = queryset.order_by(f"{prefix}seller_rank", "-id")
@@ -166,15 +186,18 @@ class SalesProductListingViewSet(ViewSet):
             elif sort_prop == "firstOrderTime":
                 queryset = queryset.order_by(f"{prefix}first_order_time", "-id")
             else:
-                queryset = queryset.order_by("-updated_at", "-id")
+                queryset = queryset.order_by("-id")
         else:
-            queryset = queryset.order_by("-updated_at", "-id")
+            queryset = queryset.order_by("-id")
 
         total = queryset.count()
         page_data = list(queryset[(page_num - 1) * page_size : page_num * page_size])
 
-        # 利润数据：按 listing_id 聚合（取最新一条，故按 -report_date 排序后首个 winning）
+        # ── 手动批量查询关联数据 ──
+
         listing_ids = [item.id for item in page_data]
+
+        # 利润数据：按 listing_id 聚合（取最新一条）
         profits = LxOrderProfit.objects.filter(
             listing_id__in=listing_ids
         ).order_by("-report_date")
@@ -186,17 +209,70 @@ class SalesProductListingViewSet(ViewSet):
                     "gross_margin": float(p.gross_margin) if p.gross_margin else 0.0,
                 }
 
-        # 货币符号映射：国家代码 → 符号（改用 LxExchangeRate 最新记录）
+        # 店铺数据：按 sid 集合批量查询
+        sid_set = {item.sid for item in page_data}
+        shop_map: dict[int, Any] = {}
+        for shop in LxShops.objects.filter(sid__in=sid_set):
+            shop_map[shop.sid] = shop
+
+        # 元数据：按 listing_data_id 集合批量查询 LxListingMeta
+        meta_map: dict[int, Any] = {}
+        for meta in LxListingMeta.objects.filter(listing_data_id__in=listing_ids):
+            meta_map[meta.listing_data_id] = meta
+
+        # 货币符号映射：直接从 LxListingData.currency_code → LxExchangeRate.icon
         rates_by_code: dict[str, str] = {}
         for r in LxExchangeRate.objects.filter(icon__isnull=False).order_by("-date"):
             if r.code not in rates_by_code and r.icon:
                 rates_by_code[r.code] = r.icon
-        # LxListingData.marketplace 存储的是国家代码，LxExchangeRate.code 存的是币种代码
-        # 需要国家→币种→符号的间接映射
-        icon_map: dict[str, str] = {}
-        for lp in listings_page:
-            if lp.currency_code and lp.currency_code not in icon_map:
-                icon_map[lp.currency_code] = rates_by_code.get(lp.currency_code, "$")
+
+        def _get_icon(currency_code: str) -> str:
+            """根据币种代码获取货币符号，默认返回 '$'。"""
+            if not currency_code:
+                return "$"
+            return rates_by_code.get(currency_code, "$")
+
+        def _extract_small_rank(raw: Any) -> int:
+            """从 LxListingData.small_rank（JSON 数组）中提取最小排名整数值。
+
+            small_rank 格式：[{"category": "...", "rank": 123}, ...]
+            取 rank 最小的那个，若为空或解析失败返回 0。
+            """
+            if not raw or not isinstance(raw, list):
+                return 0
+            min_rank = None
+            for item in raw:
+                if isinstance(item, dict):
+                    try:
+                        r = int(item.get("rank", 0))
+                    except (TypeError, ValueError):
+                        continue
+                    if r > 0 and (min_rank is None or r < min_rank):
+                        min_rank = r
+            return min_rank or 0
+
+        def _normalize_principal_info(raw: Any) -> list[dict[str, Any]]:
+            """标准化 principal_info，补齐 realname 字段供前端直接展示。
+
+            LxListingData.principal_info 格式：
+            [{"principal_uid": "...", "principal_name": "..."}, ...]
+            """
+            if not raw or not isinstance(raw, list):
+                return []
+            result: list[dict[str, Any]] = []
+            for p_info in raw:
+                if isinstance(p_info, dict):
+                    realname = (
+                        p_info.get("realname")
+                        or p_info.get("principal_name")
+                        or str(p_info.get("principal_uid", ""))
+                    )
+                    p_info["realname"] = realname
+                    p_info["principal_name"] = realname
+                    result.append(p_info)
+            return result
+
+        # ── 金额与百分比格式化辅助函数 ──
 
         def _money_display(icon: str, value) -> str:
             """金额定型字符串：``"$ 12.34"`` 形式，None/空返回空串。"""
@@ -214,110 +290,111 @@ class SalesProductListingViewSet(ViewSet):
             except (TypeError, ValueError):
                 return "0.00%"
 
+        # ── 构建 data_list ──
+
         data_list: list[dict[str, Any]] = []
         for item in page_data:
-            m = getattr(item, "metrics", None)
-            p = getattr(item, "product_link", None)
-            s = getattr(item, "shop_link", None)
-            currency_icon = icon_map.get(s.country_code, "") if s else ""
-
-            # principal_info：补齐 realname 字段供前端直接展示
-            principal_info = p.principal_list if p and p.principal_list else []
-            for p_info in principal_info:
-                if isinstance(p_info, dict):
-                    realname = (
-                        p_info.get("realname")
-                        or p_info.get("principal_name")
-                        or p_info.get("uid")
-                    )
-                    p_info["realname"] = realname
-                    p_info["principal_name"] = realname  # 向后兼容旧字段
+            s = shop_map.get(item.sid)
+            currency_icon = _get_icon(item.currency_code or "")
+            meta = meta_map.get(item.id)
 
             data_list.append({
                 "id": item.id,
-                "listing_id": str(item.id),
-                "sid": item.shop_link_id,
-                "marketplace": s.country if s else "",
+                "listing_id": str(item.listing_id or item.id),
+                "sid": item.sid,
+                "marketplace": item.marketplace or "",
                 "shop_name": s.name if s else "",
-                "country_code": s.country_code if s else "",
+                # LxShops 没有 country_code 字段，用 country 替代
+                "country_code": s.country if s else "",
                 "currency_icon": currency_icon,
-                "seller_sku": item.msku or "",
+                "seller_sku": item.seller_sku or "",
                 "fnsku": item.fnsku or "",
-                "asin": item.product_link_id or "",
+                "asin": item.asin or "",
                 "parent_asin": item.parent_asin or "",
-                "small_image_url": p.image if p else "",
-                "status": 1 if item.status == 1 else 0,
-                "is_delete": 1 if item.status == 2 else 0,
+                "small_image_url": item.small_image_url or "",
+                "status": item.status if item.status == 1 else 0,
+                "is_delete": item.is_delete if item.is_delete == 1 else 0,
                 "item_name": item.item_name or "",
-                "local_sku": p.local_sku if p else "",
-                "local_name": p.local_name if p else "",
-                "price": float(m.price) if m and m.price else 0,
-                "price_display": _money_display(currency_icon, m.price if m else None),
-                "landed_price": float(m.landed_price) if m and m.landed_price else 0,
-                "landed_price_display": _money_display(currency_icon, m.landed_price if m else None),
-                "listing_price": float(m.listing_price) if m and m.listing_price else 0,
-                "listing_price_display": _money_display(currency_icon, m.listing_price if m else None),
-                "b2b_price": m.b2b_price if m and m.b2b_price else "",
-                "b2b_price_display": _money_display(currency_icon, m.b2b_price if m and m.b2b_price else None),
-                "fba_fee": float(m.fba_fee) if m and m.fba_fee else 0,
-                "fba_fee_display": _money_display(currency_icon, m.fba_fee if m else None),
-                "referral_fee": float(m.referral_fee) if m and m.referral_fee else 0,
-                "referral_fee_display": _money_display(currency_icon, m.referral_fee if m else None),
-                "yesterday_spend": float(m.yesterday_spend) if m and m.yesterday_spend else 0,
-                "yesterday_spend_display": _money_display(currency_icon, m.yesterday_spend if m else None),
-                "seven_spend": float(m.seven_spend) if m and m.seven_spend else 0,
-                "seven_spend_display": _money_display(currency_icon, m.seven_spend if m else None),
-                "fourteen_spend": float(m.fourteen_spend) if m and m.fourteen_spend else 0,
-                "fourteen_spend_display": _money_display(currency_icon, m.fourteen_spend if m else None),
-                "thirty_spend": float(m.thirty_spend) if m and m.thirty_spend else 0,
-                "thirty_spend_display": _money_display(currency_icon, m.thirty_spend if m else None),
-                "afn_fulfillable_quantity": (
-                    int(m.afn_fulfillable_quantity)
-                    if m and m.afn_fulfillable_quantity
-                    else 0
-                ),
-                "yesterday_volume": str(m.yesterday_volume) if m else "0",
-                "total_volume": str(m.total_volume) if m else "0",
-                "fourteen_volume": str(m.fourteen_volume) if m else "0",
-                "thirty_volume": str(m.thirty_volume) if m else "0",
-                "yesterday_amount": str(m.yesterday_amount) if m else "0.00",
-                "yesterday_amount_display": _money_display(currency_icon, m.yesterday_amount if m else None),
-                "seven_amount": str(m.seven_amount) if m else "0.00",
-                "seven_amount_display": _money_display(currency_icon, m.seven_amount if m else None),
-                "fourteen_amount": str(m.fourteen_amount) if m else "0.00",
-                "fourteen_amount_display": _money_display(currency_icon, m.fourteen_amount if m else None),
-                "thirty_amount": str(m.thirty_amount) if m else "0.00",
-                "thirty_amount_display": _money_display(currency_icon, m.thirty_amount if m else None),
-                "average_seven_volume": str(m.average_seven_volume) if m else "0.00",
-                "average_fourteen_volume": str(m.average_fourteen_volume) if m else "0.00",
-                "average_thirty_volume": str(m.average_thirty_volume) if m else "0.00",
-                "seller_rank": int(item.seller_rank) if item.seller_rank else 0,
-                "small_rank": int(item.small_rank) if item.small_rank else 0,
+                "local_sku": item.local_sku or "",
+                "local_name": item.local_name or "",
+                # 价格（CharField → float）
+                "price": float(item.price) if item.price else 0,
+                "price_display": _money_display(currency_icon, item.price),
+                "landed_price": float(item.landed_price) if item.landed_price else 0,
+                "landed_price_display": _money_display(currency_icon, item.landed_price),
+                "listing_price": float(item.listing_price) if item.listing_price else 0,
+                "listing_price_display": _money_display(currency_icon, item.listing_price),
+                # TODO: b2b_price 在 LxListingData 中不存在，暂时留空
+                "b2b_price": "",
+                "b2b_price_display": "",
+                # TODO: fba_fee / referral_fee 在 LxListingData 中不存在，暂时留空
+                "fba_fee": 0,
+                "fba_fee_display": "",
+                "referral_fee": 0,
+                "referral_fee_display": "",
+                # TODO: *_spend 系列在 LxListingData 中不存在，暂时留空
+                "yesterday_spend": 0,
+                "yesterday_spend_display": "",
+                "seven_spend": 0,
+                "seven_spend_display": "",
+                "fourteen_spend": 0,
+                "fourteen_spend_display": "",
+                "thirty_spend": 0,
+                "thirty_spend_display": "",
+                # 库存
+                "afn_fulfillable_quantity": item.afn_fulfillable_quantity or 0,
+                # 销量 / 销售额（CharField → 字符串，保持原输出类型）
+                "yesterday_volume": item.yesterday_volume or "0",
+                "total_volume": item.total_volume or "0",
+                "fourteen_volume": item.fourteen_volume or "0",
+                "thirty_volume": item.thirty_volume or "0",
+                "yesterday_amount": item.yesterday_amount or "0.00",
+                "yesterday_amount_display": _money_display(currency_icon, item.yesterday_amount),
+                "seven_amount": item.seven_amount or "0.00",
+                "seven_amount_display": _money_display(currency_icon, item.seven_amount),
+                "fourteen_amount": item.fourteen_amount or "0.00",
+                "fourteen_amount_display": _money_display(currency_icon, item.fourteen_amount),
+                "thirty_amount": item.thirty_amount or "0.00",
+                "thirty_amount_display": _money_display(currency_icon, item.thirty_amount),
+                "average_seven_volume": item.average_seven_volume or "0.00",
+                "average_fourteen_volume": item.average_fourteen_volume or "0.00",
+                "average_thirty_volume": item.average_thirty_volume or "0.00",
+                # 排名 / 类目
+                "seller_rank": item.seller_rank or 0,
+                "small_rank": _extract_small_rank(item.small_rank),
                 "seller_category": item.seller_category or "",
-                "small_category": item.small_category or "",
-                "seller_brand": p.brand if p else "",
-                "principal_info": p.principal_list if p and p.principal_list else [],
-                "open_date_display": item.open_date_time or "",
+                # LxListingData 无 small_category 字段，暂时留空
+                "small_category": "",
+                "seller_brand": item.seller_brand or "",
+                # 负责人
+                "principal_info": _normalize_principal_info(item.principal_info),
+                # 时间
+                "open_date_display": item.open_date_display or "",
                 "on_sale_time": item.on_sale_time or "",
                 "first_order_time": item.first_order_time or "",
-                "assort": p.assort if p else "",
-                "label": p.label if p else "",
-                "pair_type": item.pair_type or "",
-                "amz_product_id": item.amz_product_id or "",
-                "amz_product_id_type": item.amz_product_id_type or "",
-                "variant_text": item.variant_text if item.variant_text else "",
-                "review_num": item.reviews_num or 0,
-                "last_star": str(item.stars) if item.stars else "0",
+                # 分类与标签（来源变更）
+                "assort": meta.assort if meta else "",
+                # label 已废弃，由 global_tags 替代
+                "label": "",
+                "global_tags": item.global_tags if item.global_tags else [],
+                # 以下字段 LxListingData 中不存在，暂时留空
+                # TODO: pair_type 待后续确认来源
+                "pair_type": "",
+                "amz_product_id": item.listing_id or "",
+                # TODO: amz_product_id_type 待后续确认来源
+                "amz_product_id_type": "",
+                # TODO: variant_text 待后续确认来源
+                "variant_text": "",
+                # 评论 / 评分
+                "review_num": item.review_num or 0,
+                "last_star": item.last_star or "0",
                 "fulfillment_channel_type": item.fulfillment_channel_type or "",
-                "remarks": (
-                    item.remark.remark_text
-                    if hasattr(item, "remark") and item.remark and item.remark.remark_text
-                    else "--"
-                ),
+                # 备注（来源改为 LxListingMeta）
+                "remarks": meta.remark_text if meta and meta.remark_text else "--",
+                # 利润
                 "profit_metrics": profit_map.get(
                     item.id, {"gross_profit": 0.0, "gross_margin": 0.0}
                 ),
-                # 利润后端定型字段，前端表格直接绑定，不再做 toFixed 加工
                 "gross_profit_display": _money_display(
                     currency_icon,
                     profit_map.get(item.id, {}).get("gross_profit", 0.0),
@@ -337,7 +414,12 @@ class SalesProductListingViewSet(ViewSet):
 
     @action(detail=False, methods=["post"], url_path="labels/upsert")
     def upsert_labels(self, request: Request) -> Response:
-        """批量更新或新增商品标签（``LxProductInfo.label``）。"""
+        """批量更新全局标签（``LxListingData.global_tags``）。
+
+        global_tags 为 JSON 数组，前端提交的格式：
+        [{"globalTagId": "xxx", "tagName": "xxx", "color": "#fff"}, ...]
+        为空数组即表示清除所有标签。
+        """
         data = request.data
         if isinstance(data, dict):
             data = [data]
@@ -348,38 +430,43 @@ class SalesProductListingViewSet(ViewSet):
         if not asins:
             return drf_ok(msg="未提供任何 ASIN")
 
-        products = LxProductInfo.objects.filter(asin__in=asins)
-        prod_map = {p.asin: p for p in products}
+        records = LxListingData.objects.filter(asin__in=asins)
+        record_map: dict[str, list[Any]] = {}
+        for r in records:
+            record_map.setdefault(r.asin, []).append(r)
 
-        updates: list[LxProductInfo] = []
-        creates: list[LxProductInfo] = []
+        updates: list[LxListingData] = []
         for item in data:
             asin = item.get("asin")
             if not asin:
                 continue
             tags = item.get("tags", [])
-            try:
-                label_opt = json.dumps(tags, ensure_ascii=False)
-            except Exception:
-                label_opt = "[]"
+            # 标准化标签数组结构：仅保留 {globalTagId, tagName, color}
+            normalized_tags: list[dict[str, Any]] = []
+            for t in tags if isinstance(tags, list) else []:
+                if isinstance(t, dict):
+                    normalized_tags.append({
+                        "globalTagId": t.get("globalTagId", ""),
+                        "tagName": t.get("tagName", ""),
+                        "color": t.get("color", ""),
+                    })
 
-            if asin in prod_map:
-                prod = prod_map[asin]
-                prod.label = label_opt
-                updates.append(prod)
-            else:
-                creates.append(LxProductInfo(asin=asin, label=label_opt))
+            matched = record_map.get(asin, [])
+            for record in matched:
+                record.global_tags = normalized_tags
+                updates.append(record)
 
         if updates:
-            LxProductInfo.objects.bulk_update(updates, ["label", "updated_at"])
-        if creates:
-            LxProductInfo.objects.bulk_create(creates)
+            LxListingData.objects.bulk_update(updates, ["global_tags"])
 
         return drf_ok(msg="标签保存成功")
 
     @action(detail=False, methods=["post"], url_path="assort/upsert")
     def upsert_assort(self, request: Request) -> Response:
-        """批量更新或新增商品分类（``LxProductInfo.assort``）。"""
+        """批量更新或新增分类（``LxListingMeta.assort``）。
+
+        通过 asin → LxListingData.id → LxListingMeta.listing_data_id 的链式查找完成。
+        """
         data = request.data
         if isinstance(data, dict):
             data = [data]
@@ -390,34 +477,45 @@ class SalesProductListingViewSet(ViewSet):
         if not asins:
             return drf_ok(msg="未提供任何 ASIN")
 
-        products = LxProductInfo.objects.filter(asin__in=asins)
-        prod_map = {p.asin: p for p in products}
+        # 第一步：asin → LxListingData.id 映射
+        records = LxListingData.objects.filter(asin__in=asins)
+        asin_to_data_id: dict[str, int] = {r.asin: r.id for r in records}
 
-        updates: list[LxProductInfo] = []
-        creates: list[LxProductInfo] = []
+        target_ids = list(asin_to_data_id.values())
+        # 第二步：已有元数据映射
+        existing_metas = LxListingMeta.objects.filter(listing_data_id__in=target_ids)
+        meta_map: dict[int, Any] = {m.listing_data_id: m for m in existing_metas}
+
+        update_metas: list[LxListingMeta] = []
+        create_metas: list[LxListingMeta] = []
         for item in data:
             asin = item.get("asin")
             if not asin:
                 continue
+            data_id = asin_to_data_id.get(asin)
+            if not data_id:
+                continue
             assort = item.get("assort", "")
 
-            if asin in prod_map:
-                prod = prod_map[asin]
-                prod.assort = assort
-                updates.append(prod)
+            if data_id in meta_map:
+                meta = meta_map[data_id]
+                meta.assort = assort
+                update_metas.append(meta)
             else:
-                creates.append(LxProductInfo(asin=asin, assort=assort))
+                create_metas.append(
+                    LxListingMeta(listing_data_id=data_id, assort=assort)
+                )
 
-        if updates:
-            LxProductInfo.objects.bulk_update(updates, ["assort", "updated_at"])
-        if creates:
-            LxProductInfo.objects.bulk_create(creates)
+        if update_metas:
+            LxListingMeta.objects.bulk_update(update_metas, ["assort", "updated_at"])
+        if create_metas:
+            LxListingMeta.objects.bulk_create(create_metas)
 
         return drf_ok(msg="分类保存成功")
 
     @action(detail=False, methods=["post"], url_path="remark/upsert")
     def upsert_remark(self, request: Request) -> Response:
-        """新增或更新单条 Listing 备注（``LxListingRemark.remark_text``）。"""
+        """新增或更新单条 Listing 备注（``LxListingMeta.remark_text``）。"""
         data = request.data
         listing_id = data.get("listing_id")
         remark_text = data.get("remark", "")
@@ -426,12 +524,16 @@ class SalesProductListingViewSet(ViewSet):
             return drf_error(msg="未提供 listing_id")
 
         try:
-            listing = LxListingInfo.objects.get(id=listing_id)
-        except LxListingInfo.DoesNotExist:
-            return drf_error(msg="Listing不存在")
+            listing_id_int = int(listing_id)
+        except (TypeError, ValueError):
+            return drf_error(msg="listing_id 格式错误")
 
-        LxListingRemark.objects.update_or_create(
-            listing=listing,
+        # 确认 LxListingData 存在
+        if not LxListingData.objects.filter(id=listing_id_int).exists():
+            return drf_error(msg="Listing 不存在")
+
+        LxListingMeta.objects.update_or_create(
+            listing_data_id=listing_id_int,
             defaults={"remark_text": remark_text},
         )
         return drf_ok(msg="备注保存成功")

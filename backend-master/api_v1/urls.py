@@ -50,6 +50,7 @@ urlpatterns = [
     path('sales/product/listing', views.SalesProductListingViewSet.as_view({'get': 'page', }), name='sales-product-listing'),
     path('sales/product/listing/labels/upsert', views.SalesProductListingViewSet.as_view({'post': 'upsert_labels'}), name='sales-product-listing-labels-upsert'),
     path('sales/product/listing/assort/upsert', views.SalesProductListingViewSet.as_view({'post': 'upsert_assort'}), name='sales-product-listing-assort-upsert'),
+    path('sales/product/listing/remark/upsert', views.SalesProductListingViewSet.as_view({'post': 'upsert_remark'}), name='sales-product-listing-remark-upsert'),
 
     # 广告模块
     path('ads/campaigns', views.AdCampaignViewSet.as_view({'post': 'list', }), name='ads-campaigns'),

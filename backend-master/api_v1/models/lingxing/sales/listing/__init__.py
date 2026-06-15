@@ -4,8 +4,10 @@ from api_v1.models.lingxing.sales.listing.lx_listing_remark import LxListingRema
 from api_v1.models.lingxing.sales.listing.lx_order_profit import LxOrderProfit
 from api_v1.models.lingxing.sales.listing.lx_listing_metrics import LxListingMetrics
 from api_v1.models.lingxing.sales.listing.lx_listing_data import LxListingData
+from api_v1.models.lingxing.sales.listing.lx_listing_meta import LxListingMeta
 
 __all__ = [
     'LxListingInfo', 'LxProductInfo', 'LxListingRemark',
     'LxOrderProfit', 'LxListingMetrics', 'LxListingData',
+    'LxListingMeta',
 ]
