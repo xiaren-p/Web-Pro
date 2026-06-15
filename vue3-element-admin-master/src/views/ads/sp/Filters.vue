@@ -61,8 +61,7 @@
           :remote-method="remoteSearchSku"
           :placeholder="skuPlaceholder"
           :show-only="true"
-          fixed
-          class="seamless-right asin-search-sku-select"
+          class="seamless-right w-110"
         />
       </div>
       <FsSelect
@@ -519,31 +518,6 @@ function openTemplates() {
 .input-group-seamless :deep(.seamless-right .el-input__wrapper) {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
-}
-
-/* SKU / 父 ASIN 下拉：tag 截断 + 0.5s 延时完整提示 */
-.asin-search-sku-select {
-  width: 110px !important;
-  min-width: 110px !important;
-  max-width: 110px !important;
-  flex: 0 0 110px !important;
-}
-.asin-search-sku-select :deep(.el-select__wrapper) {
-  width: 110px !important;
-  min-width: 110px !important;
-  max-width: 110px !important;
-}
-.asin-search-sku-select :deep(.el-select__selection),
-.asin-search-sku-select :deep(.el-select__tags) {
-  max-width: 110px !important;
-  overflow: hidden !important;
-}
-.asin-search-sku-select :deep(.el-select__tags .el-tag),
-.asin-search-sku-select :deep(.el-select__tags-text) {
-  max-width: 68px !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
 }
 
 .filter-actions {

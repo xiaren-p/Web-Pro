@@ -1,5 +1,5 @@
 <template>
-  <div ref="root" class="fs-select" :style="containerStyle">
+  <div class="fs-select" :style="containerStyle">
     <el-select
       v-model="internalValue"
       :multiple="multiple"
@@ -116,8 +116,8 @@ const filteredOptions = computed(() => {
   return props.options.filter((o) => {
     const label = (o.label || o.title || o.value || "").toString().toLowerCase();
     const code = (o.code || "").toString().toLowerCase();
-    const parentAsin = (o.parent || o.parent_asin || "").toString().toLowerCase();
-    return label.includes(kw) || code.includes(kw) || parentAsin.includes(kw);
+    const parent = (o.parent || o.parent_asin || "").toString().toLowerCase();
+    return label.includes(kw) || code.includes(kw) || parent.includes(kw);
   });
 });
 
@@ -127,19 +127,13 @@ function handleHeaderSearch() {
   }
 }
 
-function onRemote(query: string) {
-  if (props.remote && typeof props.remoteMethod === "function") {
-    props.remoteMethod(query);
-  }
-}
-
 function onVisibleChange(visible: boolean) {
   if (!visible) {
-    if (props.remote || props.filterable) {
-      searchKeyword.value = "";
-    }
     if (props.remote) {
+      searchKeyword.value = "";
       onRemote("");
+    } else if (props.filterable) {
+      searchKeyword.value = "";
     }
   }
 }
@@ -156,6 +150,7 @@ watch(
   () => props.modelValue,
   (v) => {
     const newVal: any = props.multiple ? (Array.isArray(v) ? v.slice() : []) : v;
+    // 内容相同时跳过，避免因引用变化触发下游 watch 形成死循环
     const oldVal = internalValue.value;
     if (JSON.stringify(oldVal) === JSON.stringify(newVal)) return;
     internalValue.value = newVal;
@@ -164,6 +159,7 @@ watch(
 );
 
 watch(internalValue, (newV, oldV) => {
+  // 内容相同时跳过，避免因引用变化形成 emit→接收→emit 死循环
   if (JSON.stringify(oldV) === JSON.stringify(newV)) return;
 
   if (props.multiple && Array.isArray(newV) && newV.includes(ALL_OPTION)) {
@@ -173,6 +169,12 @@ watch(internalValue, (newV, oldV) => {
   emit("update:modelValue", newV);
   emit("change", newV);
 });
+
+function onRemote(query: string) {
+  if (props.remote && typeof props.remoteMethod === "function") {
+    props.remoteMethod(query);
+  }
+}
 
 function onChange() {
   // no-op, watch handles emit
@@ -234,8 +236,9 @@ function toggleAll(): void {
 }
 
 /**
- * 计算组件容器宽度。
- * 多选且已选中时，根据“首项文本 + +N”估算最小宽度，上限 160px。
+ * 计算组件容器宽度：
+ * 多选且已选中时，根据“首项文本 + +N”估算最小宽度，
+ * 并使用 width=max(100%, Xpx) 让外层容器真正变宽，推动后续筛选项重新排布。
  *
  * @returns {Record<string, string>} 容器样式对象
  */
@@ -248,12 +251,13 @@ const containerStyle = computed((): Record<string, string> => {
   const opt = (props.options as any[]).find((o: any) => o.value === firstVal);
   const label: string = opt ? String(opt.label ?? opt.title ?? firstVal) : String(firstVal);
 
+  // CJK 字符宽约 14px，ASCII 宽约 8px
   const charPx = [...label].reduce(
-    (acc, ch) => acc + (/[一-鿿＀-￯]/.test(ch) ? 14 : 8),
+    (acc, ch) => acc + (/[\u4e00-\u9fff\uff00-\uffef]/.test(ch) ? 14 : 8),
     0
   );
-  const countPx = vals.length > 1 ? 42 : 0;
-  const total = Math.min(charPx + countPx + 56, 160);
+  const countPx = vals.length > 1 ? 42 : 0; // "+N" 徽标宽度
+  const total = charPx + countPx + 56; // 56 = 内边距 + 箭头图标 + 安全余量
   return { minWidth: `${total}px` };
 });
 </script>
@@ -295,6 +299,7 @@ const containerStyle = computed((): Record<string, string> => {
   width: 36px;
   height: 36px;
   margin-right: 8px;
+  vertical-align: middle;
   object-fit: cover;
   border-radius: 4px;
 }
@@ -334,20 +339,24 @@ const containerStyle = computed((): Record<string, string> => {
     padding: 8px 8px 4px;
   }
 
+  // 搜索框
   &__header {
     padding: 8px 8px 4px;
   }
 
+  // 全选行
   &__all-option {
     font-weight: var(--font-weight-medium);
     border-bottom: 1px solid var(--border-subtle);
   }
 
+  // 复选框
   &__check {
     margin-right: 8px;
-    pointer-events: none;
+    pointer-events: none; // 点击由 el-option 处理
   }
 
+  // 选项内 label 文本
   &__label {
     margin-left: 8px;
   }
@@ -362,6 +371,7 @@ const containerStyle = computed((): Record<string, string> => {
     line-height: 1.35;
     transition: background-color var(--transition-fast);
 
+    // 隐藏 Element Plus 默认的选中勾号
     &.is-selected::after {
       content: none;
     }
@@ -377,6 +387,7 @@ const containerStyle = computed((): Record<string, string> => {
     }
   }
 
+  // 复选框样式覆盖 - 仅覆盖颜色和尺寸，不覆盖定位
   .el-checkbox {
     flex-shrink: 0;
     height: auto;
