@@ -184,21 +184,47 @@ async function loadSkuOptions(): Promise<void> {
   try {
     const res = await getAdSkuOptions({});
     allSkus.value = res.skus || [];
-    skuOptions.value = allSkus.value.slice();
+    syncSkuOptions("");
   } catch (error) {
     console.error("加载 SKU 下拉失败", error);
   }
 }
 
-function remoteSearchSku(query: string) {
-  if (!query) {
-    skuOptions.value = allSkus.value.slice();
+function buildParentAsinOptions(options: any[]): any[] {
+  return options
+    .filter((item: any) => {
+      const code = String(item.code || "");
+      const parentAsin = String(item.parent || item.parent_asin || "");
+      return code && parentAsin && code === parentAsin;
+    })
+    .map((item: any) => {
+      const parentAsin = String(item.parent || item.parent_asin || item.code);
+      return {
+        ...item,
+        value: parentAsin,
+        label: parentAsin,
+        code: parentAsin,
+      };
+    });
+}
+
+function syncSkuOptions(query: string): void {
+  const q = query.toLowerCase();
+  const sourceOptions =
+    filters.asinSearchType === "parent_asin"
+      ? buildParentAsinOptions(allSkus.value)
+      : allSkus.value;
+  if (!q) {
+    skuOptions.value = sourceOptions.slice();
     return;
   }
-  const q = query.toLowerCase();
-  skuOptions.value = allSkus.value.filter((s: any) =>
-    (s.title + s.code + s.value).toLowerCase().includes(q)
+  skuOptions.value = sourceOptions.filter((s: any) =>
+    `${s.title || ""}${s.code || ""}${s.value || ""}`.toLowerCase().includes(q)
   );
+}
+
+function remoteSearchSku(query: string) {
+  syncSkuOptions(query);
 }
 
 const filters = reactive({
@@ -216,6 +242,14 @@ const filters = reactive({
   campaignStatus: [] as string[],
   serviceStatus: [] as string[],
 });
+
+watch(
+  () => filters.asinSearchType,
+  () => {
+    filters.skus = [];
+    syncSkuOptions("");
+  }
+);
 
 /**
  * 国家变更时联动清空不匹配的店铺。

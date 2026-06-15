@@ -47,11 +47,10 @@
           v-model="local.asinSearchType"
           size="small"
           class="seamless-left asin-search-type-select"
-          popper-class="asin-search-type-popper"
           placeholder="ASIN查询"
         >
-          <el-option label="按ASIN/MSKU查询" value="sku" title="按ASIN/MSKU查询" />
-          <el-option label="按父ASIN查询" value="parent_asin" title="按父ASIN查询" />
+          <el-option label="按ASIN/MSKU查询" value="sku" />
+          <el-option label="按父ASIN查询" value="parent_asin" />
         </el-select>
         <FsSelect
           v-model="local.skus"
@@ -60,7 +59,7 @@
           multiple
           remote
           :remote-method="remoteSearchSku"
-          placeholder="MSKU"
+          :placeholder="skuPlaceholder"
           :show-only="true"
           class="seamless-right w-110"
         />
@@ -177,7 +176,7 @@
         class="filter-tag"
         @close="clearField('skus')"
       >
-        {{ formatTagText("MSKU", local.skus, skuOptions) }}
+        {{ formatTagText(skuTagPrefix, local.skus, skuOptions) }}
       </el-tag>
       <el-tag
         v-if="local.campaignStatus?.length"
@@ -353,6 +352,14 @@ const hasSelected = computed(() => {
   );
 });
 
+const skuPlaceholder = computed(() => {
+  return local.value.asinSearchType === "parent_asin" ? "父ASIN" : "SKU";
+});
+
+const skuTagPrefix = computed(() => {
+  return local.value.asinSearchType === "parent_asin" ? "父ASIN" : "SKU";
+});
+
 function clearField(field: string) {
   const v = local.value[field];
   if (Array.isArray(v)) {
@@ -494,22 +501,7 @@ function openTemplates() {
 }
 
 .asin-search-type-select {
-  width: 92px;
-}
-
-.asin-search-type-select :deep(.el-select__selected-item),
-.asin-search-type-select :deep(.el-select__placeholder),
-.asin-search-type-select :deep(.el-select__selected-item span) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-:global(.asin-search-type-popper .el-select-dropdown__item) {
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  width: 150px;
 }
 
 .input-group-seamless :deep(.seamless-left .el-input__wrapper) {

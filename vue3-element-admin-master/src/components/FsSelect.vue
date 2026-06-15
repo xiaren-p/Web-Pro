@@ -58,8 +58,15 @@
             class="fs-select-popper__check"
           />
           <img v-if="option.img" :src="option.img" class="fs-option-img" />
-          <span class="fs-option-title">{{ option.title || option.label }}</span>
-          <small v-if="option.code" class="sku-code">{{ option.code }}</small>
+          <span class="fs-option-content">
+            <span class="fs-option-title" :title="option.title || option.label">
+              {{ option.title || option.label }}
+            </span>
+            <small v-if="option.code" class="sku-code">
+              {{ option.code }}
+              <span v-if="option.value && option.value !== option.code">{{ option.value }}</span>
+            </small>
+          </span>
           <el-button
             v-if="showOnly"
             class="only-btn"
@@ -109,7 +116,8 @@ const filteredOptions = computed(() => {
   return props.options.filter((o) => {
     const label = (o.label || o.title || o.value || "").toString().toLowerCase();
     const code = (o.code || "").toString().toLowerCase();
-    return label.includes(kw) || code.includes(kw);
+    const parent = (o.parent || o.parent_asin || "").toString().toLowerCase();
+    return label.includes(kw) || code.includes(kw) || parent.includes(kw);
   });
 });
 
@@ -287,21 +295,33 @@ const containerStyle = computed((): Record<string, string> => {
 }
 
 .fs-option-img {
+  flex-shrink: 0;
   width: 36px;
   height: 36px;
   margin-right: 8px;
   vertical-align: middle;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.fs-option-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
 }
 .fs-option-title {
-  margin-right: 6px;
-  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+  white-space: nowrap;
 }
 .only-btn {
-  float: right;
+  flex-shrink: 0;
   margin-left: 8px;
 }
 .sku-code {
-  margin-left: 6px;
+  margin-top: 2px;
+  margin-left: 0;
   color: var(--text-tertiary);
 }
 </style>
@@ -345,7 +365,10 @@ const containerStyle = computed((): Record<string, string> => {
     display: flex;
     gap: 8px;
     align-items: center;
+    height: auto;
+    min-height: 48px;
     padding: 8px 12px;
+    line-height: 1.35;
     transition: background-color var(--transition-fast);
 
     // 隐藏 Element Plus 默认的选中勾号
