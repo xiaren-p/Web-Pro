@@ -188,6 +188,29 @@ class LxLocalProduct(models.Model):
         help_text="数组，元素格式：{attr_id, attr_name, attr_value}",
     )
 
+    # ── 关联 ID 列表（冗余存储，方便反查）──────────────────────────────────────
+
+    tag_ids = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name="标签 ID 列表",
+        help_text="产品关联的标签 ID 数组，如 [\"907204347399528686\"]",
+    )
+
+    supplier_quote_ids = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name="供应商报价 ID 列表",
+        help_text="产品关联的供应商报价 psq_id 数组，如 [\"psq_001\", \"psq_002\"]",
+    )
+
+    custom_field_ids = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name="自定义字段 ID 列表",
+        help_text="产品关联的自定义字段 field_id 数组，如 [\"field_001\"]",
+    )
+
     # ── 时间 ──────────────────────────────────────────────────────────────────
 
     created_at = models.DateTimeField(
