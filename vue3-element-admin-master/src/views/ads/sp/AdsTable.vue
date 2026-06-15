@@ -177,7 +177,7 @@
       />
     </div>
 
-    <div class="pager-row" :style="{ bottom: showHorizontalScroll ? '12px' : '0px' }">
+    <div class="pager-row">
       <div class="pager-left">
         <span class="total-count">
           <el-icon class="count-icon"><List /></el-icon>
@@ -846,8 +846,9 @@ function formatValue(val: any): string {
 .table-horizontal-scroll {
   position: sticky;
   bottom: 0;
-  z-index: 12;
+  z-index: 14;
   height: 12px;
+  margin-bottom: 52px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-color: var(--border-strong) var(--border-subtle);
