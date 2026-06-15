@@ -1,6 +1,26 @@
 <template>
-  <div class="fs-select" :style="containerStyle">
+  <div class="fs-select" :class="{ 'fs-select--fixed': fixed }" :style="containerStyle">
+    <el-tooltip v-if="fixed && tagTooltip" :content="tagTooltip" placement="top" :show-after="500">
+      <el-select
+        v-model="internalValue"
+        :multiple="multiple"
+        :filterable="false"
+        :remote="remote"
+        :remote-method="onRemote"
+        :reserve-keyword="reserveKeyword"
+        :placeholder="placeholder"
+        :clearable="clearable"
+        :size="size"
+        collapse-tags
+        style="width: 100%"
+        :remote-show-suffix="true"
+        popper-class="fs-select-popper"
+        @change="onChange"
+        @visible-change="onVisibleChange"
+      />
+    </el-tooltip>
     <el-select
+      v-else
       v-model="internalValue"
       :multiple="multiple"
       :filterable="false"
@@ -99,6 +119,7 @@ const props = defineProps({
   showSelectAll: { type: Boolean, default: true },
   selectAllLabel: { type: String, default: "全选" },
   showOnly: { type: Boolean, default: false },
+  fixed: { type: Boolean, default: false },
   size: { type: String as PropType<"large" | "default" | "small">, default: "default" },
 });
 
@@ -116,9 +137,22 @@ const filteredOptions = computed(() => {
   return props.options.filter((o) => {
     const label = (o.label || o.title || o.value || "").toString().toLowerCase();
     const code = (o.code || "").toString().toLowerCase();
-    const parent = (o.parent || o.parent_asin || "").toString().toLowerCase();
-    return label.includes(kw) || code.includes(kw) || parent.includes(kw);
+    const parentAsin = (o.parent || o.parent_asin || "").toString().toLowerCase();
+    return label.includes(kw) || code.includes(kw) || parentAsin.includes(kw);
   });
+});
+
+/**
+ * 当前已选 tag 文本聚合（用于 tooltip 悬浮查看完整内容）。
+ */
+const tagTooltip = computed((): string => {
+  const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
+  if (vals.length === 0) return "";
+  const labels = vals.map((val) => {
+    const option = (props.options as any[]).find((item: any) => item.value === val);
+    return String(option?.title ?? option?.label ?? option?.code ?? val);
+  });
+  return labels.join("，");
 });
 
 function handleHeaderSearch() {
@@ -127,13 +161,19 @@ function handleHeaderSearch() {
   }
 }
 
+function onRemote(query: string) {
+  if (props.remote && typeof props.remoteMethod === "function") {
+    props.remoteMethod(query);
+  }
+}
+
 function onVisibleChange(visible: boolean) {
   if (!visible) {
+    if (props.remote || props.filterable) {
+      searchKeyword.value = "";
+    }
     if (props.remote) {
-      searchKeyword.value = "";
       onRemote("");
-    } else if (props.filterable) {
-      searchKeyword.value = "";
     }
   }
 }
@@ -150,7 +190,6 @@ watch(
   () => props.modelValue,
   (v) => {
     const newVal: any = props.multiple ? (Array.isArray(v) ? v.slice() : []) : v;
-    // 内容相同时跳过，避免因引用变化触发下游 watch 形成死循环
     const oldVal = internalValue.value;
     if (JSON.stringify(oldVal) === JSON.stringify(newVal)) return;
     internalValue.value = newVal;
@@ -159,7 +198,6 @@ watch(
 );
 
 watch(internalValue, (newV, oldV) => {
-  // 内容相同时跳过，避免因引用变化形成 emit→接收→emit 死循环
   if (JSON.stringify(oldV) === JSON.stringify(newV)) return;
 
   if (props.multiple && Array.isArray(newV) && newV.includes(ALL_OPTION)) {
@@ -169,12 +207,6 @@ watch(internalValue, (newV, oldV) => {
   emit("update:modelValue", newV);
   emit("change", newV);
 });
-
-function onRemote(query: string) {
-  if (props.remote && typeof props.remoteMethod === "function") {
-    props.remoteMethod(query);
-  }
-}
 
 function onChange() {
   // no-op, watch handles emit
@@ -236,14 +268,13 @@ function toggleAll(): void {
 }
 
 /**
- * 计算组件容器宽度：
- * 多选且已选中时，根据“首项文本 + +N”估算最小宽度，
- * 并使用 width=max(100%, Xpx) 让外层容器真正变宽，推动后续筛选项重新排布。
+ * 计算组件容器宽度。
+ * fixed 模式下不做自适应扩展；否则根据首项文本 + +N 估算最小宽度。
  *
  * @returns {Record<string, string>} 容器样式对象
  */
 const containerStyle = computed((): Record<string, string> => {
-  if (!props.multiple) return {};
+  if (props.fixed || !props.multiple) return {};
   const vals = Array.isArray(internalValue.value) ? (internalValue.value as any[]) : [];
   if (vals.length === 0) return {};
 
@@ -251,13 +282,9 @@ const containerStyle = computed((): Record<string, string> => {
   const opt = (props.options as any[]).find((o: any) => o.value === firstVal);
   const label: string = opt ? String(opt.label ?? opt.title ?? firstVal) : String(firstVal);
 
-  // CJK 字符宽约 14px，ASCII 宽约 8px
-  const charPx = [...label].reduce(
-    (acc, ch) => acc + (/[\u4e00-\u9fff\uff00-\uffef]/.test(ch) ? 14 : 8),
-    0
-  );
-  const countPx = vals.length > 1 ? 42 : 0; // "+N" 徽标宽度
-  const total = Math.min(charPx + countPx + 56, 160); // 56 = 内边距 + 箭头图标 + 安全余量，160 为最大宽度
+  const charPx = [...label].reduce((acc, ch) => acc + (/[一-鿿＀-￯]/.test(ch) ? 14 : 8), 0);
+  const countPx = vals.length > 1 ? 42 : 0;
+  const total = Math.min(charPx + countPx + 56, 180);
   return { minWidth: `${total}px` };
 });
 </script>
@@ -294,7 +321,13 @@ const containerStyle = computed((): Record<string, string> => {
   border-radius: 4px !important;
 }
 
-.fs-option-img {
+/* fixed 模式：强制截断显示 */
+.fs-select--fixed :deep(.el-select__tags) {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.fs-select-img {
   flex-shrink: 0;
   width: 36px;
   height: 36px;

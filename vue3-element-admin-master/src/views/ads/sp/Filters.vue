@@ -61,6 +61,7 @@
           :remote-method="remoteSearchSku"
           :placeholder="skuPlaceholder"
           :show-only="true"
+          fixed
           class="seamless-right w-110 asin-search-sku-select"
         />
       </div>
@@ -539,6 +540,10 @@ function openTemplates() {
 }
 .asin-search-sku-select :deep(.el-select__wrapper) {
   max-width: 110px;
+}
+.asin-search-sku-select :deep(.el-select__selection) {
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .filter-actions {
