@@ -193,7 +193,7 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
   flex: 1;
   flex-direction: column;
   height: calc(100vh - 84px);
-  padding: 24px;
+  padding: 20px 24px 0;
   background:
     radial-gradient(circle at top left, rgba(37, 99, 235, 0.06), transparent 32rem),
     linear-gradient(180deg, #f8fafc 0%, #f6f8fb 48%, #eef2f7 100%);
@@ -201,7 +201,7 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
 
 .content-block {
   flex-shrink: 0;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid #e2e8f0;
   border-radius: 18px;
@@ -211,7 +211,7 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
 }
 
 .filter-block {
-  padding: 20px 24px;
+  padding: 18px 24px;
 }
 
 .table-block {
@@ -229,7 +229,7 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 20px;
+  padding: 16px 20px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border-bottom: 1px solid #e2e8f0;
   border-radius: 18px 18px 0 0;
@@ -355,11 +355,13 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
   }
 
   .color-dot {
-    width: 22px;
-    height: 22px;
+    display: inline-block;
+    width: 20px;
+    height: 20px;
     border-radius: 5px;
     flex-shrink: 0;
     box-shadow: 0 0 0 1px var(--border-base);
+    vertical-align: middle;
   }
 
   .action-buttons {
@@ -406,7 +408,7 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
   gap: 12px;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 18px;
+  padding: 12px 18px;
 }
 
 .pager-left {
