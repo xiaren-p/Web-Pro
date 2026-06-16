@@ -148,17 +148,21 @@ class ListingTagViewSet(ViewSet):
         tag_type = data.get("type", "").strip()
         color = data.get("color", "").strip()
 
-        if tag_name:
+        # 判断是否为实质性修改：仅修改颜色不算实质性变更，状态恢复为正常
+        has_content_change = False
+        if tag_name and tag_name != tag.tag_name:
             tag.tag_name = tag_name
-        if tag_type:
+            has_content_change = True
+        if tag_type != tag.type:
             tag.type = tag_type
+            has_content_change = True
         if color:
             tag.color = color
 
         operator_name = _get_operator_name(request)
         tag.modify_by_name = operator_name
         if tag.status not in ["deleted"]:
-            tag.status = "modifying"
+            tag.status = "modifying" if has_content_change else "normal"
 
         tag.save(update_fields=["tag_name", "type", "color", "modify_by_name", "status"])
         return drf_ok(msg="更新成功")
