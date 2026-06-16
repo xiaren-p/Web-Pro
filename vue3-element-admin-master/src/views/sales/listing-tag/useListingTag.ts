@@ -1,7 +1,4 @@
-/**
- * Listing 标签管理页面逻辑 composable。
- */
-import { ref, reactive, computed, onMounted, nextTick } from "vue";
+import { ref, reactive, computed, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ListingTagAPI, type ListingTagVO, type ListingTagQuery } from "@/api/sales/listing-tag";
 import { defaultColumns, tagStatusOptions } from "@/views/sales/listing-tag/constants";
@@ -14,6 +11,7 @@ export function useListingTag() {
   const pageNum = ref(1);
   const pageSize = ref(20);
   const total = ref(0);
+  const typeOptions = ref<string[]>([]);
 
   // 查询参数
   const queryParams = reactive<ListingTagQuery>({
@@ -62,8 +60,6 @@ export function useListingTag() {
     }
   };
 
-  const getTypeLabel = (type: string) => type;
-
   // 查询列表
   const handleQuery = async () => {
     loading.value = true;
@@ -82,11 +78,28 @@ export function useListingTag() {
     }
   };
 
+  // 加载类型选项
+  const loadTypeOptions = async () => {
+    try {
+      const res = await ListingTagAPI.getTypeOptions();
+      typeOptions.value = res || [];
+    } catch {
+      typeOptions.value = [];
+    }
+  };
+
+  // 刷新查询和类型选项
+  const handleQueryAndRefresh = async () => {
+    await handleQuery();
+    await loadTypeOptions();
+  };
+
   // 搜索
   const handleSearch = (params: any) => {
     Object.assign(queryParams, params);
     pageNum.value = 1;
     handleQuery();
+    loadTypeOptions();
   };
 
   // 重置
@@ -107,6 +120,7 @@ export function useListingTag() {
       await ListingTagAPI.delete(row.id);
       ElMessage.success("删除成功");
       handleQuery();
+      loadTypeOptions();
     } catch {
       // 取消删除或删除失败
     }
@@ -133,19 +147,9 @@ export function useListingTag() {
       ElMessage.success("批量删除成功");
       selectedRows.value = [];
       handleQuery();
+      loadTypeOptions();
     } catch {
       // 取消删除或删除失败
-    }
-  };
-
-  // 状态切换
-  const handleStatusChange = async (row: ListingTagVO, status: string) => {
-    try {
-      await ListingTagAPI.updateStatus(row.id, status);
-      ElMessage.success("状态更新成功");
-      handleQuery();
-    } catch {
-      ElMessage.error("状态更新失败");
     }
   };
 
@@ -176,6 +180,7 @@ export function useListingTag() {
 
   onMounted(() => {
     handleQuery();
+    loadTypeOptions();
   });
 
   return {
@@ -188,15 +193,15 @@ export function useListingTag() {
     tableColumns,
     selectedRows,
     columnConfigVisible,
+    typeOptions,
     getStatusTag,
     getStatusType,
-    getTypeLabel,
     handleQuery,
+    handleQueryAndRefresh,
     handleSearch,
     handleReset,
     handleDelete,
     handleBatchDelete,
-    handleStatusChange,
     handleSizeChange,
     handleCurrentChange,
     handleConfigSave,

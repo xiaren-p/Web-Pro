@@ -116,10 +116,7 @@ class ListingTagViewSet(ViewSet):
 
         if not tag_name:
             return drf_error(msg="请输入标签名称")
-        if not tag_type:
-            return drf_error(msg="请选择标签类型")
 
-        # 获取当前用户（简化处理，后续可接入真实用户系统）
         operator_name = _get_operator_name(request)
 
         # 创建标签
@@ -129,7 +126,7 @@ class ListingTagViewSet(ViewSet):
             color=color or "#409eff",
             create_by_name=operator_name,
             modify_by_name=operator_name,
-            status="normal",
+            status="creating",
         )
         # 保存后更新 global_tag_id
         tag.global_tag_id = f"TAG_{tag.id}"
@@ -161,7 +158,7 @@ class ListingTagViewSet(ViewSet):
         operator_name = _get_operator_name(request)
         tag.modify_by_name = operator_name
         if tag.status not in ["deleted"]:
-            tag.status = "normal"
+            tag.status = "modifying"
 
         tag.save(update_fields=["tag_name", "type", "color", "modify_by_name", "status"])
         return drf_ok(msg="更新成功")

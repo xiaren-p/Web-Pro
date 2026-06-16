@@ -1,15 +1,9 @@
-/**
- * Listing 标签管理页面常量配置。
- */
-
 export const tagStatusOptions = [
   { label: "创建中", value: "creating" },
   { label: "正常", value: "normal" },
   { label: "修改中", value: "modifying" },
   { label: "已删除", value: "deleted" },
 ];
-
-export const tagTypeOptions = ["商品标签", "运营标签", "库存标签", "营销标签", "其他"];
 
 export const presetColors = [
   { label: "红色", value: "#f56c6c" },
@@ -84,7 +78,7 @@ export const defaultColumns = [
     label: "操作",
     visible: true,
     fixed: "right",
-    width: 180,
+    width: 140,
     align: "center",
   },
 ];

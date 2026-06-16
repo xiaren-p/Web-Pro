@@ -35,7 +35,7 @@ const LISTING_TAG_BASE_URL = "/sales/listing/tags";
 
 export const ListingTagAPI = {
   getPage(params: ListingTagQuery) {
-    return request<{ total: number; data: ListingTagVO[] }, any>({
+    return request<any, { total: number; data: ListingTagVO[] }>({
       url: LISTING_TAG_BASE_URL,
       method: "get",
       params,
@@ -82,7 +82,7 @@ export const ListingTagAPI = {
     });
   },
   getTypeOptions() {
-    return request<{ label: string; value: string }[]>({
+    return request<string[]>({
       url: `${LISTING_TAG_BASE_URL}/type-options`,
       method: "get",
     });

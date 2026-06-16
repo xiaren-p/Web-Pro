@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <ListingTagSearchForm @search="handleSearch" @reset="handleReset" />
+    <ListingTagSearchForm :type-options="typeOptions" @search="handleSearch" @reset="handleReset" />
 
     <el-card shadow="hover" class="data-table">
       <div class="data-table__toolbar">
@@ -42,7 +42,7 @@
             </template>
 
             <template v-else-if="col.prop === 'type'">
-              {{ scope.row.type }}
+              {{ scope.row.type || "-" }}
             </template>
 
             <template v-else-if="col.prop === 'color'">
@@ -63,31 +63,13 @@
                 <el-button link type="primary" size="small" @click="handleEdit(scope.row)">
                   编辑
                 </el-button>
-                <el-dropdown trigger="click" @command="(cmd) => handleStatusChange(scope.row, cmd)">
-                  <el-button link type="primary" size="small">
-                    切换状态
-                    <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                  </el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item
-                        v-for="item in tagStatusOptions"
-                        :key="item.value"
-                        :command="item.value"
-                        :disabled="scope.row.status === item.value"
-                      >
-                        {{ item.label }}
-                      </el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
                 <el-button link type="danger" size="small" @click="handleDelete(scope.row)">
                   删除
                 </el-button>
               </div>
             </template>
 
-            <span v-else>{{ scope.row[col.prop] }}</span>
+            <span v-else>{{ scope.row[col.prop] || "-" }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -110,7 +92,8 @@
     <ListingTagEditDialog
       v-model:visible="editDialogVisible"
       :row="currentEditRow"
-      @success="handleQuery"
+      :type-options="typeOptions"
+      @success="handleQueryAndRefresh"
     />
 
     <ColumnManager
@@ -123,13 +106,9 @@
 </template>
 
 <script setup lang="ts">
-/**
- * Listing 标签管理页面。
- */
 import { ref } from "vue";
-import { Plus, Delete, Setting, ArrowDown } from "@element-plus/icons-vue";
+import { Plus, Delete, Setting } from "@element-plus/icons-vue";
 import { useListingTag } from "@/views/sales/listing-tag/useListingTag";
-import { tagStatusOptions } from "@/views/sales/listing-tag/constants";
 import ListingTagSearchForm from "@/views/sales/listing-tag/components/ListingTagSearchForm.vue";
 import ListingTagEditDialog from "@/views/sales/listing-tag/components/ListingTagEditDialog.vue";
 import ColumnManager from "@/components/ColumnManager/index.vue";
@@ -149,14 +128,14 @@ const {
   tableColumns,
   selectedRows,
   columnConfigVisible,
+  typeOptions,
   getStatusTag,
   getStatusType,
-  handleQuery,
+  handleQueryAndRefresh,
   handleSearch,
   handleReset,
   handleDelete,
   handleBatchDelete,
-  handleStatusChange,
   handleSizeChange,
   handleCurrentChange,
   handleConfigSave,
@@ -166,19 +145,19 @@ const {
 const editDialogVisible = ref(false);
 const currentEditRow = ref<ListingTagVO | null>(null);
 
-function handleAdd() {
+const handleAdd = () => {
   currentEditRow.value = null;
   editDialogVisible.value = true;
-}
+};
 
-function handleEdit(row: ListingTagVO) {
+const handleEdit = (row: ListingTagVO) => {
   currentEditRow.value = { ...row };
   editDialogVisible.value = true;
-}
+};
 
-function handleSelectionChange(selection: ListingTagVO[]) {
+const handleSelectionChange = (selection: ListingTagVO[]) => {
   selectedRows.value = selection;
-}
+};
 </script>
 
 <style scoped lang="scss">
@@ -213,16 +192,15 @@ function handleSelectionChange(selection: ListingTagVO[]) {
 
       .color-dot {
         flex-shrink: 0;
-        width: 20px;
-        height: 20px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
-        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 0 0 1px var(--border-base);
       }
 
       .color-text {
         font-family: monospace;
-        font-size: 13px;
-        color: #606266;
+        color: var(--text-tertiary);
       }
     }
 

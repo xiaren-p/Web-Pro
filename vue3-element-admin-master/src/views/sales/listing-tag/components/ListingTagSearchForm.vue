@@ -14,9 +14,11 @@
           v-model="queryParams.type"
           placeholder="请选择标签类型"
           clearable
+          filterable
+          allow-create
           style="width: 200px"
         >
-          <el-option v-for="item in tagTypeOptions" :key="item" :label="item" :value="item" />
+          <el-option v-for="item in typeOptions" :key="item" :label="item" :value="item" />
         </el-select>
       </el-form-item>
       <el-form-item label="状态">
@@ -51,12 +53,13 @@
 </template>
 
 <script setup lang="ts">
-/**
- * Listing 标签管理搜索表单组件。
- */
 import { reactive, ref } from "vue";
 import { Search, Refresh } from "@element-plus/icons-vue";
-import { tagTypeOptions, tagStatusOptions } from "@/views/sales/listing-tag/constants";
+import { tagStatusOptions } from "@/views/sales/listing-tag/constants";
+
+defineProps<{
+  typeOptions: string[];
+}>();
 
 const emit = defineEmits(["search", "reset"]);
 
@@ -69,17 +72,17 @@ const queryParams = reactive({
   createByName: "",
 });
 
-function handleSearch() {
+const handleSearch = () => {
   emit("search", { ...queryParams });
-}
+};
 
-function handleReset() {
+const handleReset = () => {
   queryParams.tagName = "";
   queryParams.type = "";
   queryParams.status = "";
   queryParams.createByName = "";
   emit("reset", { ...queryParams });
-}
+};
 </script>
 
 <style scoped lang="scss">
