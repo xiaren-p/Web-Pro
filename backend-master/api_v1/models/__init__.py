@@ -59,6 +59,9 @@ from api_v1.models.lingxing.product.lx_local_product import (
 from api_v1.models.lingxing.product.lx_product_tag import LxProductTag
 from api_v1.models.lingxing.product.lx_supplier_quote import LxSupplierQuote, PrimaryFlag
 from api_v1.models.lingxing.product.lx_product_custom_field import LxProductCustomField
+from api_v1.models.lingxing.finance.lx_profit_report_msku import (
+    DetailFlag, LxProfitReportMsku,
+)
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import (
     BaseValueType, ExecutionResultType,
     LxTimePricingStrategy, StrategyStatus,
@@ -88,6 +91,8 @@ __all__ = [
     # 本地产品
     'LxLocalProduct', 'ProductOpenStatus', 'ProductStatus', 'ComboFlag',
     'LxProductTag', 'LxSupplierQuote', 'PrimaryFlag', 'LxProductCustomField',
+    # 财务
+    'LxProfitReportMsku', 'DetailFlag',
     # 分时调价策略
     'LxTimePricingStrategy', 'StrategyStatus', 'BaseValueType', 'ExecutionResultType',
 ]
