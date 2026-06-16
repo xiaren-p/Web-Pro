@@ -169,7 +169,7 @@ const handleSave = async () => {
   width: 32px;
   height: 32px;
   cursor: pointer;
-  border-radius: var(--radius-md);
+  border-radius: 5px;
   box-shadow: 0 0 0 1px var(--border-base);
   transition: all var(--transition-fast);
 

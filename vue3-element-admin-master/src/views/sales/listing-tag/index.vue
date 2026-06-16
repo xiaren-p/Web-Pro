@@ -53,10 +53,7 @@
               </template>
 
               <template v-else-if="col.prop === 'color'">
-                <div class="color-display">
-                  <span class="color-dot" :style="{ backgroundColor: scope.row.color }"></span>
-                  <span class="color-text">{{ scope.row.color }}</span>
-                </div>
+                <span class="color-dot" :style="{ backgroundColor: scope.row.color }"></span>
               </template>
 
               <template v-else-if="col.prop === 'status'">
@@ -195,7 +192,7 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
   display: flex;
   flex: 1;
   flex-direction: column;
-  min-height: calc(100vh - 84px);
+  height: calc(100vh - 84px);
   padding: 24px;
   background:
     radial-gradient(circle at top left, rgba(37, 99, 235, 0.06), transparent 32rem),
@@ -357,25 +354,12 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
     border-radius: 0 2px 2px 0;
   }
 
-  .color-display {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    justify-content: center;
-
-    .color-dot {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      box-shadow: 0 0 0 1px var(--border-base);
-    }
-
-    .color-text {
-      font-family: monospace;
-      font-size: 12px;
-      color: var(--text-tertiary);
-    }
+  .color-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 1px var(--border-base);
   }
 
   .action-buttons {
