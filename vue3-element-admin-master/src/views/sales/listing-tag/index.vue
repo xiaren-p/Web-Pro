@@ -242,7 +242,6 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
 }
 
 .primary-action-btn {
-  height: 36px;
   padding: 0 16px;
   font-weight: 600;
   color: #ffffff;
@@ -259,7 +258,6 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
 }
 
 .danger-action-btn {
-  height: 36px;
   padding: 0 16px;
   font-weight: 600;
   color: #ffffff;

@@ -1,6 +1,6 @@
 <template>
   <div class="search-form">
-    <el-form ref="formRef" :model="queryParams" inline size="default">
+    <el-form ref="formRef" :model="queryParams" inline>
       <el-form-item label="标签名称" class="filter-item">
         <el-input
           v-model="queryParams.tagName"
