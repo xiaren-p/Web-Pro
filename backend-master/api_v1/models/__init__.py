@@ -53,6 +53,7 @@ from api_v1.models.lingxing.sales.listing.lx_listing_remark import LxListingRema
 from api_v1.models.lingxing.sales.listing.lx_order_profit import LxOrderProfit
 from api_v1.models.lingxing.sales.listing.lx_listing_metrics import LxListingMetrics
 from api_v1.models.lingxing.sales.listing.lx_listing_meta import LxListingMeta
+from api_v1.models.lingxing.sales.listing.lx_listing_tag import LxListingTag
 from api_v1.models.lingxing.product.lx_local_product import (
     ComboFlag, LxLocalProduct, ProductOpenStatus, ProductStatus,
 )
@@ -87,7 +88,7 @@ __all__ = [
     'LxExchangeRate',
     'LxShops', 'ShopStatus', 'HasAdsSetting',
     'LxUser', 'UserStatus', 'IsMaster',
-    'LxListingInfo', 'LxListingData', 'ListingStatus', 'ListingDeleteFlag', 'ListingStoreType', 'LxProductInfo', 'LxListingRemark', 'LxOrderProfit', 'LxListingMetrics', 'LxListingMeta',
+    'LxListingInfo', 'LxListingData', 'ListingStatus', 'ListingDeleteFlag', 'ListingStoreType', 'LxProductInfo', 'LxListingRemark', 'LxOrderProfit', 'LxListingMetrics', 'LxListingMeta', 'LxListingTag',
     # 本地产品
     'LxLocalProduct', 'ProductOpenStatus', 'ProductStatus', 'ComboFlag',
     'LxProductTag', 'LxSupplierQuote', 'PrimaryFlag', 'LxProductCustomField',

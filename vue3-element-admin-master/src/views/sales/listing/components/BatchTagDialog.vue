@@ -132,7 +132,10 @@ async function executeBatchAction(action: "add" | "delete") {
       newTags = newTags.filter((t) => !batchTags.value.includes(t));
     }
 
-    updates.push({ asin: row.asin, tags: newTags.map((t: string) => ({ globalTagId: "", tagName: t, color: "" })) });
+    updates.push({
+      asin: row.asin,
+      tags: newTags.map((t: string) => ({ globalTagId: "", tagName: t, color: "" })),
+    });
   }
 
   try {

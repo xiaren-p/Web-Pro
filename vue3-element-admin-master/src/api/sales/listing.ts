@@ -14,7 +14,11 @@ export const SalesProductListingAPI = {
       params,
     });
   },
-  upsertLabels(data: { asin: string; tags: { globalTagId: string; tagName: string; color: string }[] } | { asin: string; tags: { globalTagId: string; tagName: string; color: string }[] }[]) {
+  upsertLabels(
+    data:
+      | { asin: string; tags: { globalTagId: string; tagName: string; color: string }[] }
+      | { asin: string; tags: { globalTagId: string; tagName: string; color: string }[] }[]
+  ) {
     return request<any>({
       url: "/sales/product/listing/labels/upsert",
       method: "post",

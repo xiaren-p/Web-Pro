@@ -1,6 +1,7 @@
 """利润报表-MSKU 模型（lx_profit_report_msku，managed=True）。
 
-存储领星利润报表 MSKU 粒度的全量字段，唯一键为 dataDate+sid+msku+asin+deferredSubStatusCode。
+存储领星利润报表 MSKU 粒度的全量字段。
+唯一键为 queryType + report_date_month + posted_date_locale + sid + msku + asin + deferredSubStatusCode。
 """
 from django.db import models
 
@@ -22,7 +23,7 @@ class QueryType(models.IntegerChoices):
 class LxProfitReportMsku(models.Model):
     """利润报表-MSKU（领星 → 财务 → 利润报表 MSKU）。
 
-    以 dataDate + sid + msku + asin + deferredSubStatusCode 组成联合唯一约束。
+    以 queryType + report_date_month + posted_date_locale + sid + msku + asin + deferredSubStatusCode 组成联合唯一约束。
     """
 
     id = models.BigAutoField(
@@ -1434,7 +1435,7 @@ class LxProfitReportMsku(models.Model):
         verbose_name_plural = "利润报表-MSKU 列表"
         ordering = ["-report_date_month", "-id"]
         unique_together = (
-            ("report_date_month", "posted_date_locale", "sid", "msku", "asin", "deferred_sub_status_code"),
+            ("query_type", "report_date_month", "posted_date_locale", "sid", "msku", "asin", "deferred_sub_status_code"),
         )
 
     def __str__(self) -> str:
