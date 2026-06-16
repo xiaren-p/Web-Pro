@@ -1,11 +1,19 @@
 <template>
-  <div class="app-container">
-    <ListingTagSearchForm :type-options="typeOptions" @search="handleSearch" @reset="handleReset" />
+  <div class="listing-tag-page">
+    <section class="filter-block">
+      <ListingTagSearchForm
+        :type-options="typeOptions"
+        @search="handleSearch"
+        @reset="handleReset"
+      />
+    </section>
 
-    <el-card shadow="hover" class="data-table">
-      <div class="data-table__toolbar">
-        <div class="data-table__toolbar--left">
-          <el-button type="primary" :icon="Plus" @click="handleAdd">新增标签</el-button>
+    <section class="table-block">
+      <div class="table-toolbar">
+        <div class="table-toolbar__left">
+          <el-button type="primary" :icon="Plus" @click="handleAdd">
+            新增标签
+          </el-button>
           <el-button
             type="danger"
             :icon="Delete"
@@ -15,103 +23,130 @@
             批量删除
           </el-button>
         </div>
-        <div class="data-table__toolbar--right">
-          <el-tooltip content="列配置" placement="top">
-            <el-button text :icon="Setting" @click="columnConfigVisible = true" />
-          </el-tooltip>
+      </div>
+
+      <div class="table-scroll">
+        <el-table
+          v-loading="loading"
+          :data="tableData"
+          class="table-content"
+          :border="false"
+          @selection-change="handleSelectionChange"
+        >
+          <template #empty>
+            <div class="table-empty">
+              <div class="table-empty__icon">
+                <el-icon :size="48"><List /></el-icon>
+              </div>
+              <p class="table-empty__text">暂无数据</p>
+            </div>
+          </template>
+          <el-table-column type="selection" width="48" fixed="left" align="center" />
+          <el-table-column v-for="col in tableColumns" :key="col.prop" v-bind="col">
+            <template #default="scope">
+              <template v-if="col.prop === 'tagName'">
+                <div class="tag-name-cell">
+                  <el-tag :color="scope.row.color" effect="light">
+                    {{ scope.row.tagName }}
+                  </el-tag>
+                </div>
+              </template>
+
+              <template v-else-if="col.prop === 'type'">
+                {{ scope.row.type || "-" }}
+              </template>
+
+              <template v-else-if="col.prop === 'color'">
+                <div class="color-display">
+                  <span class="color-dot" :style="{ backgroundColor: scope.row.color }"></span>
+                  <span class="color-text">{{ scope.row.color }}</span>
+                </div>
+              </template>
+
+              <template v-else-if="col.prop === 'status'">
+                <el-tag :type="getStatusType(scope.row.status)" effect="light">
+                  {{ getStatusTag(scope.row.status) }}
+                </el-tag>
+              </template>
+
+              <template v-else-if="col.prop === 'actions'">
+                <div class="action-buttons">
+                  <el-button
+                    link
+                    type="primary"
+                    size="small"
+                    :disabled="scope.row.status === 'deleting'"
+                    @click="handleEdit(scope.row)"
+                  >
+                    编辑
+                  </el-button>
+                  <el-button
+                    link
+                    type="danger"
+                    size="small"
+                    :disabled="scope.row.status === 'deleting'"
+                    @click="handleDelete(scope.row)"
+                  >
+                    删除
+                  </el-button>
+                </div>
+              </template>
+
+              <span v-else>{{ scope.row[col.prop] || "-" }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <div class="table-footer-sticky">
+        <div class="pager-row">
+          <div class="pager-left">
+            <span class="total-count">
+              <el-icon class="count-icon" :size="14"><List /></el-icon>
+              共 {{ total }} 条
+            </span>
+          </div>
+          <div class="pager-right">
+            <span class="page-size-label">每页</span>
+            <el-select
+              :model-value="pageSize"
+              class="page-size-select"
+              @change="handleSizeChange"
+            >
+              <el-option label="10条" :value="10" />
+              <el-option label="20条" :value="20" />
+              <el-option label="50条" :value="50" />
+              <el-option label="100条" :value="100" />
+            </el-select>
+            <span class="page-size-suffix">条/页</span>
+            <el-pagination
+              small
+              background
+              layout="prev, pager, next"
+              :total="total"
+              :page-size="pageSize"
+              :current-page="pageNum"
+              @current-change="handleCurrentChange"
+            />
+          </div>
         </div>
       </div>
-
-      <el-table
-        v-loading="loading"
-        :data="tableData"
-        class="data-table__content"
-        border
-        height="calc(100vh - 300px)"
-        @selection-change="handleSelectionChange"
-      >
-        <el-table-column type="selection" width="55" fixed="left" align="center" />
-        <el-table-column v-for="col in tableColumns" :key="col.prop" v-bind="col">
-          <template #default="scope">
-            <template v-if="col.prop === 'tagName'">
-              <div class="tag-name-cell">
-                <el-tag :color="scope.row.color" effect="light">
-                  {{ scope.row.tagName }}
-                </el-tag>
-              </div>
-            </template>
-
-            <template v-else-if="col.prop === 'type'">
-              {{ scope.row.type || "-" }}
-            </template>
-
-            <template v-else-if="col.prop === 'color'">
-              <div class="color-display">
-                <span class="color-dot" :style="{ backgroundColor: scope.row.color }"></span>
-                <span class="color-text">{{ scope.row.color }}</span>
-              </div>
-            </template>
-
-            <template v-else-if="col.prop === 'status'">
-              <el-tag :type="getStatusType(scope.row.status)" effect="light">
-                {{ getStatusTag(scope.row.status) }}
-              </el-tag>
-            </template>
-
-            <template v-else-if="col.prop === 'actions'">
-              <div class="action-buttons">
-                <el-button link type="primary" size="small" @click="handleEdit(scope.row)">
-                  编辑
-                </el-button>
-                <el-button link type="danger" size="small" @click="handleDelete(scope.row)">
-                  删除
-                </el-button>
-              </div>
-            </template>
-
-            <span v-else>{{ scope.row[col.prop] || "-" }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="pagination-container">
-        <el-pagination
-          size="small"
-          background
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="total"
-          :current-page="pageNum"
-          :page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
-    </el-card>
+    </section>
 
     <ListingTagEditDialog
       v-model:visible="editDialogVisible"
       :row="currentEditRow"
-      :type-options="typeOptions"
       @success="handleQueryAndRefresh"
-    />
-
-    <ColumnManager
-      v-model="columnConfigVisible"
-      :columns="columns"
-      @save="handleConfigSave"
-      @reset="handleConfigReset"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { Plus, Delete, Setting } from "@element-plus/icons-vue";
+import { Plus, Delete, List } from "@element-plus/icons-vue";
 import { useListingTag } from "@/views/sales/listing-tag/useListingTag";
 import ListingTagSearchForm from "@/views/sales/listing-tag/components/ListingTagSearchForm.vue";
 import ListingTagEditDialog from "@/views/sales/listing-tag/components/ListingTagEditDialog.vue";
-import ColumnManager from "@/components/ColumnManager/index.vue";
 import type { ListingTagVO } from "@/api/sales/listing-tag";
 
 defineOptions({ name: "SalesListingTag" });
@@ -124,10 +159,8 @@ const {
   pageNum,
   pageSize,
   total,
-  columns,
   tableColumns,
   selectedRows,
-  columnConfigVisible,
   typeOptions,
   getStatusTag,
   getStatusType,
@@ -138,8 +171,6 @@ const {
   handleBatchDelete,
   handleSizeChange,
   handleCurrentChange,
-  handleConfigSave,
-  handleConfigReset,
 } = listingTagHooks;
 
 const editDialogVisible = ref(false);
@@ -161,61 +192,204 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
 </script>
 
 <style scoped lang="scss">
-.data-table {
-  :deep(.el-card__body) {
-    padding: 16px;
-  }
+.listing-tag-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  height: calc(100vh - 84px);
+  min-height: 0;
+  padding: 0;
+}
 
-  &__toolbar {
+.filter-block {
+  flex-shrink: 0;
+}
+
+.table-block {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 12px 18px;
+
+  &__left {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-
-    &--left {
-      display: flex;
-      gap: 8px;
-    }
-  }
-
-  &__content {
-    .tag-name-cell {
-      display: flex;
-      align-items: center;
-    }
-
-    .color-display {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      justify-content: center;
-
-      .color-dot {
-        flex-shrink: 0;
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        box-shadow: 0 0 0 1px var(--border-base);
-      }
-
-      .color-text {
-        font-family: monospace;
-        color: var(--text-tertiary);
-      }
-    }
-
-    .action-buttons {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-      justify-content: center;
-    }
+    gap: 8px;
   }
 }
 
-.pagination-container {
+.table-scroll {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+
+  :deep(.el-table) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    background: var(--surface-base);
+  }
+
+  :deep(.el-table__inner-wrapper) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  :deep(.el-table__body-wrapper) {
+    flex: 1;
+    overflow-y: auto !important;
+  }
+}
+
+.table-content {
+  :deep(.el-table__cell) {
+    padding: 11px 0 !important;
+    font-size: 13px;
+    color: var(--text-primary);
+    border-right: none !important;
+  }
+
+  :deep(.el-table .cell) {
+    padding-right: 14px;
+    padding-left: 14px;
+    line-height: 1.55;
+  }
+
+  :deep(.el-table__body td.el-table__cell) {
+    border-bottom: 1px solid var(--border-subtle) !important;
+  }
+
+  :deep(.el-table .el-table__row) {
+    transition: background 160ms ease;
+  }
+
+  :deep(.el-table .el-table__row:hover > td.el-table__cell) {
+    background-color: var(--surface-hover) !important;
+  }
+
+  :deep(.el-table__body-wrapper .el-table__row:hover td:first-child::before) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    content: "";
+    background: var(--color-primary-600);
+    border-radius: 0 2px 2px 0;
+  }
+
+  .tag-name-cell {
+    display: flex;
+    align-items: center;
+  }
+
+  .color-display {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+
+    .color-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px var(--border-base);
+    }
+
+    .color-text {
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.table-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding-top: 72px;
+
+  &__icon {
+    color: var(--text-tertiary);
+    opacity: 0.4;
+  }
+
+  &__text {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+}
+
+.table-footer-sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 13;
+  flex-shrink: 0;
+  background: var(--surface-base);
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.pager-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+}
+
+.pager-left {
+  flex-shrink: 0;
+}
+
+.pager-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.total-count {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.page-size-label,
+.page-size-suffix {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.page-size-select {
+  width: 88px;
 }
 </style>

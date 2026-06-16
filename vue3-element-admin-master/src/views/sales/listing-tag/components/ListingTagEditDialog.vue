@@ -14,17 +14,6 @@
           show-word-limit
         />
       </el-form-item>
-      <el-form-item label="标签类型" prop="type">
-        <el-select
-          v-model="formData.type"
-          placeholder="请选择标签类型"
-          filterable
-          allow-create
-          style="width: 100%"
-        >
-          <el-option v-for="item in typeOptions" :key="item" :label="item" :value="item" />
-        </el-select>
-      </el-form-item>
       <el-form-item label="标签颜色" prop="color">
         <div class="color-picker-wrapper">
           <div class="color-input-row">
@@ -70,7 +59,6 @@ import { ListingTagAPI, type ListingTagForm, type ListingTagVO } from "@/api/sal
 const props = defineProps<{
   visible: boolean;
   row?: ListingTagVO | null;
-  typeOptions: string[];
 }>();
 
 const emit = defineEmits(["update:visible", "success"]);
@@ -144,7 +132,7 @@ const handleSave = async () => {
       emit("update:visible", false);
       emit("success");
     } catch {
-      ElMessage.error(isEdit.value ? "更新失败" : "创建失败");
+      // Axios 拦截器已统一弹出后端错误消息，无需重复提示
     } finally {
       saveLoading.value = false;
     }

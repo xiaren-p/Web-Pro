@@ -15,7 +15,7 @@ class LxListingTag(models.Model):
         ("creating", "创建中"),
         ("normal", "正常"),
         ("modifying", "修改中"),
-        ("deleted", "已删除"),
+        ("deleting", "删除中"),
     ]
 
     id = models.BigAutoField(
@@ -83,6 +83,13 @@ class LxListingTag(models.Model):
         verbose_name = "Listing 标签"
         verbose_name_plural = "Listing 标签列表"
         ordering = ["-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tag_name"],
+                condition=models.Q(status__in=["creating", "normal", "modifying", "deleting"]),
+                name="uq_lx_listing_tag_name_active",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"LxListingTag<{self.global_tag_id}> {self.tag_name}"

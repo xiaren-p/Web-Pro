@@ -117,9 +117,13 @@ class ListingTagViewSet(ViewSet):
         if not tag_name:
             return drf_error(msg="请输入标签名称")
 
+        # 同名检查：活跃状态标签不允许重名
+        active_statuses = ["creating", "normal", "modifying", "deleting"]
+        if LxListingTag.objects.filter(tag_name=tag_name, status__in=active_statuses).exists():
+            return drf_error(msg=f"标签「{tag_name}」已存在，请勿重复创建")
+
         operator_name = _get_operator_name(request)
 
-        # 创建标签
         tag = LxListingTag.objects.create(
             tag_name=tag_name,
             type=tag_type,
@@ -128,7 +132,6 @@ class ListingTagViewSet(ViewSet):
             modify_by_name=operator_name,
             status="creating",
         )
-        # 保存后更新 global_tag_id
         tag.global_tag_id = f"TAG_{tag.id}"
         tag.save(update_fields=["global_tag_id"])
 
@@ -145,26 +148,30 @@ class ListingTagViewSet(ViewSet):
 
         data = request.data
         tag_name = data.get("tagName", "").strip()
-        tag_type = data.get("type", "").strip()
         color = data.get("color", "").strip()
 
-        # 判断是否为实质性修改：仅修改颜色不算实质性变更，状态恢复为正常
         has_content_change = False
         if tag_name and tag_name != tag.tag_name:
+            # 同名检查
+            active_statuses = ["creating", "normal", "modifying", "deleting"]
+            if LxListingTag.objects.filter(
+                tag_name=tag_name, status__in=active_statuses
+            ).exclude(id=tag.id).exists():
+                return drf_error(msg=f"标签「{tag_name}」已存在，请勿重复创建")
             tag.tag_name = tag_name
             has_content_change = True
-        if tag_type != tag.type:
-            tag.type = tag_type
-            has_content_change = True
-        if color:
+        if color and color != tag.color:
             tag.color = color
 
         operator_name = _get_operator_name(request)
         tag.modify_by_name = operator_name
-        if tag.status not in ["deleted"]:
+        if tag.status not in ["deleting"]:
             tag.status = "modifying" if has_content_change else "normal"
 
-        tag.save(update_fields=["tag_name", "type", "color", "modify_by_name", "status"])
+        update_fields = ["color", "modify_by_name", "status"]
+        if has_content_change:
+            update_fields.append("tag_name")
+        tag.save(update_fields=update_fields)
         return drf_ok(msg="更新成功")
 
     def destroy(self, request: Request, pk: str | None = None) -> Response:
@@ -177,7 +184,7 @@ class ListingTagViewSet(ViewSet):
             return drf_error(msg="标签不存在")
 
         operator_name = _get_operator_name(request)
-        tag.status = "deleted"
+        tag.status = "deleting"
         tag.modify_by_name = operator_name
         tag.save(update_fields=["status", "modify_by_name"])
         return drf_ok(msg="删除成功")
@@ -193,7 +200,7 @@ class ListingTagViewSet(ViewSet):
         operator_name = _get_operator_name(request)
         tags = LxListingTag.objects.filter(id__in=[int(i) for i in ids if str(i).isdigit()])
         for tag in tags:
-            tag.status = "deleted"
+            tag.status = "deleting"
             tag.modify_by_name = operator_name
         LxListingTag.objects.bulk_update(tags, ["status", "modify_by_name"])
         return drf_ok(msg="批量删除成功")

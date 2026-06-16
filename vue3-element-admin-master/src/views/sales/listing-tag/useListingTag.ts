@@ -1,9 +1,7 @@
 import { ref, reactive, computed, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ListingTagAPI, type ListingTagVO, type ListingTagQuery } from "@/api/sales/listing-tag";
-import { defaultColumns, tagStatusOptions } from "@/views/sales/listing-tag/constants";
-
-const STORAGE_KEY = "SALES_LISTING_TAG_COLUMNS";
+import { tableColumns, tagStatusOptions } from "@/views/sales/listing-tag/constants";
 
 export function useListingTag() {
   const loading = ref(false);
@@ -23,22 +21,10 @@ export function useListingTag() {
     createByName: "",
   });
 
-  // 列配置
-  const initColumns = () => {
-    const cached = localStorage.getItem(STORAGE_KEY);
-    if (cached) {
-      try {
-        return JSON.parse(cached);
-      } catch {
-        return JSON.parse(JSON.stringify(defaultColumns));
-      }
-    }
-    return JSON.parse(JSON.stringify(defaultColumns));
-  };
-  const columns = ref(initColumns());
-  const tableColumns = computed(() => columns.value.filter((c: any) => c.visible));
+  // 表格列：固定写死，不需要列配置功能
+  const displayColumns = tableColumns;
 
-  // 状态和类型映射
+  // 状态映射
   const getStatusTag = (status: string) => {
     const option = tagStatusOptions.find(
       (o: { label: string; value: string }) => o.value === status
@@ -53,7 +39,7 @@ export function useListingTag() {
       case "creating":
       case "modifying":
         return "warning";
-      case "deleted":
+      case "deleting":
         return "danger";
       default:
         return "info";
@@ -165,19 +151,6 @@ export function useListingTag() {
     handleQuery();
   };
 
-  // 列配置
-  const columnConfigVisible = ref(false);
-  const handleConfigSave = (newColumns: any[]) => {
-    columns.value = newColumns;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newColumns));
-    ElMessage.success("配置已保存");
-  };
-  const handleConfigReset = () => {
-    columns.value = JSON.parse(JSON.stringify(defaultColumns));
-    localStorage.removeItem(STORAGE_KEY);
-    ElMessage.success("已恢复默认配置");
-  };
-
   onMounted(() => {
     handleQuery();
     loadTypeOptions();
@@ -189,10 +162,8 @@ export function useListingTag() {
     pageNum,
     pageSize,
     total,
-    columns,
-    tableColumns,
+    tableColumns: displayColumns,
     selectedRows,
-    columnConfigVisible,
     typeOptions,
     getStatusTag,
     getStatusType,
@@ -204,7 +175,5 @@ export function useListingTag() {
     handleBatchDelete,
     handleSizeChange,
     handleCurrentChange,
-    handleConfigSave,
-    handleConfigReset,
   };
 }
