@@ -44,12 +44,16 @@
 - **杜绝“脚本味”**：文件与目录命名必须清晰、精准地收敛于业务域或架构职责。严禁出现 `do_stuff.py`, `temp_run.js`, `test1.py`, `my_script.ts` 等随意的低级命名。
 - **生态系统一致性**：文件名必须高度遵循技术栈的约定基准。Python 等后端资源坚决执行下划线 `snake_case.py`；前端组件坚守大驼峰 `PascalCase.vue`；项目公共文档采用短横线 `kebab-case.md`。整个项目保持工程级别的克制、优雅与专业感。
 
-### 8. 数据库迁移强制闭环 (Migration Closure)
+### 8. 数据库迁移闭环 (Migration Closure) — 本地生成，服务器手动执行
 
-- **开发端必须完成迁移**：凡是涉及 Django Model 字段/索引/约束/`choices`/`Meta` 变更的改动，**必须在开发环境同步完成 `python manage.py makemigrations` 与 `python manage.py migrate` 两步**，验证迁移文件可正确生成并已落库后才能视为任务完成。
-- **禁止把"待生成迁移"留到生产端**：严禁仅修改 Model 就提交代码、把 `makemigrations` 推给生产环境执行。生产端只允许执行 `git pull` + `migrate` 应用既有迁移文件，绝不应自行生成新的迁移文件。
-- **迁移链同步前置检查**：在开发端生成新迁移前，**必须先确认本地与生产端的迁移链是否对齐**（对比最新 migration 文件名/编号）。若不对齐，先 `git pull` 同步生产端迁移文件，再 `makemigrations`，确保新迁移的 `dependencies` 挂在正确的最新节点上，避免出现同号分叉或孤儿 merge 文件。
-- **提交清单**：变更 Model 时，commit 必须同时包含 ① Model 文件 ② 新生成的 `xxxx_*.py` 迁移文件，缺一不可。
+- **迁移文件不上传**：严禁将本地 `makemigrations` 生成的 `xxxx_*.py` 迁移文件提交到 Git 仓库或推送到服务器。本地生成的迁移文件仅用于开发环境验证，生产环境由运维人员手动执行。
+- **AI 必须给出迁移方案**：凡涉及 Django Model 字段/索引/约束/`choices`/`Meta` 变更的后端改动，AI 必须在完成代码后**明确给出服务器端迁移步骤**，包括：
+  1. 如果本地已生成迁移文件，告知本地已生成的文件名和用途
+  2. 服务器上需要执行的 `python manage.py makemigrations` 命令（让服务器自行生成迁移）
+  3. 服务器上需要执行的 `python manage.py migrate` 命令
+  4. 如果遇到迁移冲突（如 MySQL 不支持条件约束、表已存在等），给出 `--fake` 或手动 SQL 的补救方案
+- **禁止 AI 替服务器执行**：AI 无权在服务器上运行 `makemigrations` / `migrate`，只能给出命令让用户手动执行。
+- **提交清单**：变更 Model 时，commit 只包含 Model 文件，不包含迁移文件。迁移在服务器端独立生成和应用。
 
 > **注意**：针对特定的编程语言（Python, Vue/TS, Java, Markdown等）以及项目的架构目录规范，请自动读取并在上下文中合并 `.github/instructions/` 目录下的对应细化强约束指令。
 

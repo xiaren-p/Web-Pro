@@ -11,9 +11,7 @@
     <section class="table-block">
       <div class="table-toolbar">
         <div class="table-toolbar__left">
-          <el-button type="primary" :icon="Plus" @click="handleAdd">
-            新增标签
-          </el-button>
+          <el-button type="primary" :icon="Plus" @click="handleAdd">新增标签</el-button>
           <el-button
             type="danger"
             :icon="Delete"
@@ -108,11 +106,7 @@
           </div>
           <div class="pager-right">
             <span class="page-size-label">每页</span>
-            <el-select
-              :model-value="pageSize"
-              class="page-size-select"
-              @change="handleSizeChange"
-            >
+            <el-select :model-value="pageSize" class="page-size-select" @change="handleSizeChange">
               <el-option label="10条" :value="10" />
               <el-option label="20条" :value="20" />
               <el-option label="50条" :value="50" />
@@ -218,8 +212,8 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
 
 .table-toolbar {
   display: flex;
-  align-items: center;
   flex-shrink: 0;
+  align-items: center;
   padding: 12px 18px;
 
   &__left {
@@ -303,10 +297,10 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
     justify-content: center;
 
     .color-dot {
+      flex-shrink: 0;
       width: 24px;
       height: 24px;
       border-radius: 50%;
-      flex-shrink: 0;
       box-shadow: 0 0 0 1px var(--border-base);
     }
 
@@ -370,9 +364,9 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
 
 .pager-right {
   display: flex;
+  flex-shrink: 0;
   gap: 8px;
   align-items: center;
-  flex-shrink: 0;
 }
 
 .total-count {

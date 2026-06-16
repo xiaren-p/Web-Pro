@@ -1,4 +1,4 @@
-import { ref, reactive, computed, onMounted } from "vue";
+import { ref, reactive, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ListingTagAPI, type ListingTagVO, type ListingTagQuery } from "@/api/sales/listing-tag";
 import { tableColumns, tagStatusOptions } from "@/views/sales/listing-tag/constants";

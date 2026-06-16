@@ -2,7 +2,7 @@
  * 销售-Listing 标签管理 API：分页查询、新增、编辑、删除、状态切换。
  */
 import request from "@/utils/request";
-import type { PageQuery, PageResult } from "@/api/common/page";
+import type { PageQuery } from "@/api/common/page";
 
 export interface ListingTagVO {
   id: number;
