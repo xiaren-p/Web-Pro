@@ -374,8 +374,6 @@ class SalesProductListingViewSet(ViewSet):
                 "first_order_time": item.first_order_time or "",
                 # 分类与标签（来源变更）
                 "assort": meta.assort if meta else "",
-                # label 已废弃，由 global_tags 替代
-                "label": "",
                 "global_tags": item.global_tags if item.global_tags else [],
                 # 以下字段 LxListingData 中不存在，暂时留空
                 # TODO: pair_type 待后续确认来源

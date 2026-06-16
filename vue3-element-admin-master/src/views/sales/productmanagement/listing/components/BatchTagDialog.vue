@@ -97,15 +97,9 @@ function handleBatchClear() {
 }
 
 const getRowTags = (row: any): string[] => {
-  if (!row.tags) return [];
-  if (Array.isArray(row.tags)) return row.tags;
-  if (typeof row.tags === "string") {
-    try {
-      const parsed = JSON.parse(row.tags.replace(/'/g, '"'));
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return row.tags.split(",").filter((t: string) => t.trim() !== "");
-    }
+  if (!row?.global_tags) return [];
+  if (Array.isArray(row.global_tags)) {
+    return row.global_tags.map((t: any) => t.tagName || "");
   }
   return [];
 };
@@ -138,7 +132,7 @@ async function executeBatchAction(action: "add" | "delete") {
       newTags = newTags.filter((t) => !batchTags.value.includes(t));
     }
 
-    updates.push({ asin: row.asin, tags: newTags });
+    updates.push({ asin: row.asin, tags: newTags.map((t: string) => ({ globalTagId: "", tagName: t, color: "" })) });
   }
 
   try {

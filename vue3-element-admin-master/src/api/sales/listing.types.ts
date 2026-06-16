@@ -9,7 +9,6 @@ export interface ListingItemVO {
   marketplace: string;
   country_code?: string;
   seller_sku: string;
-  label?: string;
   fnsku: string;
   asin: string;
   parent_asin: string;

@@ -379,7 +379,9 @@ export function useListingTable() {
             open_date_time: fallback(item.open_date_display), // 使用 open_date_display 映射为 open_date_time 根据需要修改 mapping
             asin: fallback(item.asin),
             parentAsin: fallback(item.parent_asin),
-            label: item.label || [],
+            label: Array.isArray(item.global_tags)
+              ? item.global_tags.map((t: any) => t.tagName)
+              : [],
             title: fallback(item.item_name),
             // Classification -> Computed from MSKU or SKU
             classification: "--",

@@ -53,15 +53,9 @@ const inputVisible = ref(false);
 const inputRef = ref();
 
 const getRowTags = (row: any): string[] => {
-  if (!row?.tags) return [];
-  if (Array.isArray(row.tags)) return row.tags;
-  if (typeof row.tags === "string") {
-    try {
-      const parsed = JSON.parse(row.tags.replace(/'/g, '"'));
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return row.tags.split(",").filter((t: string) => t.trim() !== "");
-    }
+  if (!row?.global_tags) return [];
+  if (Array.isArray(row.global_tags)) {
+    return row.global_tags.map((t: any) => t.tagName || "");
   }
   return [];
 };
@@ -108,10 +102,15 @@ function handleRemoveTag(tag: string) {
 
 function handleSaveTags() {
   if (!props.row?.asin) return;
+  const global_tags = currentTags.value.map((tagName: string) => ({
+    globalTagId: "",
+    tagName,
+    color: "",
+  }));
   SalesProductListingAPI.upsertLabels([
     {
       asin: props.row.asin,
-      tags: currentTags.value,
+      tags: global_tags,
     },
   ]).then(() => {
     ElMessage.success("保存成功");
