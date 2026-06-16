@@ -82,7 +82,7 @@ export const ListingTagAPI = {
     });
   },
   getTypeOptions() {
-    return request<string[]>({
+    return request<any, string[]>({
       url: `${LISTING_TAG_BASE_URL}/type-options`,
       method: "get",
     });
