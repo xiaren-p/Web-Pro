@@ -147,6 +147,7 @@ CELERY_TASK_ROUTES = {
     'api_v2.tasks.bid_adjustment_task.run_bid_adjustment_task':                   {'queue': 'single_thread_queue'},
     'api_v2.tasks.optimization_strategy_task.run_optimization_strategy_task':       {'queue': 'single_thread_queue'},
     'api_v2.tasks.optimization_execution_task.run_optimization_execution_task':     {'queue': 'single_thread_queue'},
+    'api_v2.tasks.listing_tag_sync_task.run_listing_tag_sync_task':                  {'queue': 'single_thread_queue'},
 }
 
 CELERY_BEAT_SCHEDULE = {
@@ -170,6 +171,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'api_v1.tasks.maintenance_tasks.cleanup_orphan_uploads',
         'schedule': crontab(hour=3, minute=0),
         'kwargs': {'days': 30},
+    },
+    # Listing 标签同步：每 5 秒处理创建中 / 删除中的标签（Redis 锁保证同时仅一个实例执行）
+    'listing-tag-sync': {
+        'task': 'api_v2.tasks.listing_tag_sync_task.run_listing_tag_sync_task',
+        'schedule': 5.0,
     },
 }
 
