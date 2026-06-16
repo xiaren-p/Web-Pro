@@ -1,6 +1,6 @@
 <template>
   <div class="search-form">
-    <el-form ref="formRef" :model="queryParams" inline size="small">
+    <el-form ref="formRef" :model="queryParams" inline size="default">
       <el-form-item label="标签名称" class="filter-item">
         <el-input
           v-model="queryParams.tagName"
@@ -87,24 +87,9 @@ const handleReset = () => {
 
 <style scoped lang="scss">
 .search-form {
-  :deep(.el-form) {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 0;
-  }
-
   :deep(.el-form-item) {
     margin-right: 16px;
     margin-bottom: 0;
-
-    .el-form-item__label {
-      font-weight: 600;
-      color: #475569;
-    }
-  }
-
-  :deep(.el-input__wrapper) {
-    padding: 8px 12px;
   }
 }
 
