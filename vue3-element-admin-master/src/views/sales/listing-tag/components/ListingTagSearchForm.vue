@@ -1,10 +1,9 @@
 <template>
   <div class="search-form">
-    <el-form ref="formRef" :model="queryParams" inline>
+    <el-form ref="formRef" :model="queryParams" inline size="small">
       <el-form-item label="标签名称" class="filter-item">
         <el-input
           v-model="queryParams.tagName"
-          size="small"
           placeholder="请输入标签名称"
           clearable
           style="width: 180px"
@@ -14,9 +13,9 @@
       <el-form-item label="标签类型" class="filter-item">
         <FsSelect
           v-model="queryParams.type"
-          size="small"
           class="filter-select w-180"
           :options="typeOptionItems"
+          :filterable="false"
           multiple
           placeholder="选择标签类型"
         />
@@ -24,9 +23,9 @@
       <el-form-item label="状态" class="filter-item">
         <FsSelect
           v-model="queryParams.status"
-          size="small"
           class="filter-select w-140"
           :options="tagStatusOptions"
+          :filterable="false"
           multiple
           placeholder="选择状态"
         />
@@ -34,7 +33,6 @@
       <el-form-item label="创建人" class="filter-item">
         <el-input
           v-model="queryParams.createByName"
-          size="small"
           placeholder="请输入创建人"
           clearable
           style="width: 160px"
@@ -42,8 +40,8 @@
         />
       </el-form-item>
       <el-form-item class="filter-item">
-        <el-button type="primary" size="small" :icon="Search" @click="handleSearch">搜索</el-button>
-        <el-button size="small" :icon="Refresh" @click="handleReset">重置</el-button>
+        <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
+        <el-button :icon="Refresh" @click="handleReset">重置</el-button>
       </el-form-item>
     </el-form>
   </div>
@@ -59,7 +57,9 @@ const props = defineProps<{
   typeOptions: string[];
 }>();
 
-const typeOptionItems = computed(() => props.typeOptions.map((v) => ({ label: v, value: v })));
+const typeOptionItems = computed(() =>
+  props.typeOptions.map((v) => ({ label: v, value: v }))
+);
 
 const emit = defineEmits(["search", "reset"]);
 
@@ -101,6 +101,10 @@ const handleReset = () => {
       font-weight: 600;
       color: #475569;
     }
+  }
+
+  :deep(.el-input__wrapper) {
+    padding: 8px 12px;
   }
 }
 
