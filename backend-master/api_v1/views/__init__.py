@@ -19,7 +19,7 @@ from api_v1.views.crawler import (
 )
 from api_v1.views.weather import WeatherViewSet
 from api_v1.views.shop_options_view import ShopOptionsViewSet
-from api_v1.views.lingxing.sales.listing import ImageUploadViewSet, SalesProductListingViewSet
+from api_v1.views.lingxing.sales.listing import ImageUploadViewSet, SalesProductListingViewSet, ListingTagViewSet
 from api_v1.views.finance import StatisticsViewSet, MonthlyLossViewSet, MonthlyLossFirst20ViewSet
 from api_v1.utils.responses import drf_ok
 

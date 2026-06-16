@@ -1,14 +1,8 @@
-"""销售-Listing 标签管理 ViewSet。
-
-承载 Listing 标签的 CRUD 接口：分页查询、新增、编辑、删除、状态切换、
-类型选项等。
-"""
+"""销售-Listing 标签管理 ViewSet。"""
 from __future__ import annotations
 
 from typing import Any
-from uuid import uuid4
 
-from django.db.models import Q
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -228,19 +222,14 @@ class ListingTagViewSet(ViewSet):
     @action(detail=False, methods=["get"], url_path="type-options")
     def type_options(self, request: Request) -> Response:
         """获取标签类型选项列表。"""
-        options = [
-            {"label": "商品标签", "value": "product"},
-            {"label": "运营标签", "value": "operation"},
-            {"label": "库存标签", "value": "inventory"},
-            {"label": "营销标签", "value": "marketing"},
-            {"label": "其他", "value": "other"},
-        ]
-        return Response({
-            "code": 0,
-            "message": "success",
-            "error_details": [],
-            "data": options,
-        })
+        types = (
+            LxListingTag.objects
+            .exclude(type="")
+            .values_list("type", flat=True)
+            .distinct()
+            .order_by("type")
+        )
+        return drf_ok(data=list(types))
 
 
 def _get_operator_name(request: Request) -> str:

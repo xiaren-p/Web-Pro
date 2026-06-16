@@ -4,7 +4,7 @@
 import { ref, reactive, computed, onMounted, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ListingTagAPI, type ListingTagVO, type ListingTagQuery } from "@/api/sales/listing-tag";
-import { defaultColumns, tagStatusOptions, tagTypeOptions } from "../constants";
+import { defaultColumns, tagStatusOptions } from "../constants";
 
 const STORAGE_KEY = "SALES_LISTING_TAG_COLUMNS";
 
@@ -60,10 +60,7 @@ export function useListingTag() {
     }
   };
 
-  const getTypeLabel = (type: string) => {
-    const option = tagTypeOptions.find((o) => o.value === type);
-    return option?.label || type;
-  };
+  const getTypeLabel = (type: string) => type;
 
   // 查询列表
   const handleQuery = async () => {

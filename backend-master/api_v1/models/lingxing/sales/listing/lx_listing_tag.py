@@ -25,6 +25,8 @@ class LxListingTag(models.Model):
 
     global_tag_id = models.CharField(
         max_length=50,
+        null=True,
+        blank=True,
         default="",
         verbose_name="标签 ID",
     )

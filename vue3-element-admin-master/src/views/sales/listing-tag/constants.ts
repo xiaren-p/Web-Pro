@@ -10,11 +10,11 @@ export const tagStatusOptions = [
 ];
 
 export const tagTypeOptions = [
-  { label: "商品标签", value: "product" },
-  { label: "运营标签", value: "operation" },
-  { label: "库存标签", value: "inventory" },
-  { label: "营销标签", value: "marketing" },
-  { label: "其他", value: "other" },
+  "商品标签",
+  "运营标签",
+  "库存标签",
+  "营销标签",
+  "其他",
 ];
 
 export const presetColors = [

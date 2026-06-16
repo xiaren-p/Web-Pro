@@ -18,9 +18,9 @@
         <el-select v-model="formData.type" placeholder="请选择标签类型" style="width: 100%">
           <el-option
             v-for="item in tagTypeOptions"
-            :key="item.value"
-            :label="item.label"
-            :value="item.value"
+            :key="item"
+            :label="item"
+            :value="item"
           />
         </el-select>
       </el-form-item>

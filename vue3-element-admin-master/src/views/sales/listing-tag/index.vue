@@ -42,7 +42,7 @@
             </template>
 
             <template v-else-if="col.prop === 'type'">
-              {{ getTypeLabel(scope.row.type) }}
+              {{ scope.row.type }}
             </template>
 
             <template v-else-if="col.prop === 'color'">
@@ -151,7 +151,6 @@ const {
   columnConfigVisible,
   getStatusTag,
   getStatusType,
-  getTypeLabel,
   handleQuery,
   handleSearch,
   handleReset,
