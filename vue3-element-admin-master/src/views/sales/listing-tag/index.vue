@@ -225,8 +225,8 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
 }
 
 .table-controls {
-  flex-shrink: 0;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
@@ -356,12 +356,12 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
 
   .color-dot {
     display: inline-block;
+    flex-shrink: 0;
     width: 20px;
     height: 20px;
-    border-radius: 5px;
-    flex-shrink: 0;
-    box-shadow: 0 0 0 1px var(--border-base);
     vertical-align: middle;
+    border-radius: 5px;
+    box-shadow: 0 0 0 1px var(--border-base);
   }
 
   .action-buttons {
@@ -417,9 +417,9 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
 
 .pager-right {
   display: flex;
+  flex-shrink: 0;
   gap: 8px;
   align-items: center;
-  flex-shrink: 0;
 }
 
 .total-count {

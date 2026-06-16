@@ -30,11 +30,15 @@ class ListingTagViewSet(ViewSet):
 
         tag_type = params.get("type", "").strip()
         if tag_type:
-            queryset = queryset.filter(type=tag_type)
+            types = [t.strip() for t in tag_type.replace("，", ",").split(",") if t.strip()]
+            if types:
+                queryset = queryset.filter(type__in=types)
 
         status = params.get("status", "").strip()
         if status:
-            queryset = queryset.filter(status=status)
+            statuses = [s.strip() for s in status.replace("，", ",").split(",") if s.strip()]
+            if statuses:
+                queryset = queryset.filter(status__in=statuses)
 
         create_by_name = params.get("createByName", "").strip()
         if create_by_name:

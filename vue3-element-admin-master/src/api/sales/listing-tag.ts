@@ -22,6 +22,8 @@ export interface ListingTagQuery extends PageQuery {
   type?: string;
   status?: string;
   createByName?: string;
+  "type[]"?: string[];
+  "status[]"?: string[];
 }
 
 export interface ListingTagForm {
