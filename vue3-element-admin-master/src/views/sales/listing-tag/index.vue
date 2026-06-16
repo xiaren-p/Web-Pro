@@ -68,8 +68,7 @@
                     link
                     type="primary"
                     size="small"
-                    class="action-link"
-                    :disabled="scope.row.status === 'deleting'"
+                    :disabled="scope.row.status === 'creating' || scope.row.status === 'deleting'"
                     @click="handleEdit(scope.row)"
                   >
                     编辑
@@ -78,8 +77,7 @@
                     link
                     type="danger"
                     size="small"
-                    class="action-link"
-                    :disabled="scope.row.status === 'deleting'"
+                    :disabled="scope.row.status === 'creating' || scope.row.status === 'deleting'"
                     @click="handleDelete(scope.row)"
                   >
                     删除

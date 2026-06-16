@@ -142,7 +142,7 @@ class ListingTagViewSet(ViewSet):
         return drf_ok(msg="创建成功")
 
     def update(self, request: Request, pk: str | None = None) -> Response:
-        """编辑标签。"""
+        """编辑标签。仅允许修改颜色，不允许修改名称。"""
         if not pk:
             return drf_error(msg="未提供标签 ID")
         try:
@@ -150,28 +150,21 @@ class ListingTagViewSet(ViewSet):
         except (ValueError, LxListingTag.DoesNotExist):
             return drf_error(msg="标签不存在")
 
+        # 创建中 / 删除中 不允许编辑
+        if tag.status in ["creating", "deleting"]:
+            return drf_error(msg="当前状态不允许编辑")
+
         data = request.data
-        tag_name = data.get("tagName", "").strip()
         color = data.get("color", "").strip()
 
-        if tag_name and tag_name != tag.tag_name:
-            # 同名检查
-            active_statuses = ["creating", "normal", "modifying", "deleting"]
-            if LxListingTag.objects.filter(
-                tag_name=tag_name, status__in=active_statuses
-            ).exclude(id=tag.id).exists():
-                return drf_error(msg=f"标签「{tag_name}」已存在，请勿重复创建")
-            tag.tag_name = tag_name
         if color and color != tag.color:
             tag.color = color
 
         operator_name = _get_operator_name(request)
         tag.modify_by_name = operator_name
-        # 正常→正常，其他活跃状态→修改中
-        if tag.status != "normal" and tag.status != "deleting":
-            tag.status = "modifying"
+        tag.status = "normal"
 
-        tag.save(update_fields=["tag_name", "color", "modify_by_name", "status"])
+        tag.save(update_fields=["color", "modify_by_name", "status"])
         return drf_ok(msg="更新成功")
 
     def destroy(self, request: Request, pk: str | None = None) -> Response:

@@ -6,13 +6,16 @@
     @update:model-value="emit('update:visible', $event)"
   >
     <el-form ref="formRef" :model="formData" :rules="formRules" label-width="90px">
-      <el-form-item label="标签名称" prop="tagName">
+      <el-form-item v-if="!isEdit" label="标签名称" prop="tagName">
         <el-input
           v-model="formData.tagName"
           placeholder="请输入标签名称"
           maxlength="100"
           show-word-limit
         />
+      </el-form-item>
+      <el-form-item v-else label="标签名称">
+        <el-input :model-value="formData.tagName" disabled />
       </el-form-item>
       <el-form-item label="标签颜色" prop="color">
         <div class="color-picker-wrapper">
@@ -76,10 +79,12 @@ const formData = reactive<ListingTagForm>({
 });
 
 const formRules: FormRules<ListingTagForm> = {
-  tagName: [
-    { required: true, message: "请输入标签名称", trigger: "blur" },
-    { min: 1, max: 100, message: "标签名称长度在 1 到 100 个字符", trigger: "blur" },
-  ],
+  tagName: isEdit.value
+    ? []
+    : [
+        { required: true, message: "请输入标签名称", trigger: "blur" },
+        { min: 1, max: 100, message: "标签名称长度在 1 到 100 个字符", trigger: "blur" },
+      ],
   color: [{ required: true, message: "请选择标签颜色", trigger: "change" }],
 };
 
