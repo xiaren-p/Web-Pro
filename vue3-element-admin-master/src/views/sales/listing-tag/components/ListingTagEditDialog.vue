@@ -17,7 +17,7 @@
       <el-form-item label="标签颜色" prop="color">
         <div class="color-picker-wrapper">
           <div class="color-input-row">
-            <el-color-picker v-model="formData.color" show-alpha />
+            <el-color-picker v-model="formData.color" />
             <el-input
               v-model="formData.color"
               placeholder="输入颜色值"

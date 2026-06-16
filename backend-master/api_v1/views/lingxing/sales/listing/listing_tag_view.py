@@ -150,7 +150,6 @@ class ListingTagViewSet(ViewSet):
         tag_name = data.get("tagName", "").strip()
         color = data.get("color", "").strip()
 
-        has_content_change = False
         if tag_name and tag_name != tag.tag_name:
             # 同名检查
             active_statuses = ["creating", "normal", "modifying", "deleting"]
@@ -159,19 +158,16 @@ class ListingTagViewSet(ViewSet):
             ).exclude(id=tag.id).exists():
                 return drf_error(msg=f"标签「{tag_name}」已存在，请勿重复创建")
             tag.tag_name = tag_name
-            has_content_change = True
         if color and color != tag.color:
             tag.color = color
 
         operator_name = _get_operator_name(request)
         tag.modify_by_name = operator_name
-        if tag.status not in ["deleting"]:
-            tag.status = "modifying" if has_content_change else "normal"
+        # 正常→正常，其他活跃状态→修改中
+        if tag.status != "normal" and tag.status != "deleting":
+            tag.status = "modifying"
 
-        update_fields = ["color", "modify_by_name", "status"]
-        if has_content_change:
-            update_fields.append("tag_name")
-        tag.save(update_fields=update_fields)
+        tag.save(update_fields=["tag_name", "color", "modify_by_name", "status"])
         return drf_ok(msg="更新成功")
 
     def destroy(self, request: Request, pk: str | None = None) -> Response:
@@ -241,12 +237,25 @@ class ListingTagViewSet(ViewSet):
 
 
 def _get_operator_name(request: Request) -> str:
-    """获取操作人名称（简化版本，后续可接入用户系统）。"""
-    # 优先从 request.user 获取
+    """获取当前登录用户的昵称。"""
     user = getattr(request, "user", None)
-    if user and hasattr(user, "username") and user.username:
-        return str(user.username)
-    if user and hasattr(user, "name") and user.name:
-        return str(user.name)
-    # 降级返回 "admin"
-    return "admin"
+    if user and user.is_authenticated:
+        name = _get_user_display_name(user)
+        if name:
+            return name
+        if hasattr(user, "username") and user.username:
+            return user.username
+    return "未知用户"
+
+
+def _get_user_display_name(user) -> str:
+    """从 UserProfile 获取昵称，降级返回 username。"""
+    try:
+        profile = getattr(user, "profile", None)
+        if profile and profile.nickname:
+            return profile.nickname
+    except Exception:
+        pass
+    if hasattr(user, "username") and user.username:
+        return user.username
+    return ""

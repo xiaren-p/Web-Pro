@@ -1,6 +1,6 @@
 <template>
   <div class="listing-tag-page">
-    <section class="filter-block">
+    <section class="content-block filter-block">
       <ListingTagSearchForm
         :type-options="typeOptions"
         @search="handleSearch"
@@ -8,12 +8,14 @@
       />
     </section>
 
-    <section class="table-block">
-      <div class="table-toolbar">
-        <div class="table-toolbar__left">
-          <el-button type="primary" :icon="Plus" @click="handleAdd">新增标签</el-button>
+    <section class="content-block table-block">
+      <div class="table-controls">
+        <div class="left-controls">
+          <el-button type="primary" class="primary-action-btn" :icon="Plus" @click="handleAdd">
+            新增标签
+          </el-button>
           <el-button
-            type="danger"
+            class="danger-action-btn"
             :icon="Delete"
             :disabled="selectedRows.length === 0"
             @click="handleBatchDelete"
@@ -43,11 +45,7 @@
           <el-table-column v-for="col in tableColumns" :key="col.prop" v-bind="col">
             <template #default="scope">
               <template v-if="col.prop === 'tagName'">
-                <div class="tag-name-cell">
-                  <el-tag :color="scope.row.color" effect="light">
-                    {{ scope.row.tagName }}
-                  </el-tag>
-                </div>
+                {{ scope.row.tagName || "-" }}
               </template>
 
               <template v-else-if="col.prop === 'type'">
@@ -73,6 +71,7 @@
                     link
                     type="primary"
                     size="small"
+                    class="action-link"
                     :disabled="scope.row.status === 'deleting'"
                     @click="handleEdit(scope.row)"
                   >
@@ -82,6 +81,7 @@
                     link
                     type="danger"
                     size="small"
+                    class="action-link"
                     :disabled="scope.row.status === 'deleting'"
                     @click="handleDelete(scope.row)"
                   >
@@ -106,7 +106,12 @@
           </div>
           <div class="pager-right">
             <span class="page-size-label">每页</span>
-            <el-select :model-value="pageSize" class="page-size-select" @change="handleSizeChange">
+            <el-select
+              :model-value="pageSize"
+              size="small"
+              class="page-size-select"
+              @change="handleSizeChange"
+            >
               <el-option label="10条" :value="10" />
               <el-option label="20条" :value="20" />
               <el-option label="50条" :value="50" />
@@ -190,13 +195,26 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
   display: flex;
   flex: 1;
   flex-direction: column;
-  height: calc(100vh - 84px);
-  min-height: 0;
-  padding: 0;
+  min-height: calc(100vh - 84px);
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.06), transparent 32rem),
+    linear-gradient(180deg, #f8fafc 0%, #f6f8fb 48%, #eef2f7 100%);
+}
+
+.content-block {
+  flex-shrink: 0;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
 .filter-block {
-  flex-shrink: 0;
+  padding: 20px 24px;
 }
 
 .table-block {
@@ -204,21 +222,66 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
   flex: 1;
   flex-direction: column;
   min-height: 0;
+  padding: 0;
   overflow: hidden;
-  background: var(--surface-base);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
+  --table-bg: #f8f9fb;
 }
 
-.table-toolbar {
-  display: flex;
+.table-controls {
   flex-shrink: 0;
+  display: flex;
   align-items: center;
-  padding: 12px 18px;
+  justify-content: space-between;
+  padding: 18px 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 18px 18px 0 0;
+}
 
-  &__left {
-    display: flex;
-    gap: 8px;
+.left-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.primary-action-btn {
+  height: 36px;
+  padding: 0 16px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #2563eb;
+  border-color: #2563eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
+
+  &:hover {
+    color: #ffffff;
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+  }
+}
+
+.danger-action-btn {
+  height: 36px;
+  padding: 0 16px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #dc2626;
+  border-color: #dc2626;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+
+  &:hover {
+    color: #ffffff;
+    background: #b91c1c;
+    border-color: #b91c1c;
+  }
+
+  &.is-disabled {
+    color: #94a3b8;
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    box-shadow: none;
   }
 }
 
@@ -233,7 +296,7 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
     display: flex;
     flex: 1;
     flex-direction: column;
-    background: var(--surface-base);
+    background: var(--table-bg, #f8f9fb);
   }
 
   :deep(.el-table__inner-wrapper) {
@@ -245,6 +308,10 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
   :deep(.el-table__body-wrapper) {
     flex: 1;
     overflow-y: auto !important;
+  }
+
+  :deep(.el-table__header-wrapper) {
+    background: #f0f2f5;
   }
 }
 
@@ -266,6 +333,11 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
     border-bottom: 1px solid var(--border-subtle) !important;
   }
 
+  :deep(.el-table__header th.el-table__cell) {
+    background: #f0f2f5;
+    border-right: none !important;
+  }
+
   :deep(.el-table .el-table__row) {
     transition: background 160ms ease;
   }
@@ -285,11 +357,6 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
     border-radius: 0 2px 2px 0;
   }
 
-  .tag-name-cell {
-    display: flex;
-    align-items: center;
-  }
-
   .color-display {
     display: flex;
     gap: 8px;
@@ -297,10 +364,10 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
     justify-content: center;
 
     .color-dot {
-      flex-shrink: 0;
       width: 24px;
       height: 24px;
       border-radius: 50%;
+      flex-shrink: 0;
       box-shadow: 0 0 0 1px var(--border-base);
     }
 
@@ -347,7 +414,7 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
   flex-shrink: 0;
   background: var(--surface-base);
   border-top: 1px solid var(--border-subtle);
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  border-radius: 0 0 18px 18px;
 }
 
 .pager-row {
@@ -364,9 +431,9 @@ const handleSelectionChange = (selection: ListingTagVO[]) => {
 
 .pager-right {
   display: flex;
-  flex-shrink: 0;
   gap: 8px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .total-count {

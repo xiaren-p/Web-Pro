@@ -1,7 +1,7 @@
 <template>
-  <el-card class="search-form-card" shadow="hover">
-    <el-form ref="formRef" :model="queryParams" inline>
-      <el-form-item label="标签名称">
+  <div class="search-form">
+    <el-form ref="formRef" :model="queryParams" inline size="small">
+      <el-form-item label="标签名称" class="filter-item">
         <el-input
           v-model="queryParams.tagName"
           placeholder="请输入标签名称"
@@ -9,24 +9,24 @@
           @keyup.enter="handleSearch"
         />
       </el-form-item>
-      <el-form-item label="标签类型">
+      <el-form-item label="标签类型" class="filter-item">
         <el-select
           v-model="queryParams.type"
-          placeholder="请选择标签类型"
+          placeholder="选择标签类型"
           clearable
           filterable
           allow-create
-          style="width: 200px"
+          style="width: 180px"
         >
           <el-option v-for="item in typeOptions" :key="item" :label="item" :value="item" />
         </el-select>
       </el-form-item>
-      <el-form-item label="状态">
+      <el-form-item label="状态" class="filter-item">
         <el-select
           v-model="queryParams.status"
-          placeholder="请选择状态"
+          placeholder="选择状态"
           clearable
-          style="width: 140px"
+          style="width: 130px"
         >
           <el-option
             v-for="item in tagStatusOptions"
@@ -36,7 +36,7 @@
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="创建人">
+      <el-form-item label="创建人" class="filter-item">
         <el-input
           v-model="queryParams.createByName"
           placeholder="请输入创建人"
@@ -44,12 +44,12 @@
           @keyup.enter="handleSearch"
         />
       </el-form-item>
-      <el-form-item>
+      <el-form-item class="filter-item">
         <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
         <el-button :icon="Refresh" @click="handleReset">重置</el-button>
       </el-form-item>
     </el-form>
-  </el-card>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -86,16 +86,25 @@ const handleReset = () => {
 </script>
 
 <style scoped lang="scss">
-.search-form-card {
-  margin-bottom: 16px;
-
-  :deep(.el-card__body) {
-    padding: 16px 20px;
+.search-form {
+  :deep(.el-form) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 0;
   }
 
   :deep(.el-form-item) {
-    margin-right: 16px;
+    margin-right: 20px;
     margin-bottom: 0;
+
+    .el-form-item__label {
+      font-weight: 600;
+      color: #475569;
+    }
+  }
+
+  :deep(.el-button) {
+    font-weight: 600;
   }
 }
 </style>
