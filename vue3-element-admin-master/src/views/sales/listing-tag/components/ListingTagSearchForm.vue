@@ -16,12 +16,7 @@
           clearable
           style="width: 200px"
         >
-          <el-option
-            v-for="item in tagTypeOptions"
-            :key="item"
-            :label="item"
-            :value="item"
-          />
+          <el-option v-for="item in tagTypeOptions" :key="item" :label="item" :value="item" />
         </el-select>
       </el-form-item>
       <el-form-item label="状态">
@@ -61,7 +56,7 @@
  */
 import { reactive, ref } from "vue";
 import { Search, Refresh } from "@element-plus/icons-vue";
-import { tagTypeOptions, tagStatusOptions } from "../constants";
+import { tagTypeOptions, tagStatusOptions } from "@/views/sales/listing-tag/constants";
 
 const emit = defineEmits(["search", "reset"]);
 

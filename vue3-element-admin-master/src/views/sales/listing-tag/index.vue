@@ -128,10 +128,10 @@
  */
 import { ref } from "vue";
 import { Plus, Delete, Setting, ArrowDown } from "@element-plus/icons-vue";
-import { useListingTag } from "./useListingTag";
-import { tagStatusOptions } from "./constants";
-import ListingTagSearchForm from "./components/ListingTagSearchForm.vue";
-import ListingTagEditDialog from "./components/ListingTagEditDialog.vue";
+import { useListingTag } from "@/views/sales/listing-tag/useListingTag";
+import { tagStatusOptions } from "@/views/sales/listing-tag/constants";
+import ListingTagSearchForm from "@/views/sales/listing-tag/components/ListingTagSearchForm.vue";
+import ListingTagEditDialog from "@/views/sales/listing-tag/components/ListingTagEditDialog.vue";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import type { ListingTagVO } from "@/api/sales/listing-tag";
 

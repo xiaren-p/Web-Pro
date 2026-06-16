@@ -16,12 +16,7 @@
       </el-form-item>
       <el-form-item label="标签类型" prop="type">
         <el-select v-model="formData.type" placeholder="请选择标签类型" style="width: 100%">
-          <el-option
-            v-for="item in tagTypeOptions"
-            :key="item"
-            :label="item"
-            :value="item"
-          />
+          <el-option v-for="item in tagTypeOptions" :key="item" :label="item" :value="item" />
         </el-select>
       </el-form-item>
       <el-form-item label="标签颜色" prop="color">
@@ -55,7 +50,7 @@
  */
 import { reactive, ref, computed, watch } from "vue";
 import { ElMessage, type FormInstance, type FormRules } from "element-plus";
-import { tagTypeOptions, presetColors } from "../constants";
+import { tagTypeOptions, presetColors } from "@/views/sales/listing-tag/constants";
 import { ListingTagAPI, type ListingTagForm, type ListingTagVO } from "@/api/sales/listing-tag";
 
 const props = defineProps<{

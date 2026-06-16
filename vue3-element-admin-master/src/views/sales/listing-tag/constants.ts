@@ -9,13 +9,7 @@ export const tagStatusOptions = [
   { label: "已删除", value: "deleted" },
 ];
 
-export const tagTypeOptions = [
-  "商品标签",
-  "运营标签",
-  "库存标签",
-  "营销标签",
-  "其他",
-];
+export const tagTypeOptions = ["商品标签", "运营标签", "库存标签", "营销标签", "其他"];
 
 export const presetColors = [
   { label: "红色", value: "#f56c6c" },

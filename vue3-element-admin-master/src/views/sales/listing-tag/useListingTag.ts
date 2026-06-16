@@ -4,7 +4,7 @@
 import { ref, reactive, computed, onMounted, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { ListingTagAPI, type ListingTagVO, type ListingTagQuery } from "@/api/sales/listing-tag";
-import { defaultColumns, tagStatusOptions } from "../constants";
+import { defaultColumns, tagStatusOptions } from "@/views/sales/listing-tag/constants";
 
 const STORAGE_KEY = "SALES_LISTING_TAG_COLUMNS";
 
@@ -42,7 +42,9 @@ export function useListingTag() {
 
   // 状态和类型映射
   const getStatusTag = (status: string) => {
-    const option = tagStatusOptions.find((o) => o.value === status);
+    const option = tagStatusOptions.find(
+      (o: { label: string; value: string }) => o.value === status
+    );
     return option?.label || status;
   };
 
