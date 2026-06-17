@@ -163,13 +163,15 @@
                 <div style="display: flex; flex: 1; flex-wrap: wrap; gap: 4px; margin-right: 4px">
                   <template v-if="getRowTags(scope.row).length > 0">
                     <el-tag
-                      v-for="(tag, index) in getRowTags(scope.row)"
-                      :key="index"
+                      v-for="tag in getRowTags(scope.row)"
+                      :key="tag.globalTagId || tag.tagName"
                       size="small"
-                      type="warning"
+                      :color="tag.color || '#409eff'"
+                      effect="plain"
+                      :disable-transitions="false"
                       style="border: none"
                     >
-                      {{ tag }}
+                      {{ tag.tagName }}
                     </el-tag>
                   </template>
                   <span v-else class="color-#E6A23C text-12px">-</span>
@@ -559,35 +561,15 @@ function getVariants(val: any) {
   return [];
 }
 
-function getRowTags(row: any) {
-  if (!row.label) return [];
-  // 如果后端直接返回了数组
-  if (Array.isArray(row.label)) {
-    return row.label;
-  }
-  // 如果是字符串
-  if (typeof row.label === "string") {
-    const trimmed = row.label.trim();
-    // 可能是标准 JSON 字符串如 '["a","b"]' 或者是 python 单引号字符串 "['a','b']"
-    if (trimmed.startsWith("[")) {
-      try {
-        // 先尝试正常 JSON 解析
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) return parsed;
-      } catch {
-        // 解析失败（比如出现单引号），手动清理
-        const content = trimmed.slice(1, -1);
-        if (!content.trim()) return [];
-        return content
-          .split(",")
-          .map((s: string) => s.trim().replace(/^['"]|['"]$/g, ""))
-          .filter((x: string) => x);
-      }
-    }
-    // 兼容原有的逗号分隔字符串
-    return trimmed.split(",").filter((x: string) => x);
-  }
-  return [];
+interface TagItem {
+  globalTagId: string;
+  tagName: string;
+  color: string;
+}
+
+function getRowTags(row: any): TagItem[] {
+  if (!row.label || !Array.isArray(row.label)) return [];
+  return row.label.filter((t: any) => t && t.tagName);
 }
 
 function handleSelectionChange(selection: ListingItemVO[]) {

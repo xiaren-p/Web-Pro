@@ -22,10 +22,59 @@ from api_v1.models import (
     LxExchangeRate,
     LxListingData,
     LxListingMeta,
+    LxListingTag,
     LxOrderProfit,
     LxShops,
 )
 from api_v1.utils.responses import drf_error, drf_ok
+from api_v2.models.listing_tag_modify_queue import (
+    ListingTagModifyQueue,
+    ModifyActionChoices,
+)
+
+
+def _refresh_tags_from_registry(data_list: list[dict[str, Any]]) -> None:
+    """用 LxListingTag 表中的权威数据覆盖 data_list 中 global_tags 的 tagName/color。
+
+    仅在 globalTagId 非空且存在匹配记录时覆盖；无匹配则保留快照原值。
+    """
+    if not data_list:
+        return
+
+    all_tag_ids: set[str] = set()
+    for item_data in data_list:
+        for tag in item_data.get("global_tags", []):
+            if isinstance(tag, dict):
+                gid = tag.get("globalTagId", "") or ""
+                if gid:
+                    all_tag_ids.add(gid)
+
+    if not all_tag_ids:
+        return
+
+    tag_map: dict[str, dict[str, str]] = {}
+    for t in LxListingTag.objects.filter(global_tag_id__in=all_tag_ids, status="normal"):
+        tag_map[t.global_tag_id] = {
+            "globalTagId": t.global_tag_id or "",
+            "tagName": t.tag_name or "",
+            "color": t.color or "",
+        }
+
+    for item_data in data_list:
+        refreshed: list[dict[str, str]] = []
+        for tag in item_data.get("global_tags", []):
+            if not isinstance(tag, dict):
+                continue
+            gid = tag.get("globalTagId", "") or ""
+            if gid and gid in tag_map:
+                refreshed.append(tag_map[gid])
+            else:
+                refreshed.append({
+                    "globalTagId": tag.get("globalTagId", ""),
+                    "tagName": tag.get("tagName", ""),
+                    "color": tag.get("color", ""),
+                })
+        item_data["global_tags"] = refreshed
 
 
 class SalesProductListingViewSet(ViewSet):
@@ -402,6 +451,9 @@ class SalesProductListingViewSet(ViewSet):
                 ),
             })
 
+        # 全局标签交叉引用：用 LxListingTag 中权威数据（最新 tagName / color）覆盖快照值
+        _refresh_tags_from_registry(data_list)
+
         return Response({
             "code": 0,
             "message": "success",
@@ -417,6 +469,9 @@ class SalesProductListingViewSet(ViewSet):
         global_tags 为 JSON 数组，前端提交的格式：
         [{"globalTagId": "xxx", "tagName": "xxx", "color": "#fff"}, ...]
         为空数组即表示清除所有标签。
+
+        写入 LxListingData.global_tags 后，自动计算新旧差异并写入
+        ListingTagModifyQueue 队列，供 api_v2 异步任务消费。
         """
         data = request.data
         if isinstance(data, dict):
@@ -432,6 +487,9 @@ class SalesProductListingViewSet(ViewSet):
         record_map: dict[str, list[Any]] = {}
         for r in records:
             record_map.setdefault(r.asin, []).append(r)
+
+        # 差异计算：每条提交与对应 LxListingData 原始记录比对
+        queue_entries: list[ListingTagModifyQueue] = []
 
         updates: list[LxListingData] = []
         for item in data:
@@ -449,13 +507,44 @@ class SalesProductListingViewSet(ViewSet):
                         "color": t.get("color", ""),
                     })
 
+            new_ids = {t["globalTagId"] for t in normalized_tags if t["globalTagId"]}
+
             matched = record_map.get(asin, [])
             for record in matched:
+                # ── 计算差异 ──
+                old_tags: list[dict[str, Any]] = record.global_tags or []
+                old_ids = {t.get("globalTagId", "") for t in old_tags if t.get("globalTagId")}
+
+                added_ids = new_ids - old_ids
+                removed_ids = old_ids - new_ids
+
+                msku = record.seller_sku or ""
+                sid = record.sid or 0
+
+                if added_ids:
+                    queue_entries.append(ListingTagModifyQueue(
+                        action=ModifyActionChoices.ADD,
+                        msku=msku,
+                        sid=sid,
+                        tag_ids=list(added_ids),
+                    ))
+
+                if removed_ids:
+                    queue_entries.append(ListingTagModifyQueue(
+                        action=ModifyActionChoices.REMOVE,
+                        msku=msku,
+                        sid=sid,
+                        tag_ids=list(removed_ids),
+                    ))
+
                 record.global_tags = normalized_tags
                 updates.append(record)
 
         if updates:
             LxListingData.objects.bulk_update(updates, ["global_tags"])
+
+        if queue_entries:
+            ListingTagModifyQueue.objects.bulk_create(queue_entries)
 
         return drf_ok(msg="标签保存成功")
 

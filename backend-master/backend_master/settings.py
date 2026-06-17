@@ -148,6 +148,7 @@ CELERY_TASK_ROUTES = {
     'api_v2.tasks.optimization_strategy_task.run_optimization_strategy_task':       {'queue': 'single_thread_queue'},
     'api_v2.tasks.optimization_execution_task.run_optimization_execution_task':     {'queue': 'single_thread_queue'},
     'api_v2.tasks.listing_tag_sync_task.run_listing_tag_sync_task':                  {'queue': 'single_thread_queue'},
+    'api_v2.tasks.listing_tag_modify_task.run_listing_tag_modify_task':                {'queue': 'single_thread_queue'},
 }
 
 CELERY_BEAT_SCHEDULE = {
@@ -175,6 +176,11 @@ CELERY_BEAT_SCHEDULE = {
     # Listing 标签同步：每 5 秒处理创建中 / 删除中的标签（Redis 锁保证同时仅一个实例执行）
     'listing-tag-sync': {
         'task': 'api_v2.tasks.listing_tag_sync_task.run_listing_tag_sync_task',
+        'schedule': 5.0,
+    },
+    # Listing 商品标签修改同步：每 5 秒处理新增 / 移除绑定（Redis 锁保证同时仅一个实例执行）
+    'listing-tag-modify': {
+        'task': 'api_v2.tasks.listing_tag_modify_task.run_listing_tag_modify_task',
         'schedule': 5.0,
     },
 }

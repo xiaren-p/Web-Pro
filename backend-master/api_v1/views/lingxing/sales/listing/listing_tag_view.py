@@ -232,6 +232,21 @@ class ListingTagViewSet(ViewSet):
         )
         return drf_ok(data=list(types))
 
+    @action(detail=False, methods=["get"], url_path="options")
+    def tag_options(self, request: Request) -> Response:
+        """返回 status=normal 的标签选项列表，不分页，供前端下拉选择器使用。"""
+        tags = LxListingTag.objects.filter(status="normal").order_by("tag_name")
+        data = [
+            {
+                "globalTagId": t.global_tag_id or "",
+                "tagName": t.tag_name or "",
+                "color": t.color or "",
+                "type": t.type or "",
+            }
+            for t in tags
+        ]
+        return drf_ok(data=data)
+
 
 def _get_operator_name(request: Request) -> str:
     """获取当前登录用户的昵称。"""

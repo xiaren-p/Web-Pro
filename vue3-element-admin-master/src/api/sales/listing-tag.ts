@@ -33,6 +33,14 @@ export interface ListingTagForm {
   color: string;
 }
 
+/** 标签下拉选项（精简字段，供选择器使用）。 */
+export interface TagOption {
+  globalTagId: string;
+  tagName: string;
+  color: string;
+  type: string;
+}
+
 const LISTING_TAG_BASE_URL = "/sales/listing/tags";
 
 export const ListingTagAPI = {
@@ -86,6 +94,13 @@ export const ListingTagAPI = {
   getTypeOptions() {
     return request<any, string[]>({
       url: `${LISTING_TAG_BASE_URL}/type-options`,
+      method: "get",
+    });
+  },
+  /** 获取 status=normal 的全量标签选项（供下拉选择器使用，不分页）。 */
+  getOptions() {
+    return request<any, TagOption[]>({
+      url: `${LISTING_TAG_BASE_URL}/options`,
       method: "get",
     });
   },

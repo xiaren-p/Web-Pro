@@ -56,6 +56,7 @@ urlpatterns = [
     path('sales/listing/tags', views.ListingTagViewSet.as_view({'get': 'list', 'post': 'create'}), name='sales-listing-tags'),
     path('sales/listing/tags/batch-delete', views.ListingTagViewSet.as_view({'post': 'batch_delete'}), name='sales-listing-tags-batch-delete'),
     path('sales/listing/tags/type-options', views.ListingTagViewSet.as_view({'get': 'type_options'}), name='sales-listing-tags-type-options'),
+    path('sales/listing/tags/options', views.ListingTagViewSet.as_view({'get': 'tag_options'}), name='sales-listing-tags-options'),
     path('sales/listing/tags/<str:pk>', views.ListingTagViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='sales-listing-tags-detail'),
     path('sales/listing/tags/<str:pk>/status', views.ListingTagViewSet.as_view({'put': 'update_status'}), name='sales-listing-tags-status'),
 

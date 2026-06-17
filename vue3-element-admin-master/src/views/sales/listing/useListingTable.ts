@@ -380,7 +380,11 @@ export function useListingTable() {
             asin: fallback(item.asin),
             parentAsin: fallback(item.parent_asin),
             label: Array.isArray(item.global_tags)
-              ? item.global_tags.map((t: any) => t.tagName)
+              ? item.global_tags.map((t: any) => ({
+                  globalTagId: t.globalTagId || "",
+                  tagName: t.tagName || "",
+                  color: t.color || "",
+                }))
               : [],
             title: fallback(item.item_name),
             // Classification -> Computed from MSKU or SKU
