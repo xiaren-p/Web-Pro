@@ -4,6 +4,7 @@ from api_v2.tasks.ad_campaign_submit_task import submit_pending_campaigns_task
 from api_v2.tasks.time_pricing_task import run_time_pricing_task
 from api_v2.tasks.ad_time_pricing_task import run_ad_time_pricing_task
 from api_v2.tasks.bid_adjustment_task import run_bid_adjustment_task
+from api_v2.tasks.campaign_adjustment_task import run_campaign_adjustment_task
 from api_v2.tasks.listing_image_upload_task import upload_listing_images_task
 from api_v2.tasks.listing_tag_modify_task import run_listing_tag_modify_task
 from api_v2.tasks.listing_tag_sync_task import run_listing_tag_sync_task
@@ -18,6 +19,7 @@ __all__ = [
     'run_ad_time_pricing_task',
     'run_time_pricing_task',
     'run_bid_adjustment_task',
+    'run_campaign_adjustment_task',
     'run_optimization_strategy_task',
     'run_optimization_execution_task',
     'run_listing_tag_sync_task',

@@ -5,6 +5,7 @@ from django.urls import path
 from api_v2.views.ad_campaign_submit_view import submit_pending_campaigns
 from api_v2.views.ad_time_pricing_view import trigger_time_pricing
 from api_v2.views.bid_adjustment_view import trigger_bid_adjustment
+from api_v2.views.campaign_adjustment_view import trigger_campaign_adjustment
 from api_v2.views.ad_upload_queue_view import (
     bulk_delete_ad_queue,
     list_ad_queue,
@@ -47,6 +48,9 @@ urlpatterns = [
 
     # 竞价调整执行
     path('ads/bid-adjustment/run/', trigger_bid_adjustment, name='bid_adjustment_run'),
+
+    # 广告活动调整执行（预算调整 / 暂停）
+    path('ads/campaign-adjustment/run/', trigger_campaign_adjustment, name='campaign_adjustment_run'),
 
     # SP广告优化策略匹配
     path('ads/optimization-strategy/run/', trigger_optimization_strategy, name='ads_optimization_strategy_run'),
