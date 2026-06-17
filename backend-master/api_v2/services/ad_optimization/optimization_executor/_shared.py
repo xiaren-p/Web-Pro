@@ -15,14 +15,16 @@ from django.db.models import Sum
 from api_v1.models.lingxing.ads.report.lx_sp_target_report import LxSpTargetReport
 from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
 from api_v2.models.sp_ad_optimization_strategy import ManualRulesStatus, SpAdOptimizationStrategy
-from api_v2.models.sp_ad_pause_archive import (
-    PauseArchiveEntityType,
-)
 from api_v2.models.sp_bid_adjustment import (
     AdjustmentStatusChoices,
     ExecutionStatusChoices,
     ExecutionTypeChoices,
+    PauseEntityTypeChoices,
     SpBidAdjustment,
+)
+from api_v2.models.sp_campaign_adjustment import (
+    CampaignExecutionTypeChoices,
+    SpCampaignAdjustment,
 )
 
 logger = logging.getLogger(__name__)
@@ -408,14 +410,101 @@ def is_execution_cycle_ok(
 
 
 # ============================================================
-# 预算操作 / 其他操作（占位）
+# 预算操作
 # ============================================================
 
-def execute_budget_action(rule: dict[str, Any]) -> dict[str, Any]:
-    """规则级预算操作（占位）。
+# 预算最低保底值
+MIN_BUDGET_FLOOR = 1.0
+
+
+def _calc_adjusted_budget(
+    current: float, action_type: str, value: float, limit: float | None,
+) -> float | None:
+    """根据预算操作类型计算调整后的预算。
+
+    支持四种操作类型：
+      - bud_percent_decrease：百分比降低，不低于 limit 和最低保底值
+      - bud_percent_increase：百分比提高，不高于 limit
+      - bud_fixed_decrease：固定值降低，不低于 limit 和最低保底值
+      - bud_fixed_increase：固定值提高，不高于 limit
+
+    Args:
+        current: 当前预算
+        action_type: 操作类型
+        value: 调整值
+        limit: 上下限
+
+    Returns:
+        调整后预算；未知操作类型返回 None。
+    """
+    if action_type == "bud_percent_decrease":
+        new_budget = current * (1 - value / 100)
+        if limit is not None:
+            new_budget = max(new_budget, limit)
+        return max(new_budget, MIN_BUDGET_FLOOR)
+
+    if action_type == "bud_percent_increase":
+        new_budget = current * (1 + value / 100)
+        if limit is not None:
+            new_budget = min(new_budget, limit)
+        return new_budget
+
+    if action_type == "bud_fixed_decrease":
+        new_budget = current - value
+        if limit is not None:
+            new_budget = max(new_budget, limit)
+        return max(new_budget, MIN_BUDGET_FLOOR)
+
+    if action_type == "bud_fixed_increase":
+        new_budget = current + value
+        if limit is not None:
+            new_budget = min(new_budget, limit)
+        return new_budget
+
+    logger.warning("未知预算操作类型 %s", action_type)
+    return None
+
+
+def get_last_budget_adjustment_time(
+    campaign_id: int,
+    profile_id: int,
+) -> datetime | None:
+    """查询广告活动最近一次预算调整成功记录的时间。
+
+    Args:
+        campaign_id: 广告活动 ID
+        profile_id: 店铺 ID
+
+    Returns:
+        adjustment_time 或 None（无历史记录）。
+    """
+    last = (
+        SpCampaignAdjustment.objects
+        .filter(
+            campaign_id=campaign_id,
+            profile_id=profile_id,
+            execution_type=CampaignExecutionTypeChoices.RULE_BUDGET_ADJUSTMENT,
+            adjustment_status=AdjustmentStatusChoices.SUCCESS,
+        )
+        .order_by("-adjustment_time")
+        .first()
+    )
+    if last and last.adjustment_time:
+        return last.adjustment_time
+    return None
+
+
+def execute_budget_action(
+    rule: dict[str, Any],
+    campaign_id: int,
+    profile_id: int,
+) -> dict[str, Any]:
+    """规则级预算操作：写 SpCampaignAdjustment 表 + 更新广告活动 daily_budget。
 
     Args:
         rule: 规则 JSON
+        campaign_id: 广告活动 ID
+        profile_id: 店铺 ID
 
     Returns:
         预算操作结果字典。
@@ -424,11 +513,68 @@ def execute_budget_action(rule: dict[str, Any]) -> dict[str, Any]:
     action_type = (budget_action or {}).get("type", "") if isinstance(budget_action, dict) else ""
     if not action_type or action_type == "no_adjust":
         return {"操作": "预算操作", "状态": "跳过", "原因": "无操作或不调整"}
+
+    # 1. 获取当前预算
+    from api_v1.models.lingxing.ads.basic.lx_sp_campaign import LxSpCampaign
+
+    campaign = LxSpCampaign.objects.filter(
+        campaign_id=campaign_id, profile_id=profile_id,
+    ).values("daily_budget").first()
+    if not campaign or campaign["daily_budget"] is None:
+        return {"操作": "预算操作", "状态": "跳过", "原因": "无当前预算数据"}
+    current_budget = float(campaign["daily_budget"])
+
+    # 2. 周期检查
+    last_time = get_last_budget_adjustment_time(campaign_id, profile_id)
+    cycle_ok, cycle_reason = is_execution_cycle_ok(last_time, DEFAULT_CYCLE_DAYS)
+    if not cycle_ok:
+        return {"操作": "预算操作", "状态": "跳过", "原因": cycle_reason}
+
+    # 3. 计算新预算
+    value = float(budget_action.get("value", 0) or 0)
+    limit = budget_action.get("limit")
+    limit_val = float(limit) if limit is not None else None
+    new_budget = _calc_adjusted_budget(current_budget, action_type, value, limit_val)
+    if new_budget is None:
+        return {"操作": "预算操作", "状态": "跳过", "原因": f"不支持的预算操作类型: {action_type}"}
+
+    new_budget = round(new_budget, 4)
+    if new_budget == round(current_budget, 4):
+        return {"操作": "预算操作", "状态": "跳过", "原因": "调整前后预算相同"}
+
+    # 4. 写 SpCampaignAdjustment 表
+    now = datetime.now(dt_timezone.utc)
+    record = SpCampaignAdjustment(
+        campaign_id=campaign_id,
+        profile_id=profile_id,
+        execution_type=CampaignExecutionTypeChoices.RULE_BUDGET_ADJUSTMENT,
+        auto_rule_id=rule.get("rule_id"),
+        budget_before=current_budget,
+        budget_after=new_budget,
+        adjustment_status=AdjustmentStatusChoices.PENDING,
+        execution_status=ExecutionStatusChoices.PENDING,
+        adjustment_time=now,
+    )
+    record.save()
+
+    # 5. 更新实体表 daily_budget
+    LxSpCampaign.objects.filter(
+        campaign_id=campaign_id, profile_id=profile_id,
+    ).update(daily_budget=new_budget)
+    logger.info(
+        "[_shared] 预算调整: campaign=%d budget=%.4f→%.4f",
+        campaign_id, current_budget, new_budget,
+    )
+
     return {
-        "操作": "预算操作", "状态": "占位",
+        "操作": "预算操作",
+        "状态": "完成",
         "类型": action_type,
-        "值": budget_action.get("value"),
-        "上限": budget_action.get("limit"),
+        "值": value,
+        "上限": limit_val,
+        "调整前预算": current_budget,
+        "调整后预算": new_budget,
+        "周期检查": cycle_reason,
     }
 
 
@@ -441,18 +587,15 @@ def execute_pause_archive_action(
 ) -> dict[str, Any]:
     """执行规则级暂停/归档操作：写 SpBidAdjustment 表 + 更新实体状态为 paused。
 
-    当前 pause 和 archive 统一按 BID_PAUSE 写入 SpBidAdjustment，
-    调整状态写 PENDING（待调整），同步更新 LxSp* 实体表 state="paused"。
+    仅用于 keyword / targeting / product_targeting 维度，
+    campaign 维度暂停走 SpCampaignAdjustment 表。
 
     Args:
         rule: 规则 JSON
         campaign_id: 广告活动 ID
         profile_id: 店铺 ID
-        entity_type: 投放实体类型（"campaign" / "targeting" / "keyword" / "product_targeting"）
-        entity_id: 实体 ID（campaign 维度时为 None）
-
-    Returns:
-        操作结果字典。
+        entity_type: 投放实体类型（"targeting" / "keyword" / "product_targeting"）
+        entity_id: 实体 ID
     """
     other_action = rule.get("other_action") or {}
     action_type = (other_action or {}).get("type", "") if isinstance(other_action, dict) else ""
@@ -473,30 +616,20 @@ def execute_pause_archive_action(
         execution_status=ExecutionStatusChoices.PENDING,
         adjustment_time=now,
     )
-    if entity_type == PauseArchiveEntityType.KEYWORD and entity_id:
+    if entity_type == PauseEntityTypeChoices.KEYWORD and entity_id:
         record.keyword_id = entity_id
-    elif entity_type in (PauseArchiveEntityType.TARGETING, PauseArchiveEntityType.PRODUCT_TARGETING) and entity_id:
+    elif entity_type in (PauseEntityTypeChoices.TARGETING, PauseEntityTypeChoices.PRODUCT_TARGETING) and entity_id:
         record.target_id = entity_id
-    # campaign 维度不设 keyword_id / target_id
     record.save()
 
     # 2. 更新实体表状态为 paused
-    if entity_type == PauseArchiveEntityType.CAMPAIGN:
-        from api_v1.models.lingxing.ads.basic.lx_sp_campaign import LxSpCampaign
-        LxSpCampaign.objects.filter(
-            campaign_id=campaign_id, profile_id=profile_id,
-        ).update(state=new_state)
-        logger.info(
-            "[_shared] 竞价暂停: entity=campaign campaign=%d state→%s",
-            campaign_id, new_state,
-        )
-    elif entity_type == PauseArchiveEntityType.KEYWORD and entity_id:
+    if entity_type == PauseEntityTypeChoices.KEYWORD and entity_id:
         from api_v1.models.lingxing.ads.basic.lx_sp_keyword import LxSpKeyword
         LxSpKeyword.objects.filter(keyword_id=entity_id).update(state=new_state)
         logger.info(
             "[_shared] 竞价暂停: entity=keyword kw=%d state→%s", entity_id, new_state,
         )
-    elif entity_type in (PauseArchiveEntityType.TARGETING, PauseArchiveEntityType.PRODUCT_TARGETING) and entity_id:
+    elif entity_type in (PauseEntityTypeChoices.TARGETING, PauseEntityTypeChoices.PRODUCT_TARGETING) and entity_id:
         from api_v1.models.lingxing.ads.basic.lx_sp_target import LxSpTarget
         LxSpTarget.objects.filter(target_id=entity_id).update(state=new_state)
         logger.info(

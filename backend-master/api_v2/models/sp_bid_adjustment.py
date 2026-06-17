@@ -14,6 +14,14 @@ class ExecutionTypeChoices(models.TextChoices):
     MANUAL_ADJUSTMENT = "MANUAL_ADJUSTMENT", "手动调整"
 
 
+class PauseEntityTypeChoices(models.TextChoices):
+    """暂停投放实体类型枚举（仅用于 BID_PAUSE 记录区分实体维度）。"""
+
+    TARGETING = "targeting", "定位组"
+    KEYWORD = "keyword", "关键词"
+    PRODUCT_TARGETING = "product_targeting", "商品投放"
+
+
 class AdjustmentStatusChoices(models.TextChoices):
     """调整状态枚举。"""
 

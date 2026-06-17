@@ -13,16 +13,16 @@ from api_v2.models.lx_api_err import LxApiErr
 from api_v2.models.sp_ad_optimization_strategy import (
     SpAdOptimizationStrategy,
 )
-from api_v2.models.sp_ad_pause_archive import (
-    PauseArchiveEntityType,
-    PauseArchiveExecutionType,
-    SpAdPauseArchive,
-)
 from api_v2.models.sp_bid_adjustment import (
     AdjustmentStatusChoices,
     ExecutionStatusChoices,
     ExecutionTypeChoices,
+    PauseEntityTypeChoices,
     SpBidAdjustment,
+)
+from api_v2.models.sp_campaign_adjustment import (
+    CampaignExecutionTypeChoices,
+    SpCampaignAdjustment,
 )
 from api_v2.models.workflow_execution import ExecutionStatus, WorkflowExecution, WorkflowType
 
@@ -42,11 +42,11 @@ __all__ = [
     'ExecutionTypeChoices',
     'AdjustmentStatusChoices',
     'ExecutionStatusChoices',
+    'PauseEntityTypeChoices',
+    'SpCampaignAdjustment',
     'ListingTagModifyQueue',
     'ModifyActionChoices',
     'LxApiErr',
     'SpAdOptimizationStrategy',
-    'SpAdPauseArchive',
-    'PauseArchiveExecutionType',
-    'PauseArchiveEntityType',
+    'PauseEntityTypeChoices',
 ]

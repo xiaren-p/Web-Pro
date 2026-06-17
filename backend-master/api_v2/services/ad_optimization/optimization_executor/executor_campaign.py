@@ -40,6 +40,7 @@ from api_v1.models.lingxing.ads.report.lx_sp_target_report import LxSpTargetRepo
 from api_v2.models.sp_ad_optimization_strategy import SpAdOptimizationStrategy
 from api_v2.models.sp_bid_adjustment import (
     AdjustmentStatusChoices,
+    ExecutionStatusChoices,
     ExecutionTypeChoices,
     SpBidAdjustment,
 )
@@ -52,7 +53,6 @@ from api_v2.services.ad_optimization.optimization_executor._shared import (
     check_time_pricing_link as _shared_check_time_pricing_link,
     evaluate_condition_set,
     execute_budget_action as _shared_execute_budget_action,
-    execute_pause_archive_action,
     resolve_adjustment_status,
     resolve_rules,
 )
@@ -722,26 +722,57 @@ def _execute_budget_action(
     campaign: LxSpCampaign,
 ) -> dict[str, Any]:
     """规则级预算操作 —— 委托 _shared。"""
-    _ = campaign  # 预算操作暂时不依赖 campaign
-    return _shared_execute_budget_action(rule)
+    return _shared_execute_budget_action(
+        rule,
+        campaign_id=campaign.campaign_id,
+        profile_id=campaign.profile_id,
+    )
 
 
 def _execute_other_action(
     rule: dict[str, Any],
     campaign: LxSpCampaign,
 ) -> dict[str, Any]:
-    """规则级暂停/归档操作 —— 委托 _shared.execute_pause_archive_action。
+    """广告活动维度暂停：直接写 SpCampaignAdjustment（CAMPAIGN_PAUSE）+ 更新 LxSpCampaign.state。"""
+    from api_v2.models.sp_campaign_adjustment import CampaignExecutionTypeChoices, SpCampaignAdjustment
 
-    广告活动维度：entity_type="campaign"，不传 entity_id。
-    """
-    from api_v2.models.sp_ad_pause_archive import PauseArchiveEntityType
+    other_action = rule.get("other_action") or {}
+    action_type = (other_action or {}).get("type", "") if isinstance(other_action, dict) else ""
 
-    return execute_pause_archive_action(
-        rule,
+    if not action_type or action_type == "no_other":
+        return {"操作": "暂停/归档", "状态": "跳过", "原因": "无操作"}
+
+    new_state = "paused"
+    now = datetime.now(dt_timezone.utc)
+
+    SpCampaignAdjustment.objects.create(
         campaign_id=campaign.campaign_id,
         profile_id=campaign.profile_id,
-        entity_type=PauseArchiveEntityType.CAMPAIGN,
+        execution_type=CampaignExecutionTypeChoices.CAMPAIGN_PAUSE,
+        auto_rule_id=rule.get("rule_id"),
+        adjustment_status=AdjustmentStatusChoices.PENDING,
+        execution_status=ExecutionStatusChoices.PENDING,
+        adjustment_time=now,
     )
+
+    LxSpCampaign.objects.filter(
+        campaign_id=campaign.campaign_id, profile_id=campaign.profile_id,
+    ).update(state=new_state)
+
+    logger.info(
+        "[executor_campaign] 广告活动暂停: campaign=%d state→%s",
+        campaign.campaign_id, new_state,
+    )
+
+    return {
+        "操作": "暂停/归档",
+        "状态": "完成",
+        "规则触发的操作类型": action_type,
+        "实体类型": "campaign",
+        "实体ID": campaign.campaign_id,
+        "新状态": new_state,
+        "通知": other_action.get("notify", False),
+    }
 
 
 # ============================================================

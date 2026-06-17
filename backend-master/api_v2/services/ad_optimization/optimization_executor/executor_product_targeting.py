@@ -88,8 +88,15 @@ def _is_execution_cycle_ok(*args: Any, **kwargs: Any) -> tuple[bool, str]:
     return _shared_is_execution_cycle_ok(*args, **kwargs)
 
 
-def _execute_budget_action(*args: Any, **kwargs: Any) -> dict[str, Any]:
-    return _shared_execute_budget_action(*args, **kwargs)
+def _execute_budget_action(
+    rule: dict[str, Any], campaign: LxSpCampaign,
+) -> dict[str, Any]:
+    """规则级预算操作 —— 委托 _shared，传入 campaign 上下文。"""
+    return _shared_execute_budget_action(
+        rule,
+        campaign_id=campaign.campaign_id,
+        profile_id=campaign.profile_id,
+    )
 
 
 def _execute_other_action(
@@ -99,13 +106,13 @@ def _execute_other_action(
 
     商品投放维度：entity_type="product_targeting"，传入 target_id。
     """
-    from api_v2.models.sp_ad_pause_archive import PauseArchiveEntityType
+    from api_v2.models.sp_bid_adjustment import PauseEntityTypeChoices
 
     return execute_pause_archive_action(
         rule,
         campaign_id=campaign.campaign_id,
         profile_id=campaign.profile_id,
-        entity_type=PauseArchiveEntityType.PRODUCT_TARGETING,
+        entity_type=PauseEntityTypeChoices.PRODUCT_TARGETING,
         entity_id=product_target["target_id"],
     )
 
@@ -223,7 +230,7 @@ def _execute_single_rule(
         return None, False
 
     targeting_results, bid_executed = _execute_targeting_bid_actions(rule, product_target, campaign, today)
-    budget_result = _execute_budget_action(rule)
+    budget_result = _execute_budget_action(rule, campaign)
     other_result = _execute_other_action(rule, product_target, campaign)
 
     # ── 写 SpBidAdjustment 表（仅竞价变动时写入）──
