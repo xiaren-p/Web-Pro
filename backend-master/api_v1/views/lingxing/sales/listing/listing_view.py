@@ -467,8 +467,8 @@ class SalesProductListingViewSet(ViewSet):
         """批量更新全局标签（``LxListingData.global_tags``）。
 
         global_tags 为 JSON 数组，前端提交的格式：
-        [{"globalTagId": "xxx", "tagName": "xxx", "color": "#fff"}, ...]
-        为空数组即表示清除所有标签。
+        [{"id": 12345, "asin": "xxx", "tags": [...]}, ...]
+        id 为主键（LxListingData.id），用于精确匹配单条记录。
 
         写入 LxListingData.global_tags 后，自动计算新旧差异并写入
         ListingTagModifyQueue 队列，供 api_v2 异步任务消费。
@@ -479,25 +479,26 @@ class SalesProductListingViewSet(ViewSet):
         if not isinstance(data, list):
             return drf_error(msg="参数格式错误")
 
-        asins = [item.get("asin") for item in data if item.get("asin")]
-        if not asins:
-            return drf_ok(msg="未提供任何 ASIN")
+        # 用主键 id 精确匹配，避免一个 asin 对应多条记录
+        ids = [item.get("id") for item in data if item.get("id")]
+        if not ids:
+            return drf_ok(msg="未提供任何记录 ID")
 
-        records = LxListingData.objects.filter(asin__in=asins)
-        record_map: dict[str, list[Any]] = {}
-        for r in records:
-            record_map.setdefault(r.asin, []).append(r)
+        records = list(LxListingData.objects.filter(id__in=ids))
+        record_map: dict[int, LxListingData] = {r.id: r for r in records}
 
-        # 差异计算：每条提交与对应 LxListingData 原始记录比对
         queue_entries: list[ListingTagModifyQueue] = []
-
         updates: list[LxListingData] = []
+
         for item in data:
-            asin = item.get("asin")
-            if not asin:
+            record_id = item.get("id")
+            if not record_id:
                 continue
+            record = record_map.get(record_id)
+            if not record:
+                continue
+
             tags = item.get("tags", [])
-            # 标准化标签数组结构：仅保留 {globalTagId, tagName, color}
             normalized_tags: list[dict[str, Any]] = []
             for t in tags if isinstance(tags, list) else []:
                 if isinstance(t, dict):
@@ -509,36 +510,33 @@ class SalesProductListingViewSet(ViewSet):
 
             new_ids = {t["globalTagId"] for t in normalized_tags if t["globalTagId"]}
 
-            matched = record_map.get(asin, [])
-            for record in matched:
-                # ── 计算差异 ──
-                old_tags: list[dict[str, Any]] = record.global_tags or []
-                old_ids = {t.get("globalTagId", "") for t in old_tags if t.get("globalTagId")}
+            old_tags: list[dict[str, Any]] = record.global_tags or []
+            old_ids = {t.get("globalTagId", "") for t in old_tags if t.get("globalTagId")}
 
-                added_ids = new_ids - old_ids
-                removed_ids = old_ids - new_ids
+            added_ids = new_ids - old_ids
+            removed_ids = old_ids - new_ids
 
-                msku = record.seller_sku or ""
-                sid = record.sid or 0
+            msku = record.seller_sku or ""
+            sid = record.sid or 0
 
-                if added_ids:
-                    queue_entries.append(ListingTagModifyQueue(
-                        action=ModifyActionChoices.ADD,
-                        msku=msku,
-                        sid=sid,
-                        tag_ids=list(added_ids),
-                    ))
+            if added_ids:
+                queue_entries.append(ListingTagModifyQueue(
+                    action=ModifyActionChoices.ADD,
+                    msku=msku,
+                    sid=sid,
+                    tag_ids=list(added_ids),
+                ))
 
-                if removed_ids:
-                    queue_entries.append(ListingTagModifyQueue(
-                        action=ModifyActionChoices.REMOVE,
-                        msku=msku,
-                        sid=sid,
-                        tag_ids=list(removed_ids),
-                    ))
+            if removed_ids:
+                queue_entries.append(ListingTagModifyQueue(
+                    action=ModifyActionChoices.REMOVE,
+                    msku=msku,
+                    sid=sid,
+                    tag_ids=list(removed_ids),
+                ))
 
-                record.global_tags = normalized_tags
-                updates.append(record)
+            record.global_tags = normalized_tags
+            updates.append(record)
 
         if updates:
             LxListingData.objects.bulk_update(updates, ["global_tags"])
@@ -552,7 +550,7 @@ class SalesProductListingViewSet(ViewSet):
     def upsert_assort(self, request: Request) -> Response:
         """批量更新或新增分类（``LxListingMeta.assort``）。
 
-        通过 asin → LxListingData.id → LxListingMeta.listing_data_id 的链式查找完成。
+        通过 id（LxListingData 主键）精确匹配。
         """
         data = request.data
         if isinstance(data, dict):
@@ -560,27 +558,23 @@ class SalesProductListingViewSet(ViewSet):
         if not isinstance(data, list):
             return drf_error(msg="参数格式错误")
 
-        asins = [item.get("asin") for item in data if item.get("asin")]
-        if not asins:
-            return drf_ok(msg="未提供任何 ASIN")
+        ids = [item.get("id") for item in data if item.get("id")]
+        if not ids:
+            return drf_ok(msg="未提供任何记录 ID")
 
-        # 第一步：asin → LxListingData.id 映射
-        records = LxListingData.objects.filter(asin__in=asins)
-        asin_to_data_id: dict[str, int] = {r.asin: r.id for r in records}
-
-        target_ids = list(asin_to_data_id.values())
-        # 第二步：已有元数据映射
+        target_ids = [int(i) for i in ids]
         existing_metas = LxListingMeta.objects.filter(listing_data_id__in=target_ids)
         meta_map: dict[int, Any] = {m.listing_data_id: m for m in existing_metas}
 
         update_metas: list[LxListingMeta] = []
         create_metas: list[LxListingMeta] = []
         for item in data:
-            asin = item.get("asin")
-            if not asin:
+            record_id = item.get("id")
+            if not record_id:
                 continue
-            data_id = asin_to_data_id.get(asin)
-            if not data_id:
+            try:
+                data_id = int(record_id)
+            except (TypeError, ValueError):
                 continue
             assort = item.get("assort", "")
 

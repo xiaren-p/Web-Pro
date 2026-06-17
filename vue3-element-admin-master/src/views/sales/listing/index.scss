@@ -1,171 +1,267 @@
-/* 布局优化：更现代、干净的界面风格 */
-.app-container {
-  box-sizing: border-box;
-  min-height: 100vh;
-  padding: 16px;
-  overflow: auto;
-  background-color: var(--el-bg-color-page);
+/**
+ * Listing 列表页 scoped 样式
+ *
+ * 设计语言：与广告活动模块（src/views/ads/sp/）保持一致的"精密跨境运营控制台"风格
+ * 所有颜色 / 间距 / 圆角 / 阴影 / 过渡均引用 src/styles/variables.scss 中的 CSS 变量
+ * 内容块容器复用全局 .content-block / .content-block--flush（src/styles/index.scss）
+ */
 
-  /* 减小按钮尺寸，恢复精致比例 */
+/* ═══════════════════════════════════════════════════════════════
+   页面根容器
+   ═══════════════════════════════════════════════════════════════ */
+.listing-page {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 50px);
+  padding: 24px;
+  font-family:
+    "Geist",
+    "PingFang SC",
+    "Microsoft YaHei",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: var(--text-primary);
+  background: var(--app-bg);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   按钮统一规范（向广告模块对齐）
+   ═══════════════════════════════════════════════════════════════ */
+.listing-page {
   :deep(.el-button) {
     height: auto;
     min-height: 32px;
     padding: 6px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    border-radius: 6px;
-    transition: all 0.25s ease;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-ui);
   }
+
   :deep(.el-button.is-text) {
     min-height: 28px;
     padding: 6px 10px;
   }
+
   :deep(.el-button.el-button--small) {
     min-height: 28px;
     padding: 4px 12px;
   }
+
   :deep(.el-button--primary) {
-    box-shadow: 0 2px 6px rgba(64, 158, 255, 0.25);
+    background-color: var(--color-primary-600);
+    border-color: var(--color-primary-600);
+    box-shadow: 0 8px 18px rgb(37 99 235 / 18%);
   }
+
   :deep(.el-button--primary:hover) {
-    box-shadow: 0 4px 10px rgba(64, 158, 255, 0.4);
-    transform: translateY(-1px);
-  }
-  :deep(.el-button--success) {
-    box-shadow: 0 2px 6px rgba(103, 194, 58, 0.25);
-  }
-  :deep(.el-button--success:hover) {
-    box-shadow: 0 4px 10px rgba(103, 194, 58, 0.4);
-    transform: translateY(-1px);
-  }
-  :deep(.el-button--warning) {
-    box-shadow: 0 2px 6px rgba(230, 162, 60, 0.25);
-  }
-  :deep(.el-button--warning:hover) {
-    box-shadow: 0 4px 10px rgba(230, 162, 60, 0.4);
-    transform: translateY(-1px);
-  }
-  :deep(.el-button--default) {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  }
-  :deep(.el-button--default:hover) {
-    color: var(--el-color-primary);
-    border-color: var(--el-color-primary);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    background-color: var(--color-primary-700);
+    border-color: var(--color-primary-700);
+    box-shadow: 0 10px 22px rgb(37 99 235 / 26%);
     transform: translateY(-1px);
   }
 
-  /* 表单包裹框样式优化 */
+  :deep(.el-button--success:hover),
+  :deep(.el-button--warning:hover),
+  :deep(.el-button--danger:hover) {
+    transform: translateY(-1px);
+  }
+
+  :deep(.el-button--default) {
+    color: var(--text-secondary);
+    background-color: var(--surface-base);
+    border-color: var(--border-strong);
+  }
+
+  :deep(.el-button--default:hover) {
+    color: var(--color-primary-700);
+    background-color: var(--surface-hover);
+    border-color: var(--color-primary-300);
+  }
+
+  /* 表单项统一节奏 */
   :deep(.el-form-item__label) {
     height: 32px;
     padding-right: 8px;
-    font-weight: 500;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
     line-height: 32px;
-    color: var(--el-text-color-primary);
+    color: var(--text-primary);
   }
+
   :deep(.el-form-item) {
     align-items: center;
     margin-right: 16px;
     margin-bottom: 12px;
   }
+
   :deep(.el-input__wrapper),
   :deep(.el-select__wrapper) {
     min-height: 32px;
     padding: 0 12px;
-    font-size: 13px;
-    background-color: var(--el-fill-color-blank);
-    border-radius: 6px;
-    box-shadow: 0 0 0 1px var(--el-border-color) inset;
-    transition: all 0.25s ease;
+    font-size: var(--font-size-sm);
+    background-color: var(--surface-base);
+    border-radius: var(--radius-md);
+    box-shadow: 0 0 0 1px var(--border-base) inset;
+    transition: all var(--transition-ui);
   }
+
   :deep(.el-input__wrapper:hover),
   :deep(.el-select__wrapper:hover) {
-    box-shadow:
-      0 0 0 1px var(--el-color-primary) inset,
-      0 2px 6px rgba(0, 0, 0, 0.02) !important;
+    box-shadow: 0 0 0 1px var(--color-primary-300) inset !important;
   }
+
   :deep(.el-input__wrapper.is-focus),
   :deep(.el-select__wrapper.is-focus) {
     box-shadow:
-      0 0 0 1px var(--el-color-primary) inset,
-      0 0 0 3px rgba(64, 158, 255, 0.15) !important;
+      0 0 0 1px var(--color-primary-600) inset,
+      0 0 0 3px var(--focus-ring) !important;
   }
 }
 
-/* 独立将搜索包裹为白底圆角卡片 */
-.search-container {
-  --el-font-size-base: 13px;
-  padding: 16px 20px 4px 20px;
-  background-color: var(--el-bg-color);
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  transition: all 0.3s;
+/* ═══════════════════════════════════════════════════════════════
+   筛选区 / 表格区外层
+   ═══════════════════════════════════════════════════════════════ */
+.listing-page__filters {
+  /* 由全局 .content-block 提供卡片样式，本块仅做内部节奏调整 */
+  padding-bottom: 12px;
 }
 
-.search-container:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+.listing-page__table {
+  /* .content-block--flush 会去掉内边距，让表格顶满卡片边 */
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 420px;
+
+  :deep(.el-card) {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  :deep(.el-card__body) {
+    padding: 0;
+  }
 }
 
-.search-container :deep(.el-form--inline .el-form-item) {
-  margin-right: 24px;
-  margin-bottom: 12px;
+/* ═══════════════════════════════════════════════════════════════
+   工具栏（批量操作 + 列配置）
+   ═══════════════════════════════════════════════════════════════ */
+.listing-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: linear-gradient(180deg, var(--surface-base) 0%, var(--surface-subtle) 100%);
+  border-bottom: 1px solid var(--border-base);
+  border-radius: 18px 18px 0 0;
 }
 
-.search-container :deep(.el-form-item__label) {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--el-text-color-regular);
+.listing-toolbar__left,
+.listing-toolbar__right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
-/* 数据表格卡片样式优化 */
-.data-table {
-  margin-top: 16px;
-  border: none;
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+/* 列配置图标按钮 — 替代旧的 22px 强压 inline */
+.col-config-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 16px;
+  color: var(--text-secondary);
+  background: var(--surface-base);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-ui);
 }
 
-.data-table:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+.col-config-btn:hover {
+  color: var(--color-primary-700);
+  background: var(--surface-hover);
+  border-color: var(--color-primary-300);
 }
 
-/* 顶部操作区留白 */
-.data-table__toolbar {
-  padding: 12px 16px 8px 16px;
+/* ═══════════════════════════════════════════════════════════════
+   表格
+   ═══════════════════════════════════════════════════════════════ */
+.listing-table {
+  :deep(.el-table) {
+    border: none;
+  }
+
+  :deep(.el-table::before),
+  :deep(.el-table--border::after) {
+    display: none;
+  }
+
+  /* 表头 */
+  :deep(.el-table__header-wrapper th.el-table__cell),
+  :deep(.el-table__header th) {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold) !important;
+    color: var(--text-secondary) !important;
+    text-align: center;
+    background-color: var(--surface-subtle) !important;
+    border-bottom: 1px solid var(--border-base) !important;
+    box-shadow: none;
+  }
+
+  :deep(.el-table__header th .cell) {
+    display: block;
+    width: 100%;
+  }
+
+  /* 表体 cell */
+  :deep(.el-table .el-table__cell) {
+    padding: 10px 0 !important;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
+  }
+
+  :deep(.el-table .cell) {
+    padding-right: 14px;
+    padding-left: 14px;
+    line-height: 1.5;
+  }
+
+  /* 行 hover：浅蓝背景 + 首列 3px 蓝条 */
+  :deep(.el-table .el-table__row) {
+    transition: background-color var(--transition-ui);
+  }
+
+  :deep(.el-table .el-table__row:hover > td.el-table__cell) {
+    background-color: var(--surface-hover) !important;
+  }
+
+  :deep(.el-table .el-table__row:hover > td.el-table__cell:first-child) {
+    box-shadow: inset 3px 0 0 var(--color-primary-600);
+  }
+
+  /* 斑马纹 */
+  :deep(.el-table__body .zebra-row > td.el-table__cell) {
+    background-color: var(--surface-subtle);
+  }
 }
 
-:deep(.el-card__body) {
-  padding: 0 !important; /* 移除外层内边距，让表格顶入边缘 */
-}
+/* ═══════════════════════════════════════════════════════════════
+   单元格内部布局类（替代 index.vue 中的 inline style）
+   ═══════════════════════════════════════════════════════════════ */
 
-.data-table__content {
-  border-right: none;
-  border-left: none;
-}
-
-/* 表头：浅灰色背景，不生硬 */
-:deep(.el-table__header th) {
-  font-size: 13px;
-  font-weight: 600 !important;
-  color: #3f4551 !important;
-  text-align: center;
-  background-color: #f7f8fb !important;
-  border-bottom: 1px solid #ebeef5;
-}
-
-:deep(.el-table__header th .cell) {
-  display: block;
-  width: 100%;
-}
-
-/* 表格内容：干净字体 */
-:deep(.el-table .el-table__cell) {
-  padding: 8px 0 !important;
-  font-size: 13px;
-  color: #4b5263;
-}
-
-/* 文本容器 */
+/* 通用文本容器 / 单行省略 */
 .cell-text-container {
   display: flex;
   flex-direction: column;
@@ -182,8 +278,8 @@
   white-space: nowrap;
 }
 
-/* 优化图片容器，减弱边框 */
-.thumb-container {
+/* 缩略图 */
+.cell-thumb {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -191,31 +287,283 @@
   height: 40px;
   padding: 2px;
   margin: 0 auto;
-  background-color: #fcfcfc;
-  border: 1px solid #f0f2f5;
-  border-radius: 6px;
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
 }
 
-.thumb-img {
+.cell-thumb__img {
   display: block;
   width: 36px;
   height: 36px;
 }
 
-:deep(.el-table__row) {
-  height: 54px;
+.cell-thumb__preview {
+  text-align: center;
 }
 
-/* 鼠标悬停高亮当前行 */
-:deep(.el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell) {
-  background-color: #f4f6fa;
+.cell-thumb__preview img {
+  max-width: 200px;
+  max-height: 200px;
 }
 
-/* 分页器放到卡片底部边距内 */
-.pagination-container {
+.cell-thumb__error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-disabled);
+}
+
+/* 标签列 */
+.cell-tags {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.cell-tags__list {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-right: 4px;
+}
+
+.cell-tags__list :deep(.el-tag) {
+  border: none;
+  border-radius: var(--radius-full);
+}
+
+.cell-tags__empty {
+  font-size: var(--font-size-xs);
+  color: var(--color-warning-600);
+}
+
+.cell-tags__edit {
+  flex-shrink: 0;
+  color: var(--color-primary-600);
+  cursor: pointer;
+  transition: color var(--transition-ui);
+}
+
+.cell-tags__edit:hover {
+  color: var(--color-primary-700);
+}
+
+/* 排名 / 小类排名（双行） */
+.cell-rank-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.3;
+}
+
+.cell-rank-stack__value {
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.cell-rank-stack__category {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* 商品编码（双行，居中） */
+.cell-product-code {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.cell-product-code__id {
+  color: var(--text-primary);
+}
+
+.cell-product-code__type {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* 变体属性 popover trigger */
+.cell-variants {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary-600);
+  cursor: pointer;
+}
+
+.cell-variants__text {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.cell-variants__icon {
+  margin-left: 2px;
+  color: var(--text-tertiary);
+}
+
+.cell-variants__empty {
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+/* 评分 */
+.cell-rating {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
+.cell-rating__row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.cell-rating__bar {
+  position: relative;
+  width: 70px;
+  height: 14px;
+  margin-right: 4px;
+}
+
+.cell-rating__bar-bg,
+.cell-rating__bar-fg {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.cell-rating__bar-fg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.cell-rating__bar-bg :deep(.el-icon) {
+  color: var(--border-subtle);
+}
+
+.cell-rating__bar-fg :deep(.el-icon) {
+  /* 业务语义色：星黄保留 */
+  color: #f7ba2a;
+}
+
+.cell-rating__value {
+  font-size: var(--font-size-xs);
+  color: #f7ba2a;
+}
+
+.cell-rating__count {
+  margin-top: 2px;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+/* 备注 */
+.cell-remark {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.cell-remark__text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cell-remark__edit {
+  margin-left: 4px;
+  color: var(--color-primary-600);
+  cursor: pointer;
+  transition: color var(--transition-ui);
+}
+
+.cell-remark__edit:hover {
+  color: var(--color-primary-700);
+}
+
+/* 利润 */
+.cell-profit {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  text-align: right;
+}
+
+.cell-profit__rate {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.cell-profit__value {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.cell-profit__value--negative {
+  color: var(--color-danger-600);
+}
+
+/* 数字字段：等宽数字（评分 / 排名 / 利润等） */
+.cell-rank-stack,
+.cell-product-code,
+.cell-profit,
+.cell-rating {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   分页区（粘性底部）
+   ═══════════════════════════════════════════════════════════════ */
+.listing-pager {
+  position: sticky;
+  bottom: 0;
+  z-index: 13;
   display: flex;
   justify-content: flex-end;
-  padding: 12px 16px;
-  background-color: #fff;
-  border-top: none; /* 移除顶部边框，避免与表格底边框重叠形成双线条 */
+  padding: 10px 18px;
+  background-color: var(--surface-base);
+  border-top: 1px solid var(--border-base);
+  border-radius: 0 0 18px 18px;
+}
+
+.listing-pager :deep(.el-pagination) {
+  font-size: var(--font-size-xs);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   响应式
+   ═══════════════════════════════════════════════════════════════ */
+@media (width <= 768px) {
+  .listing-page {
+    padding: var(--spacing-2);
+  }
+
+  .listing-toolbar {
+    flex-direction: column;
+    gap: var(--spacing-2);
+    align-items: stretch;
+  }
 }

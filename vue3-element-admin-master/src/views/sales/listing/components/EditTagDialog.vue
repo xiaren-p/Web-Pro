@@ -3,6 +3,7 @@
     :model-value="visible"
     title="编辑标签"
     width="480px"
+    class="listing-dialog"
     @update:model-value="emit('update:visible', $event)"
     @open="handleDialogOpen"
   >
@@ -20,7 +21,9 @@
           {{ tag.tagName }}
         </el-tag>
       </TransitionGroup>
-      <span v-if="currentTags.length === 0" class="tag-placeholder">暂无标签，请从下方搜索选择</span>
+      <span v-if="currentTags.length === 0" class="tag-placeholder">
+        暂无标签，请从下方搜索选择
+      </span>
     </div>
 
     <el-divider />
@@ -33,7 +36,7 @@
         :filter-method="handleTagSearch"
         :loading="searchLoading"
         clearable
-        style="width: 100%"
+        class="tag-search"
         @change="handleTagSelect"
         @clear="searchKeyword = ''"
       >
@@ -45,10 +48,7 @@
           :disabled="currentTags.some((t) => t.globalTagId === opt.globalTagId)"
         >
           <div class="tag-option-item">
-            <span
-              class="tag-option-dot"
-              :style="{ backgroundColor: opt.color || '#409eff' }"
-            />
+            <span class="tag-option-dot" :style="{ backgroundColor: opt.color || '#409eff' }" />
             <span>{{ opt.tagName }}</span>
           </div>
         </el-option>
@@ -56,8 +56,10 @@
     </div>
 
     <template #footer>
-      <el-button @click="emit('update:visible', false)">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="handleSaveTags">保存</el-button>
+      <div class="dialog-footer">
+        <el-button @click="emit('update:visible', false)">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="handleSaveTags">保存</el-button>
+      </div>
     </template>
   </el-dialog>
 </template>
@@ -101,9 +103,7 @@ const currentTags = ref<CurrentTag[]>([]);
 const filteredOptions = computed(() => {
   if (!searchKeyword.value) return allTagOptions.value;
   const kw = searchKeyword.value.toLowerCase();
-  return allTagOptions.value.filter((opt) =>
-    opt.tagName.toLowerCase().includes(kw)
-  );
+  return allTagOptions.value.filter((opt) => opt.tagName.toLowerCase().includes(kw));
 });
 
 function extractExistingTags(row: any): CurrentTag[] {
@@ -159,17 +159,16 @@ function handleTagSelect(globalTagId: string): void {
 }
 
 function handleRemoveTag(tag: CurrentTag): void {
-  currentTags.value = currentTags.value.filter(
-    (t) => t.globalTagId !== tag.globalTagId
-  );
+  currentTags.value = currentTags.value.filter((t) => t.globalTagId !== tag.globalTagId);
 }
 
 async function handleSaveTags(): Promise<void> {
-  if (!props.row?.asin) return;
+  if (!props.row?.id) return;
   saving.value = true;
   try {
     await SalesProductListingAPI.upsertLabels([
       {
+        id: props.row.id,
         asin: props.row.asin,
         tags: currentTags.value.map((t) => ({
           globalTagId: t.globalTagId,
@@ -190,6 +189,34 @@ async function handleSaveTags(): Promise<void> {
 </script>
 
 <style scoped lang="scss">
+/* Listing Dialog 统一规范 */
+.listing-dialog {
+  :deep(.el-dialog) {
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-dialog);
+  }
+
+  :deep(.el-dialog__header) {
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  :deep(.el-dialog__title) {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 20px 24px;
+  }
+
+  :deep(.el-dialog__footer) {
+    padding: 14px 24px 18px;
+    border-top: 1px solid var(--border-subtle);
+  }
+}
+
 .tag-display-area {
   min-height: 40px;
   padding: 4px 0;
@@ -197,44 +224,56 @@ async function handleSaveTags(): Promise<void> {
   .tag-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--spacing-2);
   }
 
   .tag-placeholder {
-    color: #c0c4cc;
-    font-size: 13px;
+    font-size: var(--font-size-sm);
+    color: var(--text-disabled);
   }
+}
+
+.tag-search {
+  width: 100%;
 }
 
 .tag-option-item {
   display: flex;
+  gap: var(--spacing-2);
   align-items: center;
-  gap: 8px;
 
   .tag-option-dot {
+    flex-shrink: 0;
     width: 10px;
     height: 10px;
+    border: 1px solid rgb(0 0 0 / 8%);
     border-radius: 50%;
-    flex-shrink: 0;
   }
+}
+
+.dialog-footer {
+  display: flex;
+  gap: var(--spacing-2);
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .tag-item-enter-active,
 .tag-item-leave-active {
-  transition: all 0.25s ease;
+  transition: all var(--transition-base);
 }
 
 .tag-item-enter-from {
   opacity: 0;
-  transform: translateY(-8px) scale(0.85);
+  transform: translateY(-4px) scale(0.95);
 }
 
 .tag-item-leave-to {
   opacity: 0;
-  transform: translateY(8px) scale(0.85);
+  transform: translateY(4px) scale(0.95);
 }
 
 .tag-item-move {
-  transition: transform 0.25s ease;
+  transition: transform var(--transition-base);
 }
 </style>

@@ -1,13 +1,20 @@
-/* 下拉框全选选项吸顶样式 (需在非 scoped 中定义以作用于 teleported 的 popper) */
+/**
+ * Listing 页面非 scoped 全局样式
+ *
+ * 仅承载 teleport 到 body 的下拉浮层与 popper 样式覆盖
+ * 颜色 / 阴影 / 圆角统一引用 src/styles/variables.scss 的设计令牌
+ */
+
+/* 下拉框「全选选项」吸顶 */
 .select-all-option {
   position: sticky !important;
   top: 0 !important;
   z-index: 10 !important;
-  background-color: var(--el-bg-color-overlay) !important;
-  border-bottom: 1px solid var(--el-border-color-light);
+  background-color: var(--surface-base) !important;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-/* 店铺下拉搜索框 去除边框和阴影 (覆盖所有状态) */
+/* 店铺下拉搜索输入框：去除内层边框/阴影 */
 .shop-filter-input .el-input__wrapper,
 .shop-filter-input .el-input__wrapper:hover,
 .shop-filter-input .el-input__wrapper.is-focus {
@@ -15,29 +22,33 @@
   box-shadow: none !important;
 }
 
-/* SaaS风格 Select 下拉浮层优化 */
+/* SaaS 风格 Select 下拉浮层（与广告模块同款） */
 .el-popper {
   padding: 6px !important;
-  border: 1px solid var(--el-border-color-lighter) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-popover) !important;
 }
+
 .el-select-dropdown__item {
   padding: 0 12px;
   margin: 2px 4px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-ui);
 }
+
 .el-select-dropdown__item.hover,
 .el-select-dropdown__item:hover {
-  color: var(--el-color-primary) !important;
-  background-color: var(--el-color-primary-light-9) !important;
+  color: var(--color-primary-700) !important;
+  background-color: var(--surface-hover) !important;
 }
+
 .el-select-dropdown__item.selected {
-  font-weight: 500;
-  color: var(--el-color-primary) !important;
-  background-color: var(--el-color-primary-light-8) !important;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary-700) !important;
+  background-color: var(--color-primary-50) !important;
 }
+
 .el-select-dropdown .el-scrollbar__wrap {
   max-height: 280px;
 }

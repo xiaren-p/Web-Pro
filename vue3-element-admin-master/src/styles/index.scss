@@ -867,3 +867,29 @@ html.sidebar-color-blue .layout-mix .layout__sidebar--left .el-menu {
 ::-webkit-scrollbar-thumb:active {
   background: var(--text-secondary);
 }
+
+// ─── 通用容器：内容块（与广告模块同款卡片基底） ──────────────────────────────
+// 设计令牌：18px 圆角 / 半透明白底 / 双层柔和阴影 / 块间距 20px
+// 在 ads.scss 中曾为模块私有，本次提升到全局供 listing 等模块统一复用
+.content-block {
+  flex-shrink: 0;
+  padding: 22px 24px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--border-base);
+  border-radius: 18px;
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 4%),
+    0 8px 24px rgb(15 23 42 / 4%);
+  transition: box-shadow var(--transition-ui);
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  // 卡片即表格场景：消除内边距，并裁切以让粘性表头/底贴齐内圆角
+  &--flush {
+    padding: 0;
+    overflow: hidden;
+  }
+}

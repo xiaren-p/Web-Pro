@@ -250,9 +250,9 @@ function resetToDefault() {
   display: flex;
   height: calc(100vh - 140px);
   overflow: hidden;
-  font-size: 14px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 12px;
+  font-size: var(--font-size-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
 }
 
@@ -265,15 +265,21 @@ function resetToDefault() {
 
 .search-box {
   padding: 16px 20px;
-  border-bottom: 1px solid var(--el-border-color-light);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .search-box :deep(.el-input__wrapper) {
-  border-radius: 8px;
-  box-shadow: 0 0 0 1px var(--el-border-color-lighter) inset;
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 1px var(--border-base) inset;
+  transition: box-shadow var(--transition-ui);
 }
 .search-box :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px var(--el-color-primary-light-3) inset;
+  box-shadow: 0 0 0 1px var(--color-primary-300) inset;
+}
+.search-box :deep(.el-input__wrapper.is-focus) {
+  box-shadow:
+    0 0 0 1px var(--color-primary-600) inset,
+    0 0 0 3px var(--focus-ring);
 }
 
 .checkbox-groups {
@@ -282,7 +288,7 @@ function resetToDefault() {
 
 .group-section {
   padding: 20px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--border-subtle);
 }
 .group-section:last-child {
   border-bottom: none;
@@ -294,12 +300,12 @@ function resetToDefault() {
   justify-content: space-between;
   padding: 10px 16px;
   margin-bottom: 16px;
-  font-size: 14px;
-  font-weight: bold;
-  color: var(--el-text-color-primary);
-  background-color: var(--el-fill-color-light);
-  border-left: 4px solid var(--el-color-primary);
-  border-radius: 8px;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  background-color: var(--surface-subtle);
+  border-left: 4px solid var(--color-primary-600);
+  border-radius: var(--radius-md);
 }
 
 .group-items {
@@ -313,22 +319,22 @@ function resetToDefault() {
   width: 33.33%;
   padding: 6px 10px;
   margin-right: 0;
-  border-radius: 6px;
-  transition: background-color 0.2s ease;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-ui);
 }
 .group-item-checkbox:hover {
-  background-color: var(--el-fill-color);
+  background-color: var(--surface-hover);
 }
 
-/* 优化 checkbox 的截断与展示 */
+/* Checkbox 截断与展示 */
 :deep(.el-checkbox__label) {
   width: calc(100% - 22px);
   padding-left: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 15px;
+  font-size: var(--font-size-sm);
   vertical-align: middle;
-  color: var(--el-text-color-regular);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
@@ -336,8 +342,8 @@ function resetToDefault() {
   display: flex;
   flex-direction: column;
   width: 38%;
-  background-color: var(--el-color-info-light-9);
-  border-left: 1px solid var(--el-border-color-light);
+  background-color: var(--surface-subtle);
+  border-left: 1px solid var(--border-subtle);
 }
 
 .selected-count {
@@ -345,23 +351,23 @@ function resetToDefault() {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  font-size: 14px;
-  font-weight: bold;
-  color: var(--el-text-color-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
   background: var(--surface-base);
-  border-bottom: 1px solid var(--el-border-color-light);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .limit-tip {
-  font-size: 12px;
-  font-weight: normal;
-  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  color: var(--text-tertiary);
 }
 
 .sort-tip {
   padding: 12px 20px;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
 }
 
 .sort-list {
@@ -375,15 +381,15 @@ function resetToDefault() {
   padding: 12px 16px;
   margin-bottom: 10px;
   background: var(--surface-base);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  box-shadow: var(--shadow-card);
-  transition: all 0.2s ease;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition-ui);
 }
 .sort-item:hover {
-  border-color: var(--el-color-primary-light-5);
+  border-color: var(--color-primary-300);
   box-shadow: var(--shadow-sm);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .sort-handle {
@@ -400,28 +406,28 @@ function resetToDefault() {
 .drag-icon {
   margin-right: 12px;
   font-size: 18px;
-  color: var(--el-text-color-placeholder);
-  transition: color 0.2s;
+  color: var(--text-disabled);
+  transition: color var(--transition-ui);
 }
 .sort-item:hover .drag-icon {
-  color: var(--el-color-primary-light-3);
+  color: var(--color-primary-600);
 }
 
 .sort-index {
   display: inline-block;
   width: 28px;
   font-family: monospace;
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-tertiary);
 }
 
 .sort-label {
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--el-text-color-regular);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
@@ -438,16 +444,16 @@ function resetToDefault() {
   width: 22px;
   height: 22px;
   font-size: 13px;
-  color: var(--el-text-color-secondary);
+  color: var(--text-tertiary);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   opacity: 0.4;
-  transition: all 0.2s;
+  transition: all var(--transition-ui);
 }
 
 .action-icon:hover {
-  color: var(--el-color-primary);
-  background-color: var(--el-color-primary-light-9);
+  color: var(--color-primary-700);
+  background-color: var(--surface-hover);
   opacity: 1 !important;
   transform: scale(1.05);
 }
@@ -458,20 +464,54 @@ function resetToDefault() {
 
 .action-icon.active {
   color: #fff;
-  background-color: var(--el-color-primary);
-  box-shadow: var(--focus-ring);
+  background-color: var(--color-primary-600);
+  box-shadow: 0 0 0 3px var(--focus-ring);
   opacity: 1;
 }
 
 .delete-icon:hover {
   color: #fff !important;
-  background-color: var(--el-color-danger) !important;
-  box-shadow: var(--focus-ring);
+  background-color: var(--color-danger-500) !important;
+  box-shadow: 0 0 0 3px rgb(239 68 68 / 18%);
 }
 
 .drawer-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+/* 按钮规范 — 与广告模块对齐 */
+.drawer-footer :deep(.el-button) {
+  height: 36px;
+  padding: 0 18px;
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-ui);
+}
+
+.drawer-footer :deep(.el-button--primary) {
+  background-color: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+  box-shadow: 0 8px 18px rgb(37 99 235 / 18%);
+}
+
+.drawer-footer :deep(.el-button--primary:hover) {
+  background-color: var(--color-primary-700);
+  border-color: var(--color-primary-700);
+  box-shadow: 0 10px 22px rgb(37 99 235 / 26%);
+  transform: translateY(-1px);
+}
+
+.drawer-footer :deep(.el-button--default) {
+  color: var(--text-secondary);
+  background-color: var(--surface-base);
+  border-color: var(--border-strong);
+}
+
+.drawer-footer :deep(.el-button--default:hover) {
+  color: var(--color-primary-700);
+  background-color: var(--surface-hover);
+  border-color: var(--color-primary-300);
 }
 </style>

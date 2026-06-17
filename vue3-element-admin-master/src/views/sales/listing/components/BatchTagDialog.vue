@@ -3,6 +3,7 @@
     :model-value="visible"
     title="批量设置标签"
     width="480px"
+    class="listing-dialog"
     @update:model-value="emit('update:visible', $event)"
     @open="handleDialogOpen"
   >
@@ -32,7 +33,7 @@
         :filter-method="handleTagSearch"
         :loading="searchLoading"
         clearable
-        style="width: 100%; margin-top: 12px"
+        class="batch-tag-search"
         @change="handleTagSelect"
         @clear="searchKeyword = ''"
       >
@@ -44,10 +45,7 @@
           :disabled="selectedTags.some((t) => t.globalTagId === opt.globalTagId)"
         >
           <div class="tag-option-item">
-            <span
-              class="tag-option-dot"
-              :style="{ backgroundColor: opt.color || '#409eff' }"
-            />
+            <span class="tag-option-dot" :style="{ backgroundColor: opt.color || '#409eff' }" />
             <span>{{ opt.tagName }}</span>
           </div>
         </el-option>
@@ -55,12 +53,12 @@
     </div>
 
     <template #footer>
-      <div style="display: flex; align-items: center; justify-content: space-between">
-        <div>
+      <div class="dialog-footer dialog-footer--split">
+        <div class="dialog-footer__group">
           <el-button @click="handleClearAll">清空</el-button>
           <el-button @click="emit('update:visible', false)">返回</el-button>
         </div>
-        <div>
+        <div class="dialog-footer__group">
           <el-button type="danger" :loading="saving" @click="confirmBatchAction('delete')">
             删除
           </el-button>
@@ -112,9 +110,7 @@ const selectedTags = ref<BatchTagItem[]>([]);
 const filteredOptions = computed(() => {
   if (!searchKeyword.value) return allTagOptions.value;
   const kw = searchKeyword.value.toLowerCase();
-  return allTagOptions.value.filter((opt) =>
-    opt.tagName.toLowerCase().includes(kw)
-  );
+  return allTagOptions.value.filter((opt) => opt.tagName.toLowerCase().includes(kw));
 });
 
 function handleDialogOpen(): void {
@@ -159,9 +155,7 @@ function handleTagSelect(globalTagId: string): void {
 }
 
 function handleRemoveTag(tag: BatchTagItem): void {
-  selectedTags.value = selectedTags.value.filter(
-    (t) => t.globalTagId !== tag.globalTagId
-  );
+  selectedTags.value = selectedTags.value.filter((t) => t.globalTagId !== tag.globalTagId);
 }
 
 function handleClearAll(): void {
@@ -206,15 +200,14 @@ async function executeBatchAction(action: "add" | "delete"): Promise<void> {
 
       if (action === "add") {
         const existingIds = new Set(existing.map((t) => t.globalTagId));
-        const toAdd = selectedTags.value.filter(
-          (t) => !existingIds.has(t.globalTagId)
-        );
+        const toAdd = selectedTags.value.filter((t) => !existingIds.has(t.globalTagId));
         newTags = [...existing, ...toAdd];
       } else {
         newTags = existing.filter((t) => !operationTagIds.has(t.globalTagId));
       }
 
       updates.push({
+        id: row.id,
         asin: row.asin,
         tags: newTags.map((t) => ({
           globalTagId: t.globalTagId,
@@ -245,50 +238,103 @@ defineExpose({
 </script>
 
 <style scoped lang="scss">
+/* Listing Dialog 统一规范 — 与 EditTagDialog / BatchAssortDialog 共用 */
+.listing-dialog {
+  :deep(.el-dialog) {
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-dialog);
+  }
+
+  :deep(.el-dialog__header) {
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  :deep(.el-dialog__title) {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 20px 24px;
+  }
+
+  :deep(.el-dialog__footer) {
+    padding: 14px 24px 18px;
+    border-top: 1px solid var(--border-subtle);
+  }
+}
+
 .batch-tag-select-area {
   .batch-hint {
     margin-bottom: 12px;
-    font-size: 13px;
-    color: #909399;
+    font-size: var(--font-size-sm);
+    color: var(--text-tertiary);
   }
 
   .batch-tag-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--spacing-2);
     min-height: 32px;
   }
 }
 
+.batch-tag-search {
+  width: 100%;
+  margin-top: 12px;
+}
+
 .tag-option-item {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-2);
   align-items: center;
 
   .tag-option-dot {
+    flex-shrink: 0;
     width: 10px;
     height: 10px;
-    flex-shrink: 0;
+    border: 1px solid rgb(0 0 0 / 8%);
     border-radius: 50%;
   }
 }
 
+/* 通用 dialog footer */
+.dialog-footer {
+  display: flex;
+  gap: var(--spacing-2);
+  align-items: center;
+  justify-content: flex-end;
+
+  &--split {
+    justify-content: space-between;
+  }
+
+  &__group {
+    display: flex;
+    gap: var(--spacing-2);
+    align-items: center;
+  }
+}
+
+/* 标签元素入场/离场动画 — duration 与全局 transition-base 对齐 */
 .batch-tag-item-enter-active,
 .batch-tag-item-leave-active {
-  transition: all 0.25s ease;
+  transition: all var(--transition-base);
 }
 
 .batch-tag-item-enter-from {
   opacity: 0;
-  transform: translateY(-8px) scale(0.85);
+  transform: translateY(-4px) scale(0.95);
 }
 
 .batch-tag-item-leave-to {
   opacity: 0;
-  transform: translateY(8px) scale(0.85);
+  transform: translateY(4px) scale(0.95);
 }
 
 .batch-tag-item-move {
-  transition: transform 0.25s ease;
+  transition: transform var(--transition-base);
 }
 </style>

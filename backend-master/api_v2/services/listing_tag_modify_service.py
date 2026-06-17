@@ -309,6 +309,8 @@ def execute_listing_tag_modify() -> dict[str, Any]:
     """
     执行 Listing 商品标签修改任务：按修改类型分批处理新增和移除的队列记录。
 
+    先处理全部新增批次，再处理全部移除批次，保证顺序不颠倒。
+
     Returns:
         dict:
             {
@@ -318,6 +320,7 @@ def execute_listing_tag_modify() -> dict[str, Any]:
     """
     logger.info("[ListingTagModifyService] 开始执行 Listing 商品标签修改同步")
 
+    # 先处理新增，再处理移除，顺序不可颠倒
     add_result = _process_add_entries()
     remove_result = _process_remove_entries()
 

@@ -1,24 +1,18 @@
 <template>
-  <div class="app-container">
+  <div class="listing-page">
     <!-- 搜索区域 -->
-    <ListingSearchForm />
+    <div class="listing-page__filters content-block">
+      <ListingSearchForm />
+    </div>
 
-    <!-- 占位表格区域 -->
-    <el-card shadow="hover" class="data-table">
-      <div
-        class="data-table__toolbar"
-        style="
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 2px;
-        "
-      >
-        <div class="data-table__toolbar--left">
+    <!-- 表格区域 -->
+    <div class="listing-page__table content-block content-block--flush">
+      <!-- 工具栏 -->
+      <div class="listing-toolbar">
+        <div class="listing-toolbar__left">
           <el-button
             :disabled="selectedRows.length === 0"
             type="success"
-            class="mr-2"
             size="default"
             icon="CollectionTag"
             @click="handleBatchOpen"
@@ -28,7 +22,6 @@
           <el-button
             :disabled="selectedRows.length === 0"
             type="warning"
-            class="mr-2"
             size="default"
             icon="Files"
             @click="handleBatchAssortOpen"
@@ -36,24 +29,21 @@
             批量设置分类
           </el-button>
         </div>
-        <div class="data-table__toolbar--right">
+        <div class="listing-toolbar__right">
           <el-tooltip content="列配置" placement="top">
-            <el-button
-              text
-              icon="Setting"
-              style="height: 22px; min-height: 22px; padding: 2px; font-size: 16px"
-              @click="columnConfigVisible = true"
-            />
+            <button class="col-config-btn" type="button" @click="columnConfigVisible = true">
+              <el-icon><Setting /></el-icon>
+            </button>
           </el-tooltip>
         </div>
       </div>
 
+      <!-- 表格本体 -->
       <el-table
         ref="tableRef"
         v-loading="loading"
         :data="tableData"
-        class="data-table__content"
-        border
+        class="listing-table"
         height="750px"
         @sort-change="handleSortChange"
         @selection-change="handleSelectionChange"
@@ -66,21 +56,20 @@
             <template v-if="col.prop === 'image'">
               <el-popover placement="right" :width="220" trigger="hover" :show-after="500">
                 <template #reference>
-                  <div class="thumb-container">
-                    <el-image :src="scope.row.image" fit="contain" class="thumb-img" lazy>
+                  <div class="cell-thumb">
+                    <el-image :src="scope.row.image" fit="contain" class="cell-thumb__img" lazy>
                       <template #error>
-                        <div class="image-slot">
+                        <div class="cell-thumb__error">
                           <el-icon><Picture /></el-icon>
                         </div>
                       </template>
                     </el-image>
                   </div>
                 </template>
-                <div style="text-align: center">
+                <div class="cell-thumb__preview">
                   <img
                     v-if="scope.row.image"
                     :src="scope.row.image.replace(/_SL\d+_/, '_SL200_')"
-                    style="max-width: 200px; max-height: 200px"
                   />
                 </div>
               </el-popover>
@@ -109,6 +98,7 @@
                 </el-tooltip>
               </div>
             </template>
+
             <!-- 品名/SKU -->
             <template v-else-if="col.prop === 'skuName'">
               <div class="cell-text-container">
@@ -150,17 +140,11 @@
                 </el-tooltip>
               </div>
             </template>
+
             <!-- 标签 -->
             <template v-else-if="col.prop === 'label'">
-              <div
-                style="
-                  display: flex;
-                  align-items: center;
-                  justify-content: space-between;
-                  overflow: hidden;
-                "
-              >
-                <div style="display: flex; flex: 1; flex-wrap: wrap; gap: 4px; margin-right: 4px">
+              <div class="cell-tags">
+                <div class="cell-tags__list">
                   <template v-if="getRowTags(scope.row).length > 0">
                     <el-tag
                       v-for="tag in getRowTags(scope.row)"
@@ -169,25 +153,23 @@
                       :color="tag.color || '#409eff'"
                       effect="plain"
                       :disable-transitions="false"
-                      style="border: none"
                     >
                       {{ tag.tagName }}
                     </el-tag>
                   </template>
-                  <span v-else class="color-#E6A23C text-12px">-</span>
+                  <span v-else class="cell-tags__empty">-</span>
                 </div>
-                <el-icon
-                  style="flex-shrink: 0; color: #409eff; cursor: pointer"
-                  @click="handleEditTags(scope.row)"
-                >
+                <el-icon class="cell-tags__edit" @click="handleEditTags(scope.row)">
                   <Edit />
                 </el-icon>
               </div>
             </template>
+
             <!-- ASIN -->
             <template v-else-if="col.prop === 'asin'">
               <span @dblclick="handleCopy(scope.row.asin)">{{ scope.row.asin }}</span>
             </template>
+
             <!-- 父ASIN -->
             <template v-else-if="col.prop === 'parentAsin'">
               <span @dblclick="handleCopy(scope.row.parentAsin)">{{ scope.row.parentAsin }}</span>
@@ -201,7 +183,7 @@
               <el-tag v-else-if="scope.row.status === 'deleted'" type="danger">已删除</el-tag>
             </template>
 
-            <!-- 标题 (特殊处理 showOverflowTooltip 参数) -->
+            <!-- 标题 -->
             <template v-else-if="col.prop === 'title'">
               <el-tooltip
                 :content="scope.row.title"
@@ -215,55 +197,36 @@
               </el-tooltip>
             </template>
 
-            <!-- 大类排名 (优化：双列显示) -->
+            <!-- 大类排名 -->
             <template v-else-if="col.prop === 'rank'">
-              <div
-                v-if="scope.row.rank && scope.row.rank.rank"
-                style="
-                  display: flex;
-                  flex-direction: column;
-                  align-items: flex-start;
-                  line-height: 1.3;
-                "
-              >
-                <span style="font-weight: bold">
-                  {{ scope.row.rank.rank }}
-                </span>
+              <div v-if="scope.row.rank && scope.row.rank.rank" class="cell-rank-stack">
+                <span class="cell-rank-stack__value">{{ scope.row.rank.rank }}</span>
                 <el-tooltip
                   :content="scope.row.rank.category || ''"
                   placement="top"
                   :show-after="500"
                   :disabled="!scope.row.rank.category"
                 >
-                  <span class="text-ellipsis" style="width: 100%">
-                    {{ scope.row.rank.category }}
-                  </span>
+                  <span class="cell-rank-stack__category">{{ scope.row.rank.category }}</span>
                 </el-tooltip>
               </div>
               <span v-else>-</span>
             </template>
 
-            <!-- 小类排名 (特殊双列显示 + Tooltip) -->
+            <!-- 小类排名 -->
             <template v-else-if="col.prop === 'smallRank'">
               <div
                 v-if="scope.row.smallRank && scope.row.smallRank.rank !== undefined"
-                style="
-                  display: flex;
-                  flex-direction: column;
-                  align-items: flex-start;
-                  line-height: 1.3;
-                "
+                class="cell-rank-stack"
               >
-                <span style="font-weight: bold">
-                  {{ scope.row.smallRank.rank }}
-                </span>
+                <span class="cell-rank-stack__value">{{ scope.row.smallRank.rank }}</span>
                 <el-tooltip
                   :content="scope.row.smallRank.category || ''"
                   placement="top"
                   :show-after="500"
                   :disabled="!scope.row.smallRank.category"
                 >
-                  <span class="text-ellipsis" style="width: 100%">
+                  <span class="cell-rank-stack__category">
                     {{ scope.row.smallRank.category }}
                   </span>
                 </el-tooltip>
@@ -271,13 +234,11 @@
               <span v-else>-</span>
             </template>
 
-            <!-- 商品编码 (双行显示) -->
+            <!-- 商品编码 -->
             <template v-else-if="col.prop === 'productCode'">
-              <div
-                style="display: flex; flex-direction: column; line-height: 1.3; text-align: center"
-              >
-                <span>{{ scope.row.productCode.id }}</span>
-                <span v-if="scope.row.productCode.type" style="font-size: 11px; color: #909399">
+              <div class="cell-product-code">
+                <span class="cell-product-code__id">{{ scope.row.productCode.id }}</span>
+                <span v-if="scope.row.productCode.type" class="cell-product-code__type">
                   {{ scope.row.productCode.type }}
                 </span>
               </div>
@@ -294,27 +255,15 @@
                   popper-style="padding: 0; min-width: unset;"
                 >
                   <template #reference>
-                    <div
-                      style="
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        color: var(--el-color-primary);
-                        cursor: pointer;
-                      "
-                    >
-                      <span class="text-ellipsis" style="max-width: 120px; font-size: 13px">
+                    <div class="cell-variants">
+                      <span class="cell-variants__text">
                         [{{
                           getVariants(scope.row.variants)
                             .map((v: any) => v.attr_value)
                             .join(", ")
                         }}]
                       </span>
-                      <el-icon
-                        style="margin-left: 2px"
-                        size="12"
-                        color="var(--el-text-color-secondary)"
-                      >
+                      <el-icon class="cell-variants__icon" :size="12">
                         <ArrowDown />
                       </el-icon>
                     </div>
@@ -328,9 +277,7 @@
                   >
                     <el-table-column prop="attr_name" width="80" align="center">
                       <template #default="{ row }">
-                        <span style="color: var(--el-text-color-secondary)">
-                          {{ row.attr_name }}
-                        </span>
+                        <span class="cell-variants__attr-name">{{ row.attr_name }}</span>
                       </template>
                     </el-table-column>
                     <el-table-column prop="attr_value" align="left">
@@ -341,62 +288,39 @@
                   </el-table>
                 </el-popover>
               </template>
-              <div v-else style="text-align: center">-</div>
+              <div v-else class="cell-variants__empty">-</div>
             </template>
 
-            <!-- 评分 (复刻样式：星级+分数一行，总数下一行，靠右) -->
+            <!-- 评分 -->
             <template v-else-if="col.prop === 'rating'">
-              <div
-                style="
-                  display: flex;
-                  flex-direction: column;
-                  align-items: flex-end;
-                  line-height: 1.2;
-                "
-              >
-                <!-- 第一行：星星 + 评分值 -->
-                <div class="flex-y-center" style="justify-content: flex-end">
-                  <div style="position: relative; width: 70px; height: 14px; margin-right: 4px">
-                    <div style="display: flex; width: 100%; height: 100%">
-                      <el-icon v-for="i in 5" :key="'bg-' + i" :size="14" color="#EFF2F7">
+              <div class="cell-rating">
+                <div class="cell-rating__row">
+                  <div class="cell-rating__bar">
+                    <div class="cell-rating__bar-bg">
+                      <el-icon v-for="i in 5" :key="'bg-' + i" :size="14">
                         <StarFilled />
                       </el-icon>
                     </div>
                     <div
-                      :style="{
-                        width: (scope.row.rating.value / 5) * 100 + '%',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        overflow: 'hidden',
-                        whiteSpace: 'nowrap',
-                        display: 'flex',
-                      }"
+                      class="cell-rating__bar-fg"
+                      :style="{ width: (scope.row.rating.value / 5) * 100 + '%' }"
                     >
-                      <el-icon v-for="i in 5" :key="'fg-' + i" :size="14" color="#F7BA2A">
+                      <el-icon v-for="i in 5" :key="'fg-' + i" :size="14">
                         <StarFilled />
                       </el-icon>
                     </div>
                   </div>
-                  <span style="font-size: 12px; color: #f7ba2a">{{ scope.row.rating.value }}</span>
+                  <span class="cell-rating__value">{{ scope.row.rating.value }}</span>
                 </div>
-                <!-- 第二行：总数 -->
-                <span style="margin-top: 2px; font-size: 12px; color: #606266">
-                  {{ scope.row.rating.count }}
-                </span>
+                <span class="cell-rating__count">{{ scope.row.rating.count }}</span>
               </div>
             </template>
 
-            <!-- 备注 (可编辑) -->
+            <!-- 备注（可编辑） -->
             <template v-else-if="col.prop === 'remarks'">
               <div
                 v-loading="scope.row.remarkLoading"
-                style="
-                  display: flex;
-                  align-items: center;
-                  justify-content: space-between;
-                  padding: 0 4px;
-                "
+                class="cell-remark"
                 @dblclick="handleEditRemark(scope.row)"
               >
                 <el-tooltip
@@ -404,37 +328,24 @@
                   placement="top"
                   :show-after="500"
                 >
-                  <div
-                    class="text-ellipsis"
-                    style="flex: 1; color: var(--el-text-color-primary); cursor: pointer"
-                  >
-                    {{ scope.row[col.prop] }}
-                  </div>
+                  <div class="cell-remark__text">{{ scope.row[col.prop] }}</div>
                 </el-tooltip>
-                <el-icon
-                  style="margin-left: 4px; color: var(--el-color-primary); cursor: pointer"
-                  @click="handleEditRemark(scope.row)"
-                >
+                <el-icon class="cell-remark__edit" @click="handleEditRemark(scope.row)">
                   <Edit />
                 </el-icon>
               </div>
             </template>
 
-            <!-- 利润 (两行显示 毛利率百分比 / 毛利润值) -->
+            <!-- 利润（双行） -->
             <template v-else-if="col.prop === 'profit'">
-              <div
-                style="display: flex; flex-direction: column; line-height: 1.3; text-align: right"
-              >
-                <span style="font-size: 13px; font-weight: 500">
+              <div class="cell-profit">
+                <span class="cell-profit__rate">
                   {{ scope.row.profit?.gross_margin_display || "0.00%" }}
                 </span>
                 <span
-                  :style="{
-                    color:
-                      (scope.row.profit?.gross_profit || 0) < 0
-                        ? 'var(--el-color-danger)'
-                        : '#909399',
-                    fontSize: '12px',
+                  class="cell-profit__value"
+                  :class="{
+                    'cell-profit__value--negative': (scope.row.profit?.gross_profit || 0) < 0,
                   }"
                 >
                   {{ scope.row.profit?.gross_profit_display || "" }}
@@ -448,7 +359,8 @@
         </el-table-column>
       </el-table>
 
-      <div class="pagination-container">
+      <!-- 分页 -->
+      <div class="listing-pager">
         <el-pagination
           size="small"
           background
@@ -461,7 +373,7 @@
           @current-change="handleCurrentChange"
         />
       </div>
-    </el-card>
+    </div>
 
     <BatchTagDialog
       ref="batchTagDialogRef"
@@ -483,7 +395,7 @@
       @success="handleQuery"
     />
 
-    <!-- 列配置组件 -->
+    <!-- 列配置抽屉 -->
     <ColumnManager
       v-model="columnConfigVisible"
       :columns="columns"
@@ -505,7 +417,7 @@ import BatchTagDialog from "./components/BatchTagDialog.vue";
 import EditTagDialog from "./components/EditTagDialog.vue";
 import BatchAssortDialog from "./components/BatchAssortDialog.vue";
 import { defaultColumns } from "./constants";
-import { Edit, Picture, StarFilled, ArrowDown } from "@element-plus/icons-vue";
+import { Edit, Picture, StarFilled, ArrowDown, Setting } from "@element-plus/icons-vue";
 
 defineOptions({ name: "SalesProductListing" });
 
@@ -545,9 +457,6 @@ function getVariants(val: any) {
   if (Array.isArray(val)) return val;
   if (typeof val === "string") {
     try {
-      // Handle Python lists parsed as string like "[{'a': 1}]" using regex replace before parse if needed,
-      // but assuming it's standard JSON array structure here.
-      // Wait, python single quotes might be inside:
       const trimmed = val.trim();
       if (trimmed.startsWith("[")) {
         const jsonStr = trimmed.replace(/'/g, '"');
@@ -604,11 +513,9 @@ function handleSelect(selection: any[], row: any) {
     const start = Math.min(lastSelectedIndex, currentIndex);
     const end = Math.max(lastSelectedIndex, currentIndex);
 
-    // Select or deselect everything between based on the target row's state
     for (let i = start; i <= end; i++) {
       tableRef.value?.toggleRowSelection(tableData.value[i], isSelected);
     }
-    // Prevent default selection text highlighting
     window.getSelection()?.removeAllRanges();
   }
 
@@ -649,7 +556,7 @@ function handleEditRemark(row: any) {
       row.remarkLoading = true;
       try {
         await SalesProductListingAPI.upsertRemark({
-          listing_id: row.listing_id,
+          listing_id: row.id,
           remark: value,
         });
         ElMessage.success("备注保存成功");
@@ -676,8 +583,6 @@ const handleCopy = async (text: string) => {
   }
 };
 
-// 默认列配置
-
 const STORAGE_KEY = "SALES_PRODUCT_LISTING_COLUMNS_V5";
 
 // 初始化列配置（合并本地缓存）
@@ -686,7 +591,6 @@ const initColumns = () => {
   if (cached) {
     try {
       const parsed = JSON.parse(cached);
-      // 合并策略：保留缓存的顺序和状态，同步最新的元数据(category/label)，并剔除已废弃的列
       const defaultMap = new Map(defaultColumns.map((c) => [c.prop, c]));
       const cachedProps = new Set();
 
