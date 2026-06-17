@@ -10,6 +10,8 @@ class ExecutionTypeChoices(models.TextChoices):
     TIME_PRICING_START = "TIME_PRICING_START", "分时开始"
     TIME_PRICING_CALLBACK = "TIME_PRICING_CALLBACK", "分时回调"
     BID_ADJUSTMENT = "BID_ADJUSTMENT", "竞价调整"
+    BID_PAUSE = "BID_PAUSE", "竞价暂停"
+    MANUAL_ADJUSTMENT = "MANUAL_ADJUSTMENT", "手动调整"
 
 
 class AdjustmentStatusChoices(models.TextChoices):

@@ -17,8 +17,6 @@ from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitSt
 from api_v2.models.sp_ad_optimization_strategy import ManualRulesStatus, SpAdOptimizationStrategy
 from api_v2.models.sp_ad_pause_archive import (
     PauseArchiveEntityType,
-    PauseArchiveExecutionType,
-    SpAdPauseArchive,
 )
 from api_v2.models.sp_bid_adjustment import (
     AdjustmentStatusChoices,
@@ -441,10 +439,10 @@ def execute_pause_archive_action(
     entity_type: str,
     entity_id: int | None = None,
 ) -> dict[str, Any]:
-    """执行规则级暂停/归档操作：写 SpAdPauseArchive 表 + 更新实体状态。
+    """执行规则级暂停/归档操作：写 SpBidAdjustment 表 + 更新实体状态为 paused。
 
-    TODO: 归档（archive）目前统一按暂停（pause）处理，execution_type 写 PAUSE，
-          实体状态更新为 "paused"。两者当前效果一致，后续如需区分再调整。
+    当前 pause 和 archive 统一按 BID_PAUSE 写入 SpBidAdjustment，
+    调整状态写 PENDING（待调整），同步更新 LxSp* 实体表 state="paused"。
 
     Args:
         rule: 规则 JSON
@@ -462,22 +460,18 @@ def execute_pause_archive_action(
     if not action_type or action_type == "no_other":
         return {"操作": "暂停/归档", "状态": "跳过", "原因": "无操作"}
 
-    # TODO: 归档（archive）当前统一按暂停（pause）执行
-    execution_type = PauseArchiveExecutionType.PAUSE
     new_state = "paused"
     now = datetime.now(dt_timezone.utc)
-    rule_name = rule.get("rule_name", "?")
 
-    # 1. 写 SpAdPauseArchive 表
-    record = SpAdPauseArchive(
+    # 1. 写 SpBidAdjustment 表
+    record = SpBidAdjustment(
         campaign_id=campaign_id,
         profile_id=profile_id,
-        entity_type=entity_type,
-        execution_type=execution_type,
+        execution_type=ExecutionTypeChoices.BID_PAUSE,
         auto_rule_id=rule.get("rule_id"),
+        adjustment_status=AdjustmentStatusChoices.PENDING,
         execution_status=ExecutionStatusChoices.PENDING,
-        execution_time=now,
-        msg=f"规则「{rule_name}」触发{action_type}操作",
+        adjustment_time=now,
     )
     if entity_type == PauseArchiveEntityType.KEYWORD and entity_id:
         record.keyword_id = entity_id
@@ -486,34 +480,34 @@ def execute_pause_archive_action(
     # campaign 维度不设 keyword_id / target_id
     record.save()
 
-    # 2. 更新实体表状态
+    # 2. 更新实体表状态为 paused
     if entity_type == PauseArchiveEntityType.CAMPAIGN:
         from api_v1.models.lingxing.ads.basic.lx_sp_campaign import LxSpCampaign
         LxSpCampaign.objects.filter(
             campaign_id=campaign_id, profile_id=profile_id,
         ).update(state=new_state)
         logger.info(
-            "[_shared] 暂停/归档: entity=campaign campaign=%d state→%s",
+            "[_shared] 竞价暂停: entity=campaign campaign=%d state→%s",
             campaign_id, new_state,
         )
     elif entity_type == PauseArchiveEntityType.KEYWORD and entity_id:
         from api_v1.models.lingxing.ads.basic.lx_sp_keyword import LxSpKeyword
         LxSpKeyword.objects.filter(keyword_id=entity_id).update(state=new_state)
         logger.info(
-            "[_shared] 暂停/归档: entity=keyword kw=%d state→%s", entity_id, new_state,
+            "[_shared] 竞价暂停: entity=keyword kw=%d state→%s", entity_id, new_state,
         )
     elif entity_type in (PauseArchiveEntityType.TARGETING, PauseArchiveEntityType.PRODUCT_TARGETING) and entity_id:
         from api_v1.models.lingxing.ads.basic.lx_sp_target import LxSpTarget
         LxSpTarget.objects.filter(target_id=entity_id).update(state=new_state)
         logger.info(
-            "[_shared] 暂停/归档: entity=target tg=%d state→%s", entity_id, new_state,
+            "[_shared] 竞价暂停: entity=target tg=%d state→%s", entity_id, new_state,
         )
 
     return {
         "操作": "暂停/归档",
         "状态": "完成",
         "规则触发的操作类型": action_type,
-        "实际执行类型": execution_type,
+        "执行类型": ExecutionTypeChoices.BID_PAUSE,
         "实体类型": entity_type,
         "实体ID": entity_id or campaign_id,
         "新状态": new_state,

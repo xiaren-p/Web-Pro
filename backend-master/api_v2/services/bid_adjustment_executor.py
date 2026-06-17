@@ -19,7 +19,7 @@ from django.utils import timezone
 from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
 from api_v2.models.lx_api_err import LxApiErr
 from api_v2.models.sp_bid_adjustment import (
-    AdjustmentStatusChoices, ExecutionStatusChoices, SpBidAdjustment,
+    AdjustmentStatusChoices, ExecutionStatusChoices, ExecutionTypeChoices, SpBidAdjustment,
 )
 from api_v2.services.qinglong_env_service import get_cached_env, refresh_with_task_trigger
 
@@ -80,9 +80,17 @@ def _get_profile_sid(profile_id: int) -> int:
 def _build_payload(record: SpBidAdjustment) -> dict:
     """单条记录构建 API 参数字典。
 
+    BID_PAUSE 类型传 state=paused + isBaseValue=0；
+    竞价类型传 bid + isBaseValue=0。
+
     Returns:
-        {"keywordId"/"targetId": int, "bid": float, "isBaseValue": 0}
+        {"keywordId"/"targetId": int, ...}
     """
+    if record.execution_type == ExecutionTypeChoices.BID_PAUSE:
+        if record.keyword_id:
+            return {"keywordId": record.keyword_id, "state": "paused", "isBaseValue": 0}
+        return {"targetId": record.target_id, "state": "paused", "isBaseValue": 0}
+
     bid = round(float(record.bid_after or 0), 2)
     if record.keyword_id:
         return {"keywordId": record.keyword_id, "bid": bid, "isBaseValue": 0}
@@ -168,6 +176,9 @@ def _apply_results(
 ) -> None:
     """将 API 返回结果按 keywordId / targetId 匹配并写入对应记录。
 
+    BID_PAUSE 类型：成功回写 msg="竞价暂停成功"，失败回写错误信息。
+    竞价类型：成功回写竞价变动详情。
+
     Args:
         results: API 返回的 apiResult 列表
         records: 本批次对应的 SpBidAdjustment 记录列表
@@ -190,14 +201,23 @@ def _apply_results(
         if record is None:
             continue
 
+        is_pause = record.execution_type == ExecutionTypeChoices.BID_PAUSE
+
         if result.get("code") == "SUCCESS":
             record.execution_status = ExecutionStatusChoices.SUCCESS
-            before = round(float(record.bid_before or 0), 4)
-            after = round(float(record.bid_after or 0), 4)
-            record.msg = f"竞价调整成功 {before} → {after}"
+            if is_pause:
+                record.msg = "竞价暂停成功"
+            else:
+                before = round(float(record.bid_before or 0), 4)
+                after = round(float(record.bid_after or 0), 4)
+                record.msg = f"竞价调整成功 {before} → {after}"
         else:
             record.execution_status = ExecutionStatusChoices.FAILED
-            record.msg = f"竞价调整失败，error: {result.get('description', 'unknown')}"
+            error_desc = result.get("description", "unknown")
+            if is_pause:
+                record.msg = f"竞价暂停失败，error: {error_desc}"
+            else:
+                record.msg = f"竞价调整失败，error: {error_desc}"
 
         record.adjustment_status = AdjustmentStatusChoices.SUCCESS
         record.adjustment_time = now_utc
@@ -208,7 +228,9 @@ def _apply_results(
 # ============================================================
 
 def execute_bid_adjustment() -> dict[str, Any]:
-    """执行竞价调整：读 PENDING 记录，按 profile 分组，分关键词 / 定位组请求 API 并回写。
+    """执行竞价调整与暂停：读 PENDING 记录，按 profile 分组，分关键词 / 定位组请求 API 并回写。
+
+    BID_ADJUSTMENT 与 BID_PAUSE 统一在一个 API 请求中执行。
 
     Returns:
         {"processed": int, "success": int, "failed": int, "errors": [str]}
@@ -216,6 +238,8 @@ def execute_bid_adjustment() -> dict[str, Any]:
     records = list(SpBidAdjustment.objects.filter(
         adjustment_status=AdjustmentStatusChoices.PENDING,
         created_at__gte=timezone.now() - timezone.timedelta(hours=2),
+    ).exclude(
+        execution_type=ExecutionTypeChoices.MANUAL_ADJUSTMENT,
     ).order_by("profile_id"))
     if not records:
         logger.info("[bid_adjustment] 无待执行记录")
