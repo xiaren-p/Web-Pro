@@ -21,9 +21,14 @@ _BID_ADJUST_LOCK_KEY = "bid_adjustment_lock"
     max_retries=0,
     soft_time_limit=1200,
     time_limit=1800,
+    acks_late=True,
 )
 def run_bid_adjustment_task(self) -> dict:
     """执行竞价调整 API 调用。"""
+    if not cache.add(_BID_ADJUST_LOCK_KEY, "1", timeout=1800):
+        logger.warning("[run_bid_adjustment_task] 任务已在执行中，跳过")
+        return {"processed": 0, "success": 0, "failed": 0, "errors": ["任务已在执行中"]}
+
     logger.info("[run_bid_adjustment_task] 开始执行竞价调整")
     try:
         result = execute_bid_adjustment()

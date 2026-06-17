@@ -32,7 +32,7 @@ _CAMPAIGN_API = "https://middle.hanlis.cn/basicOpen/adReport/manage/putSpCampaig
 _API_BATCH_SIZE = 500
 _API_TIMEOUT = 60
 _LOCK_KEY = "campaign_adjustment_lock"
-_LOCK_TIMEOUT = 1800
+_LOCK_TIMEOUT = 1800  # API 调用锁 TTL（仅异常兜底，正常路径 finally 中主动释放）
 
 
 # ============================================================
