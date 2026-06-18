@@ -26,6 +26,7 @@ from api_v2.models.sp_campaign_adjustment import (
 )
 from api_v2.models.workflow_execution import ExecutionStatus, WorkflowExecution, WorkflowType
 
+from api_v2.models.ai_conversation_group import AiConversationGroup
 from api_v2.models.ai_conversation import AiConversation
 from api_v2.models.ai_message import AiMessage, MessageRole, MessageStatus, MessageType
 from api_v2.models.ai_plan_execution import AiPlanExecution, PlanExecutionStatus
@@ -34,6 +35,7 @@ __all__ = [
     'WorkflowExecution',
     'WorkflowType',
     'ExecutionStatus',
+    'AiConversationGroup',
     'AiConversation',
     'AiMessage',
     'MessageRole',

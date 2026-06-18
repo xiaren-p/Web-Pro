@@ -1,5 +1,7 @@
 """AI 对话消息表（ai_message）。"""
 
+import uuid
+
 from django.db import models
 
 from api_v2.models.ai_conversation import AiConversation
@@ -45,7 +47,19 @@ class AiMessage(models.Model):
         从而保证用户刷新 / 关闭 / 重新打开页面后仍能拉到最新进度。
         ``raw_plan_json`` 仅在 message_type=plan 时使用，存放未翻译前的原始 Plan Schema 以便审计回放。
         ``status`` 字段是订阅视图判断"是否还在生成 / 是否需要继续监听 Redis 频道"的核心依据。
+
+    双 ID 设计：
+        ``id`` 整数主键，仅内部 join / 外键 / Celery 任务参数使用（int 序列化更轻）；
+        ``public_id`` UUID，对外暴露给前端与 SSE URL，避免泄露内部计数。
     """
+
+    public_id = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        db_index=True,
+        verbose_name='对外公开 ID',
+    )
 
     conversation = models.ForeignKey(
         AiConversation,

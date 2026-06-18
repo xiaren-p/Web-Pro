@@ -68,10 +68,13 @@ export interface PlanConfirmPayload {
 
 /**
  * 单条 AI 消息（来自后端 AiMessageSerializer，已枚举翻译）。
+ *
+ * id 与 conversation_id 都是后端 ``public_id`` 字段映射的 UUID 字符串，
+ * 前端不应感知后端内部整数主键。
  */
 export interface AiMessage {
-  id: number;
-  conversation_id: number;
+  id: string;
+  conversation_id: string;
   role: "user" | "assistant";
   role_label: string;
   message_type: "text" | "plan";
@@ -87,21 +90,58 @@ export interface AiMessage {
 
 /**
  * 会话列表项（来自 AiConversationSerializer）。
+ *
+ * 含分组归属与置顶状态，前端据此决定排序与展示。
  */
 export interface AiConversation {
-  id: number;
+  id: string;
   title: string;
   dify_conversation_id: string;
+  /** 所属分组 UUID；null 表示未分组 */
+  group_id: string | null;
+  /** 是否已置顶 */
+  is_pinned: boolean;
+  /** 置顶时间；未置顶为 null */
+  pinned_at: string | null;
   created_at: string;
   updated_at: string;
 }
 
 /**
+ * 用户自定义分组。
+ */
+export interface AiConversationGroup {
+  id: string;
+  name: string;
+  order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * 全文搜索命中条目。
+ */
+export interface AiSearchHit {
+  conversation_id: string;
+  conversation_title: string;
+  /** 命中消息 UUID；命中标题时为 null */
+  message_id: string | null;
+  /** 命中消息角色；命中标题时为 null */
+  role: "user" | "assistant" | null;
+  /** 命中片段（前后已截断） */
+  snippet: string;
+  /** 匹配时间，用于二级排序 */
+  matched_at: string;
+}
+
+/**
  * ``POST /api/v2/ai/chat/`` 的响应结构。
+ *
+ * 所有 ID 字段均为 UUID 字符串。
  */
 export interface ChatStartResponse {
-  conversation_id: number;
-  user_message_id: number;
-  assistant_message_id: number;
+  conversation_id: string;
+  user_message_id: string;
+  assistant_message_id: string;
   task_id: string;
 }

@@ -8,8 +8,9 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
 
 from django.contrib.auth.models import User
 from django.db import transaction
@@ -24,16 +25,20 @@ logger = logging.getLogger(__name__)
 class ChatStartResult:
     """``AiChatService.start_chat`` 的返回结构。
 
+    所有 ID 字段均为对外公开 UUID 字符串（``public_id``），
+    内部整数主键不暴露给视图 / 前端。
+
     Attributes:
-        conversation_id (int): 业务库 AiConversation 主键。
-        user_message_id (int): 用户提问消息主键。
-        assistant_message_id (int): 待生成的 AI 回复消息主键，前端用此 ID 订阅 SSE 频道。
-        celery_task_id (str): Celery 任务 ID，便于后续取消或追踪。
+        conversation_id (str): 会话 public_id（UUID）。
+        user_message_id (str): 用户消息 public_id（UUID）。
+        assistant_message_id (str): 待生成的 AI 消息 public_id（UUID），
+            前端用此 ID 订阅 SSE 频道。
+        celery_task_id (str): Celery 任务 ID。
     """
 
-    conversation_id: int
-    user_message_id: int
-    assistant_message_id: int
+    conversation_id: str
+    user_message_id: str
+    assistant_message_id: str
     celery_task_id: str
 
 
@@ -49,7 +54,7 @@ class AiChatService:
         self,
         user: User,
         query: str,
-        conversation_id: Optional[int] = None,
+        conversation_id: Optional[Union[uuid.UUID, str]] = None,
         inputs: Optional[dict] = None,
     ) -> ChatStartResult:
         """提交一轮对话，创建消息记录并派发 Celery 任务。
@@ -64,11 +69,12 @@ class AiChatService:
         Args:
             user (User): 当前登录用户。
             query (str): 用户提问原文。
-            conversation_id (Optional[int]): 续接已有会话的 ID；为 None 时新建。
+            conversation_id (Optional[uuid.UUID | str]): 续接已有会话的 ``public_id``；
+                为 None 时新建会话。
             inputs (Optional[dict]): Dify 工作流变量，由前端业务上下文带入。
 
         Returns:
-            ChatStartResult: 创建的会话 / 消息 / 任务标识，前端凭此订阅 SSE。
+            ChatStartResult: 创建的会话 / 消息 / 任务标识（UUID 字符串）。
 
         Raises:
             ValueError: 当 conversation_id 不属于当前用户时抛出，防止越权。
@@ -100,6 +106,7 @@ class AiChatService:
 
         # 入队动作放在事务外：
         # 防止 Celery worker 抢先执行任务时事务尚未提交，从而读到不存在的消息行
+        # Celery 任务参数仍传内部整数主键 —— 任务体只与 ORM 交互，无需暴露 UUID
         async_result = run_ai_chat_task.delay(
             conversation_id=conversation.id,
             user_id=user.id,
@@ -109,10 +116,10 @@ class AiChatService:
             inputs=inputs or {},
         )
 
-        AiMessage.objects.filter(id=assistant_message.id).update(task_id=async_result.id)
+        AiMessage.objects.filter(pk=assistant_message.pk).update(task_id=async_result.id)
 
         logger.info(
-            '[AiChatService][start_chat] 任务已派发: user=%s conv=%s assistant_msg=%s task=%s',
+            '[AiChatService][start_chat] 任务已派发: user=%s conv_pk=%s assistant_pk=%s task=%s',
             user.id,
             conversation.id,
             assistant_message.id,
@@ -120,23 +127,24 @@ class AiChatService:
         )
 
         return ChatStartResult(
-            conversation_id=conversation.id,
-            user_message_id=user_message.id,
-            assistant_message_id=assistant_message.id,
+            conversation_id=str(conversation.public_id),
+            user_message_id=str(user_message.public_id),
+            assistant_message_id=str(assistant_message.public_id),
             celery_task_id=async_result.id,
         )
 
     def _resolve_conversation(
         self,
         user: User,
-        conversation_id: Optional[int],
+        conversation_id: Optional[Union[uuid.UUID, str]],
         query: str,
     ) -> AiConversation:
         """获取或新建对话会话。
 
         Args:
             user (User): 当前用户。
-            conversation_id (Optional[int]): 已有会话 ID；为 None 时新建。
+            conversation_id (Optional[uuid.UUID | str]): 已有会话的 ``public_id``；
+                为 None 时新建。
             query (str): 用户提问，新建会话时用作默认标题。
 
         Returns:
@@ -152,7 +160,7 @@ class AiChatService:
             )
 
         try:
-            conversation = AiConversation.objects.get(id=conversation_id, user=user)
+            conversation = AiConversation.objects.get(public_id=conversation_id, user=user)
         except AiConversation.DoesNotExist as exc:
             raise ValueError(f'会话不存在或无权访问: id={conversation_id}') from exc
 

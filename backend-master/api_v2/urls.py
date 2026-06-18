@@ -26,7 +26,18 @@ from api_v2.views.ai_chat_view import (
     delete_conversation,
     list_conversations,
     list_messages,
+    pin_conversation,
+    rename_conversation,
+    search_conversations,
     start_chat,
+)
+from api_v2.views.ai_group_view import (
+    create_group,
+    delete_group,
+    list_groups,
+    move_conversation_to_group,
+    rename_group,
+    reorder_groups,
 )
 from api_v2.views.ai_stream_view import subscribe_message
 
@@ -67,10 +78,21 @@ urlpatterns = [
     path('ads/optimization-strategy/execute/', trigger_optimization_execution, name='ads_optimization_strategy_execute'),
 
     # AI 助手对话接口（Plan Mode）
+    # 路径参数统一使用 UUID 形式 public_id，禁止暴露内部整数主键
     path('ai/chat/', start_chat, name='ai_chat_start'),
-    path('ai/stream/<int:message_id>/', subscribe_message, name='ai_stream_subscribe'),
+    path('ai/stream/<uuid:public_id>/', subscribe_message, name='ai_stream_subscribe'),
     path('ai/conversations/', list_conversations, name='ai_conversations_list'),
-    path('ai/conversations/<int:conversation_id>/', delete_conversation, name='ai_conversations_delete'),
-    path('ai/conversations/<int:conversation_id>/messages/', list_messages, name='ai_conversations_messages'),
-    path('ai/messages/<int:message_id>/cancel/', cancel_message, name='ai_message_cancel'),
+    path('ai/conversations/search/', search_conversations, name='ai_conversations_search'),
+    path('ai/conversations/<uuid:public_id>/', delete_conversation, name='ai_conversations_delete'),
+    path('ai/conversations/<uuid:public_id>/rename/', rename_conversation, name='ai_conversations_rename'),
+    path('ai/conversations/<uuid:public_id>/pin/', pin_conversation, name='ai_conversations_pin'),
+    path('ai/conversations/<uuid:public_id>/messages/', list_messages, name='ai_conversations_messages'),
+    path('ai/conversations/<uuid:public_id>/move/', move_conversation_to_group, name='ai_conversations_move'),
+    path('ai/messages/<uuid:public_id>/cancel/', cancel_message, name='ai_message_cancel'),
+    # 分组管理
+    path('ai/groups/', list_groups, name='ai_groups_list'),
+    path('ai/groups/create/', create_group, name='ai_groups_create'),
+    path('ai/groups/reorder/', reorder_groups, name='ai_groups_reorder'),
+    path('ai/groups/<uuid:public_id>/', delete_group, name='ai_groups_delete'),
+    path('ai/groups/<uuid:public_id>/rename/', rename_group, name='ai_groups_rename'),
 ]

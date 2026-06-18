@@ -1,7 +1,11 @@
 """AI 对话会话表（ai_conversation）。"""
 
+import uuid
+
 from django.contrib.auth.models import User
 from django.db import models
+
+from api_v2.models.ai_conversation_group import AiConversationGroup
 
 
 class AiConversation(models.Model):
@@ -10,13 +14,45 @@ class AiConversation(models.Model):
     一条记录代表用户在侧栏发起的一次"对话窗口"，可包含多轮 user / assistant 消息。
     通过 ``dify_conversation_id`` 维系与 Dify 平台的上下文记忆，使 LLM 能跨轮次记住上下文；
     本表自身负责会话列表展示、跨设备同步、合规审计的业务留痕能力。
+
+    双 ID 设计：
+        ``id`` 整数主键，仅在内部 join / 外键中使用；
+        ``public_id`` UUID，对外暴露给前端与 URL，避免泄露内部计数与业务量。
+
+    分组与置顶：
+        ``group`` 可选外键，若为空表示"未分组"；
+        ``pinned_at`` 不为空表示置顶，置顶按其值倒序排列后再展示其余非置顶会话。
     """
+
+    public_id = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        db_index=True,
+        verbose_name='对外公开 ID',
+    )
 
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='ai_conversations',
         verbose_name='所属用户',
+    )
+
+    group = models.ForeignKey(
+        AiConversationGroup,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='conversations',
+        verbose_name='所属分组',
+    )
+
+    pinned_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='置顶时间',
     )
 
     dify_conversation_id = models.CharField(

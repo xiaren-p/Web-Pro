@@ -3,17 +3,12 @@
 from rest_framework import serializers
 
 from api_v2.models.ai_conversation import AiConversation
+from api_v2.models.ai_conversation_group import AiConversationGroup
 from api_v2.models.ai_message import AiMessage, MessageRole, MessageStatus, MessageType
 
 
 class AiChatRequestSerializer(serializers.Serializer):
-    """``POST /api/v2/ai/chat/`` 入参校验。
-
-    职责：
-        - 校验 query 必填且非空
-        - 校验 conversation_id 是数字（具体所有权由 service 层校验，避免序列化层做查询）
-        - 接收可选 inputs 透传给 Dify 工作流变量
-    """
+    """``POST /api/v2/ai/chat/`` 入参校验。"""
 
     query = serializers.CharField(
         required=True,
@@ -22,10 +17,10 @@ class AiChatRequestSerializer(serializers.Serializer):
         trim_whitespace=True,
         help_text='用户提问原文',
     )
-    conversation_id = serializers.IntegerField(
+    conversation_id = serializers.UUIDField(
         required=False,
         allow_null=True,
-        help_text='续接会话的 ID；新建对话时省略',
+        help_text='续接会话的对外 UUID；新建对话时省略',
     )
     inputs = serializers.DictField(
         required=False,
@@ -34,21 +29,51 @@ class AiChatRequestSerializer(serializers.Serializer):
     )
 
 
-class AiConversationSerializer(serializers.ModelSerializer):
-    """会话列表的最小响应结构。"""
+class AiConversationGroupSerializer(serializers.ModelSerializer):
+    """会话分组响应结构。"""
+
+    id = serializers.UUIDField(source='public_id', read_only=True)
 
     class Meta:
-        model = AiConversation
-        fields = ['id', 'title', 'dify_conversation_id', 'created_at', 'updated_at']
+        model = AiConversationGroup
+        fields = ['id', 'name', 'order', 'created_at', 'updated_at']
         read_only_fields = fields
 
 
-class AiMessageSerializer(serializers.ModelSerializer):
-    """消息详情响应结构（含枚举中文标签）。
+class AiConversationSerializer(serializers.ModelSerializer):
+    """会话列表的最小响应结构。
 
-    遵守"数据出口最终成形"：枚举翻译在后端完成，前端拿到 ``role_label`` / ``status_label`` 直接展示。
+    对外把 ``public_id`` 渲染为 ``id``；分组关联以 ``group_id`` 形式给出对应分组的 UUID。
+    ``pinned_at`` 不为空表示已置顶。
     """
 
+    id = serializers.UUIDField(source='public_id', read_only=True)
+    group_id = serializers.UUIDField(source='group.public_id', read_only=True, allow_null=True)
+    is_pinned = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AiConversation
+        fields = [
+            'id',
+            'title',
+            'dify_conversation_id',
+            'group_id',
+            'is_pinned',
+            'pinned_at',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
+    def get_is_pinned(self, obj: AiConversation) -> bool:
+        return obj.pinned_at is not None
+
+
+class AiMessageSerializer(serializers.ModelSerializer):
+    """消息详情响应结构（含枚举中文标签）。"""
+
+    id = serializers.UUIDField(source='public_id', read_only=True)
+    conversation_id = serializers.UUIDField(source='conversation.public_id', read_only=True)
     role_label = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
     message_type_label = serializers.SerializerMethodField()
@@ -80,3 +105,14 @@ class AiMessageSerializer(serializers.ModelSerializer):
 
     def get_message_type_label(self, obj: AiMessage) -> str:
         return MessageType(obj.message_type).label
+
+
+class AiSearchHitSerializer(serializers.Serializer):
+    """搜索结果命中条目（含会话信息 + 命中片段）。"""
+
+    conversation_id = serializers.UUIDField(read_only=True)
+    conversation_title = serializers.CharField(read_only=True)
+    message_id = serializers.UUIDField(read_only=True, allow_null=True)
+    role = serializers.CharField(read_only=True, allow_null=True)
+    snippet = serializers.CharField(read_only=True)
+    matched_at = serializers.DateTimeField(read_only=True)

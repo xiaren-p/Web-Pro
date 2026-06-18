@@ -94,11 +94,11 @@ class _SSEEventStreamRenderer(BaseRenderer):
 @authentication_classes([BearerTokenAuthentication, OAuth2Authentication])
 @permission_classes([IsAuthenticated, IsV2Accessible])
 @renderer_classes([_SSEEventStreamRenderer])
-def subscribe_message(request: Request, message_id: int):
+def subscribe_message(request: Request, public_id):
     """订阅指定 AI 消息的 SSE 实时流。
 
     完整流程：
-        1. 校验消息归属当前用户，否则 404
+        1. 校验消息归属当前用户（按 public_id 查询），否则 404
         2. 回放 DB 中 ``content`` 已落部分（解决"刷新页面回来"场景）
         3. 若 ``raw_plan_json`` 已存在则补播 plan 事件
         4. 若状态已是终态，立刻发 done 后退出
@@ -107,7 +107,7 @@ def subscribe_message(request: Request, message_id: int):
 
     Args:
         request (Request): DRF 请求对象。
-        message_id (int): AiMessage 主键。
+        public_id: AiMessage 对外 UUID（由 URL 路由从 ``<uuid:public_id>`` 解析）。
 
     Returns:
         StreamingHttpResponse: SSE 流响应。
@@ -118,7 +118,7 @@ def subscribe_message(request: Request, message_id: int):
     # 单点查询用于鉴权与状态判断；不能放入生成器，否则 worker 进入流后无法返回 HTTP 状态码
     try:
         message = AiMessage.objects.select_related('conversation').get(
-            id=message_id,
+            public_id=public_id,
             conversation__user=request.user,
         )
     except AiMessage.DoesNotExist:

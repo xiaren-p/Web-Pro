@@ -24,7 +24,7 @@ import type { PlanProposal } from "@/types/aiAssistant/planSchema";
  * @param messageId - 要订阅的 AI 消息 ID
  * @returns SSE 端点完整 URL
  */
-function buildStreamUrl(messageId: number): string {
+function buildStreamUrl(messageId: string): string {
   const origin = import.meta.env.VITE_APP_API_ORIGIN;
   const v2Base = origin
     ? `${origin}/api/v2`
@@ -40,8 +40,8 @@ export interface SubscribeHandlers {
   onToken?: (data: { text: string; replay?: boolean }) => void;
   /** 收到 plan 提案，前端切换为卡片渲染 */
   onPlan?: (plan: PlanProposal) => void;
-  /** 收到消息元数据（首帧后即可拿到 conversation_id / message_id） */
-  onMessageMeta?: (meta: { conversation_id: number; message_id: number }) => void;
+  /** 收到消息元数据（首帧后即可拿到 conversation_id / message_id，UUID 字符串） */
+  onMessageMeta?: (meta: { conversation_id: string; message_id: string }) => void;
   /** 后端业务错误（不是网络错误） */
   onError?: (err: { code: string; message: string }) => void;
   /** 流结束（正常完成 / 取消 / 失败 / 超时均会触发一次） */
@@ -72,7 +72,7 @@ interface ParsedFrame {
  * @param handlers - 事件回调集合
  * @returns 可中止订阅的句柄
  */
-export function useAiChatStream(messageId: number, handlers: SubscribeHandlers): SubscribeHandle {
+export function useAiChatStream(messageId: string, handlers: SubscribeHandlers): SubscribeHandle {
   const controller = new AbortController();
 
   void runSubscribe(messageId, handlers, controller).catch((err: Error) => {
@@ -93,7 +93,7 @@ export function useAiChatStream(messageId: number, handlers: SubscribeHandlers):
  * @param controller - 中止信号
  */
 async function runSubscribe(
-  messageId: number,
+  messageId: string,
   handlers: SubscribeHandlers,
   controller: AbortController
 ): Promise<void> {
@@ -182,7 +182,7 @@ function dispatchFrame(frame: ParsedFrame, handlers: SubscribeHandlers): void {
       handlers.onPlan?.(payload as PlanProposal);
       break;
     case "message_meta":
-      handlers.onMessageMeta?.(payload as { conversation_id: number; message_id: number });
+      handlers.onMessageMeta?.(payload as { conversation_id: string; message_id: string });
       break;
     case "error":
       handlers.onError?.(payload as { code: string; message: string });

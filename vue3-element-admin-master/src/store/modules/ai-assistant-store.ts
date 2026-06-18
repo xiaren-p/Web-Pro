@@ -9,7 +9,10 @@
 
 import { useStorage } from "@vueuse/core";
 import { store } from "@/store";
-import type { AiConversation } from "@/types/aiAssistant/planSchema";
+import type {
+  AiConversation,
+  AiConversationGroup,
+} from "@/types/aiAssistant/planSchema";
 
 const STORAGE_KEY_ACTIVE_CONVERSATION = "ai-assistant:active-conversation-id";
 const STORAGE_KEY_PANEL_OPEN = "ai-assistant:panel-open";
@@ -18,11 +21,14 @@ export const useAiAssistantStore = defineStore("aiAssistant", () => {
   /** 侧栏抽屉是否展开 */
   const panelOpen = useStorage<boolean>(STORAGE_KEY_PANEL_OPEN, false);
 
-  /** 当前激活的会话 ID；为 null 表示尚未选择 */
-  const activeConversationId = useStorage<number | null>(STORAGE_KEY_ACTIVE_CONVERSATION, null);
+  /** 当前激活的会话 UUID；为 null 表示尚未选择 */
+  const activeConversationId = useStorage<string | null>(STORAGE_KEY_ACTIVE_CONVERSATION, null);
 
   /** 会话列表（仅元数据，正文按需向后端拉） */
   const conversations = ref<AiConversation[]>([]);
+
+  /** 用户自定义分组列表（按 order 升序） */
+  const groups = ref<AiConversationGroup[]>([]);
 
   /** 是否正在向 Dify 发送（防止重复点击） */
   const sending = ref<boolean>(false);
@@ -46,9 +52,9 @@ export const useAiAssistantStore = defineStore("aiAssistant", () => {
   /**
    * 选择激活会话。传 null 表示进入"新建会话"占位状态。
    *
-   * @param id - 会话 ID 或 null
+   * @param id - 会话 UUID 或 null
    */
-  function setActiveConversation(id: number | null): void {
+  function setActiveConversation(id: string | null): void {
     activeConversationId.value = id;
   }
 
@@ -74,9 +80,9 @@ export const useAiAssistantStore = defineStore("aiAssistant", () => {
   /**
    * 从列表中移除某条会话。
    *
-   * @param id - 会话 ID
+   * @param id - 会话 UUID
    */
-  function removeConversation(id: number): void {
+  function removeConversation(id: string): void {
     conversations.value = conversations.value.filter((c) => c.id !== id);
     if (activeConversationId.value === id) {
       activeConversationId.value = null;
@@ -92,10 +98,53 @@ export const useAiAssistantStore = defineStore("aiAssistant", () => {
     sending.value = value;
   }
 
+  /**
+   * 用后端返回的最新分组列表覆盖本地缓存。
+   *
+   * @param items - 分组列表
+   */
+  function setGroups(items: AiConversationGroup[]): void {
+    groups.value = items;
+  }
+
+  /**
+   * 更新本地分组（重命名 / 移序后调用）。
+   *
+   * @param updated - 已更新的分组实例
+   */
+  function patchGroup(updated: AiConversationGroup): void {
+    const idx = groups.value.findIndex((g) => g.id === updated.id);
+    if (idx >= 0) groups.value[idx] = updated;
+  }
+
+  /**
+   * 把新建的分组加到本地缓存末尾。
+   *
+   * @param group - 新建分组
+   */
+  function appendGroup(group: AiConversationGroup): void {
+    if (groups.value.some((g) => g.id === group.id)) return;
+    groups.value = [...groups.value, group];
+  }
+
+  /**
+   * 从本地缓存移除分组（不影响其下会话本地缓存的 group_id 字段）。
+   *
+   * @param groupId - 分组 UUID
+   */
+  function removeGroup(groupId: string): void {
+    groups.value = groups.value.filter((g) => g.id !== groupId);
+    // 关联会话本地标记为未分组（与后端 SET_NULL 行为一致）
+    conversations.value = conversations.value.map((c) =>
+      c.group_id === groupId ? { ...c, group_id: null } : c,
+    );
+  }
+
   return {
     panelOpen,
     activeConversationId,
     conversations,
+    groups,
     sending,
     togglePanel,
     setPanelOpen,
@@ -104,6 +153,10 @@ export const useAiAssistantStore = defineStore("aiAssistant", () => {
     prependConversation,
     removeConversation,
     setSending,
+    setGroups,
+    patchGroup,
+    appendGroup,
+    removeGroup,
   };
 });
 
