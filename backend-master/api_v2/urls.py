@@ -21,6 +21,14 @@ from api_v2.views.app_view import (
 from api_v2.views.optimization_strategy_view import trigger_optimization_strategy
 from api_v2.views.optimization_execution_view import trigger_optimization_execution
 from api_v2.views.task_view import cancel_workflow, get_workflow_status, start_workflow
+from api_v2.views.ai_chat_view import (
+    cancel_message,
+    delete_conversation,
+    list_conversations,
+    list_messages,
+    start_chat,
+)
+from api_v2.views.ai_stream_view import subscribe_message
 
 app_name = 'api_v2'
 
@@ -57,4 +65,12 @@ urlpatterns = [
 
     # SP广告优化策略执行
     path('ads/optimization-strategy/execute/', trigger_optimization_execution, name='ads_optimization_strategy_execute'),
+
+    # AI 助手对话接口（Plan Mode）
+    path('ai/chat/', start_chat, name='ai_chat_start'),
+    path('ai/stream/<int:message_id>/', subscribe_message, name='ai_stream_subscribe'),
+    path('ai/conversations/', list_conversations, name='ai_conversations_list'),
+    path('ai/conversations/<int:conversation_id>/', delete_conversation, name='ai_conversations_delete'),
+    path('ai/conversations/<int:conversation_id>/messages/', list_messages, name='ai_conversations_messages'),
+    path('ai/messages/<int:message_id>/cancel/', cancel_message, name='ai_message_cancel'),
 ]

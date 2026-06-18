@@ -61,6 +61,11 @@ env = environ.Env(
     FERNET_SECRET_KEY=(str, ''),
     # Celery Broker（复用 REDIS_URL；也可单独指定 CELERY_BROKER_URL）
     CELERY_BROKER_URL=(str, ''),
+    # Dify 平台 API 接入（AI 助手 Plan Mode）
+    # DIFY_API_BASE：Dify 自托管或云端 base URL，例：https://your-dify.example.com
+    # DIFY_API_KEY：Dify 应用的 sk-xxx 密钥；严禁出现在前端代码或日志中
+    DIFY_API_BASE=(str, ''),
+    DIFY_API_KEY=(str, ''),
 )
 
 env_file = BASE_DIR / '.env'
@@ -140,6 +145,7 @@ CELERY_TASK_ROUTES = {
     'api_v1.tasks.maintenance_tasks.cleanup_orphan_uploads':      {'queue': 'celery'},
     # ── parallel_queue（concurrency=4）：可并行的批量任务 ────────────────────
     'api_v2.tasks.ad_campaign_submit_task.submit_pending_campaigns_task': {'queue': 'parallel_queue'},
+    'api_v2.tasks.ai_chat_task.run_ai_chat_task':                         {'queue': 'parallel_queue'},
     # ── single_thread_queue（concurrency=1）：须顺序执行的任务 ───────────────
     'api_v2.tasks.listing_image_upload_task.upload_listing_images_task':  {'queue': 'single_thread_queue'},
     'api_v2.tasks.ad_time_pricing_task.run_ad_time_pricing_task':         {'queue': 'single_thread_queue'},
@@ -420,6 +426,11 @@ if ALLOW_CAPTCHA_BYPASS and not DEBUG:
 
 # Channels 已从项目中移除；保留 REDIS_URL 以备将来需要，但不再配置 CHANNEL_LAYERS
 REDIS_URL = env('REDIS_URL')
+
+# AI 助手（Dify 集成）配置
+# 安全：DIFY_API_KEY 仅在后端读取，前端任何位置出现 sk-xxx 即视为严重违规
+DIFY_API_BASE = env('DIFY_API_BASE')
+DIFY_API_KEY = env('DIFY_API_KEY')
 
 # 缓存配置：若提供 REDIS_URL 则使用 django-redis 的 RedisCache，否则使用默认 locmem
 try:

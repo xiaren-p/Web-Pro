@@ -12,6 +12,13 @@
         <Fullscreen />
       </div>
 
+      <!-- AI 助手 -->
+      <div class="navbar-actions__item navbar-actions__ai" @click="handleAiAssistantClick">
+        <el-tooltip content="AI 助手" placement="bottom">
+          <el-icon class="navbar-actions__ai-icon"><MagicStick /></el-icon>
+        </el-tooltip>
+      </div>
+
       <!-- 布局大小 -->
       <div class="navbar-actions__item">
         <SizeSelect />
@@ -73,11 +80,14 @@ import SizeSelect from "@/components/SizeSelect/index.vue";
 import Notification from "@/components/Notification/index.vue";
 import defaultAvatarUrl from "@/assets/images/default-avatar.svg";
 import { resolveAvatarSrc } from "@/utils/avatarPresets";
+import { MagicStick } from "@element-plus/icons-vue";
+import { useAiAssistantStore } from "@/store/modules/ai-assistant-store";
 
 const { t } = useI18n();
 const appStore = useAppStore();
 const settingStore = useSettingsStore();
 const userStore = useUserStore();
+const aiAssistantStore = useAiAssistantStore();
 // 默认头像资源（当后端未返回头像时使用）
 // 注意：后端返回 avatar 为空字符串或 undefined 均会回退到该默认头像
 // 也可在用户信息入库时做兜底，这里优先无侵入组件层处理
@@ -88,6 +98,13 @@ const router = useRouter();
 
 // 是否为桌面设备
 const isDesktop = computed(() => appStore.device === DeviceEnum.DESKTOP);
+
+/**
+ * 打开 AI 助手抽屉。
+ */
+function handleAiAssistantClick() {
+  aiAssistantStore.togglePanel();
+}
 
 /**
  * 打开个人中心页面
@@ -218,6 +235,22 @@ function handleSettingsClick() {
       color: var(--el-text-color-regular);
       white-space: nowrap;
       transition: color 0.3s;
+    }
+  }
+
+  &__ai {
+    .navbar-actions__ai-icon {
+      font-size: 18px;
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      transition: filter 0.3s, transform 0.3s;
+    }
+
+    &:hover .navbar-actions__ai-icon {
+      filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.5));
+      transform: scale(1.1);
     }
   }
 }
