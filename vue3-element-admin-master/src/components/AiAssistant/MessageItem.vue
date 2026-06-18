@@ -14,11 +14,7 @@
         @cancel="handlePlanCancel"
       />
 
-      <div
-        v-else-if="message.content"
-        class="message-item__markdown"
-        v-html="renderedHtml"
-      />
+      <div v-else-if="message.content" class="message-item__markdown" v-html="renderedHtml" />
 
       <div v-if="isStreaming" class="message-item__indicator">
         <span class="message-item__dot" />
@@ -30,9 +26,7 @@
         生成失败：{{ message.error_msg || "未知错误" }}
       </div>
 
-      <div v-else-if="message.status === 'cancelled'" class="message-item__cancelled">
-        已取消
-      </div>
+      <div v-else-if="message.status === 'cancelled'" class="message-item__cancelled">已取消</div>
     </div>
   </div>
 </template>
@@ -94,16 +88,16 @@ function handlePlanCancel(): void {
   }
 
   &__avatar {
-    flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    background: var(--el-color-primary-light-9);
-    color: var(--el-color-primary);
+    width: 32px;
+    height: 32px;
     font-size: 16px;
+    color: var(--el-color-primary);
+    background: var(--el-color-primary-light-9);
+    border-radius: 50%;
   }
 
   &__body {
@@ -113,14 +107,14 @@ function handlePlanCancel(): void {
   }
 
   &__markdown {
-    word-break: break-word;
+    overflow-wrap: break-word;
 
     :deep(pre) {
-      background: var(--el-fill-color);
       padding: 12px;
-      border-radius: 6px;
       overflow-x: auto;
       font-size: 13px;
+      background: var(--el-fill-color);
+      border-radius: 6px;
     }
 
     :deep(code) {
@@ -135,37 +129,49 @@ function handlePlanCancel(): void {
   &__indicator {
     display: flex;
     gap: 4px;
-    margin-top: 8px;
     align-items: center;
     height: 16px;
+    margin-top: 8px;
   }
 
   &__dot {
     width: 6px;
     height: 6px;
-    border-radius: 50%;
     background: var(--el-color-primary);
+    border-radius: 50%;
     animation: ai-pulse 1.2s infinite ease-in-out;
 
-    &:nth-child(2) { animation-delay: 0.2s; }
-    &:nth-child(3) { animation-delay: 0.4s; }
+    &:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    &:nth-child(3) {
+      animation-delay: 0.4s;
+    }
   }
 
   &__error {
-    color: var(--el-color-danger);
-    font-size: 13px;
     margin-top: 6px;
+    font-size: 13px;
+    color: var(--el-color-danger);
   }
 
   &__cancelled {
-    color: var(--el-text-color-secondary);
-    font-size: 13px;
     margin-top: 6px;
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
   }
 }
 
 @keyframes ai-pulse {
-  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1); }
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 </style>

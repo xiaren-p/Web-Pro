@@ -7,11 +7,7 @@
  */
 
 import request from "@/utils/request";
-import type {
-  AiConversation,
-  AiMessage,
-  ChatStartResponse,
-} from "@/types/aiAssistant/planSchema";
+import type { AiConversation, AiMessage, ChatStartResponse } from "@/types/aiAssistant/planSchema";
 
 /**
  * 启动一轮对话。立即返回消息 ID，真实生成在后端 Celery 异步执行。

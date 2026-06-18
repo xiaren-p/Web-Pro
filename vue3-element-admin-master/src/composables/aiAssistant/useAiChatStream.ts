@@ -77,7 +77,7 @@ export function useAiChatStream(messageId: number, handlers: SubscribeHandlers):
 async function runSubscribe(
   messageId: number,
   handlers: SubscribeHandlers,
-  controller: AbortController,
+  controller: AbortController
 ): Promise<void> {
   const token = AuthStorage.getAccessToken();
   const response = await fetch(`/api/v2/ai/stream/${messageId}/`, {

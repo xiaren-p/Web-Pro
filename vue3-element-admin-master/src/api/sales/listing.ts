@@ -16,8 +16,16 @@ export const SalesProductListingAPI = {
   },
   upsertLabels(
     data:
-      | { id: number; asin: string; tags: { globalTagId: string; tagName: string; color: string }[] }
-      | { id: number; asin: string; tags: { globalTagId: string; tagName: string; color: string }[] }[]
+      | {
+          id: number;
+          asin: string;
+          tags: { globalTagId: string; tagName: string; color: string }[];
+        }
+      | {
+          id: number;
+          asin: string;
+          tags: { globalTagId: string; tagName: string; color: string }[];
+        }[]
   ) {
     return request<any>({
       url: "/sales/product/listing/labels/upsert",
@@ -25,7 +33,11 @@ export const SalesProductListingAPI = {
       data,
     });
   },
-  upsertAssort(data: { id: number; asin: string; assort: string } | { id: number; asin: string; assort: string }[]) {
+  upsertAssort(
+    data:
+      | { id: number; asin: string; assort: string }
+      | { id: number; asin: string; assort: string }[]
+  ) {
     return request<any>({
       url: "/sales/product/listing/assort/upsert",
       method: "post",

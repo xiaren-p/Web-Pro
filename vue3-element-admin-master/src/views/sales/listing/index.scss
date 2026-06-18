@@ -25,12 +25,8 @@
     sans-serif;
   color: var(--text-primary);
   background: var(--app-bg);
-}
 
-/* ═══════════════════════════════════════════════════════════════
-   按钮统一规范（向广告模块对齐）
-   ═══════════════════════════════════════════════════════════════ */
-.listing-page {
+  /* 按钮统一规范（向广告模块对齐） */
   :deep(.el-button) {
     height: auto;
     min-height: 32px;
@@ -415,8 +411,8 @@
 }
 
 .cell-variants__empty {
-  text-align: center;
   color: var(--text-tertiary);
+  text-align: center;
 }
 
 /* 评分 */

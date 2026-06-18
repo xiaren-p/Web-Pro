@@ -245,7 +245,9 @@ function handleSettingsClick() {
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
-      transition: filter 0.3s, transform 0.3s;
+      transition:
+        filter 0.3s,
+        transform 0.3s;
     }
 
     &:hover .navbar-actions__ai-icon {

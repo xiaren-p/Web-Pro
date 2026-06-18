@@ -57,9 +57,7 @@ const props = defineProps<{
   typeOptions: string[];
 }>();
 
-const typeOptionItems = computed(() =>
-  props.typeOptions.map((v) => ({ label: v, value: v }))
-);
+const typeOptionItems = computed(() => props.typeOptions.map((v) => ({ label: v, value: v })));
 
 const emit = defineEmits(["search", "reset"]);
 

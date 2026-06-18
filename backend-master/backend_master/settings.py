@@ -144,9 +144,9 @@ CELERY_TASK_ROUTES = {
     'api_v1.tasks.nc_sync_tasks.retry_failed_nc_tasks':           {'queue': 'celery'},
     'api_v1.tasks.maintenance_tasks.cleanup_orphan_uploads':      {'queue': 'celery'},
     # ── parallel_queue（concurrency=4）：可并行的批量任务 ────────────────────
-    'api_v2.tasks.ad_campaign_submit_task.submit_pending_campaigns_task': {'queue': 'parallel_queue'},
     'api_v2.tasks.ai_chat_task.run_ai_chat_task':                         {'queue': 'parallel_queue'},
     # ── single_thread_queue（concurrency=1）：须顺序执行的任务 ───────────────
+    'api_v2.tasks.ad_campaign_submit_task.submit_pending_campaigns_task': {'queue': 'single_thread_queue'},
     'api_v2.tasks.listing_image_upload_task.upload_listing_images_task':  {'queue': 'single_thread_queue'},
     'api_v2.tasks.ad_time_pricing_task.run_ad_time_pricing_task':         {'queue': 'single_thread_queue'},
     'api_v2.tasks.time_pricing_task.run_time_pricing_task':                       {'queue': 'single_thread_queue'},
@@ -180,14 +180,18 @@ CELERY_BEAT_SCHEDULE = {
         'kwargs': {'days': 30},
     },
     # Listing 标签同步：每 5 秒处理创建中 / 删除中的标签（Redis 锁保证同时仅一个实例执行）
+    # options.expires=4：队列里超过 4 秒未被消费的任务自动丢弃，防止任务跑慢时 Beat 持续堆积
     'listing-tag-sync': {
         'task': 'api_v2.tasks.listing_tag_sync_task.run_listing_tag_sync_task',
         'schedule': 5.0,
+        'options': {'expires': 4},
     },
     # Listing 商品标签修改同步：每 5 秒处理新增 / 移除绑定（Redis 锁保证同时仅一个实例执行）
+    # options.expires=4：理由同上
     'listing-tag-modify': {
         'task': 'api_v2.tasks.listing_tag_modify_task.run_listing_tag_modify_task',
         'schedule': 5.0,
+        'options': {'expires': 4},
     },
 }
 

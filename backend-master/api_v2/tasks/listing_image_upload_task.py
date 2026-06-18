@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
     bind=True,
     name='api_v2.tasks.listing_image_upload_task.upload_listing_images_task',
     max_retries=0,
-    soft_time_limit=1500,
-    time_limit=1800,
+    soft_time_limit=840,
+    time_limit=900,
 )
 def upload_listing_images_task(self, execution_id: int, listing_id: int, image_ids: list[int], **kwargs) -> dict:
     """

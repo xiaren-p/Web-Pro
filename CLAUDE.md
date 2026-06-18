@@ -357,6 +357,387 @@
 - **安全释放的句柄**：读写文件强制用 `with open`，使用 `requests` **绝对不准不写** `timeout` 超时参数。
 - **拒绝掩埋异常日志**：禁止出现 `try...except Exception: pass`。对于未知的报错，捕获后必须 `logger.error("操作失败，原因: %s", str(e), exc_info=True)` 将堆栈链路完全抛出。
 
+### 5. Celery 任务加锁标准方案（强制执行）
+
+> 适用范围：所有需要"任务在跑期间不能再被调度"语义的 Celery 任务（典型如：广告调价、批量提交、策略匹配、AI 推理等长任务）。本节是项目内**唯一合法的 Celery 任务加锁实现方案**，禁止在任务/视图层手写 `cache.add` / `cache.delete` 重新造轮子。
+
+#### 5.1 核心组件（已实现，直接复用）
+
+- **公共工具**：`api_v2/utils/task_execution_lock.py`
+  - `is_task_running(lock_key)` — 视图层只读检查（不占锁）
+  - `TaskExecutionLock(lock_key, ttl)` — 任务体上下文管理器（占锁 + 自动释放）
+  - `BUSY_RESPONSE(msg)` — 标准 409 响应体生成器（统一业务错误码 `B0001`）
+
+#### 5.2 三层防御架构（必须三层全部到位）
+
+```text
+┌─ 防线 1：Celery 队列层
+│    single_thread_queue concurrency=1
+│    └─ 物理上同一时刻只允许 1 个任务跑（最强保障）
+│
+├─ 防线 2：任务体内 TaskExecutionLock
+│    with TaskExecutionLock(LOCK_KEY, ttl=time_limit + 60):
+│    └─ 跨入口互斥兜底（即便队列改并发数 > 1 也安全）
+│
+└─ 防线 3：视图层 is_task_running
+     return Response(BUSY_RESPONSE(...), status=409) 提前拒绝
+     └─ 任务在跑时立刻 409，避免任务入队后被丢弃
+```
+
+#### 5.3 任务文件标准模板
+
+```python
+"""xxx 任务（xxx_task）。"""
+import logging
+from celery import shared_task
+
+from api_v2.utils.task_execution_lock import TaskExecutionLock
+
+logger = logging.getLogger(__name__)
+
+# 任务执行锁：视图必须 from import 同一个 LOCK_KEY 才能正确互斥
+LOCK_KEY = "xxx_lock"          # ← 必须是模块级常量并显式导出
+# 锁 TTL = time_limit + 60 秒缓冲，确保 SIGKILL 后锁能在合理时间内释放
+LOCK_TTL = 960                 # 任务 time_limit=900 + 60
+
+
+@shared_task(
+    bind=True,
+    name="api_v2.tasks.xxx_task.run_xxx_task",
+    max_retries=0,
+    soft_time_limit=840,
+    time_limit=900,
+    acks_late=True,            # ← 强杀时消息回队列重试
+)
+def run_xxx_task(self) -> dict:
+    """任务说明（中文 Google-style docstring）。"""
+    with TaskExecutionLock(LOCK_KEY, ttl=LOCK_TTL) as acquired:
+        if not acquired:
+            logger.warning("[run_xxx_task] 任务已在执行中，跳过本次调度")
+            return {"skipped": True, "errors": ["任务已在执行中"]}
+
+        logger.info("[run_xxx_task] 开始执行")
+        result = do_business_work()
+        logger.info("[run_xxx_task] 完成: %s", result)
+        return result
+```
+
+#### 5.4 视图文件标准模板
+
+```python
+"""xxx 手动触发接口。"""
+import logging
+
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.request import Request
+from rest_framework.response import Response
+
+from api_v2.tasks.xxx_task import LOCK_KEY, run_xxx_task        # ← 复用任务模块的 LOCK_KEY
+from api_v2.utils.task_execution_lock import BUSY_RESPONSE, is_task_running
+
+logger = logging.getLogger(__name__)
+
+
+@api_view(["POST"])
+@authentication_classes(_AUTH)
+@permission_classes(_PERM)
+def trigger_xxx(request: Request) -> Response:
+    """触发 xxx 任务，委托 Celery 异步执行。"""
+    # 防线 3：视图层提前检查
+    if is_task_running(LOCK_KEY):
+        return Response(BUSY_RESPONSE("xxx 任务正在执行中"), status=409)
+
+    try:
+        task = run_xxx_task.delay()
+    except Exception:
+        logger.exception("[trigger_xxx] Celery 入队失败")
+        return Response(
+            {"code": "B0002", "data": None, "msg": "Celery 任务入队失败，请稍后重试"},
+            status=500,
+        )
+
+    return Response({
+        "code": "00000",
+        "data": {"task_id": str(task.id)},
+        "msg": "任务已入队",
+    })
+```
+
+#### 5.5 带参数维度的任务（如全量 vs 分维度执行）
+
+参考 `api_v2/tasks/optimization_execution_task.py` 现成实现：
+
+- 任务模块导出 `GLOBAL_LOCK_KEY` + `DIM_LOCK_PREFIX` + `build_lock_key(dim)` 工具函数
+- 视图层先检查全局锁（防全量任务跑期间被维度任务插入），再检查目标维度锁
+- 任务体根据传入参数计算 lock_key，复用同一套 `TaskExecutionLock`
+
+#### 5.6 必须遵守的硬规则（违反即不通过 review）
+
+- **禁止视图层 `cache.add`**：视图只能 `is_task_running` 读，不允许写锁。理由：视图占锁要么 finally 立刻释放（达不到互斥效果），要么持锁等任务跑完（HTTP 挂死）；正确做法是让任务体管理锁生命周期。**唯一例外**：视图本身同步执行业务（不入队 Celery）的极少数场景（参考 `ad_campaign_submit_view.py`），可以 `cache.add` + 同步业务 + `cache.delete`。
+- **LOCK_KEY 必须由任务模块导出**：视图必须 `from api_v2.tasks.xxx_task import LOCK_KEY`，禁止在视图里另写一份字符串常量（避免后期改动不一致）。
+- **LOCK_TTL 必须 ≥ time_limit + 60 秒**：保证 SIGKILL 强杀后锁残留时长够新任务被拒绝直至 TTL 自然过期。
+- **`acks_late=True` 必须开启**：worker 跑完才 ack 消息，强杀时消息回队列重试。
+- **任务体必须用 `TaskExecutionLock` 上下文管理器**：禁止手写 `cache.add` + `try/finally cache.delete`。理由：上下文管理器统一了"成功占锁才释放"的语义，避免误删别人占的锁。
+- **抢锁失败必须返回 schema 完整的 dict**：例如返回 `{"processed": 0, "errors": ["任务已在执行中"]}`，不能返回 `None` 或空 dict，否则上层解构会 KeyError。
+- **409 响应必须用 `BUSY_RESPONSE`**：保证错误码 `B0001` 与项目其他地方一致，前端统一处理。
+
+#### 5.7 已知设计权衡（不要试图"修复"）
+
+- **TOCTOU 1~2 秒窗口**：视图 `is_task_running=False` 后到 worker 占锁前有 1~2 秒缝隙，期间第二次 HTTP 仍能入队。但任务体 `TaskExecutionLock` 会拦下第二个任务并直接 return `{"skipped": True}`，不会真的跑两次。该权衡是有意为之，**不要尝试用"视图占锁 + 任务体释放"方案修复**——会引入视图崩溃锁泄漏、跨进程锁释放调试困难等更严重的问题。
+
+#### 5.8 决策树：新任务是否需要加锁？
+
+```text
+任务是否会被多个入口触发（Beat + HTTP / 多个 HTTP 端点）？
+       │
+   ┌───┴───┐
+   是      否
+   │       │
+   │       └─ 不需要加锁，靠 single_thread_queue 即可
+   │
+任务跑期间再来一次调度，业务上是否允许？
+   │
+┌──┴──┐
+不允许  允许
+   │     │
+   │     └─ 不需要加锁（让 Celery 队列排队即可）
+   │
+按本节方案三层防御加锁
+```
+
+#### 5.9 纯 Beat 触发任务的特殊处理（无 HTTP 视图）
+
+适用：仅由 `CELERY_BEAT_SCHEDULE` 定时触发、**无任何 HTTP 视图**的任务（典型：`listing_tag_sync` / `listing_tag_modify` 这类高频轮询同步任务）。
+
+##### 5.9.1 与标准方案的差异
+
+- **防线 1（队列层）+ 防线 2（任务体内 TaskExecutionLock）**：照常套用 5.3 任务模板，无任何区别
+- **防线 3（视图层）**：N/A，跳过
+- **额外项**：必须在 Beat 调度配置加 `options.expires`
+
+##### 5.9.2 为什么必须加 `expires`
+
+Beat 高频触发（如每 5 秒）+ 任务实际耗时大于触发周期时，会出现队列堆积：
+
+```text
+T=0    Beat 触发 → 入队
+T=0.5  worker 取走 → 占锁 → 跑 30 秒
+T=5    Beat 触发 → 入队（堆 1 个）
+T=10   Beat 触发 → 入队（堆 2 个）
+T=15   Beat 触发 → 入队（堆 3 个）
+...
+T=30   T=0 任务跑完 → 释放锁 → worker 立刻拾起堆积任务
+       ❌ 已严重落后实际时间，且永远追不上
+```
+
+任务体内 `TaskExecutionLock` 会让被取出的堆积任务立刻 return `{"skipped": ...}`，但**仍要消耗 worker 时间从队列出列 → 进入任务体 → 抢锁失败 → 退出**。极高频场景下这本身就是浪费。
+
+正确做法：在 Beat 配置加 `'options': {'expires': N}`，N 取略小于触发周期的值。意思是"队列里超过 N 秒还没被消费的任务自动丢弃"——broker 直接清理过期消息，worker 看不到。
+
+##### 5.9.3 标准 Beat 配置模板
+
+```python
+CELERY_BEAT_SCHEDULE = {
+    'listing-tag-sync': {
+        'task': 'api_v2.tasks.listing_tag_sync_task.run_listing_tag_sync_task',
+        'schedule': 5.0,
+        'options': {'expires': 4},  # ← 略小于 schedule，避免堆积
+    },
+}
+```
+
+##### 5.9.4 `expires` 取值规则
+
+| `schedule` 周期 | 推荐 `expires` | 理由 |
+| ---- | ---- | ---- |
+| 每 N 秒 (N ≤ 60) | `N - 1` 或 `N * 0.8` | 短周期严格防堆积 |
+| 每 1~5 分钟 | `schedule * 0.8` | 给消息派发留点缓冲 |
+| 每 ≥ 5 分钟 | 可省略 `expires` | 低频任务堆积风险低 |
+| 一次性手动触发 | 不要加 `expires` | 用户期望任务一定会执行 |
+
+##### 5.9.5 硬规则
+
+- **高频 Beat 任务（schedule ≤ 60 秒）必须加 `expires`**：否则任务体抢锁失败仍会浪费 worker 周期，违反此规则视为低质量代码
+- **`expires` 必须小于 `schedule`**：`expires >= schedule` 时下一轮 Beat 触发前老消息还没过期，相当于没加
+- **`expires` 不要写死小于 1 秒**：消息派发本身就有 ~100ms 延迟，过小会导致正常消息也被丢
+
+### 6. Celery 任务路由与 Worker 部署规范（强制执行）
+
+> 适用范围：所有新增 / 修改的 Celery 任务。本节定义"任务怎么进对队列"以及"哪个 worker 取走"的完整契约，是 5 节"加锁方案"的前置基础。
+
+#### 6.1 核心机制（理解这一段才能写对路由）
+
+Celery 多 worker 部署的两端职责分离：
+
+```text
+代码端（settings.CELERY_TASK_ROUTES + 任务装饰器 name）
+    决定：任务投递到哪个队列
+                ↓
+          broker (Redis)
+                ↓
+运维端（systemd service 启动命令的 -Q 参数）
+    决定：哪个 worker 进程监听哪些队列
+```
+
+**两端通过队列名解耦**——代码不知道有几个 worker、worker 在哪；worker 不知道哪些代码会派发任务。**契约只有"队列名"**。
+
+#### 6.2 任务装饰器的 `name` 字段必须严格规范
+
+```python
+@shared_task(
+    bind=True,
+    name="api_v2.tasks.xxx_task.run_xxx_task",   # ← 必须是"完整模块路径.函数名"
+    ...
+)
+def run_xxx_task(self): ...
+```
+
+**硬规则**：
+
+- `name` 必须 = 该函数的完整 Python 导入路径（`<app>.tasks.<module>.<func>`）
+- 任何任务**禁止省略 `name=` 让 Celery 自动生成**——自动生成的 name 在重命名 / 移动文件后会变化，路由表对不上后任务跑去默认队列
+- `name` 一旦写定，**禁止再改**——改了等于跟运维端契约破裂，老消息找不到对应任务
+
+#### 6.3 集中路由表 `CELERY_TASK_ROUTES` 的标准写法
+
+位于 `backend_master/settings.py`，**唯一合法的路由声明位置**。所有任务必须在这里登记，按队列分组：
+
+```python
+CELERY_TASK_ROUTES = {
+    # ── celery（默认队列）：轻量 / 定时 / 低频任务 ───────────────────
+    'api_v2.tasks.qinglong_env_sync_task.sync_qinglong_env_task': {'queue': 'celery'},
+    'api_v1.tasks.nc_sync_tasks.process_pending_nc_tasks':        {'queue': 'celery'},
+
+    # ── parallel_queue（concurrency=4）：可并行的批量任务 ────────────
+    'api_v2.tasks.ai_chat_task.run_ai_chat_task':                 {'queue': 'parallel_queue'},
+
+    # ── single_thread_queue（concurrency=1）：须顺序执行的任务 ───────
+    'api_v2.tasks.bid_adjustment_task.run_bid_adjustment_task':   {'queue': 'single_thread_queue'},
+}
+```
+
+**硬规则**：
+
+- **禁止在 `@shared_task` 装饰器里写 `queue='xxx'` 参数**——路由声明必须集中在 settings，避免散落难以审计
+- **禁止在调用方写 `task.apply_async(queue='xxx')`**——这会绕过路由表，导致代码端两份不一致的事实
+- **三段注释分组必须保留**（celery / parallel_queue / single_thread_queue）——后人加新任务一眼能看出该归哪类
+- **每个任务必须显式登记**——没登记的任务会走 `CELERY_TASK_DEFAULT_QUEUE = 'celery'`，可能跑错地方
+
+#### 6.4 选队列的决策树
+
+```text
+任务耗时？
+   │
+┌──┴──────────────────────┐
+< 30 秒              ≥ 30 秒
+轻量快任务            中长任务
+   │                    │
+   ▼                    ▼
+celery              能并发跑吗？（"同时来 5 个会出问题吗？"）
+                        │
+                  ┌─────┴─────┐
+                  能          不能
+                  │           │
+                  ▼           ▼
+            parallel_   single_thread_
+            queue       queue
+```
+
+**进 `single_thread_queue` 的典型场景**：
+
+- 调有 QPS 限制的外部 API（亚马逊 SP-API、Dify、TikTok Shop）
+- 写入同一资源（同一 campaign 调价、批量更新同一张表）
+- 涉及钱 / 库存 / 订单的关键业务
+- 文件追加写、跨表事务
+
+**进 `parallel_queue` 的典型场景**：
+
+- AI 对话 / LLM 调用（每会话独立）
+- 单条记录的导出 / 解析（独立文件）
+- 数据分析（只读）
+- 给单个用户发推送
+
+**进 `celery`（默认）的典型场景**：
+
+- 发通知 / 写日志 / 落审计
+- 清理临时文件 / 心跳同步
+- 任何 < 30 秒的轻量任务
+
+#### 6.5 写新任务的标准 4 步流程
+
+每次新增 Celery 任务必须严格按以下顺序执行：
+
+```text
+1. 写任务文件
+   位置：api_v2/tasks/your_task.py
+   要点：装饰器 name 必须 = "完整模块路径.函数名"
+
+2. 在 settings.CELERY_TASK_ROUTES 加一行
+   按 6.4 决策树选队列
+   key 必须跟装饰器 name 一字不差
+
+3. 重启 Django Web
+   理由：CELERY_TASK_ROUTES 是 Django 派发任务时读的，不重启新路由不生效
+   命令：sudo systemctl restart <你的 django service 名>
+
+4. 重启对应队列的 Celery worker
+   理由：worker 启动时扫描 tasks/*.py 加载任务函数，不重启会报 "Received unregistered task"
+   命令：sudo systemctl restart celery-<队列名>.service
+```
+
+**调用方式（保持简单）**：
+
+```python
+# ✅ 推荐：让路由表决定去哪
+your_task.delay(arg1, arg2)
+
+# ❌ 禁止：绕过路由表硬指定队列
+your_task.apply_async(args=[arg1, arg2], queue='parallel_queue')
+```
+
+#### 6.6 改路由的 4 个常见场景
+
+| 场景 | 操作 | 重启项 |
+| ---- | ---- | ---- |
+| 新增任务 | 加路由表 + 实现任务文件 | Django + 目标队列 worker |
+| 改任务归属（如 parallel_queue → single_thread_queue） | 改路由表那一行 | Django + 原队列 worker + 新队列 worker |
+| 删任务 | 删路由表那一行 + 删任务文件 + 删迁移引用 | 涉及的所有 worker |
+| 改任务 `name` | 禁止（参考 6.2 硬规则） | - |
+
+#### 6.7 排错速查表
+
+| 现象 | 根因 | 排查 |
+| ---- | ---- | ---- |
+| `Received unregistered task of type 'xxx'` | worker 没加载新任务函数 | 重启目标队列的 worker |
+| 任务跑去了错的 worker / 错的队列 | 路由表没登记 → 走默认 `celery` 队列 | 检查 `CELERY_TASK_ROUTES`，确认 key 跟装饰器 `name` 一致 |
+| 任务在 Redis 里堆积没人取 | 没有 worker 监听该队列 | `redis-cli LLEN <队列名>` 看堆积；检查 systemd service 的 `-Q` 参数 |
+| 改完路由没生效 | 没重启 Django Web（不是 worker） | 路由是 Django 派发时读的，必须重启 Django |
+| Celery Beat 触发的任务跑了，HTTP 触发的没跑 | Django 路由表跟 worker 启动配置不同步 | 比对 `CELERY_TASK_ROUTES` 和 service 文件的 `-Q` 列表 |
+
+#### 6.8 Worker 部署形态（运维端，了解即可）
+
+项目当前部署 3 个独立 worker service：
+
+| service | 监听队列 | 并发数 | 用途 |
+| ---- | ---- | ---- | ---- |
+| `celery-default.service` | `celery` | 4 | 轻量任务池 |
+| `celery-parallel.service` | `parallel_queue` | 8 | AI 对话等并发任务 |
+| `celery-single.service` | `single_thread_queue` | 1 | 严格串行任务 |
+| `celery-beat.service` | —（调度器，不消费任务） | 1 | 定时触发器 |
+
+**为什么必须拆 3 个 service 而不是单 service 监听全部**：单 service 用 `-c 8` 时，`single_thread_queue` 的任务也会被 8 个并发槽中任意一个取走，"严格串行"语义失效。物理上只有"1 个 service + concurrency=1 + 只监听 single_thread_queue" 才能保证真正串行。
+
+#### 6.9 给 AI Agent 的执行口令
+
+下次用户说"写个新任务"时，按下面顺序自动执行（不用每次问）：
+
+```text
+1. 用 6.4 决策树问用户耗时与并发预期，选队列
+2. 用 5.3 / 5.9 任务模板写文件（含锁与不含锁两种）
+3. 用 6.3 标准格式在 settings.CELERY_TASK_ROUTES 追加一行
+4. 必须显式提示用户："改完后必须重启 Django Web + 对应队列的 Celery worker"
+```
+
 ---
 
 ## 四、前端专项规范 (Vue3 / TS / JS / HTML)

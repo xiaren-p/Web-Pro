@@ -45,12 +45,7 @@
     </div>
 
     <div class="plan-card__actions">
-      <el-button
-        v-if="plan.cancellable"
-        size="default"
-        :disabled="readonly"
-        @click="handleCancel"
-      >
+      <el-button v-if="plan.cancellable" size="default" :disabled="readonly" @click="handleCancel">
         取消
       </el-button>
       <el-button
@@ -94,9 +89,7 @@ const emit = defineEmits<{
 }>();
 
 /** 多选模式下的已选 key 数组 */
-const selectedKeys = ref<string[]>(
-  props.plan.options.filter((o) => o.selected).map((o) => o.key),
-);
+const selectedKeys = ref<string[]>(props.plan.options.filter((o) => o.selected).map((o) => o.key));
 
 /** 单选模式下的已选 key */
 const singleKey = ref<string>(props.plan.options.find((o) => o.selected)?.key ?? "");
@@ -111,7 +104,7 @@ watch(
     selectedKeys.value = props.plan.options.filter((o) => o.selected).map((o) => o.key);
     singleKey.value = props.plan.options.find((o) => o.selected)?.key ?? "";
     customValue.value = "";
-  },
+  }
 );
 
 const canConfirm = computed<boolean>(() => {
@@ -148,16 +141,16 @@ function handleCancel(): void {
 
 <style scoped lang="scss">
 .plan-card {
+  padding: 16px;
+  margin: 8px 0;
+  background: var(--el-bg-color);
   border: 1px solid var(--el-border-color);
   border-radius: 8px;
-  padding: 16px;
-  background: var(--el-bg-color);
-  margin: 8px 0;
 
   &__header {
     display: flex;
-    align-items: center;
     gap: 8px;
+    align-items: center;
     margin-bottom: 8px;
     color: var(--el-color-primary);
   }
@@ -172,10 +165,10 @@ function handleCancel(): void {
   }
 
   &__desc {
-    color: var(--el-text-color-regular);
+    margin-bottom: 12px;
     font-size: 13px;
     line-height: 1.5;
-    margin-bottom: 12px;
+    color: var(--el-text-color-regular);
   }
 
   &__options {
@@ -194,8 +187,8 @@ function handleCancel(): void {
 
   &__actions {
     display: flex;
-    justify-content: flex-end;
     gap: 8px;
+    justify-content: flex-end;
   }
 }
 </style>

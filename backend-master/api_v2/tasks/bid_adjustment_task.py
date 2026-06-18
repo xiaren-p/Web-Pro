@@ -6,36 +6,36 @@
 import logging
 
 from celery import shared_task
-from django.core.cache import cache
 
 from api_v2.services.bid_adjustment_executor import execute_bid_adjustment
+from api_v2.utils.task_execution_lock import TaskExecutionLock
 
 logger = logging.getLogger(__name__)
 
-_BID_ADJUST_LOCK_KEY = "bid_adjustment_lock"
+# 任务执行锁：视图层调用 is_task_running(LOCK_KEY) 提前判断
+LOCK_KEY = "bid_adjustment_lock"
+LOCK_TTL = 960
 
 
 @shared_task(
     bind=True,
     name="api_v2.tasks.bid_adjustment_task.run_bid_adjustment_task",
     max_retries=0,
-    soft_time_limit=1200,
-    time_limit=1800,
+    soft_time_limit=840,
+    time_limit=900,
     acks_late=True,
 )
 def run_bid_adjustment_task(self) -> dict:
     """执行竞价调整 API 调用。"""
-    if not cache.add(_BID_ADJUST_LOCK_KEY, "1", timeout=1800):
-        logger.warning("[run_bid_adjustment_task] 任务已在执行中，跳过")
-        return {"processed": 0, "success": 0, "failed": 0, "errors": ["任务已在执行中"]}
+    with TaskExecutionLock(LOCK_KEY, ttl=LOCK_TTL) as acquired:
+        if not acquired:
+            logger.warning("[run_bid_adjustment_task] 任务已在执行中，跳过")
+            return {"processed": 0, "success": 0, "failed": 0, "errors": ["任务已在执行中"]}
 
-    logger.info("[run_bid_adjustment_task] 开始执行竞价调整")
-    try:
+        logger.info("[run_bid_adjustment_task] 开始执行竞价调整")
         result = execute_bid_adjustment()
         logger.info(
             "[run_bid_adjustment_task] 完成: processed=%d success=%d failed=%d errors=%d",
             result["processed"], result["success"], result["failed"], len(result["errors"]),
         )
         return result
-    finally:
-        cache.delete(_BID_ADJUST_LOCK_KEY)

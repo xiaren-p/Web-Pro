@@ -55,11 +55,7 @@
         />
         <div class="ai-chat-panel__footer-actions">
           <span class="ai-chat-panel__hint">{{ footerHint }}</span>
-          <el-button
-            v-if="canCancelStreaming"
-            size="default"
-            @click="handleCancelStreaming"
-          >
+          <el-button v-if="canCancelStreaming" size="default" @click="handleCancelStreaming">
             停止生成
           </el-button>
           <el-button
@@ -75,13 +71,7 @@
       </footer>
     </div>
 
-    <el-drawer
-      v-model="historyVisible"
-      title="历史会话"
-      :size="320"
-      direction="ltr"
-      append-to-body
-    >
+    <el-drawer v-model="historyVisible" title="历史会话" :size="320" direction="ltr" append-to-body>
       <div class="ai-chat-panel__history">
         <div
           v-for="conv in store.conversations"
@@ -121,13 +111,7 @@
 
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
-import {
-  ChatLineRound,
-  Close,
-  Delete,
-  MagicStick,
-  Plus,
-} from "@element-plus/icons-vue";
+import { ChatLineRound, Close, Delete, MagicStick, Plus } from "@element-plus/icons-vue";
 
 import {
   cancelMessage,
@@ -136,17 +120,10 @@ import {
   listMessages,
   startChat,
 } from "@/api/aiAssistant/aiChat";
-import {
-  useAiChatStream,
-  type SubscribeHandle,
-} from "@/composables/aiAssistant/useAiChatStream";
+import { useAiChatStream, type SubscribeHandle } from "@/composables/aiAssistant/useAiChatStream";
 import { useAiAssistantStore } from "@/store/modules/ai-assistant-store";
 import MessageItem from "@/components/AiAssistant/MessageItem.vue";
-import type {
-  AiMessage,
-  PlanConfirmPayload,
-  PlanProposal,
-} from "@/types/aiAssistant/planSchema";
+import type { AiMessage, PlanConfirmPayload, PlanProposal } from "@/types/aiAssistant/planSchema";
 
 const store = useAiAssistantStore();
 
@@ -165,13 +142,9 @@ let activeSubscription: SubscribeHandle | null = null;
 /** 当前正在订阅的 assistant message id */
 const subscribingMessageId = ref<number | null>(null);
 
-const canSend = computed<boolean>(
-  () => inputText.value.trim().length > 0 && !store.sending,
-);
+const canSend = computed<boolean>(() => inputText.value.trim().length > 0 && !store.sending);
 
-const canCancelStreaming = computed<boolean>(
-  () => subscribingMessageId.value !== null,
-);
+const canCancelStreaming = computed<boolean>(() => subscribingMessageId.value !== null);
 
 const footerHint = computed<string>(() => {
   if (store.sending) return "AI 正在思考…";
@@ -197,7 +170,7 @@ watch(
       await loadActiveMessages();
     }
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 watch(
@@ -205,7 +178,7 @@ watch(
   async () => {
     abortSubscription();
     await loadActiveMessages();
-  },
+  }
 );
 
 onMounted(async () => {
@@ -229,7 +202,7 @@ async function loadConversations(): Promise<void> {
     if (store.activeConversationId === null && resp.items.length > 0) {
       store.setActiveConversation(resp.items[0].id);
     }
-  } catch (err) {
+  } catch {
     ElMessage.error("加载会话列表失败");
   }
 }
@@ -249,10 +222,14 @@ async function loadActiveMessages(): Promise<void> {
 
     // 续订：如果最后一条是 assistant 消息且仍在 pending/streaming，重新订阅 SSE
     const last = messages.value[messages.value.length - 1];
-    if (last && last.role === "assistant" && (last.status === "pending" || last.status === "streaming")) {
+    if (
+      last &&
+      last.role === "assistant" &&
+      (last.status === "pending" || last.status === "streaming")
+    ) {
       subscribeMessage(last.id);
     }
-  } catch (err) {
+  } catch {
     ElMessage.error("加载消息失败");
   }
 }
@@ -277,8 +254,12 @@ async function handleSend(): Promise<void> {
 
     // 本地占位消息（避免等历史接口刷新）
     const now = new Date().toISOString();
-    messages.value.push(buildLocalUserMessage(resp.user_message_id, resp.conversation_id, query, now));
-    messages.value.push(buildLocalAssistantPlaceholder(resp.assistant_message_id, resp.conversation_id, now));
+    messages.value.push(
+      buildLocalUserMessage(resp.user_message_id, resp.conversation_id, query, now)
+    );
+    messages.value.push(
+      buildLocalAssistantPlaceholder(resp.assistant_message_id, resp.conversation_id, now)
+    );
 
     if (isNewConversation) {
       await loadConversations();
@@ -286,7 +267,7 @@ async function handleSend(): Promise<void> {
 
     scrollToBottom();
     subscribeMessage(resp.assistant_message_id);
-  } catch (err) {
+  } catch {
     ElMessage.error("发送失败，请稍后重试");
   } finally {
     store.setSending(false);
@@ -478,7 +459,7 @@ function buildLocalUserMessage(
   id: number,
   conversationId: number,
   content: string,
-  createdAt: string,
+  createdAt: string
 ): AiMessage {
   return {
     id,
@@ -508,7 +489,7 @@ function buildLocalUserMessage(
 function buildLocalAssistantPlaceholder(
   id: number,
   conversationId: number,
-  createdAt: string,
+  createdAt: string
 ): AiMessage {
   return {
     id,
@@ -538,17 +519,17 @@ function buildLocalAssistantPlaceholder(
 
   &__header {
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
     border-bottom: 1px solid var(--el-border-color-light);
-    flex-shrink: 0;
   }
 
   &__title {
     display: flex;
-    align-items: center;
     gap: 8px;
+    align-items: center;
     font-size: 16px;
     font-weight: 600;
   }
@@ -560,8 +541,8 @@ function buildLocalAssistantPlaceholder(
 
   &__messages {
     flex: 1;
-    overflow-y: auto;
     padding: 8px 0;
+    overflow-y: auto;
   }
 
   &__empty {
@@ -570,8 +551,8 @@ function buildLocalAssistantPlaceholder(
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: var(--el-text-color-secondary);
     font-size: 14px;
+    color: var(--el-text-color-secondary);
 
     p {
       margin-top: 12px;
@@ -584,23 +565,23 @@ function buildLocalAssistantPlaceholder(
   }
 
   &__footer {
-    border-top: 1px solid var(--el-border-color-light);
-    padding: 12px 16px;
     flex-shrink: 0;
+    padding: 12px 16px;
+    border-top: 1px solid var(--el-border-color-light);
   }
 
   &__footer-actions {
     display: flex;
+    gap: 8px;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
     margin-top: 8px;
   }
 
   &__hint {
-    color: var(--el-text-color-secondary);
-    font-size: 12px;
     margin-right: auto;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
   }
 
   &__history {
@@ -610,10 +591,10 @@ function buildLocalAssistantPlaceholder(
   &__history-item {
     position: relative;
     padding: 10px 36px 10px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.15s;
     margin-bottom: 4px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s;
 
     &:hover {
       background: var(--el-fill-color-light);
@@ -625,23 +606,23 @@ function buildLocalAssistantPlaceholder(
   }
 
   &__history-title {
-    font-size: 14px;
-    color: var(--el-text-color-primary);
     overflow: hidden;
     text-overflow: ellipsis;
+    font-size: 14px;
+    color: var(--el-text-color-primary);
     white-space: nowrap;
   }
 
   &__history-time {
+    margin-top: 2px;
     font-size: 12px;
     color: var(--el-text-color-secondary);
-    margin-top: 2px;
   }
 
   &__history-delete {
     position: absolute;
-    right: 4px;
     top: 50%;
+    right: 4px;
     transform: translateY(-50%);
   }
 }

@@ -33,8 +33,8 @@ _DB_FLUSH_INTERVAL_CHARS = 64
     bind=True,
     name='api_v2.tasks.ai_chat_task.run_ai_chat_task',
     max_retries=0,
-    soft_time_limit=180,
-    time_limit=240,
+    soft_time_limit=840,
+    time_limit=900,
 )
 def run_ai_chat_task(
     self,
