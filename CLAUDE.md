@@ -1242,7 +1242,7 @@ export function useListingTable() {
 - **ESLint 校验铁律**：Vue 和 TS 代码必须遵循项目的 ESLint 校验标准。
 - **提交前检查**：提交代码或建议代码之前，必须确保不存在未使用的变量、未处理的警告，以及任何违反项目中 `eslint.config.ts` 规则的语法问题（例如缩进、尾逗号、分号等）。
 - **禁止绕过 Lint**：严禁随意使用 `// eslint-disable-next-line`、`@ts-ignore` 等注释来掩盖语法错误或类型报错；如遇特殊情况确实需要使用，必须跟上清晰的 TODO 中文注释说明为什么绕过。
-- **变更 Model 时**：commit 必须同时包含 ① Model 文件 ② 新生成的 `xxxx_*.py` 迁移文件，缺一不可。
+- **变更 Model 时**：commit 只包含 Model 文件，不包含迁移文件（详见 §1.8，迁移文件本地生成、服务器手动执行、不上传 Git）。AI 需同步给出服务器端 `makemigrations` + `migrate` 迁移命令，遇冲突给 `--fake` 或手动 SQL 补救方案。
 - **保持提交纯净**：绝对禁止将带有 `test_xxx`（非官方单元测试）、`temp_run.py` 等非工程规划内的临时文件推进主代码库。
 
 ---
