@@ -15,8 +15,14 @@ from typing import Iterator
 
 from django.http import StreamingHttpResponse
 from oauth2_provider.contrib.rest_framework import OAuth2Authentication
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    permission_classes,
+    renderer_classes,
+)
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import BaseRenderer
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -67,9 +73,27 @@ def _format_heartbeat() -> str:
     return f': heartbeat {int(time.time())}\n\n'
 
 
+class _SSEEventStreamRenderer(BaseRenderer):
+    """SSE 内容协商兜底 renderer。
+
+    DRF 默认只能渲染 application/json，前端发 ``Accept: text/event-stream`` 时
+    会被 DRF 内容协商拒绝并返回 406。注册本 renderer 让 DRF 知道"我能产出这个 MIME"，
+    实际响应仍由视图通过 ``StreamingHttpResponse`` 直接构造，不会走 renderer 的 ``render()``。
+    """
+
+    media_type = 'text/event-stream'
+    format = 'sse'
+    charset = 'utf-8'
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        # 视图直接返回 StreamingHttpResponse，不经此处；保留空实现以满足 BaseRenderer 接口
+        return data if isinstance(data, (bytes, str)) else b''
+
+
 @api_view(['GET'])
 @authentication_classes([BearerTokenAuthentication, OAuth2Authentication])
 @permission_classes([IsAuthenticated, IsV2Accessible])
+@renderer_classes([_SSEEventStreamRenderer])
 def subscribe_message(request: Request, message_id: int):
     """订阅指定 AI 消息的 SSE 实时流。
 
