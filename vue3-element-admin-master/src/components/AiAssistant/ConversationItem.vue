@@ -119,13 +119,39 @@ function handleCommand(command: string): void {
 <style scoped lang="scss">
 .conversation-item {
   display: flex;
-  align-items: center;
   gap: 4px;
+  align-items: center;
   padding: 8px 10px;
   margin: 1px 0;
-  border-radius: 8px;
   cursor: pointer;
+  border-radius: 8px;
   transition: background 0.15s;
+
+  &__pin {
+    flex-shrink: 0;
+    font-size: 14px;
+    color: var(--el-color-warning);
+  }
+
+  &__title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--el-text-color-primary);
+    white-space: nowrap;
+  }
+
+  &__menu {
+    visibility: hidden;
+    flex-shrink: 0;
+  }
+
+  &__arrow {
+    margin-left: auto;
+    font-size: 12px;
+  }
 
   &:hover {
     background: var(--el-fill-color);
@@ -139,39 +165,13 @@ function handleCommand(command: string): void {
     background: var(--el-color-primary-light-9);
 
     .conversation-item__title {
-      color: var(--el-color-primary);
       font-weight: 500;
+      color: var(--el-color-primary);
     }
 
     .conversation-item__menu {
       visibility: visible;
     }
-  }
-
-  &__pin {
-    flex-shrink: 0;
-    color: var(--el-color-warning);
-    font-size: 14px;
-  }
-
-  &__title {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 13.5px;
-    color: var(--el-text-color-primary);
-    line-height: 1.4;
-  }
-
-  &__menu {
-    flex-shrink: 0;
-    visibility: hidden;
-  }
-
-  &__arrow {
-    margin-left: auto;
-    font-size: 12px;
   }
 }
 </style>

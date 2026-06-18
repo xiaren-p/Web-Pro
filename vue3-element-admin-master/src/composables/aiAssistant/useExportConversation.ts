@@ -8,10 +8,7 @@
  *   - Plan 卡片消息额外渲染为 JSON 代码块附在文本下方
  */
 
-import type {
-  AiConversation,
-  AiMessage,
-} from "@/types/aiAssistant/planSchema";
+import type { AiConversation, AiMessage } from "@/types/aiAssistant/planSchema";
 
 /** Windows / macOS / Linux 通用文件名非法字符 */
 const _UNSAFE_CHARS_PATTERN = /[\\/:*?"<>|]/g;
@@ -64,7 +61,7 @@ function messageToMarkdown(msg: AiMessage): string {
       "",
       "```json",
       JSON.stringify(msg.raw_plan_json, null, 2),
-      "```",
+      "```"
     );
   }
 
@@ -87,7 +84,7 @@ function messageToMarkdown(msg: AiMessage): string {
 function downloadTextFile(
   fileName: string,
   content: string,
-  mimeType: string = "text/markdown;charset=utf-8",
+  mimeType: string = "text/markdown;charset=utf-8"
 ): void {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -109,7 +106,7 @@ function downloadTextFile(
  */
 export function exportConversationAsMarkdown(
   conversation: AiConversation,
-  messages: AiMessage[],
+  messages: AiMessage[]
 ): void {
   const title = conversation.title || "新对话";
   const safeTitle = sanitizeFileName(title);

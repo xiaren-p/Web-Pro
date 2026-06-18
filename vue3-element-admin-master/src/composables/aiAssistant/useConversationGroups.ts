@@ -73,7 +73,7 @@ export function groupConversationsByDate(conversations: AiConversation[]): Conve
  */
 export function filterConversations(
   conversations: AiConversation[],
-  keyword: string,
+  keyword: string
 ): AiConversation[] {
   const trimmed = keyword.trim().toLowerCase();
   if (!trimmed) return conversations;

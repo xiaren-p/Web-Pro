@@ -9,10 +9,7 @@
 
 import { useStorage } from "@vueuse/core";
 import { store } from "@/store";
-import type {
-  AiConversation,
-  AiConversationGroup,
-} from "@/types/aiAssistant/planSchema";
+import type { AiConversation, AiConversationGroup } from "@/types/aiAssistant/planSchema";
 
 const STORAGE_KEY_ACTIVE_CONVERSATION = "ai-assistant:active-conversation-id";
 const STORAGE_KEY_PANEL_OPEN = "ai-assistant:panel-open";
@@ -136,7 +133,7 @@ export const useAiAssistantStore = defineStore("aiAssistant", () => {
     groups.value = groups.value.filter((g) => g.id !== groupId);
     // 关联会话本地标记为未分组（与后端 SET_NULL 行为一致）
     conversations.value = conversations.value.map((c) =>
-      c.group_id === groupId ? { ...c, group_id: null } : c,
+      c.group_id === groupId ? { ...c, group_id: null } : c
     );
   }
 

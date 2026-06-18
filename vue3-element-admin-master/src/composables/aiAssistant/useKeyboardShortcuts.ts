@@ -46,10 +46,7 @@ function isEditing(): boolean {
  * @param handlers - 各快捷键对应的回调
  * @param enabled - 响应式 getter，返回 true 时才生效（如抽屉打开状态）
  */
-export function useKeyboardShortcuts(
-  handlers: ShortcutHandlers,
-  enabled: () => boolean,
-): void {
+export function useKeyboardShortcuts(handlers: ShortcutHandlers, enabled: () => boolean): void {
   function onKeyDown(event: KeyboardEvent): void {
     if (!enabled()) return;
 

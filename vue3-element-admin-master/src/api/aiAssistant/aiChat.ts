@@ -65,7 +65,7 @@ export function deleteConversation(conversationId: string): Promise<{ success: b
  */
 export function renameConversation(
   conversationId: string,
-  title: string,
+  title: string
 ): Promise<{ success: boolean; title: string }> {
   return requestV2.patch(`/ai/conversations/${conversationId}/rename/`, { title });
 }
@@ -87,7 +87,7 @@ export function cancelMessage(messageId: string): Promise<{ success: boolean }> 
  */
 export function pinConversation(
   conversationId: string,
-  pinned: boolean,
+  pinned: boolean
 ): Promise<{ success: boolean; pinned: boolean }> {
   return requestV2.patch(`/ai/conversations/${conversationId}/pin/`, { pinned });
 }
@@ -100,7 +100,7 @@ export function pinConversation(
  */
 export function moveConversationToGroup(
   conversationId: string,
-  groupId: string | null,
+  groupId: string | null
 ): Promise<{ success: boolean }> {
   return requestV2.post(`/ai/conversations/${conversationId}/move/`, { group_id: groupId });
 }
@@ -113,7 +113,7 @@ export function moveConversationToGroup(
  */
 export function searchConversations(
   keyword: string,
-  limit: number = 30,
+  limit: number = 30
 ): Promise<{ items: AiSearchHit[] }> {
   return requestV2.get("/ai/conversations/search/", {
     params: { q: keyword, limit },

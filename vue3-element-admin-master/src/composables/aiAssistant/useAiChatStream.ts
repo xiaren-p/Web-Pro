@@ -26,9 +26,7 @@ import type { PlanProposal } from "@/types/aiAssistant/planSchema";
  */
 function buildStreamUrl(messageId: string): string {
   const origin = import.meta.env.VITE_APP_API_ORIGIN;
-  const v2Base = origin
-    ? `${origin}/api/v2`
-    : `${import.meta.env.VITE_APP_BASE_API}/api/v2`;
+  const v2Base = origin ? `${origin}/api/v2` : `${import.meta.env.VITE_APP_BASE_API}/api/v2`;
   return `${v2Base}/ai/stream/${messageId}/`;
 }
 

@@ -9,24 +9,15 @@
   >
     <div class="ai-chat-panel__layout">
       <!-- 左侧栏 -->
-      <aside class="ai-chat-panel__sidebar" :class="{ 'is-collapsed': sidebarCollapsed }">
+      <aside class="ai-chat-panel__sidebar">
         <div class="ai-chat-panel__sidebar-header">
           <div class="ai-chat-panel__brand">
             <el-icon class="ai-chat-panel__brand-icon"><MagicStick /></el-icon>
-            <span v-show="!sidebarCollapsed" class="ai-chat-panel__brand-text">AI 助手</span>
+            <span class="ai-chat-panel__brand-text">AI 助手</span>
           </div>
-          <el-tooltip :content="sidebarCollapsed ? '展开侧栏' : '收起侧栏'" placement="bottom">
-            <el-button
-              :icon="sidebarCollapsed ? Expand : Fold"
-              circle
-              text
-              size="small"
-              @click="sidebarCollapsed = !sidebarCollapsed"
-            />
-          </el-tooltip>
         </div>
 
-        <div v-show="!sidebarCollapsed" class="ai-chat-panel__sidebar-body">
+        <div class="ai-chat-panel__sidebar-body">
           <el-button
             type="primary"
             :icon="EditPen"
@@ -65,9 +56,7 @@
                 未找到匹配的对话
               </div>
               <div v-else class="ai-chat-panel__group">
-                <div class="ai-chat-panel__group-label">
-                  搜索结果（{{ searchHits.length }}）
-                </div>
+                <div class="ai-chat-panel__group-label">搜索结果（{{ searchHits.length }}）</div>
                 <div
                   v-for="hit in searchHits"
                   :key="`${hit.conversation_id}-${hit.message_id ?? 'title'}`"
@@ -114,11 +103,7 @@
               </div>
 
               <!-- 用户自定义分组 -->
-              <div
-                v-for="group in store.groups"
-                :key="group.id"
-                class="ai-chat-panel__group"
-              >
+              <div v-for="group in store.groups" :key="group.id" class="ai-chat-panel__group">
                 <div class="ai-chat-panel__group-label is-clickable">
                   <el-icon><Folder /></el-icon>
                   <span class="ai-chat-panel__group-name">{{ group.name }}</span>
@@ -224,8 +209,15 @@
             <h3 class="ai-chat-panel__empty-title">你好，我是 AI 助手</h3>
             <p class="ai-chat-panel__empty-desc">可以帮你处理 ERP 任务、生成方案、回答问题</p>
             <p class="ai-chat-panel__empty-shortcut">
-              快捷键：<kbd>{{ modKeyLabel }}</kbd> + <kbd>K</kbd> 搜索 ·
-              <kbd>{{ modKeyLabel }}</kbd> + <kbd>/</kbd> 新建对话
+              快捷键：
+              <kbd>{{ modKeyLabel }}</kbd>
+              +
+              <kbd>K</kbd>
+              搜索 ·
+              <kbd>{{ modKeyLabel }}</kbd>
+              +
+              <kbd>/</kbd>
+              新建对话
             </p>
           </div>
 
@@ -296,8 +288,12 @@
           </div>
           <div class="ai-chat-panel__footer-tip">
             内容由 AI 生成，关键操作请人工确认 ·
-            <kbd>Enter</kbd> 发送 ·
-            <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行
+            <kbd>Enter</kbd>
+            发送 ·
+            <kbd>Shift</kbd>
+            +
+            <kbd>Enter</kbd>
+            换行
           </div>
         </footer>
       </main>
@@ -319,8 +315,6 @@ import {
   Delete,
   Download,
   EditPen,
-  Expand,
-  Fold,
   Folder,
   Loading,
   MagicStick,
@@ -368,7 +362,6 @@ const drawerVisible = computed<boolean>({
   set: (val) => store.setPanelOpen(val),
 });
 
-const sidebarCollapsed = ref<boolean>(false);
 const searchKeyword = ref<string>("");
 const searchHits = ref<AiSearchHit[]>([]);
 const searchLoading = ref<boolean>(false);
@@ -411,7 +404,7 @@ const pinnedConversations = computed<AiConversation[]>(() =>
   store.conversations
     .filter((c) => c.is_pinned)
     .slice()
-    .sort((a, b) => (b.pinned_at || "").localeCompare(a.pinned_at || "")),
+    .sort((a, b) => (b.pinned_at || "").localeCompare(a.pinned_at || ""))
 );
 
 /** 按 group_id 索引会话（仅未置顶会话进入分组桶） */
@@ -447,7 +440,7 @@ watch(
       await loadActiveMessages();
     }
   },
-  { immediate: true },
+  { immediate: true }
 );
 
 watch(
@@ -455,7 +448,7 @@ watch(
   async () => {
     abortSubscription();
     await loadActiveMessages();
-  },
+  }
 );
 
 /** 搜索关键词变化时防抖 300ms 调后端搜索 */
@@ -492,7 +485,7 @@ useKeyboardShortcuts(
       store.setPanelOpen(false);
     },
   },
-  () => store.panelOpen,
+  () => store.panelOpen
 );
 
 onMounted(async () => {
@@ -572,10 +565,10 @@ async function handleSend(): Promise<void> {
 
     const now = new Date().toISOString();
     messages.value.push(
-      buildLocalUserMessage(resp.user_message_id, resp.conversation_id, query, now),
+      buildLocalUserMessage(resp.user_message_id, resp.conversation_id, query, now)
     );
     messages.value.push(
-      buildLocalAssistantPlaceholder(resp.assistant_message_id, resp.conversation_id, now),
+      buildLocalAssistantPlaceholder(resp.assistant_message_id, resp.conversation_id, now)
     );
 
     if (isNewConversation) {
@@ -623,11 +616,7 @@ function subscribeMessage(messageId: string): void {
     onDone: ({ cancelled, final_status }) => {
       const target = findMessage(messageId);
       if (target && target.status !== "failed") {
-        target.status = cancelled
-          ? "cancelled"
-          : final_status === "failed"
-            ? "failed"
-            : "done";
+        target.status = cancelled ? "cancelled" : final_status === "failed" ? "failed" : "done";
       }
       subscribingMessageId.value = null;
       activeSubscription = null;
@@ -830,9 +819,13 @@ async function handleRenameGroup(group: AiConversationGroup): Promise<void> {
 
 async function handleDeleteGroup(group: AiConversationGroup): Promise<void> {
   try {
-    await ElMessageBox.confirm(`确认删除分组「${group.name}」？分组内的对话会变成未分组。`, "提示", {
-      type: "warning",
-    });
+    await ElMessageBox.confirm(
+      `确认删除分组「${group.name}」？分组内的对话会变成未分组。`,
+      "提示",
+      {
+        type: "warning",
+      }
+    );
   } catch {
     return;
   }
@@ -882,11 +875,7 @@ function findMessage(id: string): AiMessage | null {
 function highlightKeyword(text: string, keyword: string): string {
   if (!text) return "";
   const escapeHtml = (s: string): string =>
-    s
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const safeText = escapeHtml(text);
   const trimmed = keyword.trim();
   if (!trimmed) return safeText;
@@ -898,7 +887,7 @@ function buildLocalUserMessage(
   id: string,
   conversationId: string,
   content: string,
-  createdAt: string,
+  createdAt: string
 ): AiMessage {
   return {
     id,
@@ -920,7 +909,7 @@ function buildLocalUserMessage(
 function buildLocalAssistantPlaceholder(
   id: string,
   conversationId: string,
-  createdAt: string,
+  createdAt: string
 ): AiMessage {
   return {
     id,
@@ -951,32 +940,26 @@ function buildLocalAssistantPlaceholder(
   /* ── 左侧栏 ─────────────────────────────────────────── */
   &__sidebar {
     display: flex;
-    flex-direction: column;
     flex-shrink: 0;
+    flex-direction: column;
     width: 280px;
-    border-right: 1px solid var(--el-border-color-light);
     background: var(--el-fill-color-extra-light, #fafafa);
-    transition: width 0.25s ease;
-
-    &.is-collapsed {
-      width: 56px;
-    }
+    border-right: 1px solid var(--el-border-color-light);
   }
 
   &__sidebar-header {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
     flex-shrink: 0;
+    align-items: center;
     height: 52px;
-    padding: 0 14px;
+    padding: 0 16px;
     border-bottom: 1px solid var(--el-border-color-lighter);
   }
 
   &__brand {
     display: flex;
-    align-items: center;
     gap: 8px;
+    align-items: center;
     font-size: 16px;
     font-weight: 600;
   }
@@ -991,8 +974,8 @@ function buildLocalAssistantPlaceholder(
 
   &__sidebar-body {
     display: flex;
-    flex-direction: column;
     flex: 1;
+    flex-direction: column;
     min-height: 0;
     padding: 12px;
   }
@@ -1006,13 +989,13 @@ function buildLocalAssistantPlaceholder(
   }
 
   &__shortcut-hint {
-    margin-left: 8px;
     padding: 1px 6px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.2);
+    margin-left: 8px;
     font-size: 11px;
     font-weight: 400;
     line-height: 1.4;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
   }
 
   &__search {
@@ -1027,8 +1010,8 @@ function buildLocalAssistantPlaceholder(
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin: 4px 0 6px;
     padding: 0 4px;
+    margin: 4px 0 6px;
   }
 
   &__groups-title {
@@ -1039,16 +1022,16 @@ function buildLocalAssistantPlaceholder(
 
   &__history {
     flex: 1;
-    overflow-y: auto;
-    margin: 0 -8px;
     padding: 0 8px;
+    margin: 0 -8px;
+    overflow-y: auto;
 
     &::-webkit-scrollbar {
       width: 6px;
     }
     &::-webkit-scrollbar-thumb {
-      border-radius: 3px;
       background: var(--el-border-color);
+      border-radius: 3px;
     }
     &::-webkit-scrollbar-thumb:hover {
       background: var(--el-border-color-darker);
@@ -1057,27 +1040,6 @@ function buildLocalAssistantPlaceholder(
 
   &__group {
     margin-bottom: 12px;
-  }
-
-  &__group-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-    padding: 4px 8px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--el-text-color-secondary);
-
-    &.is-clickable:hover {
-      background: var(--el-fill-color);
-      border-radius: 6px;
-      cursor: default;
-
-      .ai-chat-panel__group-menu {
-        visibility: visible;
-      }
-    }
   }
 
   &__group-name {
@@ -1091,28 +1053,49 @@ function buildLocalAssistantPlaceholder(
     visibility: hidden;
   }
 
+  &__group-label {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--el-text-color-secondary);
+
+    &.is-clickable:hover {
+      cursor: default;
+      background: var(--el-fill-color);
+      border-radius: 6px;
+
+      .ai-chat-panel__group-menu {
+        visibility: visible;
+      }
+    }
+  }
+
   &__group-empty {
     padding: 4px 12px;
     font-size: 12px;
-    color: var(--el-text-color-placeholder);
     font-style: italic;
+    color: var(--el-text-color-placeholder);
   }
 
   &__empty-hint {
     padding: 24px 0;
-    text-align: center;
-    color: var(--el-text-color-placeholder);
     font-size: 13px;
+    color: var(--el-text-color-placeholder);
+    text-align: center;
   }
 
   &__search-loading {
     display: flex;
+    gap: 6px;
     align-items: center;
     justify-content: center;
-    gap: 6px;
     padding: 16px 0;
-    color: var(--el-text-color-secondary);
     font-size: 13px;
+    color: var(--el-text-color-secondary);
 
     .is-loading {
       animation: rotating 1.5s linear infinite;
@@ -1131,18 +1114,18 @@ function buildLocalAssistantPlaceholder(
   }
 
   &__hit-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-size: 13.5px;
     font-weight: 500;
     color: var(--el-text-color-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   &__hit-snippet {
     display: flex;
-    align-items: center;
     gap: 6px;
+    align-items: center;
     margin-top: 4px;
     font-size: 12px;
     color: var(--el-text-color-secondary);
@@ -1156,9 +1139,9 @@ function buildLocalAssistantPlaceholder(
     }
 
     :deep(mark) {
-      background: rgba(168, 85, 247, 0.18);
-      color: var(--el-color-primary);
       padding: 0 2px;
+      color: var(--el-color-primary);
+      background: rgba(168, 85, 247, 0.18);
       border-radius: 2px;
     }
   }
@@ -1166,39 +1149,39 @@ function buildLocalAssistantPlaceholder(
   /* ── 右侧主区 ───────────────────────────────────────── */
   &__main {
     display: flex;
-    flex-direction: column;
     flex: 1;
+    flex-direction: column;
     min-width: 0;
   }
 
   &__main-header {
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     justify-content: space-between;
-    flex-shrink: 0;
     height: 52px;
     padding: 0 20px;
     border-bottom: 1px solid var(--el-border-color-light);
   }
 
   &__main-title {
-    font-size: 15px;
-    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-size: 15px;
+    font-weight: 500;
     white-space: nowrap;
   }
 
   &__main-actions {
     display: flex;
-    align-items: center;
     gap: 4px;
+    align-items: center;
   }
 
   &__messages {
     flex: 1;
-    overflow-y: auto;
     padding: 12px 0;
+    overflow-y: auto;
   }
 
   &__empty {
@@ -1218,10 +1201,10 @@ function buildLocalAssistantPlaceholder(
     width: 64px;
     height: 64px;
     margin-bottom: 16px;
-    border-radius: 16px;
-    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
-    color: #fff;
     font-size: 32px;
+    color: #fff;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+    border-radius: 16px;
     box-shadow: 0 8px 24px rgba(168, 85, 247, 0.25);
   }
 
@@ -1246,11 +1229,11 @@ function buildLocalAssistantPlaceholder(
       display: inline-block;
       padding: 1px 6px;
       margin: 0 2px;
-      border-radius: 4px;
-      border: 1px solid var(--el-border-color);
-      background: var(--el-fill-color);
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 11px;
+      background: var(--el-fill-color);
+      border: 1px solid var(--el-border-color);
+      border-radius: 4px;
     }
   }
 
@@ -1260,12 +1243,14 @@ function buildLocalAssistantPlaceholder(
   }
 
   &__composer {
-    border: 1px solid var(--el-border-color);
-    border-radius: 16px;
     padding: 14px 16px 12px;
     background: var(--el-bg-color);
+    border: 1px solid var(--el-border-color);
+    border-radius: 16px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-    transition: border-color 0.18s, box-shadow 0.18s;
+    transition:
+      border-color 0.18s,
+      box-shadow 0.18s;
 
     &:focus-within {
       border-color: var(--el-color-primary);
@@ -1278,12 +1263,12 @@ function buildLocalAssistantPlaceholder(
   &__composer-input {
     :deep(.el-textarea__inner) {
       padding: 4px 0;
-      border: none;
-      box-shadow: none;
-      resize: none;
-      background: transparent;
       font-size: 14.5px;
       line-height: 1.6;
+      resize: none;
+      background: transparent;
+      border: none;
+      box-shadow: none;
 
       &:focus {
         box-shadow: none;
@@ -1293,68 +1278,68 @@ function buildLocalAssistantPlaceholder(
 
   &__composer-toolbar {
     display: flex;
+    gap: 8px;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    margin-top: 8px;
     padding-top: 8px;
+    margin-top: 8px;
     border-top: 1px dashed var(--el-border-color-lighter);
   }
 
   &__composer-tools {
     display: flex;
-    align-items: center;
     gap: 6px;
+    align-items: center;
   }
 
   &__composer-status {
     display: flex;
-    align-items: center;
     gap: 8px;
+    align-items: center;
+  }
+
+  &__chip-icon {
+    font-size: 13px;
   }
 
   /* 思考 / 后续工具按钮（chip 风格）*/
   &__chip {
     display: inline-flex;
-    align-items: center;
     gap: 4px;
+    align-items: center;
     height: 28px;
     padding: 0 12px;
-    border: 1px solid var(--el-border-color);
-    border-radius: 14px;
-    background: var(--el-bg-color);
-    color: var(--el-text-color-regular);
     font-size: 12.5px;
     font-weight: 500;
+    color: var(--el-text-color-regular);
     cursor: pointer;
-    transition: all 0.18s;
     user-select: none;
-
-    &:hover:not(:disabled) {
-      border-color: var(--el-color-primary-light-5);
-      background: var(--el-color-primary-light-9);
-      color: var(--el-color-primary);
-    }
+    background: var(--el-bg-color);
+    border: 1px solid var(--el-border-color);
+    border-radius: 14px;
+    transition: all 0.18s;
 
     &:disabled {
       cursor: not-allowed;
       opacity: 0.5;
     }
 
+    &:hover:not(:disabled) {
+      color: var(--el-color-primary);
+      background: var(--el-color-primary-light-9);
+      border-color: var(--el-color-primary-light-5);
+    }
+
     &.is-active {
-      border-color: transparent;
-      background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
       color: #fff;
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+      border-color: transparent;
       box-shadow: 0 4px 12px rgba(168, 85, 247, 0.25);
 
       .ai-chat-panel__chip-icon {
         color: #fff;
       }
     }
-  }
-
-  &__chip-icon {
-    font-size: 13px;
   }
 
   /* 圆形发送按钮 */
@@ -1365,29 +1350,32 @@ function buildLocalAssistantPlaceholder(
     width: 32px;
     height: 32px;
     padding: 0;
+    font-size: 16px;
+    color: #fff;
+    cursor: pointer;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
     border: none;
     border-radius: 50%;
-    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
-    color: #fff;
-    font-size: 16px;
-    cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
     box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
-
-    &:hover:not(.is-disabled):not(.is-loading) {
-      transform: translateY(-1px) scale(1.04);
-      box-shadow: 0 6px 18px rgba(168, 85, 247, 0.45);
-    }
+    transition:
+      transform 0.15s,
+      box-shadow 0.15s,
+      opacity 0.15s;
 
     &:active:not(.is-disabled) {
       transform: translateY(0) scale(0.96);
     }
 
+    &:hover:not(.is-disabled):not(.is-loading) {
+      box-shadow: 0 6px 18px rgba(168, 85, 247, 0.45);
+      transform: translateY(-1px) scale(1.04);
+    }
+
     &.is-disabled {
-      background: var(--el-fill-color-darker);
       color: var(--el-text-color-placeholder);
-      box-shadow: none;
       cursor: not-allowed;
+      background: var(--el-fill-color-darker);
+      box-shadow: none;
     }
 
     &.is-loading {
@@ -1414,11 +1402,11 @@ function buildLocalAssistantPlaceholder(
       display: inline-block;
       padding: 1px 5px;
       margin: 0 2px;
-      border-radius: 3px;
-      border: 1px solid var(--el-border-color);
-      background: var(--el-fill-color);
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 10.5px;
+      background: var(--el-fill-color);
+      border: 1px solid var(--el-border-color);
+      border-radius: 3px;
     }
   }
 }
