@@ -11,6 +11,7 @@ from api_v2.tasks.listing_tag_sync_task import run_listing_tag_sync_task
 from api_v2.tasks.optimization_strategy_task import run_optimization_strategy_task
 from api_v2.tasks.optimization_execution_task import run_optimization_execution_task
 from api_v2.tasks.qinglong_env_sync_task import sync_qinglong_env_task
+from api_v2.tasks.ai_chat_task import run_ai_chat_task
 
 __all__ = [
     'upload_listing_images_task',
@@ -24,4 +25,6 @@ __all__ = [
     'run_optimization_execution_task',
     'run_listing_tag_sync_task',
     'run_listing_tag_modify_task',
+    'run_ai_chat_task',
 ]
+

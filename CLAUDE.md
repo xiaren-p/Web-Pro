@@ -672,16 +672,26 @@ celery              能并发跑吗？（"同时来 5 个会出问题吗？"）
    位置：api_v2/tasks/your_task.py
    要点：装饰器 name 必须 = "完整模块路径.函数名"
 
-2. 在 settings.CELERY_TASK_ROUTES 加一行
+2. 在 api_v2/tasks/__init__.py 显式 import 新任务
+   ⚠️ 项目用"显式列出"模式聚合 task 包，新任务必须加进 __init__.py，
+   否则 Celery autodiscover 拿不到，worker 启动时不会加载，派发的任务
+   会报 "Received unregistered task" 然后被丢弃。
+   
+   from api_v2.tasks.your_task import do_something_task
+   
+   并追加到 __all__ 列表里。
+
+3. 在 settings.CELERY_TASK_ROUTES 加一行
    按 6.4 决策树选队列
    key 必须跟装饰器 name 一字不差
 
-3. 重启 Django Web
+4. 重启 Django Web
    理由：CELERY_TASK_ROUTES 是 Django 派发任务时读的，不重启新路由不生效
    命令：sudo systemctl restart <你的 django service 名>
 
-4. 重启对应队列的 Celery worker
-   理由：worker 启动时扫描 tasks/*.py 加载任务函数，不重启会报 "Received unregistered task"
+5. 重启对应队列的 Celery worker
+   理由：worker 启动时扫描 tasks/__init__.py 加载任务函数，不重启会报
+        "Received unregistered task"
    命令：sudo systemctl restart celery-<队列名>.service
 ```
 
