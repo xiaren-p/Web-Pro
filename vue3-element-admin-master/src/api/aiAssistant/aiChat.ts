@@ -2,11 +2,11 @@
  * AI 助手对话 API 模块。
  *
  * 仅做请求封装，不做业务加工：
- *   - 普通 REST 接口走项目共享 axios 实例（自动注入 Authorization）
- *   - SSE 订阅由 useAiChatStream 直接调用，避免 axios 的 timeout 干扰流式
+ *   - 普通 REST 接口走 requestV2 实例（baseURL 自动拼 /api/v2）
+ *   - SSE 订阅由 useAiChatStream 直接 fetch 调用，避免 axios timeout 干扰流式
  */
 
-import request from "@/utils/request";
+import { requestV2 } from "@/utils/request";
 import type { AiConversation, AiMessage, ChatStartResponse } from "@/types/aiAssistant/planSchema";
 
 /**
@@ -23,14 +23,14 @@ export function startChat(payload: {
   conversation_id?: number | null;
   inputs?: Record<string, unknown>;
 }): Promise<ChatStartResponse> {
-  return request.post("/api/v2/ai/chat/", payload);
+  return requestV2.post("/ai/chat/", payload);
 }
 
 /**
  * 拉取当前用户的会话列表（最近活跃倒序）。
  */
 export function listConversations(): Promise<{ items: AiConversation[] }> {
-  return request.get("/api/v2/ai/conversations/");
+  return requestV2.get("/ai/conversations/");
 }
 
 /**
@@ -39,7 +39,7 @@ export function listConversations(): Promise<{ items: AiConversation[] }> {
  * @param conversationId - 会话 ID
  */
 export function listMessages(conversationId: number): Promise<{ items: AiMessage[] }> {
-  return request.get(`/api/v2/ai/conversations/${conversationId}/messages/`);
+  return requestV2.get(`/ai/conversations/${conversationId}/messages/`);
 }
 
 /**
@@ -48,7 +48,7 @@ export function listMessages(conversationId: number): Promise<{ items: AiMessage
  * @param conversationId - 会话 ID
  */
 export function deleteConversation(conversationId: number): Promise<{ success: boolean }> {
-  return request.delete(`/api/v2/ai/conversations/${conversationId}/`);
+  return requestV2.delete(`/ai/conversations/${conversationId}/`);
 }
 
 /**
@@ -57,5 +57,5 @@ export function deleteConversation(conversationId: number): Promise<{ success: b
  * @param messageId - 消息 ID
  */
 export function cancelMessage(messageId: number): Promise<{ success: boolean }> {
-  return request.post(`/api/v2/ai/messages/${messageId}/cancel/`);
+  return requestV2.post(`/ai/messages/${messageId}/cancel/`);
 }

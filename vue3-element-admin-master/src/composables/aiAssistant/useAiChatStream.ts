@@ -15,6 +15,24 @@ import { AuthStorage } from "@/utils/auth";
 import type { PlanProposal } from "@/types/aiAssistant/planSchema";
 
 /**
+ * 构造 SSE 订阅完整 URL。
+ *
+ * 与 src/utils/request.ts 中 requestV2 的 baseURL 推导逻辑保持一致：
+ *   - 生产环境（VITE_APP_API_ORIGIN 非空）：``https://api.hanlis.cn/api/v2/ai/stream/<id>/``
+ *   - 开发环境（VITE_APP_API_ORIGIN 为空）：``/dev-api/api/v2/ai/stream/<id>/``，由 Vite 代理转发
+ *
+ * @param messageId - 要订阅的 AI 消息 ID
+ * @returns SSE 端点完整 URL
+ */
+function buildStreamUrl(messageId: number): string {
+  const origin = import.meta.env.VITE_APP_API_ORIGIN;
+  const v2Base = origin
+    ? `${origin}/api/v2`
+    : `${import.meta.env.VITE_APP_BASE_API}/api/v2`;
+  return `${v2Base}/ai/stream/${messageId}/`;
+}
+
+/**
  * SSE 订阅回调集合。
  */
 export interface SubscribeHandlers {
@@ -80,7 +98,7 @@ async function runSubscribe(
   controller: AbortController
 ): Promise<void> {
   const token = AuthStorage.getAccessToken();
-  const response = await fetch(`/api/v2/ai/stream/${messageId}/`, {
+  const response = await fetch(`${buildStreamUrl(messageId)}`, {
     method: "GET",
     headers: {
       Accept: "text/event-stream",
