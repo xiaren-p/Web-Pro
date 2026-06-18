@@ -557,7 +557,7 @@ async function handleSend(): Promise<void> {
     const resp = await startChat({
       query,
       conversation_id: store.activeConversationId ?? undefined,
-      inputs: thinkingEnabled.value ? { thinking_mode: true } : undefined,
+      inputs: { thinking_mode: thinkingEnabled.value ? "on" : "off" },
     });
 
     const isNewConversation = store.activeConversationId === null;

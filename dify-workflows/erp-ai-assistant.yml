@@ -1,0 +1,358 @@
+app:
+  description: ERP AI 助手 - 支持思考模式切换的对话流
+  icon: 💬
+  icon_background: '#FEF7C3'
+  icon_type: emoji
+  mode: advanced-chat
+  name: ERP AI 助手
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/deepseek:0.0.17@f7a5c1d222d17ee419b17a80d6e4923838fe93788dc724a3af73fbc6990b3a32
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 20
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: 你好，我是 ERP AI 助手 ✨ 有什么可以帮你的吗？
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        sourceType: llm
+        targetType: answer
+      id: llm-answer
+      selected: false
+      source: llm
+      sourceHandle: source
+      target: answer
+      targetHandle: target
+      type: custom
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 1776072202913-source-llm-target
+      selected: false
+      source: '1776072202913'
+      sourceHandle: source
+      target: llm
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: 接收用户消息和 thinking_mode 思考模式开关，作为对话起点。
+        selected: false
+        title: 用户输入
+        type: start
+        variables:
+        - label: 思考模式
+          max_length: 0
+          options: []
+          required: false
+          type: select
+          variable: thinking_mode
+          default: 'off'
+          hint: 由前端 inputs 字段透传；on 表示用户开启了"深度思考"按钮
+          options_v2:
+          - label: 关闭（普通对话）
+            value: 'off'
+          - label: 开启（深度思考）
+            value: 'on'
+      height: 116
+      id: '1776072202913'
+      position:
+        x: 114.61618082003986
+        y: 282
+      positionAbsolute:
+        x: 114.61618082003986
+        y: 282
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: 根据 thinking_mode 决定是否输出 <think> 标签包裹的推理过程。
+        memory:
+          query_prompt_template: '{{#sys.query#}}
+
+
+            {{#sys.files#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 10
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_template:
+        - id: 603f57fd-55d0-492d-a6ae-5fdb8bdc70cb
+          role: system
+          text: |-
+            # 角色
+
+            你是 ERP 系统的专业 AI 助手，名字叫"小韩"。
+
+            # 任务
+
+            针对用户的问题（包括 ERP 业务咨询、数据分析、操作指引、通用问题等），提供准确、条理清晰、简洁易懂的回答。
+
+            # 语气
+
+            友好、客观、中立。
+
+            # 回答规范
+
+            - 遇到复杂内容时，使用要点 / 编号列表 / 表格拆解说明，方便阅读
+            - 涉及数据或操作时，确保信息准确，模糊或不确定时如实告知用户，不猜测、不编造
+            - 代码示例使用 Markdown 代码块，并标注语言
+            - 中文回答中英文单词、数字之间留半角空格，例如"使用 Vue3 框架"
+            - 回答要简洁，避免冗长铺垫
+
+            # 思考模式控制
+
+            {% if thinking_mode == 'on' %}
+            ⚠️ 当前用户开启了【深度思考】模式，请严格按以下格式回复：
+
+            <think>
+            （在这里写出完整的推理过程：
+            1. 理解用户真实需求与上下文
+            2. 列出多种可能的解决方案
+            3. 评估每种方案的利弊与适用边界
+            4. 选定最优方案的依据）
+            </think>
+
+            （在 think 标签外给出最终答案，answer 应当简洁、可执行、直接回应用户问题）
+
+            硬性约束：
+            - <think> 与 </think> 必须严格成对闭合
+            - 一次回复中只能出现一对 <think>...</think>
+            - <think> 标签之外不要再使用其他 HTML 标签
+            {% else %}
+            当前用户未开启深度思考模式，**绝对不要**输出 <think> 标签或任何标签包裹的内容，直接给出简洁答案即可。
+            {% endif %}
+        selected: false
+        title: LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 131
+      id: llm
+      position:
+        x: 583.6475025505555
+        y: 303
+      positionAbsolute:
+        x: 583.6475025505555
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: '{{#llm.text#}}'
+        desc: 将 AI 生成的回复（含可选的 <think> 标签）原样返回给前端。
+        selected: false
+        title: 直接回复
+        type: answer
+        variables: []
+      height: 146
+      id: answer
+      position:
+        x: 1042
+        y: 303
+      positionAbsolute:
+        x: 1042
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        author: ERP Team
+        desc: ''
+        height: 374
+        selected: false
+        showAuthor: false
+        text: '{"root":{"children":[{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          16px;","text":"思考模式如何工作？","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":1,"textStyle":"font-size:
+          16px;"},{"children":[],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"前端在 ERP 侧栏点击「思考」按钮后，会通过 inputs.thinking_mode = ''on''
+          传入。","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"},{"children":[],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          14px;","text":"开启时","type":"text","version":1},{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"：LLM 输出 <think>推理过程</think> 后再给答案，前端会折叠展示推理过程。","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"},{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          14px;","text":"关闭时","type":"text","version":1},{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"：LLM 直接给简洁答案，不输出 think 标签。","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"},{"children":[],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          14px;","text":"实现方式","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":1,"textStyle":"font-size:
+          14px;"},{"children":[{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"- 开始节点新增 select 类型变量 thinking_mode（默认 off）","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"},{"children":[{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"- LLM 系统提示词使用 Jinja2 if/else 切换两套指令","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"},{"children":[{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"- 不切模型，靠提示词模拟（成本可控）","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"}],"direction":null,"format":"","indent":0,"type":"root","version":1}}'
+        theme: yellow
+        title: ''
+        type: ''
+        width: 594
+      height: 374
+      id: '1776072886890'
+      position:
+        x: -547.4840842518711
+        y: 155.7776484454086
+      positionAbsolute:
+        x: -547.4840842518711
+        y: 155.7776484454086
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom-note
+      width: 594
+    - data:
+        author: ERP Team
+        desc: ''
+        height: 480
+        selected: false
+        showAuthor: false
+        text: '{"root":{"children":[{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          16px;","text":"如何升级到真实的推理模型？","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":1,"textStyle":"font-size:
+          16px;"},{"children":[],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"当前 LLM 节点用的是普通模型 + 提示词模拟思考。如果想接入真实推理模型（更高质量的
+          <think> 推理），有两种升级路径：","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"},{"children":[],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          14px;","text":"路径 A（推荐）：加条件分支节点","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":1,"textStyle":"font-size:
+          14px;"},{"children":[{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"开始 → IF/ELSE [thinking_mode == ''on''] → LLM-推理模型（DeepSeek-R1）","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"},{"children":[{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"                          → 否分支 → LLM-普通模型（DeepSeek-V3）","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"},{"children":[],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          14px;","text":"路径 B：直接换成 R1 模型","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":1,"textStyle":"font-size:
+          14px;"},{"children":[{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"DeepSeek-R1 / Qwen3-Thinking 等模型自动输出 <think> 标签，提示词的
+          if/else 也保留作为兜底（控制 thinking_mode=off 时让模型自己抑制思考）。","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"},{"children":[],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          14px;","text":"前端契约（不用改代码）","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":1,"textStyle":"font-size:
+          14px;"},{"children":[{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"前端发请求时 inputs = { thinking_mode: ''on'' | ''off'' }","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"},{"children":[{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"前端 MessageItem.vue 已经能识别 <think>...</think> 并折叠展示。","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"}],"direction":null,"format":"","indent":0,"type":"root","version":1}}'
+        theme: pink
+        title: ''
+        type: ''
+        width: 795
+      height: 480
+      id: '1776073032757'
+      position:
+        x: 1330.5541789064728
+        y: 198.83769720201087
+      positionAbsolute:
+        x: 1330.5541789064728
+        y: 198.83769720201087
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom-note
+      width: 795
+    - data:
+        author: ERP Team
+        desc: ''
+        height: 232
+        selected: false
+        showAuthor: false
+        text: '{"root":{"children":[{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          16px;","text":"LLM 节点说明","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":1,"textStyle":"font-size:
+          16px;"},{"children":[],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          14px;","text":"对话记忆","type":"text","version":1},{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"：window.enabled = true，size = 10，记住最近 10 轮对话。","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"},{"children":[],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          14px;","text":"系统提示词","type":"text","version":1},{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"：使用 Jinja2 if/else 根据 thinking_mode 切换两套指令，实现思考模式开关。","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"},{"children":[],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":""},{"children":[{"detail":0,"format":1,"mode":"normal","style":"font-size:
+          14px;","text":"模型","type":"text","version":1},{"detail":0,"format":0,"mode":"normal","style":"font-size:
+          14px;","text":"：deepseek-v4-flash（普通模型，靠 prompt 模拟思考）。","type":"text","version":1}],"direction":null,"format":"","indent":0,"type":"paragraph","version":1,"textFormat":0,"textStyle":"font-size:
+          14px;"}],"direction":null,"format":"","indent":0,"type":"root","version":1}}'
+        theme: blue
+        title: ''
+        type: ''
+        width: 658
+      height: 232
+      id: '1776665049022'
+      position:
+        x: 365.28437991013845
+        y: -6.764841957179314
+      positionAbsolute:
+        x: 365.28437991013845
+        y: -6.764841957179314
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom-note
+      width: 658
+    viewport:
+      x: 310.9911783390926
+      y: 258.5511402813538
+      zoom: 0.7578582832551991
+  rag_pipeline_variables: []
