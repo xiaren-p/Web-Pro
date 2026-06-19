@@ -241,17 +241,14 @@ function handleSettingsClick() {
   &__ai {
     .navbar-actions__ai-icon {
       font-size: 18px;
-      background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
+      color: #334155;
       transition:
-        filter 0.3s,
+        color 0.3s,
         transform 0.3s;
     }
 
     &:hover .navbar-actions__ai-icon {
-      filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.5));
+      color: #0f172a;
       transform: scale(1.1);
     }
   }

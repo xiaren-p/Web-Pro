@@ -218,8 +218,8 @@ function handlePlanCancel(): void {
     border-radius: 10px;
 
     &--ai {
-      background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
-      box-shadow: 0 4px 12px rgba(168, 85, 247, 0.25);
+      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
     }
 
     &--user {
@@ -265,11 +265,11 @@ function handlePlanCancel(): void {
     line-height: 1.65;
     color: #fff;
     overflow-wrap: break-word;
-    background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
     border-radius: 18px 18px 4px 18px;
     box-shadow:
-      0 4px 12px rgba(99, 102, 241, 0.18),
-      0 1px 2px rgba(99, 102, 241, 0.12);
+      0 4px 12px rgba(15, 23, 42, 0.16),
+      0 1px 2px rgba(15, 23, 42, 0.1);
   }
 
   &__bubble-empty {
@@ -401,12 +401,7 @@ function handlePlanCancel(): void {
   &__thinking {
     margin-bottom: 10px;
     overflow: hidden;
-    background: linear-gradient(
-      135deg,
-      rgba(99, 102, 241, 0.04) 0%,
-      rgba(168, 85, 247, 0.04) 50%,
-      rgba(236, 72, 153, 0.04) 100%
-    );
+    background: rgba(15, 23, 42, 0.03);
     border: 1px solid var(--el-border-color-lighter);
     border-radius: 12px;
   }
@@ -426,16 +421,13 @@ function handlePlanCancel(): void {
     transition: background 0.15s;
 
     &:hover {
-      background: rgba(168, 85, 247, 0.06);
+      background: rgba(15, 23, 42, 0.04);
     }
   }
 
   &__thinking-icon {
     font-size: 14px;
-    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #475569;
   }
 
   &__thinking-arrow {
@@ -526,7 +518,7 @@ function handlePlanCancel(): void {
   &__dot {
     width: 6px;
     height: 6px;
-    background: linear-gradient(135deg, #6366f1, #a855f7);
+    background: linear-gradient(135deg, #1e293b, #475569);
     border-radius: 50%;
     animation: ai-pulse 1.2s infinite ease-in-out;
 

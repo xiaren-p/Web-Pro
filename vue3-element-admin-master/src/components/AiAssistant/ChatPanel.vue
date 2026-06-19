@@ -966,10 +966,7 @@ function buildLocalAssistantPlaceholder(
 
   &__brand-icon {
     font-size: 20px;
-    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #1e293b;
   }
 
   &__sidebar-body {
@@ -1141,8 +1138,8 @@ function buildLocalAssistantPlaceholder(
 
     :deep(mark) {
       padding: 0 2px;
-      color: var(--el-color-primary);
-      background: rgba(168, 85, 247, 0.18);
+      color: #1e293b;
+      background: rgba(15, 23, 42, 0.12);
       border-radius: 2px;
     }
   }
@@ -1160,16 +1157,18 @@ function buildLocalAssistantPlaceholder(
     flex-shrink: 0;
     align-items: center;
     justify-content: space-between;
-    height: 52px;
-    padding: 0 20px;
+    height: 60px;
+    padding: 0 24px;
     border-bottom: 1px solid var(--el-border-color-light);
   }
 
   &__main-title {
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 15px;
-    font-weight: 500;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+    letter-spacing: 0.2px;
     white-space: nowrap;
   }
 
@@ -1204,9 +1203,9 @@ function buildLocalAssistantPlaceholder(
     margin-bottom: 16px;
     font-size: 32px;
     color: #fff;
-    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
     border-radius: 16px;
-    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.25);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
   }
 
   &__empty-title {
@@ -1244,35 +1243,50 @@ function buildLocalAssistantPlaceholder(
   }
 
   &__composer {
-    padding: 14px 16px 12px;
+    padding: 14px 16px 10px;
     background: var(--el-bg-color);
     border: 1px solid var(--el-border-color);
     border-radius: 16px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     transition:
       border-color 0.18s,
       box-shadow 0.18s;
 
     &:focus-within {
-      border-color: var(--el-color-primary);
+      border-color: var(--el-text-color-primary);
       box-shadow:
-        0 0 0 3px rgba(99, 102, 241, 0.1),
-        0 4px 16px rgba(99, 102, 241, 0.08);
+        0 0 0 3px rgba(15, 23, 42, 0.06),
+        0 2px 8px rgba(15, 23, 42, 0.06);
     }
   }
 
   &__composer-input {
+    /* 干掉 el-input/textarea 内部所有边框、shadow，让外层 composer 唯一显示边框 */
+    :deep(.el-textarea) {
+      background: transparent;
+    }
+
     :deep(.el-textarea__inner) {
-      padding: 4px 0;
+      padding: 0;
       font-size: 14.5px;
-      line-height: 1.6;
+      line-height: 1.65;
       resize: none;
+      color: var(--el-text-color-primary);
       background: transparent;
       border: none;
-      box-shadow: none;
+      border-radius: 0;
+      box-shadow: none !important;
+      transition: none;
 
+      &::placeholder {
+        color: var(--el-text-color-placeholder);
+      }
+
+      &:hover,
       &:focus {
-        box-shadow: none;
+        background: transparent;
+        border: none;
+        box-shadow: none !important;
       }
     }
   }
@@ -1282,9 +1296,7 @@ function buildLocalAssistantPlaceholder(
     gap: 8px;
     align-items: center;
     justify-content: space-between;
-    padding-top: 8px;
     margin-top: 8px;
-    border-top: 1px dashed var(--el-border-color-lighter);
   }
 
   &__composer-tools {
@@ -1326,16 +1338,16 @@ function buildLocalAssistantPlaceholder(
     }
 
     &:hover:not(:disabled) {
-      color: var(--el-color-primary);
-      background: var(--el-color-primary-light-9);
-      border-color: var(--el-color-primary-light-5);
+      color: var(--el-text-color-primary);
+      background: var(--el-fill-color);
+      border-color: var(--el-border-color-darker);
     }
 
     &.is-active {
       color: #fff;
-      background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
       border-color: transparent;
-      box-shadow: 0 4px 12px rgba(168, 85, 247, 0.25);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
 
       .ai-chat-panel__chip-icon {
         color: #fff;
@@ -1354,10 +1366,10 @@ function buildLocalAssistantPlaceholder(
     font-size: 16px;
     color: #fff;
     cursor: pointer;
-    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
     border: none;
     border-radius: 50%;
-    box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.22);
     transition:
       transform 0.15s,
       box-shadow 0.15s,
@@ -1368,7 +1380,7 @@ function buildLocalAssistantPlaceholder(
     }
 
     &:hover:not(.is-disabled):not(.is-loading) {
-      box-shadow: 0 6px 18px rgba(168, 85, 247, 0.45);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.3);
       transform: translateY(-1px) scale(1.04);
     }
 
