@@ -55,6 +55,17 @@
 - **禁止 AI 替服务器执行**：AI 无权在服务器上运行 `makemigrations` / `migrate`，只能给出命令让用户手动执行。
 - **提交清单**：变更 Model 时，commit 只包含 Model 文件，不包含迁移文件。迁移在服务器端独立生成和应用。
 
+### 9. Dify 知识库同步闭环 (Knowledge Base Sync)
+
+- **知识库位置**：`docs/knowledge-base/`，按 `user-guide/`（用户）、`developer-guide/`（开发者）、`ops-guide/`（运维）三类受众组织，索引与维护流程见 `docs/knowledge-base/README.md`。该知识库喂给 Dify 聊天机器人，供其回答系统使用与开发问题。
+- **新增或变更对外功能必须同步知识库**：凡新增业务模块、Celery 任务、接口、模型、环境变量、管理命令、部署变更，或变更已有功能行为，AI 必须在完成代码后**同步更新 `docs/knowledge-base/` 对应章节**，未同步视为任务未完成。
+  - 新增业务模块 → 在 `user-guide/` 新增使用说明，并在 `README.md` 目录结构登记。
+  - 新增 Celery 任务 / 接口 / 模型 → 更新 `developer-guide/` 对应章节。
+  - 新增环境变量 / 管理命令 / 部署变更 → 更新 `ops-guide/` 对应章节。
+  - 变更已有功能行为 → 修改对应文档，删除过时描述。
+- **文档规范**：遵循本文第六章 Markdown 规范（中英混排空格、ATX 标题、代码块标语言、禁敏感硬编码），命名 `kebab-case.md`。
+- **Dify 侧更新**：文档修改后需在 Dify 知识库中重新上传对应文件（Dify 支持单文件覆盖更新），此步由用户手动完成。
+
 > **注意**：针对特定的编程语言（Python, Vue/TS, Java, Markdown等）以及项目的架构目录规范，请自动读取并在上下文中合并 `.github/instructions/` 目录下的对应细化强约束指令。
 
 ---

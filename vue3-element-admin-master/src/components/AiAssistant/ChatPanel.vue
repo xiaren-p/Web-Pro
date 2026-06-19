@@ -1270,8 +1270,8 @@ function buildLocalAssistantPlaceholder(
       padding: 0;
       font-size: 14.5px;
       line-height: 1.65;
-      resize: none;
       color: var(--el-text-color-primary);
+      resize: none;
       background: transparent;
       border: none;
       border-radius: 0;

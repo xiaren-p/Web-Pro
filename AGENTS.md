@@ -19,6 +19,7 @@
 - **依赖同步**（§1.6）：新增第三方包必须同步写入 `requirements.txt` / `package.json`。
 - **命名美学**（§1.7）：禁 `do_stuff.py` / `temp_run.js` 等脚本味命名；Python `snake_case.py`、前端组件 `PascalCase.vue`、文档 `kebab-case.md`。
 - **数据库迁移闭环**（§1.8）：迁移文件**不上传**——本地 `makemigrations` 生成的 `xxxx_*.py` 仅用于开发验证，生产由运维在服务器手动执行；commit 只含 Model 文件，不含迁移文件。AI 改动 Model 后必须给出服务器端 `makemigrations` + `migrate` 步骤（遇冲突给 `--fake` 或手动 SQL），禁止替服务器执行。
+- **Dify 知识库同步闭环**（§1.9）：`docs/knowledge-base/` 是喂给 Dify 聊天机器人的知识库（按 user/developer/ops 三类受众组织，索引见其 `README.md`）。**新增或变更对外功能必须同步更新对应章节**——新业务模块→`user-guide/`、新任务/接口/模型→`developer-guide/`、新环境变量/命令/部署→`ops-guide/`；未同步视为任务未完成。文档遵循 §6 Markdown 规范，命名 `kebab-case.md`；Dify 侧重新上传由用户手动完成。
 
 ## AI 编码行为铁律（CLAUDE.md §2，最高优先级）
 
