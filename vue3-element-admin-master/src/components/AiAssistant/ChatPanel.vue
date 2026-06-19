@@ -1134,6 +1134,7 @@ function buildLocalAssistantPlaceholder(
       display: -webkit-box;
       overflow: hidden;
       -webkit-line-clamp: 2;
+      line-clamp: 2;
       -webkit-box-orient: vertical;
       line-height: 1.5;
     }

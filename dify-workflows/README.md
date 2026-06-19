@@ -1,117 +1,112 @@
 # Dify 工作流配置
 
 > 本目录存放 ERP AI 助手用到的 Dify 应用编排导出文件（DSL）。
-> 修改后**重新导入 Dify** 即可生效，不需要改后端 / 前端代码。
+> **DSL 文件是档案，不是部署源**——Dify 不支持"覆盖现有应用"，DSL 只用于第一次创建应用或灾难恢复重建。
+> 平时改动直接在 Dify 编排页操作，改完再导出 DSL 覆盖本地文件保持同步。
 
 ## 文件清单
 
 | 文件 | 用途 |
 | ---- | ---- |
-| [erp-ai-assistant.yml](erp-ai-assistant.yml) | ERP AI 助手主对话流，支持 `thinking_mode` 思考模式开关 |
+| [erp-ai-assistant.yml](erp-ai-assistant.yml) | ERP AI 助手主对话流，含思考模式双模型分流（R1 推理 / V3 快答） |
 
-## 关键设计：思考模式 (`thinking_mode`)
-
-### 前后端契约
+## 工作流架构
 
 ```text
-前端点击「思考」chip
-       ↓
-ChatPanel.vue: thinkingEnabled.value = true
-       ↓
-POST /api/v2/ai/chat/  body.inputs = { thinking_mode: "on" | "off" }
-       ↓
-Django → DifyClient → POST /v1/chat-messages  inputs.thinking_mode
-       ↓
-Dify 工作流的「开始节点」收到变量 thinking_mode
-       ↓
-LLM 节点系统提示词通过 Jinja2 if/else 切换指令：
-  on  → 输出 <think>推理过程</think> 答案
-  off → 直接输出简洁答案
-       ↓
-前端 MessageItem.vue 解析 <think> 标签 → 折叠展示
+开始节点 (thinking_mode 变量)
+   │
+   ↓
+IF/ELSE 条件分支
+   │
+   ├─ thinking_mode == 'on'  → LLM-推理（DeepSeek-R1）→ 直接回复
+   │                           （自动输出 <think>...</think> 推理过程）
+   │
+   └─ 否则                    → LLM-快答（DeepSeek-V3 / Chat）→ 直接回复
+                               （直接给答案，禁止输出 think 标签）
 ```
 
-### 变量定义（开始节点）
+## 前后端契约
+
+```text
+前端「思考」chip 状态
+   ├─ 开 → inputs.thinking_mode = "on"
+   └─ 关 → inputs.thinking_mode = "off"
+        ↓
+   Dify 开始节点接收变量
+        ↓
+   IF/ELSE 节点根据值分流到对应 LLM
+        ↓
+   两个 LLM 都汇入「直接回复」节点
+        ↓
+   前端 MessageItem.vue 解析 <think> 标签 → 折叠展示
+```
+
+## 开始节点变量
 
 | 字段 | 值 |
 | ---- | ---- |
 | 变量名 | `thinking_mode` |
-| 类型 | `select`（下拉选项） |
+| 类型 | `select` |
 | 必填 | 否 |
-| 默认值 | `off` |
+| 默认 | `off` |
 | 选项 | `on` / `off` |
 
-### 提示词模板（LLM 节点）
+## 模型选择
 
-提示词使用 Jinja2 语法：
+| 节点 | 模型 | 用途 |
+| ---- | ---- | ---- |
+| LLM-推理 | `deepseek-reasoner`（DeepSeek-R1） | 真深度思考，自带 `<think>` 标签 |
+| LLM-快答 | `deepseek-chat`（DeepSeek-V3） | 普通对话，秒级响应 |
 
-```jinja2
-{% if thinking_mode == 'on' %}
-（开启时的指令：要求输出 <think>...</think> + 答案）
-{% else %}
-（关闭时的指令：直接输出简洁答案，不要 <think> 标签）
-{% endif %}
-```
+如需用其他推理模型替换 R1：
 
-完整模板见 [erp-ai-assistant.yml](erp-ai-assistant.yml) 中 `nodes[].id == 'llm'` → `data.prompt_template[0].text` 字段。
+| 模型 | provider 字段 | name 字段 |
+| ---- | ---- | ---- |
+| Qwen3-Thinking-235B | `langgenius/dashscope/dashscope` | `qwen3-235b-a22b` |
+| OpenAI o3-mini | `langgenius/openai/openai` | `o3-mini` |
+| Claude Sonnet 4 (extended thinking) | `langgenius/anthropic/anthropic` | `claude-sonnet-4-20250514` |
 
-## 如何导入到 Dify
+## 首次部署到 Dify
 
-1. 打开 Dify 后台 → **工作室**
-2. 点 **创建应用** → 右上角 **导入 DSL 文件**
-3. 选择 `erp-ai-assistant.yml`
-4. 创建后进入应用 → 左侧菜单 **「访问 API」** → 复制 API 密钥
-5. 把密钥填到服务器 `.env` 的 `DIFY_API_KEY`：
+1. Dify 后台 → **工作室** → **创建应用**
+2. 选择 **Chatflow** 类型 → 顶部 Tab 切换到 **「导入 DSL」** → 上传 `erp-ai-assistant.yml`
+3. 创建后进入应用 → 左侧菜单 **「访问 API」** → 创建 API 密钥
+4. 把密钥填到服务器 `.env`：
 
    ```bash
+   DIFY_API_BASE=http://你的Dify地址
    DIFY_API_KEY=app-xxxxxxxxxxxxxxxxxxxxx
    ```
 
-6. 重启 Celery worker（让新 key 生效）：
+5. 重启 Celery worker：
 
    ```bash
    sudo systemctl restart celery-default celery-parallel celery-single
    ```
 
-## 升级到真实推理模型（可选）
+## ⚠️ Dify 不支持"覆盖现有应用"
 
-当前用 DeepSeek-V4-Flash + 提示词模拟思考。如果想接入真实推理模型（DeepSeek-R1 / Qwen3-Thinking 等），有两条路径：
+**Dify 大部分版本只能"导入 DSL 创建新应用"，不能用 DSL 覆盖已有应用配置**。
 
-### 路径 A：加条件分支节点（推荐）
+所以日常工作流应该是：
 
-在 Dify 编排页改造：
+1. **平时改动**：直接在 Dify 编排页修改 → 右上角【发布更新】
+2. **改完同步本地**：编排页 → 右上角【⋯】→「导出 DSL」→ 覆盖本目录的 yml
+3. **本地 yml 是档案**，不是部署源；只在第一次部署或重建应用时使用
+
+## 测试方法
+
+进入 Dify 应用编排页右侧的预览窗口：
 
 ```text
-开始 → IF/ELSE 节点 [thinking_mode == 'on']
-        ├─ 是 → LLM-推理（DeepSeek-R1 / Qwen3-Thinking）→ 直接回复
-        └─ 否 → LLM-普通（DeepSeek-V3）              → 直接回复
+1. 思考模式开关：选「关闭」 → 输入"你好" → 应该秒回，无 <think>
+2. 思考模式开关：选「开启」 → 输入"分析房价上涨原因" → 应看到推理过程 + 答案
 ```
-
-推理模型本身会输出 `<think>` 标签，前端无需改动。
-
-### 路径 B：直接替换为推理模型
-
-把现有 LLM 节点的 `model.name` 从 `deepseek-v4-flash` 改成 `deepseek-r1-distill-qwen-32b` 之类的推理模型。
-
-提示词的 `if/else` 仍保留作为兜底——这样推理模型在 `thinking_mode=off` 时也会被强制约束不输出 `<think>` 标签。
-
-## 修改提示词后的同步
-
-**只改提示词**：
-
-1. 在 Dify 编排页直接改 LLM 节点提示词
-2. 点右上角「发布」
-3. 完事——不需要重启 Django / Celery
-
-**改了变量结构 / 节点拓扑**：
-
-1. 改完后导出 DSL（Dify → 右上角 ⋯ → 导出 DSL）
-2. 覆盖本目录下对应的 `.yml` 文件
-3. `git commit` 留档
 
 ## 接 Plan Mode（结构化方案卡片）
 
-如果以后要让 AI 输出 Plan 卡片（让用户勾选选项后确认执行业务），按 `CLAUDE.md` 第三章的 Plan Schema 约定，在提示词里追加：
+让 AI 输出 Plan 卡片让用户勾选确认（参考 `CLAUDE.md` 第三章 Plan Schema）。
+推荐做法：在两个 LLM 节点的提示词末尾各加一段：
 
 ```text
 当你判断需要让用户做选择 / 确认时（如"创建采购单"、"调整广告预算"），
@@ -122,8 +117,7 @@ LLM 节点系统提示词通过 Jinja2 if/else 切换指令：
   "title": "卡片标题",
   "description": "简短说明",
   "options": [
-    {"key": "stable_id_1", "label": "用户看到的文案"},
-    ...
+    {"key": "stable_id_1", "label": "用户看到的文案"}
   ],
   "multi_select": false,
   "allow_custom": true,
@@ -140,3 +134,12 @@ LLM 节点系统提示词通过 Jinja2 if/else 切换指令：
 ```
 
 后端 `plan_translator.py` 会自动从 `<plan>...</plan>` 提取并归一化为前端 Schema。
+
+## 模型成本参考（仅供决策）
+
+| 模型 | 单价（输入/输出） | 速度 | 适用场景 |
+| ---- | ---- | ---- | ---- |
+| `deepseek-chat` (V3) | ¥1 / ¥2 每百万 token | 秒级 | 普通对话、快答 |
+| `deepseek-reasoner` (R1) | ¥4 / ¥16 每百万 token | 10~60 秒 | 深度推理、复杂问题 |
+
+R1 输入价是 V3 的 4 倍、输出价是 8 倍，但只有用户主动开启「思考」chip 才会触发，整体成本可控。
