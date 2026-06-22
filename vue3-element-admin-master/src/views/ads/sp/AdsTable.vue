@@ -27,13 +27,28 @@
         <el-table-column label="有效" width="80" fixed="left" align="center">
           <template #default="{ row }">
             <span v-if="row._isSummary" class="summary-dash">--</span>
-            <el-switch
-              v-else
-              v-model="row.state"
-              active-value="enabled"
-              inactive-value="paused"
-              @change="(val: string | number | boolean) => onStateChange(row, val)"
-            />
+            <div v-else class="state-cell">
+              <el-switch
+                v-model="row.state"
+                active-value="enabled"
+                inactive-value="paused"
+                @change="(val: string | number | boolean) => onStateChange(row, val)"
+              />
+              <el-tooltip
+                v-if="row.latest_adjustment?.has_recent"
+                placement="top"
+                popper-class="latest-adj-tooltip"
+              >
+                <span class="recent-star" @click.stop>★</span>
+                <template #content>
+                  <div class="latest-adj-content">
+                    <div v-for="(line, idx) in row.latest_adjustment.lines" :key="idx">
+                      {{ line }}
+                    </div>
+                  </div>
+                </template>
+              </el-tooltip>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="类型" width="100" fixed="left" align="center">
@@ -110,64 +125,88 @@
           show-overflow-tooltip
           :show-overflow-tooltip-delay="500"
         >
-          <template #default="{ row }">
-            <template v-if="col.prop === 'service_status'">
-              <template v-if="row._isSummary">--</template>
+          <template #default="scope">
+            <template v-if="scope.col.prop === 'service_status'">
+              <template v-if="scope.row._isSummary">--</template>
               <span
                 v-else
                 class="status-badge"
-                :class="`status-badge--${row.service_status_type || 'info'}`"
+                :class="`status-badge--${scope.row.service_status_type || 'info'}`"
               >
-                {{ row.service_status_label || row.service_status || "-" }}
+                {{ scope.row.service_status_label || scope.row.service_status || "-" }}
               </span>
             </template>
-            <template v-else-if="col.prop === 'budget'">
-              <!-- 预算列：货币符号 + 直接可编辑输入框 -->
-              <span v-if="row._isSummary" class="data-value data-bold">
-                {{ row.budget != null ? formatValue(row.budget) : "--" }}
+            <template v-else-if="scope.col.prop === 'budget'">
+              <!-- 预算列：货币符号 + 直接可编辑输入框 + 最近修改星标 -->
+              <span v-if="scope.row._isSummary" class="data-value data-bold">
+                {{ scope.row.budget != null ? formatValue(scope.row.budget) : "--" }}
               </span>
               <div v-else class="budget-cell">
                 <el-input
-                  v-model="row._budgetInput"
+                  v-model="scope.row._budgetInput"
                   size="small"
                   class="budget-input"
                   type="number"
-                  @keyup.enter="confirmBudget(row)"
-                  @keyup.esc="resetBudget(row)"
+                  @keyup.enter="confirmBudget(scope.row)"
+                  @keyup.esc="resetBudget(scope.row)"
                 >
                   <template #prefix>
-                    <span class="budget-icon">{{ row.currency_icon || "$" }}</span>
+                    <span class="budget-icon">{{ scope.row.currency_icon || "$" }}</span>
                   </template>
                 </el-input>
-                <el-icon class="budget-ok" title="确认修改" @click="confirmBudget(row)">
+                <el-icon class="budget-ok" title="确认修改" @click="confirmBudget(scope.row)">
                   <Check />
                 </el-icon>
-                <el-icon class="budget-cancel" title="还原" @click="resetBudget(row)">
+                <el-icon class="budget-cancel" title="还原" @click="resetBudget(scope.row)">
                   <Close />
                 </el-icon>
+                <el-tooltip
+                  v-if="scope.row.latest_adjustment?.has_recent"
+                  placement="top"
+                  popper-class="latest-adj-tooltip"
+                >
+                  <span class="recent-star" @click.stop>★</span>
+                  <template #content>
+                    <div class="latest-adj-content">
+                      <div v-for="(line, idx) in scope.row.latest_adjustment.lines" :key="idx">
+                        {{ line }}
+                      </div>
+                    </div>
+                  </template>
+                </el-tooltip>
               </div>
             </template>
             <template v-else>
-              <span v-if="row._isSummary && row[col.prop] == null" class="data-null">--</span>
-              <span v-else class="data-value" :class="getDataValueClass(row, col.prop)">
+              <span
+                v-if="scope.row._isSummary && scope.row[scope.col.prop] == null"
+                class="data-null"
+              >
+                --
+              </span>
+              <span v-else class="data-value" :class="getDataValueClass(scope.row, scope.col.prop)">
                 <span
-                  v-if="!row._isSummary && shouldShowTrend(col.prop, row[col.prop])"
+                  v-if="
+                    !scope.row._isSummary &&
+                    shouldShowTrend(scope.col.prop, scope.row[scope.col.prop])
+                  "
                   class="trend-icon"
-                  :class="getDataValueClass(row, col.prop)"
+                  :class="getDataValueClass(scope.row, scope.col.prop)"
                 >
                   <el-icon>
-                    <TrendCharts v-if="getDataValueClass(row, col.prop) === 'data-up'" />
                     <TrendCharts
-                      v-else-if="getDataValueClass(row, col.prop) === 'data-down'"
+                      v-if="getDataValueClass(scope.row, scope.col.prop) === 'data-up'"
+                    />
+                    <TrendCharts
+                      v-else-if="getDataValueClass(scope.row, scope.col.prop) === 'data-down'"
                       class="trend-icon-down"
                     />
                   </el-icon>
                 </span>
-                <template v-if="col.prop === 'startDate'">
-                  {{ formatDateValue(row[col.prop]) }}
+                <template v-if="scope.col.prop === 'startDate'">
+                  {{ formatDateValue(scope.row[scope.col.prop]) }}
                 </template>
                 <template v-else>
-                  {{ formatValue(row[col.prop]) }}
+                  {{ formatValue(scope.row[scope.col.prop]) }}
                 </template>
               </span>
             </template>
@@ -239,7 +278,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { TrendCharts, List, Check, Close } from "@element-plus/icons-vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 
 const props = withDefaults(
   defineProps<{
@@ -427,13 +466,14 @@ function onPageSizeChange(v: number) {
 // 预算输入框直接渲染，每行用 _budgetInput 临时字段绑定；confirmBudget 校验后 emit。
 
 /**
- * 确认预算修改：校验后向上 emit update-budget，由父组件调 API 并回写 row.budget。
+ * 确认预算修改：弹窗确认后向上 emit update-budget，由父组件调 API 并回写 row.budget。
  * 值未变化时拦截，避免写无意义调整记录。父组件失败时会还原 row.budget，
  * 此处同步还原 _budgetInput。
  *
  * @param {any} row - 表格行
+ * @returns {Promise<void>}
  */
-function confirmBudget(row: any): void {
+async function confirmBudget(row: any): Promise<void> {
   const val = Number(row._budgetInput);
   const original = Number(row.budget);
   if (!val || val <= 0 || isNaN(val)) {
@@ -443,6 +483,17 @@ function confirmBudget(row: any): void {
   }
   if (val === original) {
     ElMessage.info("预算未变化");
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确认将预算从 ${original.toFixed(2)} 修改为 ${val.toFixed(2)}？`,
+      "确认修改预算",
+      { confirmButtonText: "确认", cancelButtonText: "取消", type: "warning" }
+    );
+  } catch {
+    // 用户取消：还原输入框
+    row._budgetInput = row.budget;
     return;
   }
   emit("update-budget", { row, budget: val });
@@ -458,13 +509,27 @@ function resetBudget(row: any): void {
 }
 
 /**
- * 状态 switch 变更：向上 emit update-state，由父组件调 API 并回写行。
- * 父组件失败时会还原 row.state。
+ * 状态 switch 变更：弹窗确认后向上 emit update-state，由父组件调 API 并回写行。
+ * 用户取消时还原 switch 为原值。
  *
  * @param {any} row - 表格行
  * @param {string | number | boolean} val - switch 新值（enabled / paused）
+ * @returns {Promise<void>}
  */
-function onStateChange(row: any, val: string | number | boolean): void {
+async function onStateChange(row: any, val: string | number | boolean): Promise<void> {
+  const oldVal = val === "enabled" ? "paused" : "enabled";
+  const targetLabel = val === "enabled" ? "启用" : "暂停";
+  try {
+    await ElMessageBox.confirm(`确认将广告活动状态修改为「${targetLabel}」？`, "确认修改状态", {
+      confirmButtonText: "确认",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+  } catch {
+    // 用户取消：还原 switch
+    row.state = oldVal;
+    return;
+  }
   emit("update-state", { row, state: val });
 }
 
@@ -1083,6 +1148,45 @@ function formatValue(val: any): string {
 .pager-row :deep(.el-pagination .btn-prev),
 .pager-row :deep(.el-pagination .btn-next) {
   font-size: 13px;
+}
+
+/* ── 状态单元格（switch + 最近修改星标）────────────────────────────────── */
+.state-cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── 最近修改星标（状态列 + 预算列共用）────────────────────────────────── */
+.recent-star {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 12px;
+  color: #f59e0b;
+  cursor: help;
+  text-shadow: 0 0 2px rgb(245 158 11 / 40%);
+  z-index: 2;
+}
+
+.budget-cell .recent-star {
+  top: -4px;
+  right: -8px;
+}
+
+/* tooltip 多行展示 */
+:global(.latest-adj-tooltip) {
+  max-width: 360px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #1e293b;
+  white-space: pre-line;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 10%);
 }
 
 /* ── 预算可编辑单元格 ──────────────────────────────────────────────────── */

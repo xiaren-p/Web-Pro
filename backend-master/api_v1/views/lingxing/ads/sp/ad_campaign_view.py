@@ -655,6 +655,9 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
             res_list.append(dic)
 
+        # ── 最近修改信息（7 天内最近一次调整记录，供前端星标 + tooltip 展示）──
+        latest_adj_map = self._build_latest_adjustment_map(items, sid_to_country)
+
         # ── 标签和负责人数据 ──
         item_keys = [(str(item.campaign_id), str(item.profile_id)) for item in items]
         ad_rows = LxSpAd.objects.filter(
@@ -700,6 +703,8 @@ class AdCampaignViewSet(viewsets.ViewSet):
             for a in asins:
                 principals_set.update(asin_principal_map.get(a, []))
             dic["owners"] = sorted(principals_set)
+            # 最近修改信息（星标 + tooltip 文案）
+            dic["latest_adjustment"] = latest_adj_map.get(key, {"has_recent": False, "lines": []})
 
         result = {
             "total": total,
@@ -938,6 +943,307 @@ class AdCampaignViewSet(viewsets.ViewSet):
             "spendsPercent": 0,
             "cpa": 0,
         }
+
+    # ── 最近修改信息构建 ──────────────────────────────────────────────────────
+    # 查询每个广告活动 7 天内最近一次 SpCampaignAdjustment 记录，
+    # 按 execution_type + auto_rule_id 是否为空区分规则/手动，构建多行展示文案。
+
+    _ADJ_LOOKBACK_DAYS = 7
+
+    def _build_latest_adjustment_map(
+        self,
+        items: list[LxSpCampaign],
+        sid_to_country: dict[int, str],
+    ) -> dict[str, dict[str, Any]]:
+        """批量构建当前页每个广告活动的最近修改展示信息。
+
+        Args:
+            items (list[LxSpCampaign]): 当前页广告活动对象列表。
+            sid_to_country (dict[int, str]): sid → 中文国家名映射（list 方法已构建）。
+
+        Returns:
+            dict[str, dict[str, Any]]: 复合键 → {"has_recent": bool, "lines": [str]}
+        """
+        from datetime import timedelta
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+        from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
+        from api_v2.models.sp_campaign_adjustment import SpCampaignAdjustment
+        from api_v2.utils.timezone_utils import country_to_timezone
+
+        # 空页直接返回
+        if not items:
+            return {}
+
+        pairs = [
+            (it.campaign_id, it.profile_id)
+            for it in items
+            if it.campaign_id and it.profile_id
+        ]
+        if not pairs:
+            return {}
+
+        # 7 天内最近一条调整记录（全量查后内存分组取首条，避免子查询）
+        threshold = timezone.now() - timedelta(days=self._ADJ_LOOKBACK_DAYS)
+        recent_qs = (
+            SpCampaignAdjustment.objects
+            .filter(
+                campaign_id__in=[c for c, _ in pairs],
+                profile_id__in=[p for _, p in pairs],
+                created_at__gte=threshold,
+            )
+            .order_by("-created_at")
+        )
+        latest_by_pair: dict[tuple[int, int], SpCampaignAdjustment] = {}
+        for rec in recent_qs:
+            key_pair = (rec.campaign_id, rec.profile_id)
+            if key_pair not in latest_by_pair:
+                latest_by_pair[key_pair] = rec
+
+        if not latest_by_pair:
+            return {}
+
+        # 批量查规则（auto_rule_id 非空的记录）
+        rule_ids = {
+            r.auto_rule_id
+            for r in latest_by_pair.values()
+            if r.auto_rule_id
+        }
+        rule_map: dict[int, Any] = {}
+        if rule_ids:
+            from api_v1.models.lingxing.ads.lx_ad_rule import LxAdRule
+            for rule in LxAdRule.objects.filter(id__in=rule_ids).only(
+                "id", "name", "condition_sets", "budget_action", "other_action"
+            ):
+                rule_map[rule.id] = rule
+
+        # 批量查 profile 的 country_code + sid（用于本地时间 + 中文国家名）
+        profile_ids = {p for _, p in latest_by_pair.keys()}
+        profile_info_map: dict[int, dict[str, str]] = {}
+        if profile_ids:
+            for sp in LxAdsProfile.objects.filter(profile_id__in=profile_ids).only(
+                "profile_id", "country_code", "sid"
+            ):
+                profile_info_map[sp.profile_id] = {
+                    "country_code": sp.country_code or "",
+                    "sid": sp.sid or 0,
+                }
+
+        result: dict[str, dict[str, Any]] = {}
+        for (cid, pid), rec in latest_by_pair.items():
+            pinfo = profile_info_map.get(pid, {})
+            country_code = pinfo.get("country_code", "")
+            sid = pinfo.get("sid", 0)
+            country_name = sid_to_country.get(sid, country_code) or country_code or "未知"
+            tz_name = country_to_timezone(country_code)
+            local_time_str = self._format_local_time(rec.created_at, tz_name, country_name)
+
+            lines = self._build_adjustment_lines(rec, rule_map, country_name, local_time_str)
+            result[build_campaign_profile_key(cid, pid)] = {
+                "has_recent": True,
+                "lines": lines,
+            }
+        return result
+
+    @staticmethod
+    def _format_local_time(created_at: Any, tz_name: str, country_name: str) -> str:
+        """将 UTC created_at 转为站点本地时间字符串。
+
+        Args:
+            created_at: UTC datetime（Django 时区感知）。
+            tz_name: 时区名，如 "Europe/Berlin"。
+            country_name: 中文国家名，如 "德国"。
+
+        Returns:
+            str: "{国家名}时间: YYYY-MM-DD HH:MM"；无时区则回退原始 UTC。
+        """
+        from datetime import datetime
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+        if not created_at:
+            return f"{country_name}时间: 未知"
+        try:
+            if tz_name:
+                tz = ZoneInfo(tz_name)
+                local_dt = created_at.astimezone(tz)
+            else:
+                local_dt = created_at
+            return f"{country_name}时间: {local_dt.strftime('%Y-%m-%d %H:%M')}"
+        except (ZoneInfoNotFoundError, Exception):
+            # 回退：去掉时区信息直接格式化
+            try:
+                return f"{country_name}时间: {created_at.strftime('%Y-%m-%d %H:%M')}"
+            except Exception:
+                return f"{country_name}时间: 未知"
+
+    def _build_adjustment_lines(
+        self,
+        rec: Any,
+        rule_map: dict[int, Any],
+        country_name: str,
+        local_time_str: str,
+    ) -> list[str]:
+        """根据调整记录的 execution_type + auto_rule_id 构建多行展示文案。
+
+        四种情况：
+        - 规则预算调整 / 规则启用暂停（auto_rule_id 非空）：含规则名 + 详细内容 + 执行操作。
+        - 手动预算调整 / 手动启用暂停（auto_rule_id 为空）：含操作人 + 执行操作。
+
+        Args:
+            rec: SpCampaignAdjustment 实例。
+            rule_map: rule_id → LxAdRule 实例映射。
+            country_name: 中文国家名。
+            local_time_str: 已格式化的本地时间字符串。
+
+        Returns:
+            list[str]: 多行文案，前端按 \\n 拼接展示。
+        """
+        from api_v2.models.sp_campaign_adjustment import CampaignExecutionTypeChoices
+
+        is_rule = bool(rec.auto_rule_id)
+        rule = rule_map.get(rec.auto_rule_id) if is_rule else None
+        rule_name = getattr(rule, "name", "") if rule else "未知规则"
+        operator = rec.operator or "未知用户"
+        etype = rec.execution_type
+
+        # 第一行：修改来源
+        if is_rule:
+            line1 = f"最近一次修改通过「{rule_name}」规则修改"
+        else:
+            line1 = f"最近一次修改由{operator}完成"
+
+        # 第二行：本地时间
+        line2 = local_time_str
+
+        lines = [line1, line2]
+
+        # 预算调整类型
+        if etype == CampaignExecutionTypeChoices.RULE_BUDGET_ADJUSTMENT:
+            if is_rule and rule:
+                lines.append(f"详细内容: {self._summarize_conditions(rule.condition_sets)}")
+            lines.append(f"执行操作: {self._summarize_budget_action(rule.budget_action if rule else {}, rec)}")
+        elif etype == CampaignExecutionTypeChoices.MANUAL_BUDGET_ADJUSTMENT:
+            before = float(rec.budget_before) if rec.budget_before is not None else 0
+            after = float(rec.budget_after) if rec.budget_after is not None else 0
+            lines.append(f"执行操作: 预算 {before:.2f} → {after:.2f}")
+        elif etype == CampaignExecutionTypeChoices.CAMPAIGN_PAUSE:
+            if is_rule and rule:
+                lines.append(f"详细内容: {self._summarize_conditions(rule.condition_sets)}")
+            lines.append("执行操作: 广告活动暂停")
+        elif etype == CampaignExecutionTypeChoices.CAMPAIGN_ENABLE:
+            if is_rule and rule:
+                lines.append(f"详细内容: {self._summarize_conditions(rule.condition_sets)}")
+            lines.append("执行操作: 广告活动启用")
+
+        return lines
+
+    @staticmethod
+    def _summarize_conditions(condition_sets: Any) -> str:
+        """从 condition_sets JSON 提取所有条件组与所有条件，格式化为完整简述字符串。
+
+        结构：condition_sets = [ {days, conditions: [{metric, operator, value, isRange?, operator2?, value2?}]}, ... ]
+        组间 AND（用"；"分隔），组内条件 AND（用"，"分隔），区间模式（isRange=true）输出 "op val 且 op2 val2"。
+
+        Args:
+            condition_sets: LxAdRule.condition_sets JSON。
+
+        Returns:
+            str: 如 "近7天: 花费 > 50, 广告销售额 > 200 且 < 500；近30天: ACoS > 30"；
+                  无条件返回 "无"。
+        """
+        # 指标字段 → 中文名映射（覆盖常见指标，与 evaluate_condition_set 的 metric_key 对齐）
+        field_label = {
+            "cost": "花费",
+            "sales": "广告销售额",
+            "same_sales": "直接销售额",
+            "orders": "广告订单",
+            "same_orders": "直接订单",
+            "units": "广告销量",
+            "clicks": "点击",
+            "impressions": "曝光量",
+            "ctr": "CTR",
+            "cpc": "CPC",
+            "cpa": "CPA",
+            "acos": "ACoS",
+            "roas": "ROAS",
+            "cvr": "CVR",
+            "spend_rate": "花费占比",
+            "sales_rate": "销售额占比",
+            "is_ratio": "IS",
+        }
+        operator_label = {
+            ">": ">",
+            "<": "<",
+            ">=": "≥",
+            "<=": "≤",
+            "==": "=",
+            "!=": "≠",
+        }
+
+        if not isinstance(condition_sets, list) or not condition_sets:
+            return "无"
+
+        group_parts: list[str] = []
+        for cs in condition_sets:
+            if not isinstance(cs, dict):
+                continue
+            days = cs.get("days", "?")
+            conditions = cs.get("conditions") or []
+            if not isinstance(conditions, list) or not conditions:
+                continue
+            cond_parts: list[str] = []
+            for cond in conditions:
+                if not isinstance(cond, dict):
+                    continue
+                # 字段名优先 metric（与 evaluate_condition_set 一致），回退 field
+                field = str(cond.get("metric") or cond.get("field") or "")
+                op = str(cond.get("operator", ">"))
+                val = cond.get("value", "")
+                name = field_label.get(field.lower(), field or "未知指标")
+                op_sym = operator_label.get(op, op)
+                seg = f"{name} {op_sym} {val}"
+                # 区间模式：追加第二操作符与阈值
+                if bool(cond.get("isRange", False)):
+                    op2 = str(cond.get("operator2", "<"))
+                    val2 = cond.get("value2", "")
+                    op2_sym = operator_label.get(op2, op2)
+                    seg += f" 且 {op2_sym} {val2}"
+                cond_parts.append(seg)
+            if cond_parts:
+                group_parts.append(f"近{days}天: {', '.join(cond_parts)}")
+
+        return "；".join(group_parts) if group_parts else "无"
+
+    @staticmethod
+    def _summarize_budget_action(budget_action: Any, rec: Any) -> str:
+        """从 budget_action JSON + 记录的 before/after 构建预算操作简述。
+
+        Args:
+            budget_action: LxAdRule.budget_action JSON。
+            rec: SpCampaignAdjustment 实例（含 budget_before/after）。
+
+        Returns:
+            str: 如 "预算上调 10%，上限 100"；无信息回退 before → after。
+        """
+        if not isinstance(budget_action, dict) or not budget_action:
+            before = float(rec.budget_before) if rec.budget_before is not None else 0
+            after = float(rec.budget_after) if rec.budget_after is not None else 0
+            return f"预算 {before:.2f} → {after:.2f}"
+        action_type = str(budget_action.get("type", ""))
+        value = budget_action.get("value")
+        limit = budget_action.get("limit")
+        type_label = {
+            "raise": "预算上调",
+            "lower": "预算下调",
+            "set": "预算设置为",
+            "no_adjust": "预算不调整",
+        }.get(action_type, "预算调整")
+        parts: list[str] = []
+        if value is not None:
+            parts.append(f"{type_label} {value}")
+        if limit is not None and limit != "":
+            parts.append(f"上限 {limit}")
+        return "，".join(parts) if parts else type_label
 
     @staticmethod
     def _compute_metrics_from_agg(
