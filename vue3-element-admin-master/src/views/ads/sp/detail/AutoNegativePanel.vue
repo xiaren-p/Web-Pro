@@ -6,9 +6,6 @@
           :campaign-id="campaignId"
           :profile-id="profileId"
           :initial-date-range="initialDateRange"
-          :campaign-name="campaignName"
-          :targeting-type="targetingType"
-          :campaign-state="campaignState"
         />
       </el-tab-pane>
       <el-tab-pane label="否定商品" name="products">
@@ -16,9 +13,6 @@
           :campaign-id="campaignId"
           :profile-id="profileId"
           :initial-date-range="initialDateRange"
-          :campaign-name="campaignName"
-          :targeting-type="targetingType"
-          :campaign-state="campaignState"
         />
       </el-tab-pane>
     </el-tabs>
@@ -39,9 +33,6 @@ defineProps<{
   campaignId: string;
   profileId: string;
   initialDateRange?: string[];
-  campaignName?: string;
-  targetingType?: string;
-  campaignState?: string;
 }>();
 
 /** 当前激活的子 Tab（默认否定关键词） */

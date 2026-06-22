@@ -1,21 +1,5 @@
 <template>
   <div class="ads-panel ads-detail-panel">
-    <!-- 广告活动上下文信息 -->
-    <div class="campaign-context-bar">
-      <span v-if="targetingType" class="targeting-badge">
-        {{ formatTargetingType(targetingType) }}
-      </span>
-      <span class="campaign-state-icon" :class="`state-${campaignState}`">
-        <span v-if="campaignState === 'enabled'" class="dot-circle" />
-        <el-icon v-else-if="campaignState === 'paused'"><VideoPause /></el-icon>
-        <el-icon v-else-if="campaignState === 'archived'"><CircleClose /></el-icon>
-      </span>
-      <span class="context-campaign-name">{{ campaignName || campaignId || "-" }}</span>
-    </div>
-
-    <!-- 指标汇总板块 -->
-    <Indicators v-if="summaryRow" :summary="summaryRow" />
-
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <el-date-picker
@@ -344,7 +328,6 @@ import { ElMessage } from "element-plus";
 
 import { getAds } from "@/api/ads";
 import ColumnManager from "@/components/ColumnManager/index.vue";
-import Indicators from "@/views/ads/sp/Indicators.vue";
 
 defineOptions({ name: "AdsPanel" });
 
@@ -355,31 +338,13 @@ defineOptions({ name: "AdsPanel" });
  * @prop {string} [profileId] - 店铺 Profile ID（必填，缺失时不发请求）
  * @prop {string} [adGroupId] - 广告组 ID（可选，不传则展示整个广告活动的投放）
  * @prop {string[]} [initialDateRange] - 格式 ['YYYY-MM-DD', 'YYYY-MM-DD'] 或空数组
- * @prop {string} campaignName - 广告活动名称
- * @prop {string} targetingType - 投放类型（AUTO / MANUAL）
- * @prop {string} campaignState - 活动状态（enabled / paused / archived）
  */
 const props = defineProps<{
   campaignId?: string;
   profileId?: string;
   adGroupId?: string;
   initialDateRange?: string[];
-  campaignName?: string;
-  targetingType?: string;
-  campaignState?: string;
 }>();
-
-/**
- * 将投放类型字段值格式化为中文显示。
- *
- * @param {string} val - targeting_type 原始值（AUTO / MANUAL）
- * @returns {string} 中文显示文字；无法识别则原样返回。
- */
-function formatTargetingType(val: string): string {
-  if (!val) return "";
-  const map: Record<string, string> = { AUTO: "自动", MANUAL: "手动" };
-  return map[val.toUpperCase()] ?? val;
-}
 
 /** 列可见性持久化（只存 prop → visible 映射，列定义结构始终以代码为准） */
 const _savedColVis = useLocalStorage<Record<string, boolean>>("ads_panel_col_vis", {});

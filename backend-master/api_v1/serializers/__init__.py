@@ -33,6 +33,7 @@ from api_v1.serializers.crawler.crawler_category_serializer import CrawlerCatego
 
 # file 板块
 from api_v1.serializers.file import ImageUploadSerializer
+from api_v1.serializers.image_sync_queue import ImageSyncQueueSerializer
 
 # finance 板块
 from api_v1.serializers.finance.monthly_loss_serializer import MonthlyLossSerializer
@@ -55,6 +56,7 @@ __all__ = [
     "CrawlerLogSerializer", "CrawlerConfSerializer", "CrawlerSellerSerializer",
     "CrawlerCategorySerializer",
     "ImageUploadSerializer",
+    "ImageSyncQueueSerializer",
     "MonthlyLossSerializer", "MonthlyLossFirst20Serializer",
     "WorkReportSerializer",
     "LxTimePricingStrategySerializer",

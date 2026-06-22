@@ -3,20 +3,23 @@ import csv
 import io
 import os
 import uuid
-import requests
 import traceback
 from datetime import datetime
-from urllib.parse import quote
 from PIL import Image
 
 from django.conf import settings
-from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from api_v1.models import ImageUpload
 from api_v1.serializers import ImageUploadSerializer
+from api_v1.serializers.image_sync_queue import ImageSyncQueueSerializer
+from api_v1.services.lingxing.image_sync_queue_service import (
+    batch_upsert_sync_tasks,
+    get_queue_queryset,
+    upsert_sync_task,
+)
 from api_v1.utils.responses import drf_ok, drf_error
 
 class ImageUploadViewSet(viewsets.ModelViewSet):
@@ -102,63 +105,13 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def sync(self, request, pk=None):
-        """
-        同步单个图片组到外部服务
-        逻辑：
-        1. PUT /update_image/sku/<sku> 更新
-        2. 若失败（404），则 POST /update_image/sku 创建
-        """
+        """同步单个图片组到内部同步队列。"""
         instance = self.get_object()
-        sku = instance.image_group
-        local_path = instance.cloud_path
-        base_url = getattr(settings, 'IMAGE_SYNC_URL', 'https://cloud.hanlis.cn:9898').rstrip('/')
-        
-        # 构造请求数据
-        payload = {
-            "sku": sku,
-            "local_path": local_path,
-            "status": 1
-        }
-        
-        success = False
-        error_msg = ""
-        
-        try:
-            # 1. 尝试 PUT 更新
-            put_url = f"{base_url}/update_image/sku/{quote(sku)}"
-            resp_put = requests.put(put_url, json=payload, timeout=10, verify=False)
-            
-            if resp_put.status_code == 200:
-                success = True
-            elif resp_put.status_code == 404:
-                # 2. 尝试 POST 创建
-                post_url = f"{base_url}/update_image/sku"
-                resp_post = requests.post(post_url, json=payload, timeout=10, verify=False)
-                if resp_post.status_code in (200, 201):
-                    success = True
-                else:
-                    error_msg = f"POST failed: {resp_post.status_code}"
-            else:
-                error_msg = f"PUT failed: {resp_put.status_code}"
-                
-        except Exception as e:
-            error_msg = f"Exception: {str(e)}"
-            
-        # 更新日志（不更新状态）
-        current_log = instance.log or ""
-        now_str = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+        success, log_line = upsert_sync_task(instance)
+
         if success:
-            new_log_line = f"[{now_str}] 已提交同步队列！"
-        else:
-            new_log_line = f"[{now_str}] 同步失败: {error_msg}"
-            
-        instance.log = f"{current_log}\n{new_log_line}".strip()
-        instance.save()
-        
-        if success:
-            return drf_ok({"msg": "Sync success", "log": new_log_line})
-        else:
-            return drf_error(f"Sync failed: {error_msg}")
+            return drf_ok({"msg": "Sync success", "log": log_line})
+        return drf_error(f"Sync failed: {log_line}")
 
     @action(detail=False, methods=['post'])
     def import_csv(self, request):
@@ -249,83 +202,35 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def batch_sync(self, request):
-        """
-        批量同步
-        ids: 逗号分隔的 ID 列表
+        """批量同步到内部同步队列。
+
+        Args:
+            ids (list[str] | str): ID 列表或逗号分隔的 ID 字符串。
         """
         ids = request.data.get('ids', [])
         if isinstance(ids, str):
             ids = ids.split(',')
-        
+
         if not ids:
             return drf_error("No ids provided")
-            
+
         queryset = self.get_queryset().filter(id__in=ids)
-        results = []
-        base_url = getattr(settings, 'IMAGE_SYNC_URL', 'https://cloud.hanlis.cn:9898').rstrip('/')
-        
-        for instance in queryset:
-            sku = instance.image_group
-            local_path = instance.cloud_path
-            payload = {"sku": sku, "local_path": local_path, "status": 1}
-            
-            success = False
-            error_msg = ""
-            
-            try:
-                # 1. Try PUT
-                put_url = f"{base_url}/update_image/sku/{quote(sku)}"
-                resp_put = requests.put(put_url, json=payload, timeout=5, verify=False)
-                
-                if resp_put.status_code == 200:
-                    success = True
-                elif resp_put.status_code == 404:
-                    # 2. Try POST
-                    post_url = f"{base_url}/update_image/sku"
-                    resp_post = requests.post(post_url, json=payload, timeout=5, verify=False)
-                    if resp_post.status_code in (200, 201):
-                        success = True
-                    else:
-                        error_msg = f"POST failed: {resp_post.status_code}"
-                else:
-                    error_msg = f"PUT failed: {resp_put.status_code}"
-            except Exception as e:
-                error_msg = f"Exception: {str(e)}"
-            
-            # 更新日志（不更新状态）
-            current_log = instance.log or ""
-            now_str = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
-            if success:
-                new_log_line = f"[{now_str}] 已提交同步队列！"
-            else:
-                new_log_line = f"[{now_str}] 同步失败: {error_msg}"
-                
-            instance.log = f"{current_log}\n{new_log_line}".strip()
-            instance.save()
-            results.append({"id": instance.id, "success": success, "msg": new_log_line})
-            
+        results = batch_upsert_sync_tasks(list(queryset))
+
         return drf_ok(results)
 
     @action(detail=False, methods=['get'])
     def queue(self, request):
-        """
-        获取外部同步队列数据
-        GET https://cloud.hanlis.cn:9898/update_image/sku
-        """
-        base_url = getattr(settings, 'IMAGE_SYNC_URL', 'https://cloud.hanlis.cn:9898').rstrip('/')
-        url = f"{base_url}/update_image/sku"
-        
-        try:
-            resp = requests.get(url, timeout=10, verify=False)
-            if resp.status_code == 200:
-                data = resp.json()
-                # 响应格式 {"data": [...]}
-                items = data.get("data", [])
-                return drf_ok(items)
-            else:
-                return drf_error(f"Fetch queue failed: {resp.status_code}")
-        except Exception as e:
-            return drf_error(f"Fetch queue exception: {str(e)}")
+        """查询内部图片同步队列（后端分页 + imageGroup 过滤）。"""
+        qs = get_queue_queryset(request.query_params.dict())
+
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = ImageSyncQueueSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = ImageSyncQueueSerializer(qs, many=True)
+        return drf_ok({'list': serializer.data, 'total': qs.count()})
 
     @action(detail=False, methods=['post'])
     def upload_image(self, request):

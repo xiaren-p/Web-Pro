@@ -1,21 +1,5 @@
 <template>
   <div class="auto-targeting-panel ads-detail-panel">
-    <!-- 广告活动上下文信息 -->
-    <div class="campaign-context-bar">
-      <span v-if="targetingType" class="targeting-badge">
-        {{ formatTargetingType(targetingType) }}
-      </span>
-      <span class="campaign-state-icon" :class="`state-${campaignState}`">
-        <span v-if="campaignState === 'enabled'" class="dot-circle" />
-        <el-icon v-else-if="campaignState === 'paused'"><VideoPause /></el-icon>
-        <el-icon v-else-if="campaignState === 'archived'"><CircleClose /></el-icon>
-      </span>
-      <span class="context-campaign-name">{{ campaignName || campaignId || "-" }}</span>
-    </div>
-
-    <!-- 指标汇总板块 -->
-    <Indicators v-if="summaryRow" :summary="summaryRow" />
-
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <el-date-picker
@@ -283,7 +267,6 @@ import { CopyDocument, Filter, Operation, VideoPause, CircleClose } from "@eleme
 import { ElMessage } from "element-plus";
 
 import ColumnManager from "@/components/ColumnManager/index.vue";
-import Indicators from "@/views/ads/sp/Indicators.vue";
 import { getAutoTargeting } from "@/api/ads";
 
 defineOptions({ name: "AutoTargetingPanel" });
@@ -292,30 +275,12 @@ defineOptions({ name: "AutoTargetingPanel" });
  * @prop {string} campaignId - 广告活动 ID（必填）
  * @prop {string} profileId - 店铺 Profile ID（必填）
  * @prop {string[]} initialDateRange - 格式 ['YYYY-MM-DD', 'YYYY-MM-DD'] 或空数组
- * @prop {string} campaignName - 广告活动名称
- * @prop {string} targetingType - 投放类型（AUTO / MANUAL）
- * @prop {string} campaignState - 活动状态（enabled / paused / archived）
  */
 const props = defineProps<{
   campaignId?: string;
   profileId?: string;
   initialDateRange?: string[];
-  campaignName?: string;
-  targetingType?: string;
-  campaignState?: string;
 }>();
-
-/**
- * 将投放类型字段值格式化为中文显示。
- *
- * @param {string} val - targeting_type 原始值（AUTO / MANUAL）
- * @returns {string} 中文显示文字；无法识别则原样返回。
- */
-function formatTargetingType(val: string): string {
-  if (!val) return "";
-  const map: Record<string, string> = { AUTO: "自动", MANUAL: "手动" };
-  return map[val.toUpperCase()] ?? val;
-}
 
 /** 列可见性持久化 */
 const _savedColVis = useLocalStorage<Record<string, boolean>>("auto_targeting_panel_col_vis", {});

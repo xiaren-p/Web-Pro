@@ -44,9 +44,6 @@
           :campaign-id="campaignId"
           :profile-id="profileId"
           :initial-date-range="inheritedDateRange"
-          :campaign-name="campaignInfo?.name ?? ''"
-          :targeting-type="campaignInfo?.targeting_type ?? ''"
-          :campaign-state="campaignInfo?.state ?? ''"
         />
       </el-tab-pane>
       <el-tab-pane label="广告" name="ads">
@@ -54,9 +51,6 @@
           :campaign-id="campaignId"
           :profile-id="profileId"
           :initial-date-range="inheritedDateRange"
-          :campaign-name="campaignInfo?.name ?? ''"
-          :targeting-type="campaignInfo?.targeting_type ?? ''"
-          :campaign-state="campaignInfo?.state ?? ''"
         />
       </el-tab-pane>
       <el-tab-pane label="投放" name="targeting">
@@ -65,9 +59,6 @@
             :campaign-id="campaignId"
             :profile-id="profileId"
             :initial-date-range="inheritedDateRange"
-            :campaign-name="campaignInfo?.name ?? ''"
-            :targeting-type="campaignInfo?.targeting_type ?? ''"
-            :campaign-state="campaignInfo?.state ?? ''"
           />
         </template>
         <template v-else>
@@ -75,9 +66,6 @@
             :campaign-id="campaignId"
             :profile-id="profileId"
             :initial-date-range="inheritedDateRange"
-            :campaign-name="campaignInfo?.name ?? ''"
-            :targeting-type="campaignInfo?.targeting_type ?? ''"
-            :campaign-state="campaignInfo?.state ?? ''"
           />
         </template>
       </el-tab-pane>
@@ -87,9 +75,6 @@
             :campaign-id="campaignId"
             :profile-id="profileId"
             :initial-date-range="inheritedDateRange"
-            :campaign-name="campaignInfo?.name ?? ''"
-            :targeting-type="campaignInfo?.targeting_type ?? ''"
-            :campaign-state="campaignInfo?.state ?? ''"
           />
         </template>
         <template v-else>
@@ -97,9 +82,6 @@
             :campaign-id="campaignId"
             :profile-id="profileId"
             :initial-date-range="inheritedDateRange"
-            :campaign-name="campaignInfo?.name ?? ''"
-            :targeting-type="campaignInfo?.targeting_type ?? ''"
-            :campaign-state="campaignInfo?.state ?? ''"
           />
         </template>
       </el-tab-pane>
@@ -197,13 +179,13 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .ad-campaign-detail {
-  /* ── 页头卡片 ── */
+  /* ── 页头卡片（下圆角归零，与 Tabs 无缝衔接）── */
   .detail-header-card {
     padding: var(--spacing-4) var(--spacing-5) var(--spacing-4);
-    margin-bottom: var(--spacing-4);
+    margin-bottom: 0;
     background: #ffffff;
     border: 1px solid var(--color-gray-200);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     box-shadow: var(--shadow-sm);
   }
 
@@ -327,17 +309,16 @@ onMounted(() => {
     white-space: nowrap;
   }
 
-  /* ── 导航 Tab ── */
+  /* ── 导航 Tab（上圆角归零，与 header-card 无缝衔接）── */
   .detail-tabs {
     :deep(.el-tabs__header) {
       padding: 0 var(--spacing-1);
       margin-bottom: 0;
       background: #ffffff;
       border: 1px solid var(--color-gray-200);
+      border-top: none;
       border-bottom: none;
-      border-radius: var(--radius-xl);
-      border-bottom-right-radius: 0;
-      border-bottom-left-radius: 0;
+      border-radius: 0;
       box-shadow: var(--shadow-xs);
     }
 

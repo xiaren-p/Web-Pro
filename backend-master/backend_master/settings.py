@@ -38,8 +38,6 @@ env = environ.Env(
     DJANGO_SERVE_MEDIA=(bool, True),
     # 默认头像（空字符串表示不使用远端兜底，前端使用本地占位图）
     DEFAULT_AVATAR_URL=(str, ''),
-    # 图片同步服务地址
-    IMAGE_SYNC_URL=(str, 'https://cloud.hanlis.cn:9898'),
     # 高德天气 API 配置
     AMAP_BASE=(str, 'https://restapi.amap.com'),
     AMAP_KEY=(str, '9ca18a1d97d6a8c31a77e001bfbd2742'),
@@ -78,8 +76,6 @@ if env_file.exists():
 SECRET_KEY = env('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
-# 图片信息存储地址
-IMAGE_SYNC_URL = env('IMAGE_SYNC_URL')
 AMAP_BASE = env('AMAP_BASE')
 AMAP_KEY = env('AMAP_KEY')
 AMAP_CITY = env('AMAP_CITY')

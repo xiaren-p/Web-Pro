@@ -23,6 +23,7 @@ from api_v1.models.file.file_folder import FileFolder
 from api_v1.models.file.file_asset import FileAsset
 from api_v1.models.file.file_chunk import FileChunk
 from api_v1.models.file.image_upload import ImageUpload
+from api_v1.models.file.image_sync_queue import ImageSyncQueue, ImageSyncStatus
 from api_v1.models.crawler.crawler_log import CrawlerLog
 from api_v1.models.crawler.crawler_conf import CrawlerConf
 from api_v1.models.crawler.crawler_seller_account import CrawlerSellerAccount
@@ -76,6 +77,7 @@ __all__ = [
     'NcSyncTask', 'SyncOperation', 'SyncStatus',
     'Notice', 'NoticeTarget', 'NoticeRead',
     'FileFolder', 'FileAsset', 'FileChunk', 'ImageUpload',
+    'ImageSyncQueue', 'ImageSyncStatus',
     'CrawlerLog', 'CrawlerConf', 'CrawlerSellerAccount', 'CrawlerCategory',
     'OrderProfitCache', 'MonthlyLossOrder', 'MonthlyLossOrderFirst20',
     'WorkReport',
