@@ -349,199 +349,43 @@ onMounted(fetchData);
 
 <style scoped lang="scss">
 .negative-keyword-panel {
-  .filter-bar {
+  .keyword-info-card {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    padding: 12px 0;
-  }
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    background: var(--surface-subtle);
+    border-radius: 6px;
 
-  .filter-item {
-    &.w-110 {
-      width: 110px;
-    }
-
-    &.w-130 {
-      width: 130px;
-    }
-  }
-
-  .keyword-cell {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-  }
-
-  .match-badge {
-    display: inline-block;
-    padding: 1px 6px;
-    font-size: 11px;
-    font-weight: 500;
-    white-space: nowrap;
-    border-radius: 3px;
-
-    &.match-negativeExact {
-      color: var(--color-danger-600);
-      background: var(--color-danger-50);
-      border: 1px solid var(--color-danger-200);
-    }
-
-    &.match-negativePhrase {
-      color: var(--color-warning-600);
-      background: var(--color-warning-50);
-      border: 1px solid var(--color-warning-200);
-    }
-  }
-
-  .status-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    font-size: 12px;
-    border-radius: 4px;
-  }
-
-  .summary-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
-  }
-
-  .msku-cell {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-  }
-
-  .msku-text {
-    font-size: 13px;
-    color: var(--text-primary);
-  }
-
-  .dot-circle {
-    display: inline-block;
-    flex-shrink: 0;
-    width: 8px;
-    height: 8px;
-    background: var(--color-success-500);
-    border-radius: 50%;
-  }
-
-  .pagination-bar {
-    display: flex;
-    justify-content: flex-end;
-    padding: 12px 0 4px;
-  }
-
-  // 分析抽屉
-  .analysis-drawer {
-    display: flex;
-    gap: 20px;
-    height: 100%;
-    padding: 4px 0;
-
-    .drawer-left {
-      flex: 0 0 260px;
-      padding-right: 16px;
-      border-right: 1px solid var(--border-subtle);
-    }
-
-    .drawer-right {
-      flex: 1;
-    }
-
-    .drawer-section-title {
-      margin-bottom: 12px;
+    .keyword-text {
       font-size: 14px;
-      font-weight: 600;
+      font-weight: 500;
+      line-height: 1.5;
       color: var(--text-primary);
+      word-break: break-all;
     }
 
-    .keyword-info-card {
+    .keyword-meta {
       display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding: 14px;
-      background: var(--surface-subtle);
-      border-radius: 6px;
-
-      .keyword-text {
-        font-size: 14px;
-        font-weight: 500;
-        line-height: 1.5;
-        color: var(--text-primary);
-        word-break: break-all;
-      }
-
-      .keyword-meta {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-      }
-
-      .keyword-state {
-        padding: 1px 6px;
-        font-size: 12px;
-        border-radius: 3px;
-
-        &.state-tag-enabled {
-          color: #67c23a;
-          background: var(--color-success-50);
-          border: 1px solid var(--color-success-200);
-        }
-
-        &.state-tag-archived {
-          color: var(--text-tertiary);
-          background: #f4f4f5;
-          border: 1px solid #d3d4d6;
-        }
-      }
-
-      .keyword-detail-row {
-        display: flex;
-        gap: 8px;
-        font-size: 13px;
-
-        .detail-label {
-          flex-shrink: 0;
-          width: 60px;
-          color: var(--text-tertiary);
-        }
-
-        .detail-value {
-          color: var(--text-secondary);
-        }
-      }
+      gap: 8px;
+      align-items: center;
     }
 
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
+    .keyword-detail-row {
+      display: flex;
+      gap: 8px;
+      font-size: 13px;
 
-      .metric-card {
-        padding: 14px 16px;
-        background: var(--surface-subtle);
-        border-radius: 6px;
+      .detail-label {
+        flex-shrink: 0;
+        width: 60px;
+        color: var(--text-tertiary);
+      }
 
-        .metric-label {
-          margin-bottom: 6px;
-          font-size: 12px;
-          color: var(--text-tertiary);
-        }
-
-        .metric-value {
-          font-size: 18px;
-          font-weight: 600;
-          color: var(--text-primary);
-        }
+      .detail-value {
+        color: var(--text-secondary);
       }
     }
   }
-}
-
-:deep(.el-table__fixed-right) {
-  box-shadow: -2px 0 6px rgba(0, 0, 0, 0.06);
 }
 </style>

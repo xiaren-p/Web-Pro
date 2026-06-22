@@ -382,24 +382,7 @@ onMounted(fetchData);
 
 <style scoped lang="scss">
 .auto-negative-targeting-panel {
-  .filter-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    padding: 12px 0;
-  }
-
-  .filter-item {
-    &.w-110 {
-      width: 110px;
-    }
-    &.w-130 {
-      width: 130px;
-    }
-  }
-
-  // ASIN 商品卡片单元格
+  /* ASIN 商品卡片单元格 */
   .asin-cell {
     display: flex;
     flex-direction: column;
@@ -416,7 +399,7 @@ onMounted(fetchData);
   .asin-code {
     font-size: 13px;
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
   }
 
   .exp-type-badge {
@@ -428,15 +411,15 @@ onMounted(fetchData);
     border-radius: 3px;
 
     &.exp-asin {
-      color: #409eff;
-      background: #ecf5ff;
-      border: 1px solid #b3d8ff;
+      color: var(--color-primary-500);
+      background: var(--color-primary-50);
+      border: 1px solid var(--color-primary-200);
     }
 
     &.exp-brand {
-      color: #67c23a;
-      background: #f0f9eb;
-      border: 1px solid #c2e7b0;
+      color: var(--color-success-500);
+      background: var(--color-success-50);
+      border: 1px solid var(--color-success-200);
     }
   }
 
@@ -446,7 +429,7 @@ onMounted(fetchData);
     text-overflow: ellipsis;
     font-size: 12px;
     line-height: 1.4;
-    color: #606266;
+    color: var(--text-secondary);
     white-space: nowrap;
   }
 
@@ -458,159 +441,68 @@ onMounted(fetchData);
 
   .meta-item {
     font-size: 12px;
-    color: #909399;
+    color: var(--text-tertiary);
     white-space: nowrap;
 
     &.meta-price {
       font-weight: 500;
-      color: #f56c6c;
+      color: var(--color-danger-500);
     }
     &.meta-reviews {
-      color: #909399;
+      color: var(--text-tertiary);
     }
   }
 
-  .status-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    font-size: 12px;
-    border-radius: 4px;
-  }
-
-  .summary-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #606266;
-  }
-
-  .msku-cell {
+  /* 分析抽屉商品信息卡片 */
+  .product-info-card {
     display: flex;
-    gap: 4px;
-    align-items: center;
-  }
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    background: var(--surface-subtle);
+    border-radius: 6px;
 
-  .msku-text {
-    font-size: 13px;
-    color: #303133;
-  }
-
-  .dot-circle {
-    display: inline-block;
-    flex-shrink: 0;
-    width: 8px;
-    height: 8px;
-    background: #67c23a;
-    border-radius: 50%;
-  }
-
-  .pagination-bar {
-    display: flex;
-    justify-content: flex-end;
-    padding: 12px 0 4px;
-  }
-
-  // 分析抽屉
-  .analysis-drawer {
-    display: flex;
-    gap: 20px;
-    height: 100%;
-    padding: 4px 0;
-
-    .drawer-left {
-      flex: 0 0 260px;
-      padding-right: 16px;
-      border-right: 1px solid #ebeef5;
-    }
-
-    .drawer-right {
-      flex: 1;
-    }
-
-    .drawer-section-title {
-      margin-bottom: 12px;
-      font-size: 14px;
-      font-weight: 600;
-      color: #303133;
-    }
-
-    .product-info-card {
+    .product-asin-row {
       display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding: 14px;
-      background: #f5f7fa;
-      border-radius: 6px;
+      gap: 8px;
+      align-items: center;
 
-      .product-asin-row {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-
-        .product-asin {
-          font-size: 15px;
-          font-weight: 700;
-          color: #303133;
-          letter-spacing: 0.5px;
-        }
-      }
-
-      .product-title {
-        font-size: 13px;
-        line-height: 1.5;
-        color: #606266;
-        word-break: break-all;
-      }
-
-      .product-meta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-
-      .product-detail-row {
-        display: flex;
-        gap: 8px;
-        font-size: 13px;
-
-        .detail-label {
-          flex-shrink: 0;
-          width: 60px;
-          color: #909399;
-        }
-
-        .detail-value {
-          color: #606266;
-        }
+      .product-asin {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: 0.5px;
       }
     }
 
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
+    .product-title {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      word-break: break-all;
+    }
 
-      .metric-card {
-        padding: 14px 16px;
-        background: #f5f7fa;
-        border-radius: 6px;
+    .product-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
 
-        .metric-label {
-          margin-bottom: 6px;
-          font-size: 12px;
-          color: #909399;
-        }
+    .product-detail-row {
+      display: flex;
+      gap: 8px;
+      font-size: 13px;
 
-        .metric-value {
-          font-size: 18px;
-          font-weight: 600;
-          color: #303133;
-        }
+      .detail-label {
+        flex-shrink: 0;
+        width: 60px;
+        color: var(--text-tertiary);
+      }
+
+      .detail-value {
+        color: var(--text-secondary);
       }
     }
   }
-}
-
-:deep(.el-table__fixed-right) {
-  box-shadow: -2px 0 6px rgba(0, 0, 0, 0.06);
 }
 </style>
