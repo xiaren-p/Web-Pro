@@ -43,6 +43,7 @@ def run_ai_chat_task(
     assistant_message_id: int,
     query: str,
     dify_conversation_id: str = '',
+    dify_app_id: int | None = None,
     inputs: dict | None = None,
     **kwargs,
 ) -> dict:
@@ -57,6 +58,8 @@ def run_ai_chat_task(
         assistant_message_id (int): 待填充的 AI 回复消息主键。
         query (str): 用户本轮提问。
         dify_conversation_id (str): Dify 平台会话 ID；新会话传空字符串。
+        dify_app_id (int | None): 该会话所属 ``DifyApp`` 主键。
+            为 None 时回退到 ``DifyApp.objects.get_default()``，兼容历史会话。
         inputs (dict | None): Dify 工作流变量。
 
     Returns:
@@ -66,8 +69,15 @@ def run_ai_chat_task(
         Exception: Dify 调用层异常会抛出，Celery 自动落入失败状态；
             本函数捕获后会先把消息状态置 FAILED 并广播 error 事件再 re-raise。
     """
+    # 延迟导入避免循环依赖
+    from api_v2.models.dify_app import DifyApp
+
     redis_client = get_redis_client()
-    dify_client = DifyClient()
+    dify_app = None
+    if dify_app_id is not None:
+        dify_app = DifyApp.objects.filter(pk=dify_app_id, is_active=True).first()
+    # dify_app 为 None 时 DifyClient 自动回退到默认应用
+    dify_client = DifyClient(app=dify_app)
     plan_translator = PlanTranslator()
 
     accumulated: list[str] = []

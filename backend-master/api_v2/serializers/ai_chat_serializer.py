@@ -5,6 +5,7 @@ from rest_framework import serializers
 from api_v2.models.ai_conversation import AiConversation
 from api_v2.models.ai_conversation_group import AiConversationGroup
 from api_v2.models.ai_message import AiMessage, MessageRole, MessageStatus, MessageType
+from api_v2.models.dify_app import DifyApp
 
 
 class AiChatRequestSerializer(serializers.Serializer):
@@ -21,6 +22,12 @@ class AiChatRequestSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
         help_text='续接会话的对外 UUID；新建对话时省略',
+    )
+    app_code = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=40,
+        help_text='前端选择的 Dify 应用 code；新建会话时按此切换 agent，续接会话时被忽略（沿用会话已绑定的应用）',
     )
     inputs = serializers.DictField(
         required=False,
@@ -43,12 +50,16 @@ class AiConversationGroupSerializer(serializers.ModelSerializer):
 class AiConversationSerializer(serializers.ModelSerializer):
     """会话列表的最小响应结构。
 
-    对外把 ``public_id`` 渲染为 ``id``；分组关联以 ``group_id`` 形式给出对应分组的 UUID。
+    对外把 ``public_id`` 渲染为 ``id``；分组关联以 ``group_id`` 形式给出对应分组的 UUID；
+    Dify 应用归属以 ``app_code`` / ``app_name`` / ``app_icon`` 三字段成形输出，前端零翻译。
     ``pinned_at`` 不为空表示已置顶。
     """
 
     id = serializers.UUIDField(source='public_id', read_only=True)
     group_id = serializers.UUIDField(source='group.public_id', read_only=True, allow_null=True)
+    app_code = serializers.CharField(source='dify_app.code', read_only=True, allow_null=True)
+    app_name = serializers.CharField(source='dify_app.name', read_only=True, allow_null=True)
+    app_icon = serializers.CharField(source='dify_app.icon', read_only=True, allow_null=True)
     is_pinned = serializers.SerializerMethodField()
 
     class Meta:
@@ -58,6 +69,9 @@ class AiConversationSerializer(serializers.ModelSerializer):
             'title',
             'dify_conversation_id',
             'group_id',
+            'app_code',
+            'app_name',
+            'app_icon',
             'is_pinned',
             'pinned_at',
             'created_at',
@@ -116,3 +130,23 @@ class AiSearchHitSerializer(serializers.Serializer):
     role = serializers.CharField(read_only=True, allow_null=True)
     snippet = serializers.CharField(read_only=True)
     matched_at = serializers.DateTimeField(read_only=True)
+
+
+class DifyAppSerializer(serializers.ModelSerializer):
+    """Dify 应用列表响应结构（仅暴露前端切换器需要的字段，不返回密钥/base URL）。"""
+
+    id = serializers.UUIDField(source='public_id', read_only=True)
+
+    class Meta:
+        model = DifyApp
+        fields = [
+            'id',
+            'code',
+            'name',
+            'description',
+            'icon',
+            'mode',
+            'is_default',
+            'sort_order',
+        ]
+        read_only_fields = fields

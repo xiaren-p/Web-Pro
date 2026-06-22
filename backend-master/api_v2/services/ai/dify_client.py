@@ -5,6 +5,11 @@
     - Bearer 认证头注入
     - 网络异常 / 超时分类
 对外只暴露同步生成器接口，由上层 Celery 任务消费。
+
+多应用支持：
+    每个 ``DifyApp`` 实例携带独立的 ``api_base`` + 加密的 ``api_key``，本客户端在
+    实例化时按 app 解析凭据。无参实例化时回退到 ``DifyApp.objects.get_default()``，
+    兼容历史调用方式。
 """
 
 from __future__ import annotations
@@ -12,10 +17,12 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING, Iterator, Optional
 
 import requests
-from django.conf import settings
+
+if TYPE_CHECKING:
+    from api_v2.models.dify_app import DifyApp
 
 logger = logging.getLogger(__name__)
 
@@ -54,25 +61,36 @@ class DifyClient:
     """Dify 流式对话 HTTP 客户端。
 
     设计：
-        实例化时一次性读取 settings 中的 base_url 与 api_key，避免每次请求重复读 env；
-        ``stream_chat`` 返回生成器，调用方逐帧消费即可，客户端不缓存任何中间状态，
-        线程安全，可由 Celery 多 worker 共用同一实例。
+        实例化时按传入的 ``DifyApp`` 一次性解析凭据（base + 解密后的 api_key），
+        避免每次请求重复读 DB / Fernet 解密。``stream_chat`` 返回生成器，调用方
+        逐帧消费即可，客户端本身不缓存中间状态，可由 Celery 多 worker 共用。
     """
 
-    def __init__(self) -> None:
-        """初始化客户端，从 Django settings 读取 Dify 接入凭据。
+    def __init__(self, app: Optional['DifyApp'] = None) -> None:
+        """初始化客户端，从 DifyApp 实例（或默认应用）解析凭据。
+
+        Args:
+            app (Optional[DifyApp]): 显式指定要调用的 Dify 应用。
+                为 None 时调用 ``DifyApp.objects.get_default()`` 取系统默认应用，
+                兼容历史调用方式。
 
         Raises:
-            RuntimeError: 当 ``DIFY_API_BASE`` 或 ``DIFY_API_KEY`` 任一未配置时抛出，
-                避免运行时才发现密钥缺失。
+            RuntimeError: 当解析后的 ``base_url`` 或 ``api_key`` 任一为空时抛出。
         """
-        self._base_url: str = (getattr(settings, 'DIFY_API_BASE', '') or '').rstrip('/')
-        self._api_key: str = getattr(settings, 'DIFY_API_KEY', '') or ''
+        # 延迟导入避免模型层启动期循环依赖
+        from api_v2.models.dify_app import DifyApp as _DifyApp
+
+        resolved_app = app if app is not None else _DifyApp.objects.get_default()
+
+        self._app_code: str = resolved_app.code
+        self._app_mode: str = resolved_app.mode
+        self._base_url: str = resolved_app.resolve_api_base()
+        self._api_key: str = resolved_app.decrypt_api_key()
 
         if not self._base_url or not self._api_key:
             raise RuntimeError(
-                '[DifyClient][__init__] DIFY_API_BASE 或 DIFY_API_KEY 未配置，'
-                '请检查 .env 文件。前端代码任何位置出现 sk- 密钥即视为严重违规。'
+                f'[DifyClient][__init__] DifyApp<{self._app_code}> 凭据不完整，'
+                'base_url 或 api_key 为空。请检查应用配置与 settings.DIFY_API_BASE。'
             )
 
     def stream_chat(
@@ -99,6 +117,7 @@ class DifyClient:
             requests.RequestException: 网络层异常（连接失败、超时等）。
             RuntimeError: Dify 返回非 2xx 状态码或 SSE 协议格式异常。
         """
+        # Chatflow 与 Agent 在 Dify 端共用 /v1/chat-messages；Workflow 走另一个端点暂不实现
         url = f'{self._base_url}/v1/chat-messages'
         headers = {
             'Authorization': f'Bearer {self._api_key}',
@@ -114,7 +133,9 @@ class DifyClient:
         }
 
         logger.info(
-            '[DifyClient][stream_chat] 发起请求: user=%s conv=%s query_len=%s',
+            '[DifyClient][stream_chat] 发起请求: app=%s mode=%s user=%s conv=%s query_len=%s',
+            self._app_code,
+            self._app_mode,
             user_identifier,
             conversation_id or '<new>',
             len(query),
@@ -130,7 +151,8 @@ class DifyClient:
             if response.status_code != 200:
                 error_text = response.text[:500]
                 logger.error(
-                    '[DifyClient][stream_chat] Dify 返回非 200: status=%s body=%s',
+                    '[DifyClient][stream_chat] Dify 返回非 200: app=%s status=%s body=%s',
+                    self._app_code,
                     response.status_code,
                     error_text,
                 )
