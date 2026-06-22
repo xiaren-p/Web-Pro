@@ -122,40 +122,29 @@
               </span>
             </template>
             <template v-else-if="col.prop === 'budget'">
-              <!-- 预算列：货币符号 + 可编辑小框 -->
+              <!-- 预算列：货币符号 + 直接可编辑输入框 -->
               <span v-if="row._isSummary" class="data-value data-bold">
                 {{ row.budget != null ? formatValue(row.budget) : "--" }}
               </span>
               <div v-else class="budget-cell">
-                <template v-if="editingKey !== rowKey(row)">
-                  <span
-                    class="budget-display"
-                    :title="'点击修改预算'"
-                    @click="startEditBudget(row)"
-                  >
+                <el-input
+                  v-model="row._budgetInput"
+                  size="small"
+                  class="budget-input"
+                  type="number"
+                  @keyup.enter="confirmBudget(row)"
+                  @keyup.esc="resetBudget(row)"
+                >
+                  <template #prefix>
                     <span class="budget-icon">{{ row.currency_icon || "$" }}</span>
-                    <span class="data-value">{{ formatValue(row.budget) }}</span>
-                  </span>
-                </template>
-                <template v-else>
-                  <div class="budget-edit">
-                    <el-input
-                      v-model="editingBudget"
-                      size="small"
-                      class="budget-input"
-                      type="number"
-                      :prefix-icon="undefined"
-                      @keyup.enter="confirmEditBudget(row)"
-                      @keyup.esc="cancelEditBudget()"
-                    >
-                      <template #prefix>
-                        <span class="budget-icon">{{ row.currency_icon || "$" }}</span>
-                      </template>
-                    </el-input>
-                    <el-icon class="budget-ok" @click="confirmEditBudget(row)"><Check /></el-icon>
-                    <el-icon class="budget-cancel" @click="cancelEditBudget()"><Close /></el-icon>
-                  </div>
-                </template>
+                  </template>
+                </el-input>
+                <el-icon class="budget-ok" title="确认修改" @click="confirmBudget(row)">
+                  <Check />
+                </el-icon>
+                <el-icon class="budget-cancel" title="还原" @click="resetBudget(row)">
+                  <Close />
+                </el-icon>
               </div>
             </template>
             <template v-else>
@@ -380,6 +369,13 @@ watch(
  */
 const displayData = computed<any[]>(() => {
   if (!props.tableData || props.tableData.length === 0) return [];
+  // 为每个数据行注入预算输入框临时绑定字段（响应式）
+  for (const row of props.tableData) {
+    if (row._isSummary) continue;
+    if (row._budgetInput === undefined || row._budgetInput === null) {
+      row._budgetInput = row.budget;
+    }
+  }
   if (!props.summary) return props.tableData;
   const summaryRow: Record<string, unknown> = {
     _isSummary: true,
@@ -388,6 +384,21 @@ const displayData = computed<any[]>(() => {
   };
   return [summaryRow, ...props.tableData];
 });
+
+/**
+ * 监听 tableData 变化（含父组件 onUpdateBudget 成功回写 row.budget 后），
+ * 同步刷新 _budgetInput，保证输入框显示最新预算值。
+ */
+watch(
+  () => props.tableData,
+  (rows) => {
+    for (const row of rows) {
+      if (row._isSummary) continue;
+      row._budgetInput = row.budget;
+    }
+  },
+  { deep: true }
+);
 
 /**
  * 为汇总行附加专属 CSS 类名，用于高亮显示。
@@ -413,52 +424,37 @@ function onPageSizeChange(v: number) {
 }
 
 // ── 预算/状态可编辑 ─────────────────────────────────────────────────────────────
-const editingKey = ref<string>("");
-const editingBudget = ref<string>("");
+// 预算输入框直接渲染，每行用 _budgetInput 临时字段绑定；confirmBudget 校验后 emit。
 
 /**
- * 构造行唯一键，用于编辑态定位。
- *
- * @param {any} row - 表格行
- * @returns {string} campaign_id::profile_id 复合键
- */
-function rowKey(row: any): string {
-  return `${row.campaign_id}::${row.profile_id}`;
-}
-
-/**
- * 进入预算编辑态：记录当前行键并回填原值。
+ * 确认预算修改：校验后向上 emit update-budget，由父组件调 API 并回写 row.budget。
+ * 值未变化时拦截，避免写无意义调整记录。父组件失败时会还原 row.budget，
+ * 此处同步还原 _budgetInput。
  *
  * @param {any} row - 表格行
  */
-function startEditBudget(row: any): void {
-  editingKey.value = rowKey(row);
-  editingBudget.value = String(row.budget ?? "");
-}
-
-/**
- * 取消预算编辑：清空编辑态，不修改行数据。
- */
-function cancelEditBudget(): void {
-  editingKey.value = "";
-  editingBudget.value = "";
-}
-
-/**
- * 确认预算编辑：校验后向上 emit update-budget，由父组件调 API 并回写行。
- * 父组件失败时会还原 row.budget，编辑态在此关闭。
- *
- * @param {any} row - 表格行
- */
-function confirmEditBudget(row: any): void {
-  const val = Number(editingBudget.value);
-  editingKey.value = "";
-  editingBudget.value = "";
+function confirmBudget(row: any): void {
+  const val = Number(row._budgetInput);
+  const original = Number(row.budget);
   if (!val || val <= 0 || isNaN(val)) {
     ElMessage.warning("预算必须为大于 0 的数值");
+    row._budgetInput = row.budget;
+    return;
+  }
+  if (val === original) {
+    ElMessage.info("预算未变化");
     return;
   }
   emit("update-budget", { row, budget: val });
+}
+
+/**
+ * 还原预算输入框为当前 row.budget（esc 或点击取消图标时调用）。
+ *
+ * @param {any} row - 表格行
+ */
+function resetBudget(row: any): void {
+  row._budgetInput = row.budget;
 }
 
 /**
@@ -1092,25 +1088,20 @@ function formatValue(val: any): string {
 /* ── 预算可编辑单元格 ──────────────────────────────────────────────────── */
 .budget-cell {
   display: inline-flex;
+  gap: 6px;
   align-items: center;
   justify-content: center;
 }
 
-.budget-display {
-  display: inline-flex;
-  gap: 2px;
-  align-items: center;
-  padding: 2px 6px;
-  cursor: pointer;
-  border-radius: var(--radius-sm, 6px);
-  transition:
-    background 160ms ease,
-    box-shadow 160ms ease;
+.budget-cell .budget-input {
+  width: 104px;
 }
 
-.budget-display:hover {
-  background: var(--surface-hover, #f1f5f9);
-  box-shadow: 0 0 0 1px var(--color-primary-200, #bfdbfe) inset;
+/* 货币符号前缀 */
+.budget-cell :deep(.el-input__prefix) {
+  display: inline-flex;
+  align-items: center;
+  padding-right: 4px;
 }
 
 .budget-icon {
@@ -1119,27 +1110,67 @@ function formatValue(val: any): string {
   color: var(--text-secondary, #64748b);
 }
 
-.budget-edit {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
+/* 输入框主体：浅灰底、圆角、聚焦主色光晕 */
+.budget-cell :deep(.el-input__wrapper) {
+  height: 28px;
+  padding: 0 8px;
+  background: var(--surface-subtle, #f8fafc);
+  border: 1px solid var(--border-base, #e2e8f0);
+  border-radius: 8px;
+  box-shadow: none;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
-.budget-edit .budget-input {
-  width: 96px;
+.budget-cell :deep(.el-input__wrapper:hover) {
+  background: var(--surface-base, #fff);
+  border-color: var(--color-primary-300, #93c5fd);
 }
 
-.budget-edit :deep(.el-input__wrapper) {
-  padding-left: 6px;
+.budget-cell :deep(.el-input__wrapper.is-focus) {
+  background: var(--surface-base, #fff);
+  border-color: var(--color-primary-600, #2563eb);
+  box-shadow: 0 0 0 3px var(--focus-ring, rgb(37 99 235 / 18%));
 }
 
+.budget-cell :deep(.el-input__inner) {
+  height: 26px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary, #0f172a);
+}
+
+/* 隐藏 number 输入框的旋钮箭头，保持整洁 */
+.budget-cell :deep(.el-input__inner[type="number"])::-webkit-outer-spin-button,
+.budget-cell :deep(.el-input__inner[type="number"])::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+/* 确认 / 取消图标按钮 */
 .budget-ok,
 .budget-cancel {
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 15px;
   cursor: pointer;
+  border-radius: 6px;
+  opacity: 0.55;
   transition:
     color 160ms ease,
-    transform 160ms ease;
+    background 160ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.budget-cell:hover .budget-ok,
+.budget-cell:hover .budget-cancel {
+  opacity: 1;
 }
 
 .budget-ok {
@@ -1148,6 +1179,7 @@ function formatValue(val: any): string {
 
 .budget-ok:hover {
   color: var(--color-success-700, #15803d);
+  background: rgb(22 163 74 / 12%);
   transform: scale(1.12);
 }
 
@@ -1157,6 +1189,7 @@ function formatValue(val: any): string {
 
 .budget-cancel:hover {
   color: var(--color-danger-700, #b91c1c);
+  background: rgb(220 38 38 / 12%);
   transform: scale(1.12);
 }
 </style>

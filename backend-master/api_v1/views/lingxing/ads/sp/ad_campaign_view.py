@@ -76,6 +76,31 @@ def _flat_parse_label(raw_label: str) -> list[str]:
     return [t.strip() for t in s.split(",") if t.strip()]
 
 
+def _get_operator_name(request: Request) -> str:
+    """获取当前登录用户的展示名（昵称优先，降级 username）。
+
+    用于手动调整操作时写入 SpCampaignAdjustment.operator 字段，
+    与 listing_tag_view 中的同名 helper 保持一致范式。
+
+    Args:
+        request (Request): DRF 请求对象。
+
+    Returns:
+        str: 用户昵称或 username；未认证返回 "未知用户"。
+    """
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated:
+        try:
+            profile = getattr(user, "profile", None)
+            if profile and profile.nickname:
+                return profile.nickname
+        except Exception:
+            pass
+        if hasattr(user, "username") and user.username:
+            return user.username
+    return "未知用户"
+
+
 class AdCampaignViewSet(viewsets.ViewSet):
     """SP 广告活动基础数据视图，提供查询与手动预算/状态调整。
 
@@ -805,6 +830,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             adjustment_status=AdjustmentStatusChoices.PENDING,
             execution_status=ExecutionStatusChoices.PENDING,
             adjustment_time=timezone.now(),
+            operator=_get_operator_name(request),
         )
 
         # 同步更新本地实体表预算
@@ -873,6 +899,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             adjustment_status=AdjustmentStatusChoices.PENDING,
             execution_status=ExecutionStatusChoices.PENDING,
             adjustment_time=timezone.now(),
+            operator=_get_operator_name(request),
         )
 
         # 同步更新本地实体表状态

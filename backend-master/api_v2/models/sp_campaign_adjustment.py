@@ -82,6 +82,14 @@ class SpCampaignAdjustment(models.Model):
         verbose_name="执行日志回写",
     )
 
+    operator = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        verbose_name="操作人",
+        help_text="用户手动操作时写入用户昵称；任务自动写入时留空",
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="创建时间",
