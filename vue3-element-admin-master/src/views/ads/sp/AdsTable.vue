@@ -141,6 +141,40 @@
               <span v-if="scope.row._isSummary" class="data-value data-bold">
                 {{ scope.row.budget != null ? formatValue(scope.row.budget) : "--" }}
               </span>
+              <el-tooltip
+                v-else-if="scope.row.latest_adjustment?.has_recent"
+                placement="top"
+                popper-class="latest-adj-tooltip"
+              >
+                <div class="budget-cell">
+                  <el-input
+                    v-model="scope.row._budgetInput"
+                    size="small"
+                    class="budget-input"
+                    type="number"
+                    @keyup.enter="confirmBudget(scope.row)"
+                    @keyup.esc="resetBudget(scope.row)"
+                  >
+                    <template #prefix>
+                      <span class="budget-icon">{{ scope.row.currency_icon || "$" }}</span>
+                    </template>
+                  </el-input>
+                  <el-icon class="budget-ok" title="确认修改" @click="confirmBudget(scope.row)">
+                    <Check />
+                  </el-icon>
+                  <el-icon class="budget-cancel" title="还原" @click="resetBudget(scope.row)">
+                    <Close />
+                  </el-icon>
+                  <span class="recent-star" @click.stop>★</span>
+                </div>
+                <template #content>
+                  <div class="latest-adj-content">
+                    <div v-for="(line, idx) in scope.row.latest_adjustment.lines" :key="idx">
+                      {{ line }}
+                    </div>
+                  </div>
+                </template>
+              </el-tooltip>
               <div v-else class="budget-cell">
                 <el-input
                   v-model="scope.row._budgetInput"
@@ -160,20 +194,6 @@
                 <el-icon class="budget-cancel" title="还原" @click="resetBudget(scope.row)">
                   <Close />
                 </el-icon>
-                <el-tooltip
-                  v-if="scope.row.latest_adjustment?.has_recent"
-                  placement="top"
-                  popper-class="latest-adj-tooltip"
-                >
-                  <span class="recent-star" @click.stop>★</span>
-                  <template #content>
-                    <div class="latest-adj-content">
-                      <div v-for="(line, idx) in scope.row.latest_adjustment.lines" :key="idx">
-                        {{ line }}
-                      </div>
-                    </div>
-                  </template>
-                </el-tooltip>
               </div>
             </template>
             <template v-else>
@@ -555,7 +575,7 @@ function getColumnMinWidth(prop: string): number {
     cpa: 80,
     budget: 110,
     startDate: 120,
-    service_status: 120,
+    service_status: 140,
     bidding_type: 100,
     portfolio_name: 130,
     tags: 100,
@@ -1190,7 +1210,7 @@ function formatValue(val: any): string {
 }
 
 .budget-cell .budget-input {
-  width: 104px;
+  width: 80px;
 }
 
 /* 货币符号前缀 */
