@@ -122,7 +122,7 @@
           :sortable="col.sortable ? 'custom' : false"
           :min-width="getColumnMinWidth(col.prop)"
           align="center"
-          show-overflow-tooltip
+          :show-overflow-tooltip="col.prop !== 'budget'"
           :show-overflow-tooltip-delay="500"
         >
           <template #default="scope">
