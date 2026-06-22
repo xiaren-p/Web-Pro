@@ -154,17 +154,12 @@
                     type="number"
                     @keyup.enter="confirmBudget(scope.row)"
                     @keyup.esc="resetBudget(scope.row)"
+                    @blur="confirmBudget(scope.row)"
                   >
                     <template #prefix>
                       <span class="budget-icon">{{ scope.row.currency_icon || "$" }}</span>
                     </template>
                   </el-input>
-                  <el-icon class="budget-ok" title="确认修改" @click="confirmBudget(scope.row)">
-                    <Check />
-                  </el-icon>
-                  <el-icon class="budget-cancel" title="还原" @click="resetBudget(scope.row)">
-                    <Close />
-                  </el-icon>
                   <span class="recent-star" @click.stop>★</span>
                 </div>
                 <template #content>
@@ -183,17 +178,12 @@
                   type="number"
                   @keyup.enter="confirmBudget(scope.row)"
                   @keyup.esc="resetBudget(scope.row)"
+                  @blur="confirmBudget(scope.row)"
                 >
                   <template #prefix>
                     <span class="budget-icon">{{ scope.row.currency_icon || "$" }}</span>
                   </template>
                 </el-input>
-                <el-icon class="budget-ok" title="确认修改" @click="confirmBudget(scope.row)">
-                  <Check />
-                </el-icon>
-                <el-icon class="budget-cancel" title="还原" @click="resetBudget(scope.row)">
-                  <Close />
-                </el-icon>
               </div>
             </template>
             <template v-else>
@@ -289,8 +279,8 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
-import { TrendCharts, List, Check, Close } from "@element-plus/icons-vue";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { TrendCharts, List } from "@element-plus/icons-vue";
+import { ElMessageBox } from "element-plus";
 
 const props = withDefaults(
   defineProps<{
@@ -486,29 +476,31 @@ function onPageSizeChange(v: number) {
  * @returns {Promise<void>}
  */
 async function confirmBudget(row: any): Promise<void> {
+  // 防抖：blur 与 enter 可能同时触发，避免重复弹窗
+  if (row._confirming) return;
   const val = Number(row._budgetInput);
   const original = Number(row.budget);
   if (!val || val <= 0 || isNaN(val)) {
-    ElMessage.warning("预算必须为大于 0 的数值");
     row._budgetInput = row.budget;
     return;
   }
   if (val === original) {
-    ElMessage.info("预算未变化");
     return;
   }
+  row._confirming = true;
   try {
     await ElMessageBox.confirm(
       `确认将预算从 ${original.toFixed(2)} 修改为 ${val.toFixed(2)}？`,
       "确认修改预算",
       { confirmButtonText: "确认", cancelButtonText: "取消", type: "warning" }
     );
+    emit("update-budget", { row, budget: val });
   } catch {
     // 用户取消：还原输入框
     row._budgetInput = row.budget;
-    return;
+  } finally {
+    row._confirming = false;
   }
-  emit("update-budget", { row, budget: val });
 }
 
 /**
@@ -1263,49 +1255,5 @@ function formatValue(val: any): string {
 .budget-cell :deep(.el-input__inner[type="number"])::-webkit-inner-spin-button {
   margin: 0;
   -webkit-appearance: none;
-}
-
-/* 确认 / 取消图标按钮 */
-.budget-ok,
-.budget-cancel {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  font-size: 15px;
-  cursor: pointer;
-  border-radius: 6px;
-  opacity: 0.55;
-  transition:
-    color 160ms ease,
-    background 160ms ease,
-    transform 160ms ease,
-    opacity 160ms ease;
-}
-
-.budget-ok {
-  color: var(--color-success-600, #16a34a);
-}
-
-.budget-ok:hover {
-  color: var(--color-success-700, #15803d);
-  background: rgb(22 163 74 / 12%);
-  transform: scale(1.12);
-}
-
-.budget-cancel {
-  color: var(--color-danger-600, #dc2626);
-}
-
-.budget-cancel:hover {
-  color: var(--color-danger-700, #b91c1c);
-  background: rgb(220 38 38 / 12%);
-  transform: scale(1.12);
-}
-
-.budget-cell:hover .budget-ok,
-.budget-cell:hover .budget-cancel {
-  opacity: 1;
 }
 </style>
