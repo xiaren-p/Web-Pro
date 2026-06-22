@@ -39,6 +39,7 @@ from api_v2.views.ai_group_view import (
     rename_group,
     reorder_groups,
 )
+from api_v2.views.ai_app_view import list_apps as list_ai_apps
 from api_v2.views.ai_stream_view import subscribe_message
 
 app_name = 'api_v2'
@@ -95,4 +96,6 @@ urlpatterns = [
     path('ai/groups/reorder/', reorder_groups, name='ai_groups_reorder'),
     path('ai/groups/<uuid:public_id>/', delete_group, name='ai_groups_delete'),
     path('ai/groups/<uuid:public_id>/rename/', rename_group, name='ai_groups_rename'),
+    # Dify 应用列表（前端切换器使用）
+    path('ai/apps/', list_ai_apps, name='ai_apps_list'),
 ]

@@ -126,7 +126,7 @@
           :show-overflow-tooltip-delay="500"
         >
           <template #default="scope">
-            <template v-if="scope.col.prop === 'service_status'">
+            <template v-if="col.prop === 'service_status'">
               <template v-if="scope.row._isSummary">--</template>
               <span
                 v-else
@@ -136,7 +136,7 @@
                 {{ scope.row.service_status_label || scope.row.service_status || "-" }}
               </span>
             </template>
-            <template v-else-if="scope.col.prop === 'budget'">
+            <template v-else-if="col.prop === 'budget'">
               <!-- 预算列：货币符号 + 直接可编辑输入框 + 最近修改星标 -->
               <span v-if="scope.row._isSummary" class="data-value data-bold">
                 {{ scope.row.budget != null ? formatValue(scope.row.budget) : "--" }}
@@ -177,36 +177,28 @@
               </div>
             </template>
             <template v-else>
-              <span
-                v-if="scope.row._isSummary && scope.row[scope.col.prop] == null"
-                class="data-null"
-              >
+              <span v-if="scope.row._isSummary && scope.row[col.prop] == null" class="data-null">
                 --
               </span>
-              <span v-else class="data-value" :class="getDataValueClass(scope.row, scope.col.prop)">
+              <span v-else class="data-value" :class="getDataValueClass(scope.row, col.prop)">
                 <span
-                  v-if="
-                    !scope.row._isSummary &&
-                    shouldShowTrend(scope.col.prop, scope.row[scope.col.prop])
-                  "
+                  v-if="!scope.row._isSummary && shouldShowTrend(col.prop, scope.row[col.prop])"
                   class="trend-icon"
-                  :class="getDataValueClass(scope.row, scope.col.prop)"
+                  :class="getDataValueClass(scope.row, col.prop)"
                 >
                   <el-icon>
+                    <TrendCharts v-if="getDataValueClass(scope.row, col.prop) === 'data-up'" />
                     <TrendCharts
-                      v-if="getDataValueClass(scope.row, scope.col.prop) === 'data-up'"
-                    />
-                    <TrendCharts
-                      v-else-if="getDataValueClass(scope.row, scope.col.prop) === 'data-down'"
+                      v-else-if="getDataValueClass(scope.row, col.prop) === 'data-down'"
                       class="trend-icon-down"
                     />
                   </el-icon>
                 </span>
-                <template v-if="scope.col.prop === 'startDate'">
-                  {{ formatDateValue(scope.row[scope.col.prop]) }}
+                <template v-if="col.prop === 'startDate'">
+                  {{ formatDateValue(scope.row[col.prop]) }}
                 </template>
                 <template v-else>
-                  {{ formatValue(scope.row[scope.col.prop]) }}
+                  {{ formatValue(scope.row[col.prop]) }}
                 </template>
               </span>
             </template>
@@ -1163,11 +1155,11 @@ function formatValue(val: any): string {
   position: absolute;
   top: -6px;
   right: -6px;
+  z-index: 2;
   font-size: 12px;
   color: #f59e0b;
-  cursor: help;
   text-shadow: 0 0 2px rgb(245 158 11 / 40%);
-  z-index: 2;
+  cursor: help;
 }
 
 .budget-cell .recent-star {
@@ -1272,11 +1264,6 @@ function formatValue(val: any): string {
     opacity 160ms ease;
 }
 
-.budget-cell:hover .budget-ok,
-.budget-cell:hover .budget-cancel {
-  opacity: 1;
-}
-
 .budget-ok {
   color: var(--color-success-600, #16a34a);
 }
@@ -1295,5 +1282,10 @@ function formatValue(val: any): string {
   color: var(--color-danger-700, #b91c1c);
   background: rgb(220 38 38 / 12%);
   transform: scale(1.12);
+}
+
+.budget-cell:hover .budget-ok,
+.budget-cell:hover .budget-cancel {
+  opacity: 1;
 }
 </style>

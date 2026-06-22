@@ -8,6 +8,7 @@
 
 import { requestV2 } from "@/utils/request";
 import type {
+  AiApp,
   AiConversation,
   AiConversationGroup,
   AiMessage,
@@ -27,9 +28,18 @@ import type {
 export function startChat(payload: {
   query: string;
   conversation_id?: string | null;
+  /** Dify 应用 code（前端切换器选择的值），新建会话时按此切换 agent */
+  app_code?: string | null;
   inputs?: Record<string, unknown>;
 }): Promise<ChatStartResponse> {
   return requestV2.post("/ai/chat/", payload);
+}
+
+/**
+ * 拉取后台维护的全部启用 Dify 应用（用于前端"应用切换器"渲染下拉列表）。
+ */
+export function listAiApps(): Promise<{ items: AiApp[] }> {
+  return requestV2.get("/ai/apps/");
 }
 
 /**

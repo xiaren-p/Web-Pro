@@ -29,6 +29,9 @@
 | 流式输出中断 | SSE 订阅先回放 DB 已落内容；检查 Redis 是否可用；`X-Accel-Buffering: no` 是否透传 |
 | Plan 卡片不显示 | 后端 `plan_translator` 未提取到 `<plan>` JSON；检查 LLM 提示词 |
 | 取消无效 | `/ai/messages/<id>/cancel/` 调 Celery revoke；任务可能已接近完成 |
+| 切换应用后消息发到旧应用 | Dify `conversation_id` 不可跨应用复用；续接会话时后端忽略前端 `app_code`，沿用会话已绑定的 `dify_app`。切换应用必须新建会话 |
+| `DifyApp` 缺少默认应用 | `DifyApp.objects.get_default()` 抛 `DoesNotExist`；通过 `manage.py shell` 创建至少一条 `is_active=True` 的 `DifyApp` 记录 |
+| Dify API Key 解密失败 | 检查 `FERNET_SECRET_KEY` 是否与加密时一致；`api_key_encrypted` 是否为空；用 `DifyApp.encrypt_api_key()` 重新加密写入 |
 
 ## 前端问题
 

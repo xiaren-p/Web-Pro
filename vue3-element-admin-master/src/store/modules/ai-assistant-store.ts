@@ -8,11 +8,13 @@
  */
 
 import { useStorage } from "@vueuse/core";
+import { computed } from "vue";
 import { store } from "@/store";
-import type { AiConversation, AiConversationGroup } from "@/types/aiAssistant/planSchema";
+import type { AiApp, AiConversation, AiConversationGroup } from "@/types/aiAssistant/planSchema";
 
 const STORAGE_KEY_ACTIVE_CONVERSATION = "ai-assistant:active-conversation-id";
 const STORAGE_KEY_PANEL_OPEN = "ai-assistant:panel-open";
+const STORAGE_KEY_ACTIVE_APP_CODE = "ai-assistant:active-app-code";
 
 export const useAiAssistantStore = defineStore("aiAssistant", () => {
   /** 侧栏抽屉是否展开 */
@@ -20,6 +22,12 @@ export const useAiAssistantStore = defineStore("aiAssistant", () => {
 
   /** 当前激活的会话 UUID；为 null 表示尚未选择 */
   const activeConversationId = useStorage<string | null>(STORAGE_KEY_ACTIVE_CONVERSATION, null);
+
+  /** 用户选定的 Dify 应用 code；null 表示走系统默认应用 */
+  const activeAppCode = useStorage<string | null>(STORAGE_KEY_ACTIVE_APP_CODE, null);
+
+  /** 后端拉的全部启用 Dify 应用列表（按 sort_order 升序） */
+  const availableApps = ref<AiApp[]>([]);
 
   /** 会话列表（仅元数据，正文按需向后端拉） */
   const conversations = ref<AiConversation[]>([]);
@@ -29,6 +37,25 @@ export const useAiAssistantStore = defineStore("aiAssistant", () => {
 
   /** 是否正在向 Dify 发送（防止重复点击） */
   const sending = ref<boolean>(false);
+
+  /**
+   * 当前选中的 Dify 应用对象。
+   *
+   * 计算规则：
+   *   1. 优先按 ``activeAppCode`` 匹配
+   *   2. 若 activeAppCode 为 null 或匹配不到（应用已停用）→ 回退到 ``is_default=true``
+   *   3. 仍找不到 → 取列表第一条
+   *   4. 列表为空 → null
+   */
+  const currentApp = computed<AiApp | null>(() => {
+    if (availableApps.value.length === 0) return null;
+    if (activeAppCode.value) {
+      const matched = availableApps.value.find((a) => a.code === activeAppCode.value);
+      if (matched) return matched;
+    }
+    const fallback = availableApps.value.find((a) => a.is_default);
+    return fallback ?? availableApps.value[0];
+  });
 
   /**
    * 切换侧栏抽屉显隐。
@@ -137,9 +164,30 @@ export const useAiAssistantStore = defineStore("aiAssistant", () => {
     );
   }
 
+  /**
+   * 用后端返回的 Dify 应用列表覆盖本地缓存。
+   *
+   * @param items - 后端 list_apps 返回的应用数组
+   */
+  function setApps(items: AiApp[]): void {
+    availableApps.value = items;
+  }
+
+  /**
+   * 切换当前激活的 Dify 应用。
+   *
+   * @param code - 目标应用 code；传 null 表示恢复到 currentApp 计算的默认值
+   */
+  function setActiveApp(code: string | null): void {
+    activeAppCode.value = code;
+  }
+
   return {
     panelOpen,
     activeConversationId,
+    activeAppCode,
+    availableApps,
+    currentApp,
     conversations,
     groups,
     sending,
@@ -154,6 +202,8 @@ export const useAiAssistantStore = defineStore("aiAssistant", () => {
     patchGroup,
     appendGroup,
     removeGroup,
+    setApps,
+    setActiveApp,
   };
 });
 

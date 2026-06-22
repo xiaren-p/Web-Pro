@@ -31,8 +31,8 @@
 | --- | --- | --- |
 | `SECRET_KEY` | 内置 insecure | Django 密钥，生产必须替换 |
 | `FERNET_SECRET_KEY` | （空） | Fernet 对称加密密钥，Config PASSWORD 类型必需。生成：`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
-| `DIFY_API_BASE` | （空） | Dify 平台 base URL |
-| `DIFY_API_KEY` | （空） | Dify 应用 sk- 密钥，仅后端读取 |
+| `DIFY_API_BASE` | （空） | Dify 平台 base URL，作为 `DifyApp.api_base` 为空时的兜底默认值 |
+| `DIFY_API_KEY` | （空） | Dify 应用 sk- 密钥，仅后端读取。**多应用模式下改为 `DifyApp` 表管理**：通过 `manage.py shell` 用 `DifyApp.encrypt_api_key()` 加密后写入 `api_key_encrypted`，此环境变量仅作历史兜底 |
 
 ## 鉴权与 Token
 
@@ -92,3 +92,4 @@
 - `.env` 被 gitignore，禁止提交。
 - 文档中真实密钥用 `<YOUR_xxx>` 替换。
 - `DIFY_API_KEY` 严禁出现在前端代码或日志中。
+- **Dify 多应用配置**：新增 Dify 应用时通过 `manage.py shell` 创建 `DifyApp` 记录，API Key 用 `DifyApp.encrypt_api_key('sk-xxx')` 加密后写入 `api_key_encrypted`（BinaryField），DB 中永不出现明文。`FERNET_SECRET_KEY` 是解密密钥，必须妥善保管。

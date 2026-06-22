@@ -58,6 +58,7 @@ def start_chat(request: Request) -> Response:
             user=request.user,
             query=payload['query'],
             conversation_id=payload.get('conversation_id'),
+            app_code=payload.get('app_code') or None,
             inputs=payload.get('inputs') or {},
         )
     except ValueError as exc:

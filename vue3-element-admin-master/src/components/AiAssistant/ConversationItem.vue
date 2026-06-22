@@ -5,6 +5,13 @@
     @click="$emit('select', conversation.id)"
   >
     <el-icon v-if="conversation.is_pinned" class="conversation-item__pin"><Top /></el-icon>
+    <span
+      v-if="conversation.app_icon"
+      class="conversation-item__app-icon"
+      :title="conversation.app_name || ''"
+    >
+      {{ conversation.app_icon }}
+    </span>
     <span class="conversation-item__title">{{ conversation.title || "新对话" }}</span>
 
     <el-dropdown
@@ -131,6 +138,12 @@ function handleCommand(command: string): void {
     flex-shrink: 0;
     font-size: 14px;
     color: var(--el-color-warning);
+  }
+
+  &__app-icon {
+    flex-shrink: 0;
+    font-size: 14px;
+    line-height: 1;
   }
 
   &__title {

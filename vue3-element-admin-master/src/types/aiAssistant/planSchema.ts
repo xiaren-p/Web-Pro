@@ -99,12 +99,42 @@ export interface AiConversation {
   dify_conversation_id: string;
   /** 所属分组 UUID；null 表示未分组 */
   group_id: string | null;
+  /** 所属 Dify 应用 code；null 表示历史数据未绑定 */
+  app_code: string | null;
+  /** Dify 应用展示名 */
+  app_name: string | null;
+  /** Dify 应用图标（emoji） */
+  app_icon: string | null;
   /** 是否已置顶 */
   is_pinned: boolean;
   /** 置顶时间；未置顶为 null */
   pinned_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Dify 应用配置（聊天机器人 / 智能体）。
+ *
+ * 来自后端 ``GET /api/v2/ai/apps/``，前端用于渲染输入区的"应用切换器 chip"。
+ */
+export interface AiApp {
+  /** 后端 UUID（public_id） */
+  id: string;
+  /** 内部代码，前端 startChat 时携带此值 */
+  code: string;
+  /** 用户可见名称 */
+  name: string;
+  /** 辅助说明，下拉项 tooltip 用 */
+  description: string;
+  /** 单字符 emoji */
+  icon: string;
+  /** 应用类型：chatflow / agent / workflow */
+  mode: "chatflow" | "agent" | "workflow";
+  /** 是否系统默认 */
+  is_default: boolean;
+  /** 展示顺序 */
+  sort_order: number;
 }
 
 /**

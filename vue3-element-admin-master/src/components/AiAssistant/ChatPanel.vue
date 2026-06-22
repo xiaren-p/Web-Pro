@@ -260,6 +260,41 @@
                     <span>思考</span>
                   </button>
                 </el-tooltip>
+
+                <!-- 应用切换器：列出所有启用的 Dify 应用，选中后下条消息走对应应用 -->
+                <el-dropdown
+                  v-if="store.availableApps.length > 1"
+                  trigger="click"
+                  placement="top-start"
+                  @command="handleSelectApp"
+                >
+                  <el-tooltip :content="currentAppTooltip" placement="top">
+                    <button
+                      type="button"
+                      class="ai-chat-panel__chip ai-chat-panel__chip--app"
+                      :disabled="store.sending"
+                    >
+                      <span class="ai-chat-panel__chip-icon">
+                        {{ store.currentApp?.icon || "💬" }}
+                      </span>
+                      <span>{{ store.currentApp?.name || "通用助手" }}</span>
+                      <el-icon class="ai-chat-panel__chip-caret"><ArrowDown /></el-icon>
+                    </button>
+                  </el-tooltip>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item
+                        v-for="app in store.availableApps"
+                        :key="app.code"
+                        :command="app.code"
+                        :disabled="app.code === store.currentApp?.code"
+                      >
+                        <span style="margin-right: 6px">{{ app.icon }}</span>
+                        <span>{{ app.name }}</span>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
               <div class="ai-chat-panel__composer-status">
                 <span v-if="footerHint" class="ai-chat-panel__hint">{{ footerHint }}</span>
@@ -311,6 +346,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
+  ArrowDown,
   Close,
   Delete,
   Download,
@@ -329,6 +365,7 @@ import {
   createGroup,
   deleteConversation,
   deleteGroup,
+  listAiApps,
   listConversations,
   listGroups,
   listMessages,
@@ -399,6 +436,16 @@ const currentConversationTitle = computed<string>(() => {
   return conv?.title || "新对话";
 });
 
+/**
+ * 应用切换器 chip 的 tooltip 文本：展示当前 app 名称 + 描述。
+ */
+const currentAppTooltip = computed<string>(() => {
+  const app = store.currentApp;
+  if (!app) return "切换 AI 应用";
+  if (app.description) return `${app.name}：${app.description}（点击切换）`;
+  return `当前：${app.name}（点击切换）`;
+});
+
 /** 已置顶会话（跨分组聚合到顶部，按 pinned_at 倒序） */
 const pinnedConversations = computed<AiConversation[]>(() =>
   store.conversations
@@ -436,7 +483,7 @@ watch(
   () => store.panelOpen,
   async (open) => {
     if (open) {
-      await Promise.all([loadGroups(), loadConversations()]);
+      await Promise.all([loadGroups(), loadConversations(), loadApps()]);
       await loadActiveMessages();
     }
   },
@@ -490,7 +537,7 @@ useKeyboardShortcuts(
 
 onMounted(async () => {
   if (store.panelOpen) {
-    await Promise.all([loadGroups(), loadConversations()]);
+    await Promise.all([loadGroups(), loadConversations(), loadApps()]);
     await loadActiveMessages();
   }
 });
@@ -520,6 +567,21 @@ async function loadGroups(): Promise<void> {
     store.setGroups(resp.items);
   } catch {
     // 分组失败不影响对话核心功能，静默
+  }
+}
+
+/**
+ * 拉取后台维护的全部启用 Dify 应用。
+ *
+ * 首次拉到列表后，若 ``activeAppCode`` 尚未持久化或指向已停用的应用，
+ * 由 store.currentApp 的计算属性自动回退到 is_default。
+ */
+async function loadApps(): Promise<void> {
+  try {
+    const resp = await listAiApps();
+    store.setApps(resp.items);
+  } catch {
+    // 应用列表拉取失败时，后端会兜底使用 settings 默认应用，前端切换器隐藏
   }
 }
 
@@ -557,6 +619,7 @@ async function handleSend(): Promise<void> {
     const resp = await startChat({
       query,
       conversation_id: store.activeConversationId ?? undefined,
+      app_code: store.currentApp?.code ?? undefined,
       inputs: { thinking_mode: thinkingEnabled.value ? "on" : "off" },
     });
 
@@ -658,6 +721,42 @@ function handleNewConversation(): void {
   store.setActiveConversation(null);
   messages.value = [];
   searchKeyword.value = "";
+}
+
+/**
+ * 用户在 chip 下拉里选了新的 AI 应用。
+ *
+ * 同一会话不能跨应用续接（Dify conversation_id 限制），所以切换后
+ * 必须开启新对话；若当前已有会话则弹确认框，避免误丢上下文。
+ *
+ * @param appCode - 目标应用 code
+ */
+async function handleSelectApp(appCode: string): Promise<void> {
+  if (appCode === store.currentApp?.code) return;
+
+  // 已在某会话中 → 提示用户切换会创建新对话
+  if (store.activeConversationId !== null) {
+    try {
+      await ElMessageBox.confirm(
+        "切换 AI 应用将开启一个新对话，当前会话会保留在历史里。是否继续？",
+        "切换应用",
+        { type: "warning", confirmButtonText: "切换", cancelButtonText: "取消" }
+      );
+    } catch {
+      return;
+    }
+  }
+
+  store.setActiveApp(appCode);
+  abortSubscription();
+  store.setActiveConversation(null);
+  messages.value = [];
+  searchKeyword.value = "";
+
+  const target = store.availableApps.find((a) => a.code === appCode);
+  if (target) {
+    ElMessage.success(`已切换到「${target.icon} ${target.name}」`);
+  }
 }
 
 async function handleRenameConversation(conv: AiConversation): Promise<void> {
@@ -1313,6 +1412,25 @@ function buildLocalAssistantPlaceholder(
 
   &__chip-icon {
     font-size: 13px;
+  }
+
+  &__chip-caret {
+    margin-left: 2px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    transition: color 0.15s;
+  }
+
+  /* 应用切换器 chip（含 emoji icon + 名称 + 下拉箭头）*/
+  &__chip--app {
+    .ai-chat-panel__chip-icon {
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    &:hover:not(:disabled) .ai-chat-panel__chip-caret {
+      color: var(--el-text-color-primary);
+    }
   }
 
   /* 思考 / 后续工具按钮（chip 风格）*/
