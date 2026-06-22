@@ -390,14 +390,6 @@ onMounted(() => {
       height: 2px;
       border-radius: 2px;
     }
-
-    /* 内容区下边框与下圆角，完成卡片封闭 */
-    :deep(.el-tabs__content) {
-      background: #ffffff;
-      border: 1px solid var(--color-gray-200);
-      border-top: none;
-      border-radius: 0 0 var(--radius-xl) var(--radius-xl);
-    }
   }
 
   .tab-placeholder {
@@ -408,7 +400,12 @@ onMounted(() => {
   }
 
   .tab-indicators-wrapper {
-    padding: var(--spacing-2) 0 0;
+    margin-bottom: var(--spacing-4);
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
   }
 
   :deep(.el-tab-pane) {
