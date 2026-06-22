@@ -311,6 +311,8 @@ const tableData = ref<any[]>([]);
 /** 汇总行 */
 const summaryRow = ref<Record<string, unknown> | null>(null);
 
+defineExpose({ summaryRow });
+
 /** 货币符号 */
 const currencyIcon = ref<string>("$");
 

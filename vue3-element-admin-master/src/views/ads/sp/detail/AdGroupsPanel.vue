@@ -282,6 +282,8 @@ const tableData = ref<any[]>([]);
 /** 汇总行数据（后端返回的 summary，挂载 _isSummary 标志后置顶） */
 const summaryRow = ref<Record<string, unknown> | null>(null);
 
+defineExpose({ summaryRow });
+
 /** 货币符号（从接口响应中获取，用于默认竞价列前缀） */
 const currencyIcon = ref<string>("$");
 

@@ -40,14 +40,22 @@
     <!-- 横向功能导航 Tab -->
     <el-tabs v-model="activeTab" class="detail-tabs">
       <el-tab-pane label="广告组" name="adgroups">
+        <div class="tab-indicators-wrapper">
+          <Indicators v-if="activeSummary" :summary="activeSummary" />
+        </div>
         <AdGroupsPanel
+          ref="adGroupsRef"
           :campaign-id="campaignId"
           :profile-id="profileId"
           :initial-date-range="inheritedDateRange"
         />
       </el-tab-pane>
       <el-tab-pane label="广告" name="ads">
+        <div class="tab-indicators-wrapper">
+          <Indicators v-if="activeSummary" :summary="activeSummary" />
+        </div>
         <AdsPanel
+          ref="adsRef"
           :campaign-id="campaignId"
           :profile-id="profileId"
           :initial-date-range="inheritedDateRange"
@@ -55,7 +63,11 @@
       </el-tab-pane>
       <el-tab-pane label="投放" name="targeting">
         <template v-if="campaignInfo?.targeting_type?.toUpperCase() === 'AUTO'">
+          <div class="tab-indicators-wrapper">
+            <Indicators v-if="activeSummary" :summary="activeSummary" />
+          </div>
           <AutoTargetingPanel
+            ref="autoTargetingRef"
             :campaign-id="campaignId"
             :profile-id="profileId"
             :initial-date-range="inheritedDateRange"
@@ -109,6 +121,7 @@ import AutoTargetingPanel from "@/views/ads/sp/detail/AutoTargetingPanel.vue";
 import AutoNegativePanel from "@/views/ads/sp/detail/AutoNegativePanel.vue";
 import KeywordPanel from "@/views/ads/sp/detail/KeywordPanel.vue";
 import NegativeKeywordPanel from "@/views/ads/sp/detail/NegativeKeywordPanel.vue";
+import Indicators from "@/views/ads/sp/Indicators.vue";
 
 defineOptions({ name: "AdCampaignDetail" });
 
@@ -146,6 +159,33 @@ const inheritedDateRange = computed<string[]>(() => {
 
 /** 广告活动基础信息，通过 API 异步加载 */
 const campaignInfo = ref<AdCampaignDetailResponse | null>(null);
+
+/** 子面板组件引用（用于获取各面板的 summaryRow） */
+const adGroupsRef = ref<InstanceType<typeof AdGroupsPanel>>();
+const adsRef = ref<InstanceType<typeof AdsPanel>>();
+const autoTargetingRef = ref<InstanceType<typeof AutoTargetingPanel>>();
+
+/**
+ * 当前激活 Tab 对应的汇总指标数据。
+ * 从已加载的子面板 defineExpose 的 summaryRow 中实时获取。
+ *
+ * @returns {Record<string, unknown> | null} 当前面板的汇总数据，或 null
+ */
+const activeSummary = computed<Record<string, unknown> | null>(() => {
+  switch (activeTab.value) {
+    case "adgroups":
+      return (adGroupsRef.value as any)?.summaryRow ?? null;
+    case "ads":
+      return (adsRef.value as any)?.summaryRow ?? null;
+    case "targeting":
+      if (campaignInfo.value?.targeting_type?.toUpperCase() === "AUTO") {
+        return (autoTargetingRef.value as any)?.summaryRow ?? null;
+      }
+      return null;
+    default:
+      return null;
+  }
+});
 
 /**
  * 将投放类型字段值格式化为中文显示。
@@ -350,6 +390,14 @@ onMounted(() => {
       height: 2px;
       border-radius: 2px;
     }
+
+    /* 内容区下边框与下圆角，完成卡片封闭 */
+    :deep(.el-tabs__content) {
+      background: #ffffff;
+      border: 1px solid var(--color-gray-200);
+      border-top: none;
+      border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+    }
   }
 
   .tab-placeholder {
@@ -357,6 +405,10 @@ onMounted(() => {
     font-size: var(--font-size-base);
     color: var(--color-gray-400);
     text-align: center;
+  }
+
+  .tab-indicators-wrapper {
+    padding: var(--spacing-2) 0 0;
   }
 
   :deep(.el-tab-pane) {
