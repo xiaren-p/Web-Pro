@@ -44,6 +44,9 @@
           :campaign-id="campaignId"
           :profile-id="profileId"
           :initial-date-range="inheritedDateRange"
+          :campaign-name="campaignInfo?.name ?? ''"
+          :targeting-type="campaignInfo?.targeting_type ?? ''"
+          :campaign-state="campaignInfo?.state ?? ''"
         />
       </el-tab-pane>
       <el-tab-pane label="广告" name="ads">
@@ -51,6 +54,9 @@
           :campaign-id="campaignId"
           :profile-id="profileId"
           :initial-date-range="inheritedDateRange"
+          :campaign-name="campaignInfo?.name ?? ''"
+          :targeting-type="campaignInfo?.targeting_type ?? ''"
+          :campaign-state="campaignInfo?.state ?? ''"
         />
       </el-tab-pane>
       <el-tab-pane label="投放" name="targeting">
@@ -59,6 +65,9 @@
             :campaign-id="campaignId"
             :profile-id="profileId"
             :initial-date-range="inheritedDateRange"
+            :campaign-name="campaignInfo?.name ?? ''"
+            :targeting-type="campaignInfo?.targeting_type ?? ''"
+            :campaign-state="campaignInfo?.state ?? ''"
           />
         </template>
         <template v-else>
@@ -66,6 +75,9 @@
             :campaign-id="campaignId"
             :profile-id="profileId"
             :initial-date-range="inheritedDateRange"
+            :campaign-name="campaignInfo?.name ?? ''"
+            :targeting-type="campaignInfo?.targeting_type ?? ''"
+            :campaign-state="campaignInfo?.state ?? ''"
           />
         </template>
       </el-tab-pane>
@@ -75,6 +87,9 @@
             :campaign-id="campaignId"
             :profile-id="profileId"
             :initial-date-range="inheritedDateRange"
+            :campaign-name="campaignInfo?.name ?? ''"
+            :targeting-type="campaignInfo?.targeting_type ?? ''"
+            :campaign-state="campaignInfo?.state ?? ''"
           />
         </template>
         <template v-else>
@@ -82,6 +97,9 @@
             :campaign-id="campaignId"
             :profile-id="profileId"
             :initial-date-range="inheritedDateRange"
+            :campaign-name="campaignInfo?.name ?? ''"
+            :targeting-type="campaignInfo?.targeting_type ?? ''"
+            :campaign-state="campaignInfo?.state ?? ''"
           />
         </template>
       </el-tab-pane>

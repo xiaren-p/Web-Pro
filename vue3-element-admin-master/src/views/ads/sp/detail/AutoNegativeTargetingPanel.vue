@@ -1,5 +1,18 @@
 <template>
   <div class="auto-negative-targeting-panel ads-detail-panel">
+    <!-- 广告活动上下文信息 -->
+    <div class="campaign-context-bar">
+      <span v-if="targetingType" class="targeting-badge">
+        {{ formatTargetingType(targetingType) }}
+      </span>
+      <span class="campaign-state-icon" :class="`state-${campaignState}`">
+        <span v-if="campaignState === 'enabled'" class="dot-circle" />
+        <el-icon v-else-if="campaignState === 'paused'"><VideoPause /></el-icon>
+        <el-icon v-else-if="campaignState === 'archived'"><CircleClose /></el-icon>
+      </span>
+      <span class="context-campaign-name">{{ campaignName || campaignId || "-" }}</span>
+    </div>
+
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <el-date-picker
@@ -280,7 +293,22 @@ const props = defineProps<{
   campaignId: string;
   profileId: string;
   initialDateRange?: string[];
+  campaignName?: string;
+  targetingType?: string;
+  campaignState?: string;
 }>();
+
+/**
+ * 将投放类型字段值格式化为中文显示。
+ *
+ * @param {string} val - targeting_type 原始值（AUTO / MANUAL）
+ * @returns {string} 中文显示文字；无法识别则原样返回。
+ */
+function formatTargetingType(val: string): string {
+  if (!val) return "";
+  const map: Record<string, string> = { AUTO: "自动", MANUAL: "手动" };
+  return map[val.toUpperCase()] ?? val;
+}
 
 // ── 筛选状态 ──────────────────────────────────────────
 const filters = reactive({

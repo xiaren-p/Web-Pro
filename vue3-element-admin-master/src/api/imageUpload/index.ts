@@ -28,6 +28,21 @@ export interface ImageUploadForm {
   imageUrl?: string;
 }
 
+/** 图片同步队列查询参数。 */
+export interface ImageSyncQueueQuery extends PageQuery {
+  imageGroup?: string;
+}
+
+/** 图片同步队列返回对象。 */
+export interface ImageSyncQueueVO {
+  id: string;
+  imageGroup: string;
+  cloudPath: string;
+  status: string;
+  errorMsg: string;
+  createTime: string;
+}
+
 const IMAGE_UPLOAD_BASE_URL = "/image-uploads";
 
 export const ImageUploadAPI = {
@@ -59,8 +74,12 @@ export const ImageUploadAPI = {
   batchSync(ids: string[]) {
     return request({ url: `${IMAGE_UPLOAD_BASE_URL}/batch_sync`, method: "post", data: { ids } });
   },
-  getQueue() {
-    return request<any, any[]>({ url: `${IMAGE_UPLOAD_BASE_URL}/queue`, method: "get" });
+  getQueue(params: ImageSyncQueueQuery) {
+    return request<any, PageResult<ImageSyncQueueVO[]>>({
+      url: `${IMAGE_UPLOAD_BASE_URL}/queue`,
+      method: "get",
+      params,
+    });
   },
   importCsv(file: File) {
     const formData = new FormData();

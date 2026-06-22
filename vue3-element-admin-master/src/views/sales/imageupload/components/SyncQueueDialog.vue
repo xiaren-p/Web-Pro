@@ -15,6 +15,14 @@
       <el-table-column type="index" label="序号" width="60" align="center" />
       <el-table-column property="imageGroup" label="图片组" />
       <el-table-column property="cloudPath" label="路径" show-overflow-tooltip />
+      <el-table-column label="状态" width="100" align="center">
+        <template #default="scope">
+          <el-tag v-if="scope.row.status === 'pending'" type="warning">待同步</el-tag>
+          <el-tag v-else-if="scope.row.status === 'success'" type="success">同步成功</el-tag>
+          <el-tag v-else-if="scope.row.status === 'failed'" type="danger">同步失败</el-tag>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
     </el-table>
 
     <div class="pagination-container">
@@ -30,13 +38,18 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 同步队列弹窗：展示内部图片同步队列记录，支持按图片组搜索与后端分页。
+ * 所属板块：listing / imageupload。
+ */
 import { ref, reactive } from "vue";
 import { ImageUploadAPI } from "@/api/imageUpload";
+import type { ImageSyncQueueVO } from "@/api/imageUpload";
 import { ElMessage } from "element-plus";
 
 const visible = ref(false);
 const loading = ref(false);
-const list = ref<any[]>([]);
+const list = ref<ImageSyncQueueVO[]>([]);
 const total = ref(0);
 
 const queryParams = reactive({
@@ -52,34 +65,13 @@ function open() {
   handleQueueQuery();
 }
 
+/** 查询同步队列（后端分页 + imageGroup 过滤）。 */
 function handleQueueQuery() {
   loading.value = true;
-  ImageUploadAPI.getQueue()
-    .then((res: any) => {
-      // Backend returns the list directly (wrapped in drf_ok, unwrapped by request interceptor)
-      const rawList = Array.isArray(res) ? res : [];
-
-      // Map fields: sku -> imageGroup, local_path -> cloudPath
-      let allData = rawList.map((item: any) => ({
-        ...item,
-        imageGroup: item.sku,
-        cloudPath: item.local_path,
-      }));
-
-      // Client-side filtering
-      if (queryParams.imageGroup) {
-        const keyword = queryParams.imageGroup.trim().toLowerCase();
-        allData = allData.filter(
-          (item: any) => item.imageGroup && String(item.imageGroup).toLowerCase().includes(keyword)
-        );
-      }
-
-      total.value = allData.length;
-
-      // Client-side pagination
-      const { pageNum, pageSize } = queryParams;
-      const start = (pageNum - 1) * pageSize;
-      list.value = allData.slice(start, start + pageSize);
+  ImageUploadAPI.getQueue(queryParams)
+    .then((data) => {
+      list.value = data.list;
+      total.value = data.total;
     })
     .catch((err) => {
       console.error("Fetch queue error:", err);

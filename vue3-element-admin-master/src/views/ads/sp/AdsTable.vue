@@ -6,9 +6,10 @@
         class="data-table__content"
         :data="displayData"
         :row-class-name="getRowClass"
-        :border="false"
+        border
         style="width: 100%"
         @sort-change="$emit('sort-change', $event)"
+        @header-dragend="onHeaderDragEnd"
       >
         <template #empty>
           <div class="table-empty">
@@ -18,13 +19,13 @@
             <p class="table-empty__text">暂无数据</p>
           </div>
         </template>
-        <el-table-column type="selection" width="48" fixed="left" align="center">
+        <el-table-column type="selection" width="48" fixed="left" align="center" :resizable="false">
           <template #default="{ row }">
             <span v-if="row._isSummary" />
           </template>
         </el-table-column>
 
-        <el-table-column label="有效" width="80" fixed="left" align="center">
+        <el-table-column label="有效" width="80" fixed="left" align="center" :resizable="false">
           <template #default="{ row }">
             <span v-if="row._isSummary" class="summary-dash">--</span>
             <div v-else class="state-cell">
@@ -51,7 +52,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="类型" width="100" fixed="left" align="center">
+        <el-table-column label="类型" width="100" fixed="left" align="center" :resizable="false">
           <template #default="{ row }">
             <template v-if="row._isSummary"><span class="summary-dash">--</span></template>
             <template v-else>
@@ -69,6 +70,7 @@
           fixed="left"
           align="center"
           sortable="custom"
+          :resizable="false"
         >
           <template #default="{ row }">
             <template v-if="row._isSummary">
@@ -90,6 +92,7 @@
           fixed="left"
           align="center"
           sortable="custom"
+          :resizable="false"
           show-overflow-tooltip
           :show-overflow-tooltip-delay="500"
         >
@@ -215,7 +218,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="分析" width="80" fixed="right" align="center">
+        <el-table-column label="分析" width="80" fixed="right" align="center" :resizable="false">
           <template #default="{ row }">
             <el-button
               v-if="!row._isSummary"
@@ -588,6 +591,21 @@ function getColumnMinWidth(prop: string): number {
     adsVolume: 120,
   };
   return widthMap[prop] ?? 120;
+}
+
+/**
+ * 拖拽列宽后确保不低于 min-width（Element Plus @header-dragend 回调）。
+ *
+ * @param {number} newWidth - 拖拽后的新列宽
+ * @param {number} _oldWidth - 拖拽前的旧列宽（未使用）
+ * @param {any} column - Element Plus 内部列对象（含 minWidth 属性）
+ */
+function onHeaderDragEnd(newWidth: number, _oldWidth: number, column: any): void {
+  const minW = column.minWidth ? Number(column.minWidth) : 80;
+  if (newWidth < minW) {
+    column.width = minW;
+    column.realWidth = minW;
+  }
 }
 
 /** 需要染色的正向指标（值越高越好） */
