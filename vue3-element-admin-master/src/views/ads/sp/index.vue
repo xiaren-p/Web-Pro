@@ -71,6 +71,8 @@
         @current-change="handlePageChange"
         @page-size-change="handlePageSizeChange"
         @sort-change="handleSortChange"
+        @update-budget="onUpdateBudget"
+        @update-state="onUpdateState"
       />
     </section>
 
@@ -104,9 +106,51 @@ import {
   getAdPortfolioOptions,
   getAdSkuOptions,
 } from "@/api/ads";
+import {
+  createCampaignStateAdjustment,
+  createManualBudgetAdjustment,
+} from "@/api/ads/campaign-adjustment";
 import { ShopsAPI } from "@/api/shops";
 
 defineOptions({ name: "AdsText" });
+
+// ── 浏览器缓存：记忆用户筛选 / 分页 / 列配置等手动选择 ──────────────────────────
+const STORAGE_KEYS = {
+  filters: "ADS_SP_FILTERS_V1",
+  pagination: "ADS_SP_PAGINATION_V1",
+  columns: "ADS_SP_COLUMNS_V1",
+  overBudget: "ADS_SP_OVERBUDGET_V1",
+  sort: "ADS_SP_SORT_V1",
+} as const;
+
+/**
+ * 安全读取 localStorage JSON 缓存。
+ *
+ * @param {string} key - 缓存键
+ * @returns {unknown|null} 解析后的值；读取失败或不存在返回 null
+ */
+function readCache(key: string): unknown {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 安全写入 localStorage JSON 缓存。
+ *
+ * @param {string} key - 缓存键
+ * @param {unknown} value - 待序列化写入的值
+ */
+function writeCache(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // 容量满或隐私模式：静默忽略，不影响业务
+  }
+}
 
 // ── 广告上传队列 ──────────────────────────────────────────────────────────────
 const queueDrawerVisible = ref(false);
@@ -123,10 +167,16 @@ function handleNewAdCommand(command: string): void {
 }
 
 // ── 广告列表 ──────────────────────────────────────────────────────────────────
-const onlyOverBudget = ref(false);
+const onlyOverBudget = ref<boolean>(
+  (() => {
+    const cached = readCache(STORAGE_KEYS.overBudget);
+    return typeof cached === "boolean" ? cached : false;
+  })()
+);
 
-// 切换超预算筛选时自动刷新表格
-watch(onlyOverBudget, () => {
+// 切换超预算筛选时自动刷新表格并持久化
+watch(onlyOverBudget, (v) => {
+  writeCache(STORAGE_KEYS.overBudget, v);
   currentPage.value = 1;
   loadTableData();
 });
@@ -227,21 +277,70 @@ function remoteSearchSku(query: string) {
   syncSkuOptions(query);
 }
 
-const filters = reactive({
-  countries: [] as string[],
-  profiles: [] as string[],
-  range: [] as string[],
-  adsTypes: [] as string[],
-  portfolios: [] as string[],
-  asinSearchType: "sku",
-  skus: [] as string[],
-  biddingType: "",
-  tags: [] as string[],
-  owners: [] as string[],
-  campaignName: "",
-  campaignStatus: [] as string[],
-  serviceStatus: [] as string[],
-});
+/**
+ * 从 localStorage 恢复筛选状态；无缓存时返回全空默认值。
+ * range 留空，由 Filters.vue 在无缓存时回填 7 天默认值。
+ */
+function initFiltersFromCache(): Record<string, unknown> {
+  const cached = readCache(STORAGE_KEYS.filters);
+  const defaults = {
+    countries: [] as string[],
+    profiles: [] as string[],
+    range: [] as string[],
+    adsTypes: [] as string[],
+    portfolios: [] as string[],
+    asinSearchType: "sku",
+    skus: [] as string[],
+    biddingType: "",
+    tags: [] as string[],
+    owners: [] as string[],
+    campaignName: "",
+    campaignStatus: [] as string[],
+    serviceStatus: [] as string[],
+  };
+  if (cached && typeof cached === "object") {
+    // 仅取已知字段，避免脏数据注入；数组类型校验
+    const c = cached as Record<string, unknown>;
+    const merged: Record<string, unknown> = { ...defaults };
+    for (const k of Object.keys(defaults)) {
+      const v = c[k];
+      if (Array.isArray(defaults[k as keyof typeof defaults])) {
+        if (Array.isArray(v)) merged[k] = v;
+      } else if (typeof v === "string") {
+        merged[k] = v;
+      }
+    }
+    return merged;
+  }
+  return defaults;
+}
+
+const filters = reactive(
+  initFiltersFromCache() as {
+    countries: string[];
+    profiles: string[];
+    range: string[];
+    adsTypes: string[];
+    portfolios: string[];
+    asinSearchType: string;
+    skus: string[];
+    biddingType: string;
+    tags: string[];
+    owners: string[];
+    campaignName: string;
+    campaignStatus: string[];
+    serviceStatus: string[];
+  }
+);
+
+// 筛选变更时持久化（deep watch，与 Filters.vue 的 emit 同步触发）
+watch(
+  filters,
+  (v) => {
+    writeCache(STORAGE_KEYS.filters, { ...v });
+  },
+  { deep: true }
+);
 
 watch(
   () => filters.asinSearchType,
@@ -331,7 +430,36 @@ const defaultColumns = [
   { label: "CPA", prop: "cpa", visible: true, category: "业绩", sortable: true },
 ];
 
-const activeColumns = ref(defaultColumns);
+/**
+ * 初始化列配置：合并本地缓存与默认配置。
+ * 缓存列按其顺序保留 visible/fixed，默认列补齐 label/category 与新增列。
+ */
+function initColumns(): any[] {
+  const cached = readCache(STORAGE_KEYS.columns);
+  if (cached && Array.isArray(cached)) {
+    try {
+      const defaultMap = new Map(defaultColumns.map((c) => [c.prop, c]));
+      const cachedProps = new Set<string>();
+      const merged = cached
+        .map((c: any) => {
+          const def = defaultMap.get(c.prop);
+          if (def) {
+            cachedProps.add(c.prop);
+            return { ...c, category: def.category, label: def.label };
+          }
+          return null;
+        })
+        .filter(Boolean);
+      const newCols = defaultColumns.filter((c) => !cachedProps.has(c.prop));
+      return [...merged, ...newCols];
+    } catch {
+      // 缓存损坏：回退默认
+    }
+  }
+  return JSON.parse(JSON.stringify(defaultColumns));
+}
+
+const activeColumns = ref(initColumns());
 const tableColumns = computed(() => activeColumns.value.filter((col) => col.visible));
 
 function restoreDefaultColumns() {
@@ -340,6 +468,7 @@ function restoreDefaultColumns() {
 
 function onColumnConfigSave(columns: any[]) {
   activeColumns.value = columns;
+  writeCache(STORAGE_KEYS.columns, columns);
   ElMessage.success("列配置已保存");
 }
 
@@ -382,13 +511,26 @@ function resetFilters() {
 
 const tableData = ref([] as any[]);
 const total = ref(0);
-const pageSize = ref(25);
-const currentPage = ref(1);
+// 分页从缓存恢复（pageSize / currentPage）
+const _cachedPagination = readCache(STORAGE_KEYS.pagination) as {
+  pageSize?: number;
+  currentPage?: number;
+} | null;
+const pageSize = ref<number>(
+  _cachedPagination?.pageSize && _cachedPagination.pageSize > 0 ? _cachedPagination.pageSize : 25
+);
+const currentPage = ref<number>(
+  _cachedPagination?.currentPage && _cachedPagination.currentPage > 0
+    ? _cachedPagination.currentPage
+    : 1
+);
 
 const loading = ref(false);
+// 排序从缓存恢复
+const _cachedSort = readCache(STORAGE_KEYS.sort) as { prop?: string; order?: string } | null;
 const sortParams = reactive({
-  prop: "",
-  order: "",
+  prop: _cachedSort?.prop || "",
+  order: _cachedSort?.order || "",
 });
 
 async function loadTableData() {
@@ -432,6 +574,12 @@ async function loadTableData() {
     tableData.value = res.list || [];
     total.value = res.total || 0;
     summary.value = res.summary ?? null;
+
+    // 持久化当前分页位置（加载成功后写回，避免失败状态被记忆）
+    writeCache(STORAGE_KEYS.pagination, {
+      pageSize: pageSize.value,
+      currentPage: currentPage.value,
+    });
   } catch (error) {
     console.error(error);
     ElMessage.error("获取广告列表数据失败");
@@ -453,12 +601,87 @@ function handlePageSizeChange(size: number) {
 function handleSortChange({ prop, order }: { prop: string; order: string }) {
   sortParams.prop = prop || "";
   sortParams.order = order || "";
+  writeCache(STORAGE_KEYS.sort, { prop: sortParams.prop, order: sortParams.order });
   currentPage.value = 1;
   loadTableData();
 }
 
 function openSearchTemplates() {
   ElMessage.info("打开筛选模板（占位）");
+}
+
+// ── 手动调整预算 / 状态（写调整记录表 + 更新本地实体，不触发亚马逊推送）──────────
+
+/**
+ * 处理预算修改：调用后端 adjust-budget 接口，成功后更新行内 budget 字段。
+ * 失败时由 AdsTable 还原编辑框值（通过 row.budget 未被修改实现）。
+ *
+ * @param {Object} payload - { row, budget }
+ * @param {any} payload.row - 表格行数据
+ * @param {number} payload.budget - 新预算值
+ * @returns {Promise<void>}
+ */
+async function onUpdateBudget({ row, budget }: { row: any; budget: number }): Promise<void> {
+  if (!row?.campaign_id || !row?.profile_id) {
+    ElMessage.error("缺少广告活动标识，无法修改预算");
+    return;
+  }
+  if (!(budget > 0)) {
+    ElMessage.error("预算必须大于 0");
+    return;
+  }
+  const oldBudget = row.budget;
+  try {
+    await createManualBudgetAdjustment({
+      campaign_id: row.campaign_id,
+      profile_id: row.profile_id,
+      budget_after: budget,
+    });
+    row.budget = budget;
+    ElMessage.success("预算修改已记录，待执行推送");
+  } catch (error) {
+    // 还原 UI 值，避免与后端不一致
+    row.budget = oldBudget;
+    console.error("[onUpdateBudget] 修改预算失败", error);
+    ElMessage.error("修改预算失败");
+  }
+}
+
+/**
+ * 处理状态修改：调用后端 adjust-state 接口，成功后更新行内 state 字段。
+ * 失败时还原 switch 状态。
+ *
+ * @param {Object} payload - { row, state }
+ * @param {any} payload.row - 表格行数据
+ * @param {string} payload.state - 目标状态（enabled / paused）
+ * @returns {Promise<void>}
+ */
+async function onUpdateState({
+  row,
+  state,
+}: {
+  row: any;
+  state: "enabled" | "paused";
+}): Promise<void> {
+  if (!row?.campaign_id || !row?.profile_id) {
+    ElMessage.error("缺少广告活动标识，无法修改状态");
+    return;
+  }
+  const oldState = row.state;
+  try {
+    await createCampaignStateAdjustment({
+      campaign_id: row.campaign_id,
+      profile_id: row.profile_id,
+      state,
+    });
+    row.state = state;
+    ElMessage.success(state === "enabled" ? "启用已记录，待执行推送" : "暂停已记录，待执行推送");
+  } catch (error) {
+    // 还原 UI 值，避免与后端不一致
+    row.state = oldState;
+    console.error("[onUpdateState] 修改状态失败", error);
+    ElMessage.error("修改状态失败");
+  }
 }
 
 loadTableData();

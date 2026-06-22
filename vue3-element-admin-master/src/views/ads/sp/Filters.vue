@@ -268,7 +268,7 @@ const initLocal = () => {
   if (!defaultValues.range || defaultValues.range.length !== 2) {
     const end = new Date();
     const start = new Date();
-    start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
+    start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
 
     // 格式化为 YYYY-MM-DD
     const formatDate = (date: Date) => {

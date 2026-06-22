@@ -1,10 +1,12 @@
-"""SP 广告活动基础数据视图（LxSpCampaign），仅提供查询。"""
+"""SP 广告活动基础数据视图（LxSpCampaign），提供查询与手动预算/状态调整。"""
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from django.core.cache import cache
 from django.db.models import Q, Sum
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -32,6 +34,11 @@ from api_v1.views.lingxing.ads._helpers import (
     build_campaign_profile_query,
     fmt_money,
     parse_exchange_rate,
+)
+from api_v2.models.sp_bid_adjustment import AdjustmentStatusChoices, ExecutionStatusChoices
+from api_v2.models.sp_campaign_adjustment import (
+    CampaignExecutionTypeChoices,
+    SpCampaignAdjustment,
 )
 
 # Doris 表达式树深度限制为 3000，因此分 batch 查询，每批最多 500 对 (campaign_id, profile_id)。
@@ -70,7 +77,12 @@ def _flat_parse_label(raw_label: str) -> list[str]:
 
 
 class AdCampaignViewSet(viewsets.ViewSet):
-    """SP 广告活动基础数据视图（只提供查询）。"""
+    """SP 广告活动基础数据视图，提供查询与手动预算/状态调整。
+
+    手动调整（adjust_budget / adjust_state）仅写入 SpCampaignAdjustment 调整记录表
+    并同步更新 LxSpCampaign 实体表，不触发 Celery 任务；实际推送到亚马逊由
+    专门的触发处调用 api_v2 的 ads/campaign-adjustment/run/ 接口完成。
+    """
 
     def _serialize(self, obj: LxSpCampaign) -> dict[str, Any]:
         """数据序列化辅助方法。
@@ -530,6 +542,17 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 for cid, pid in all_campaign_pairs
             }
 
+        # ── 预算映射：全量筛选集 campaign → daily_budget（供汇总行统计预算，与销售额同口径）──
+        budget_by_campaign_all: dict[str, float] = {}
+        for obj in campaigns:
+            if obj.campaign_id and obj.profile_id and obj.daily_budget is not None:
+                try:
+                    budget_by_campaign_all[
+                        build_campaign_profile_key(obj.campaign_id, obj.profile_id)
+                    ] = float(obj.daily_budget)
+                except (ValueError, TypeError):
+                    continue
+
         # ── 从 agg_map 计算汇总行 ──
         summary = self._compute_summary_from_agg(
             agg_map, all_pairs_set,
@@ -537,6 +560,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             ref_currency=ref_currency,
             currency_by_campaign_all=currency_by_campaign_all,
             rate_usd_to_cny=rate_usd_to_cny,
+            budget_by_campaign_all=budget_by_campaign_all,
         )
         meta = summary.pop("_meta", {})
 
@@ -593,6 +617,14 @@ class AdCampaignViewSet(viewsets.ViewSet):
                     self._empty_metrics(),
                 )
             )
+
+            # 货币符号 / 代码：取自分页货币映射，供前端预算编辑框显示货币前缀
+            _ccy = campaign_currency_map.get(
+                build_campaign_profile_key(item.campaign_id, item.profile_id),
+                {"icon": "$", "code": "USD"},
+            )
+            dic["currency_icon"] = _ccy.get("icon", "$")
+            dic["currency_code"] = _ccy.get("code", "USD")
 
             dic["store_id"] = p_info.get("sid", "")
 
@@ -715,6 +747,143 @@ class AdCampaignViewSet(viewsets.ViewSet):
             "targeting_type": obj.targeting_type or "",
             "state": obj.state,
             "sponsored_type": obj.campaign_type,
+        })
+
+    @action(detail=False, methods=["post"], url_path="adjust-budget")
+    def adjust_budget(self, request: Request) -> Response:
+        """手动调整广告活动预算：写 SpCampaignAdjustment 记录 + 更新 LxSpCampaign.daily_budget。
+
+        仅写入调整记录表与本地实体表，不触发 Celery 任务；实际推送到亚马逊由
+        专门的触发处调用 api_v2 的 ads/campaign-adjustment/run/ 接口完成。
+
+        Args:
+            request (Request): DRF 请求对象，body 需含：
+                - campaign_id (str|int): 广告活动 ID（必填）
+                - profile_id (str|int): 店铺 Profile ID（必填）
+                - budget_after (str|float|int): 调整后预算（必填，>0）
+
+        Returns:
+            Response: 成功返回 {campaign_id, profile_id, budget_before, budget_after}；
+                      参数错误或活动不存在返回 {code, msg}。
+        """
+        data = request.data or {}
+        campaign_id = data.get("campaign_id")
+        profile_id = data.get("profile_id")
+        budget_after_raw = data.get("budget_after")
+
+        if campaign_id is None or profile_id is None or budget_after_raw is None:
+            return drf_ok({}, msg="campaign_id、profile_id、budget_after 均为必填参数")
+
+        try:
+            budget_after = Decimal(str(budget_after_raw))
+        except (InvalidOperation, ValueError, TypeError):
+            return drf_ok({}, msg="budget_after 必须为有效数值")
+        if budget_after <= 0:
+            return drf_ok({}, msg="budget_after 必须大于 0")
+
+        try:
+            cid_int = int(campaign_id)
+            pid_int = int(profile_id)
+        except (ValueError, TypeError):
+            return drf_ok({}, msg="campaign_id 与 profile_id 必须为整数")
+
+        campaign = LxSpCampaign.objects.filter(
+            campaign_id=cid_int, profile_id=pid_int,
+        ).only("daily_budget").first()
+        if not campaign:
+            return drf_ok({}, msg="未找到对应的广告活动")
+
+        budget_before = campaign.daily_budget
+
+        # 写调整记录表（PENDING，待专门触发处推送）
+        SpCampaignAdjustment.objects.create(
+            campaign_id=cid_int,
+            profile_id=pid_int,
+            execution_type=CampaignExecutionTypeChoices.MANUAL_BUDGET_ADJUSTMENT,
+            budget_before=float(budget_before) if budget_before is not None else None,
+            budget_after=float(budget_after),
+            adjustment_status=AdjustmentStatusChoices.PENDING,
+            execution_status=ExecutionStatusChoices.PENDING,
+            adjustment_time=timezone.now(),
+        )
+
+        # 同步更新本地实体表预算
+        LxSpCampaign.objects.filter(
+            campaign_id=cid_int, profile_id=pid_int,
+        ).update(daily_budget=budget_after)
+
+        return drf_ok({
+            "campaign_id": cid_int,
+            "profile_id": pid_int,
+            "budget_before": float(budget_before) if budget_before is not None else None,
+            "budget_after": float(budget_after),
+        })
+
+    @action(detail=False, methods=["post"], url_path="adjust-state")
+    def adjust_state(self, request: Request) -> Response:
+        """手动调整广告活动状态：写 SpCampaignAdjustment 记录 + 更新 LxSpCampaign.state。
+
+        state=enabled 写 CAMPAIGN_ENABLE 类型，state=paused 写 CAMPAIGN_PAUSE 类型（复用）。
+        仅写入调整记录表与本地实体表，不触发 Celery 任务；实际推送到亚马逊由
+        专门的触发处调用 api_v2 的 ads/campaign-adjustment/run/ 接口完成。
+
+        Args:
+            request (Request): DRF 请求对象，body 需含：
+                - campaign_id (str|int): 广告活动 ID（必填）
+                - profile_id (str|int): 店铺 Profile ID（必填）
+                - state (str): 目标状态，仅支持 "enabled" / "paused"（必填）
+
+        Returns:
+            Response: 成功返回 {campaign_id, profile_id, state}；
+                      参数错误或活动不存在返回 {code, msg}。
+        """
+        data = request.data or {}
+        campaign_id = data.get("campaign_id")
+        profile_id = data.get("profile_id")
+        state = str(data.get("state") or "").strip().lower()
+
+        if campaign_id is None or profile_id is None or not state:
+            return drf_ok({}, msg="campaign_id、profile_id、state 均为必填参数")
+        if state not in ("enabled", "paused"):
+            return drf_ok({}, msg="state 仅支持 enabled / paused")
+
+        try:
+            cid_int = int(campaign_id)
+            pid_int = int(profile_id)
+        except (ValueError, TypeError):
+            return drf_ok({}, msg="campaign_id 与 profile_id 必须为整数")
+
+        campaign = LxSpCampaign.objects.filter(
+            campaign_id=cid_int, profile_id=pid_int,
+        ).only("state").first()
+        if not campaign:
+            return drf_ok({}, msg="未找到对应的广告活动")
+
+        execution_type = (
+            CampaignExecutionTypeChoices.CAMPAIGN_ENABLE
+            if state == "enabled"
+            else CampaignExecutionTypeChoices.CAMPAIGN_PAUSE
+        )
+
+        # 写调整记录表（PENDING，待专门触发处推送）
+        SpCampaignAdjustment.objects.create(
+            campaign_id=cid_int,
+            profile_id=pid_int,
+            execution_type=execution_type,
+            adjustment_status=AdjustmentStatusChoices.PENDING,
+            execution_status=ExecutionStatusChoices.PENDING,
+            adjustment_time=timezone.now(),
+        )
+
+        # 同步更新本地实体表状态
+        LxSpCampaign.objects.filter(
+            campaign_id=cid_int, profile_id=pid_int,
+        ).update(state=state)
+
+        return drf_ok({
+            "campaign_id": cid_int,
+            "profile_id": pid_int,
+            "state": state,
         })
 
     @staticmethod
@@ -842,6 +1011,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         ref_currency: dict[str, Any],
         currency_by_campaign_all: dict[str, dict[str, Any]],
         rate_usd_to_cny: float = 1.0,
+        budget_by_campaign_all: dict[str, float] | None = None,
     ) -> dict[str, Any]:
         """从预聚合 agg_map 中计算汇总行与占比基准元数据，零额外数据库查询。
 
@@ -852,6 +1022,8 @@ class AdCampaignViewSet(viewsets.ViewSet):
             ref_currency (dict): 参考货币信息。
             currency_by_campaign_all (dict): campaign → 货币信息映射（多货币时传入）。
             rate_usd_to_cny (float): 美元对人民币汇率。
+            budget_by_campaign_all (dict | None): campaign 复合键 → daily_budget（本币），
+                供汇总行统计预算总和，与销售额同口径换算；None 时不输出 budget 字段。
 
         Returns:
             dict[str, Any]: 汇总行指标字段，含 _meta 内部基准值。
@@ -860,6 +1032,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         t_sales = t_same_sales = t_cost = 0.0
         t_orders = t_same_orders = t_units = t_clicks = t_impressions = 0
+        t_budget = 0.0
 
         for cp_key, data in agg_map.items():
             key_from_map = cp_key
@@ -897,14 +1070,31 @@ class AdCampaignViewSet(viewsets.ViewSet):
             t_clicks += r_clicks
             t_impressions += r_impressions
 
+        # 预算总和：按复合键从 budget_by_campaign_all 取值，多货币时换算到参考货币
+        if budget_by_campaign_all is not None:
+            for cp_key, raw_budget in budget_by_campaign_all.items():
+                try:
+                    parts = cp_key.split("::")
+                    pair = (parts[0], parts[1])
+                except (IndexError, ValueError):
+                    continue
+                if pair not in all_pairs_set:
+                    continue
+                if not is_single_currency:
+                    ccy = currency_by_campaign_all.get(cp_key, {"rate": rate_usd_to_cny})
+                    rate = ccy.get("rate", rate_usd_to_cny) / rate_usd_to_cny
+                    t_budget += raw_budget * rate
+                else:
+                    t_budget += raw_budget
+
         acos = f"{round(t_cost / t_sales * 100, 2)}%" if t_sales > 0 else "0"
         roas = round(t_sales / t_cost, 2) if t_cost > 0 else 0
         cvr = f"{round(t_orders / t_clicks * 100, 2)}%" if t_clicks > 0 else "0"
         ctr = f"{round(t_clicks / t_impressions * 100, 2)}%" if t_impressions > 0 else "0"
         cpc_raw = round(t_cost / t_clicks, 2) if t_clicks > 0 else 0
-        cpa_raw = round(t_cost / t_orders, 2) if t_orders > 0 else 0
+        cpa_raw = round(t_cost / r_orders, 2) if r_orders > 0 else 0
 
-        return {
+        result: dict[str, Any] = {
             "adsSales": fmt_money(t_sales, icon),
             "adsSalesPercent": "100%" if t_sales > 0 else "0",
             "directSales": fmt_money(t_same_sales, icon),
@@ -932,3 +1122,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 "impressions": t_impressions,
             },
         }
+        if budget_by_campaign_all is not None:
+            result["budget"] = fmt_money(t_budget, icon)
+        return result

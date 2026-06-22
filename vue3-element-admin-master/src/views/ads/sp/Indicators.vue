@@ -91,6 +91,7 @@ const METRIC_DEFS: { key: string; label: string }[] = [
   { key: "clicks", label: "点击（总和）" },
   { key: "spends", label: "花费（总和）" },
   { key: "adsSales", label: "广告销售额（总和）" },
+  { key: "budget", label: "预算（总和）" },
   { key: "acos", label: "ACoS（平均）" },
   { key: "impressions", label: "曝光量（总和）" },
   { key: "ctr", label: "CTR（平均）" },
@@ -141,24 +142,68 @@ const searchTerm = ref("");
 /** 默认置顶 4 个核心指标 */
 const DEFAULT_TOP_KEYS = ["clicks", "spends", "adsSales", "acos"];
 
+/** 置顶指标 keys 的 localStorage 缓存键 */
+const TOP_METRICS_KEY = "ADS_SP_TOP_METRICS_V1";
+
+/**
+ * 从 localStorage 读取置顶指标 keys，校验其对应的指标定义仍存在。
+ *
+ * @returns {string[] | null} 缓存的 keys；无缓存或全部失效时返回 null
+ */
+function readCachedTopKeys(): string[] | null {
+  try {
+    const raw = localStorage.getItem(TOP_METRICS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const validKeys = new Set(METRIC_DEFS.map((d) => d.key));
+    const filtered = parsed.filter(
+      (k: unknown) => typeof k === "string" && validKeys.has(k as string)
+    );
+    return filtered.length > 0 ? (filtered as string[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 持久化置顶指标 keys 到 localStorage。
+ *
+ * @param {string[]} keys - 当前置顶指标的 key 列表
+ */
+function persistTopKeys(keys: string[]): void {
+  try {
+    localStorage.setItem(TOP_METRICS_KEY, JSON.stringify(keys));
+  } catch {
+    // 容量满或隐私模式：静默忽略
+  }
+}
+
 const topIndicators = ref<{ key: string; label: string; value: string; type?: number }[]>([]);
 const otherIndicators = ref<{ key: string; label: string; value: string }[]>([]);
 
 /**
  * 初始化时从 computedMetrics 中拆出 top 和 other 两部分。
+ * 首次加载优先用 localStorage 缓存的置顶 keys，无缓存才用默认 4 个核心指标。
  * 每次 summary 变化时同步刷新数值而不重置用户选择。
  */
 function syncMetricsFromSummary() {
   const all = computedMetrics.value;
 
-  // 首次加载用默认置顶
+  // 首次加载：优先用缓存 keys，回退默认置顶
   if (topIndicators.value.length === 0 && otherIndicators.value.length === 0) {
+    const cachedKeys = readCachedTopKeys();
+    const topKeys = cachedKeys ?? DEFAULT_TOP_KEYS;
     for (const m of all) {
-      if (DEFAULT_TOP_KEYS.includes(m.key)) {
+      if (topKeys.includes(m.key)) {
         topIndicators.value.push({ ...m, type: m.key === "acos" ? 1 : 0 });
       } else {
         otherIndicators.value.push({ ...m });
       }
+    }
+    // 首次若用了缓存，需保证置顶顺序与缓存一致
+    if (cachedKeys) {
+      topIndicators.value.sort((a, b) => cachedKeys.indexOf(a.key) - cachedKeys.indexOf(b.key));
     }
     return;
   }
@@ -210,6 +255,7 @@ function promoteToTop(item: { key: string; label: string; value: string }) {
   if (idx >= 0) {
     const [found] = topIndicators.value.splice(idx, 1);
     topIndicators.value.unshift(found);
+    persistTopKeys(topIndicators.value.map((t) => t.key));
     return;
   }
   // 从 other 中移除
@@ -220,12 +266,14 @@ function promoteToTop(item: { key: string; label: string; value: string }) {
     if (moved) otherIndicators.value.unshift(moved);
   }
   topIndicators.value.unshift({ ...item });
+  persistTopKeys(topIndicators.value.map((t) => t.key));
 }
 
 function removeTop(item: { key: string; label: string; value: string }) {
   topIndicators.value = topIndicators.value.filter((t) => t.key !== item.key);
   if (!otherIndicators.value.find((o) => o.key === item.key))
     otherIndicators.value.unshift({ ...item });
+  persistTopKeys(topIndicators.value.map((t) => t.key));
 }
 
 function confirmAdd() {
@@ -240,6 +288,7 @@ function confirmAdd() {
   otherIndicators.value = otherIndicators.value.filter((o) => !keys.has(o.key));
   selectedKeys.value = [];
   showAddDialog.value = false;
+  // promoteToTop 内部已持久化，此处无需重复
   ElMessage.success("已添加指标");
 }
 </script>

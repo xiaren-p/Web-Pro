@@ -32,7 +32,7 @@
               v-model="row.state"
               active-value="enabled"
               inactive-value="paused"
-              disabled
+              @change="(val: string | number | boolean) => onStateChange(row, val)"
             />
           </template>
         </el-table-column>
@@ -120,6 +120,43 @@
               >
                 {{ row.service_status_label || row.service_status || "-" }}
               </span>
+            </template>
+            <template v-else-if="col.prop === 'budget'">
+              <!-- 预算列：货币符号 + 可编辑小框 -->
+              <span v-if="row._isSummary" class="data-value data-bold">
+                {{ row.budget != null ? formatValue(row.budget) : "--" }}
+              </span>
+              <div v-else class="budget-cell">
+                <template v-if="editingKey !== rowKey(row)">
+                  <span
+                    class="budget-display"
+                    :title="'点击修改预算'"
+                    @click="startEditBudget(row)"
+                  >
+                    <span class="budget-icon">{{ row.currency_icon || "$" }}</span>
+                    <span class="data-value">{{ formatValue(row.budget) }}</span>
+                  </span>
+                </template>
+                <template v-else>
+                  <div class="budget-edit">
+                    <el-input
+                      v-model="editingBudget"
+                      size="small"
+                      class="budget-input"
+                      type="number"
+                      :prefix-icon="undefined"
+                      @keyup.enter="confirmEditBudget(row)"
+                      @keyup.esc="cancelEditBudget()"
+                    >
+                      <template #prefix>
+                        <span class="budget-icon">{{ row.currency_icon || "$" }}</span>
+                      </template>
+                    </el-input>
+                    <el-icon class="budget-ok" @click="confirmEditBudget(row)"><Check /></el-icon>
+                    <el-icon class="budget-cancel" @click="cancelEditBudget()"><Close /></el-icon>
+                  </div>
+                </template>
+              </div>
             </template>
             <template v-else>
               <span v-if="row._isSummary && row[col.prop] == null" class="data-null">--</span>
@@ -212,7 +249,8 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
-import { TrendCharts, List } from "@element-plus/icons-vue";
+import { TrendCharts, List, Check, Close } from "@element-plus/icons-vue";
+import { ElMessage } from "element-plus";
 
 const props = withDefaults(
   defineProps<{
@@ -233,7 +271,14 @@ const props = withDefaults(
   }
 );
 
-const emit = defineEmits(["current-change", "view-row", "page-size-change", "sort-change"]);
+const emit = defineEmits([
+  "current-change",
+  "view-row",
+  "page-size-change",
+  "sort-change",
+  "update-budget",
+  "update-state",
+]);
 const localPageSize = ref(props.pageSize || 25);
 const tableContainerRef = ref<HTMLElement | null>(null);
 const horizontalScrollRef = ref<HTMLElement | null>(null);
@@ -365,6 +410,66 @@ watch(
 
 function onPageSizeChange(v: number) {
   emit("page-size-change", v);
+}
+
+// ── 预算/状态可编辑 ─────────────────────────────────────────────────────────────
+const editingKey = ref<string>("");
+const editingBudget = ref<string>("");
+
+/**
+ * 构造行唯一键，用于编辑态定位。
+ *
+ * @param {any} row - 表格行
+ * @returns {string} campaign_id::profile_id 复合键
+ */
+function rowKey(row: any): string {
+  return `${row.campaign_id}::${row.profile_id}`;
+}
+
+/**
+ * 进入预算编辑态：记录当前行键并回填原值。
+ *
+ * @param {any} row - 表格行
+ */
+function startEditBudget(row: any): void {
+  editingKey.value = rowKey(row);
+  editingBudget.value = String(row.budget ?? "");
+}
+
+/**
+ * 取消预算编辑：清空编辑态，不修改行数据。
+ */
+function cancelEditBudget(): void {
+  editingKey.value = "";
+  editingBudget.value = "";
+}
+
+/**
+ * 确认预算编辑：校验后向上 emit update-budget，由父组件调 API 并回写行。
+ * 父组件失败时会还原 row.budget，编辑态在此关闭。
+ *
+ * @param {any} row - 表格行
+ */
+function confirmEditBudget(row: any): void {
+  const val = Number(editingBudget.value);
+  editingKey.value = "";
+  editingBudget.value = "";
+  if (!val || val <= 0 || isNaN(val)) {
+    ElMessage.warning("预算必须为大于 0 的数值");
+    return;
+  }
+  emit("update-budget", { row, budget: val });
+}
+
+/**
+ * 状态 switch 变更：向上 emit update-state，由父组件调 API 并回写行。
+ * 父组件失败时会还原 row.state。
+ *
+ * @param {any} row - 表格行
+ * @param {string | number | boolean} val - switch 新值（enabled / paused）
+ */
+function onStateChange(row: any, val: string | number | boolean): void {
+  emit("update-state", { row, state: val });
 }
 
 /**
@@ -982,5 +1087,76 @@ function formatValue(val: any): string {
 .pager-row :deep(.el-pagination .btn-prev),
 .pager-row :deep(.el-pagination .btn-next) {
   font-size: 13px;
+}
+
+/* ── 预算可编辑单元格 ──────────────────────────────────────────────────── */
+.budget-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.budget-display {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 6px);
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.budget-display:hover {
+  background: var(--surface-hover, #f1f5f9);
+  box-shadow: 0 0 0 1px var(--color-primary-200, #bfdbfe) inset;
+}
+
+.budget-icon {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+}
+
+.budget-edit {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.budget-edit .budget-input {
+  width: 96px;
+}
+
+.budget-edit :deep(.el-input__wrapper) {
+  padding-left: 6px;
+}
+
+.budget-ok,
+.budget-cancel {
+  font-size: 16px;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.budget-ok {
+  color: var(--color-success-600, #16a34a);
+}
+
+.budget-ok:hover {
+  color: var(--color-success-700, #15803d);
+  transform: scale(1.12);
+}
+
+.budget-cancel {
+  color: var(--color-danger-600, #dc2626);
+}
+
+.budget-cancel:hover {
+  color: var(--color-danger-700, #b91c1c);
+  transform: scale(1.12);
 }
 </style>

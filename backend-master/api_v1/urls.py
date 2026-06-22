@@ -63,6 +63,8 @@ urlpatterns = [
     # 广告模块
     path('ads/campaigns', views.AdCampaignViewSet.as_view({'post': 'list', }), name='ads-campaigns'),
     path('ads/campaigns/detail', views.AdCampaignViewSet.as_view({'get': 'campaign_info', }), name='ads-campaign-detail'),
+    path('ads/campaigns/adjust-budget', views.AdCampaignViewSet.as_view({'post': 'adjust_budget', }), name='ads-campaigns-adjust-budget'),
+    path('ads/campaigns/adjust-state', views.AdCampaignViewSet.as_view({'post': 'adjust_state', }), name='ads-campaigns-adjust-state'),
     path('ads/options', views.ShopProfileViewSet.as_view({'post': 'options', }), name='ads-options'),
     path('ads/sku-options', views.ShopProfileViewSet.as_view({'post': 'sku_options', }), name='ads-sku-options'),
     path('ads/enum-labels', views.ShopProfileViewSet.as_view({'post': 'enum_labels', }), name='ads-enum-labels'),

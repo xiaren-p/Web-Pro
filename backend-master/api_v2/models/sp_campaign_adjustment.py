@@ -1,6 +1,6 @@
 """广告活动调整记录表（sp_campaign_adjustment）。
 
-记录广告活动维度的预算调整、手动预算调整、广告活动暂停操作。
+记录广告活动维度的预算调整、手动预算调整、广告活动暂停、广告活动启用操作。
 """
 from django.db import models
 
@@ -13,6 +13,7 @@ class CampaignExecutionTypeChoices(models.TextChoices):
     RULE_BUDGET_ADJUSTMENT = "RULE_BUDGET_ADJUSTMENT", "规则预算调整"
     MANUAL_BUDGET_ADJUSTMENT = "MANUAL_BUDGET_ADJUSTMENT", "手动预算调整"
     CAMPAIGN_PAUSE = "CAMPAIGN_PAUSE", "广告活动暂停"
+    CAMPAIGN_ENABLE = "CAMPAIGN_ENABLE", "广告活动启用"
 
 
 class SpCampaignAdjustment(models.Model):

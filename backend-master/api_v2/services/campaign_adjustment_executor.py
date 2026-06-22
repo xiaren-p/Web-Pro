@@ -1,7 +1,7 @@
 """广告活动调整执行器（campaign_adjustment_executor）。
 
 读取 SpCampaignAdjustment 待执行记录，
-调用 middle.hanlis.cn API 执行预算调整 / 广告活动暂停并回写结果。
+调用 middle.hanlis.cn API 执行预算调整 / 广告活动暂停 / 广告活动启用并回写结果。
 API 令牌桶容量为 1，必须串行执行，不可并行。
 """
 from __future__ import annotations
@@ -85,6 +85,7 @@ def _build_payload(record: SpCampaignAdjustment) -> dict:
     """单条记录构建 API 参数字典。
 
     CAMPAIGN_PAUSE 类型：传 state=paused + isBaseValue=0。
+    CAMPAIGN_ENABLE 类型：传 state=enabled + isBaseValue=0。
     预算调整类型：传 budget={"budgetType":"DAILY","budget":X.XX} + isBaseValue=0。
 
     Returns:
@@ -94,6 +95,10 @@ def _build_payload(record: SpCampaignAdjustment) -> dict:
 
     if record.execution_type == CampaignExecutionTypeChoices.CAMPAIGN_PAUSE:
         base["state"] = "paused"
+        return base
+
+    if record.execution_type == CampaignExecutionTypeChoices.CAMPAIGN_ENABLE:
+        base["state"] = "enabled"
         return base
 
     # 预算调整类型：RULE_BUDGET_ADJUSTMENT / MANUAL_BUDGET_ADJUSTMENT
@@ -180,7 +185,7 @@ def _apply_results(
 ) -> None:
     """将 API 返回结果按 campaignId 匹配并写入对应记录。
 
-    成功时写 msg，三种类型各写不同描述。
+    成功时写 msg，四种类型各写不同描述。
 
     Args:
         results: API 返回的 apiResult 列表
@@ -200,6 +205,7 @@ def _apply_results(
             continue
 
         is_pause = record.execution_type == CampaignExecutionTypeChoices.CAMPAIGN_PAUSE
+        is_enable = record.execution_type == CampaignExecutionTypeChoices.CAMPAIGN_ENABLE
         is_budget_rule = record.execution_type == CampaignExecutionTypeChoices.RULE_BUDGET_ADJUSTMENT
         is_budget_manual = record.execution_type == CampaignExecutionTypeChoices.MANUAL_BUDGET_ADJUSTMENT
 
@@ -207,6 +213,8 @@ def _apply_results(
             record.execution_status = ExecutionStatusChoices.SUCCESS
             if is_pause:
                 record.msg = "广告活动暂停成功"
+            elif is_enable:
+                record.msg = "广告活动启用成功"
             elif is_budget_rule:
                 before = round(float(record.budget_before or 0), 4)
                 after = round(float(record.budget_after or 0), 4)
@@ -220,6 +228,8 @@ def _apply_results(
             error_desc = result.get("description", "unknown")
             if is_pause:
                 record.msg = f"广告活动暂停失败，error: {error_desc}"
+            elif is_enable:
+                record.msg = f"广告活动启用失败，error: {error_desc}"
             elif is_budget_rule:
                 record.msg = f"规则预算调整失败，error: {error_desc}"
             elif is_budget_manual:
@@ -238,7 +248,7 @@ def execute_campaign_adjustment() -> dict[str, Any]:
 
     使用 Redis 分布式锁保证串行执行（API 令牌桶容量=1）。
 
-    三种类型（规则预算调整 / 手动预算调整 / 广告活动暂停）统一执行。
+    四种类型（规则预算调整 / 手动预算调整 / 广告活动暂停 / 广告活动启用）统一执行。
 
     Returns:
         {"processed": int, "success": int, "failed": int, "errors": [str]}
