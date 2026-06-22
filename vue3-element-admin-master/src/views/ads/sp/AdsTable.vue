@@ -521,6 +521,8 @@ function resetBudget(row: any): void {
  * @returns {Promise<void>}
  */
 async function onStateChange(row: any, val: string | number | boolean): Promise<void> {
+  // 守卫：防止页面重新渲染时 el-switch 伪触发 @change（值实际未变）
+  if (row.state === val) return;
   const oldVal = val === "enabled" ? "paused" : "enabled";
   const targetLabel = val === "enabled" ? "启用" : "暂停";
   try {
