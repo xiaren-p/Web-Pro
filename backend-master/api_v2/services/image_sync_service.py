@@ -734,10 +734,10 @@ def _resolve_missing_paths(
     logger.info("[ImageSync][resolve_paths] 搜索 %d 个 SKU 路径", len(skus))
     try:
         path_map = search_nc_sku_paths(nc_client, admin_user, scope, skus)
-    except RuntimeError:
-        logger.error("[ImageSync][resolve_paths] NC 搜索失败", exc_info=True)
+    except RuntimeError as exc:
+        logger.error("[ImageSync][resolve_paths] NC 搜索失败: %s", exc, exc_info=True)
         for it in missing:
-            msg = "NC 路径搜索失败"
+            msg = f"NC 路径搜索失败: {exc}"
             _report_result(it.sku, "", "WARNING", msg)
             _update_queue_status(it, ImageSyncStatus.FAILED, msg)
         return

@@ -250,7 +250,12 @@ def search_nc_sku_paths(
     )
 
     # 1. 搜索所有 jpg 图片（一次 SEARCH 请求）
-    scope_for_search = f"/files/{admin_user}/{scope_dav.lstrip('/')}" if not scope_dav.startswith("/files/") else scope_dav
+    # scope_dav 可能是 /remote.php/dav/files/... 或 /files/... 格式
+    # SEARCH XML 需要 /files/{user}/... 格式
+    if scope_dav.startswith("/remote.php/dav"):
+        scope_for_search = scope_dav[len("/remote.php/dav"):]
+    else:
+        scope_for_search = scope_dav
     files = client.search_dav_files(scope_for_search, "%.jpg", "image/%")
     if not files:
         # 尝试 jpeg/png/webp
