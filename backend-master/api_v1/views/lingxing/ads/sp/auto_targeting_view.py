@@ -252,7 +252,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
 
         # ── 最近修改信息 ──
         adj_map = _build_bid_latest_adjustment_map(
-            [str(it.target_id) for it in items if it.target_id], "target_id", pid_int,
+            [str(it.target_id) for it in items if it.target_id], "target_id", profile_id,
         )
         for row in res_list:
             row["latest_adjustment"] = adj_map.get(str(row.get("target_id", "")), {"has_recent": False, "lines": []})
@@ -446,7 +446,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
 
         # ── 最近修改信息（product targeting）──
         adj_map = _build_bid_latest_adjustment_map(
-            [str(it.target_id) for it in items if it.target_id], "target_id", pid_int,
+            [str(it.target_id) for it in items if it.target_id], "target_id", profile_id,
         )
         for row in res_list:
             row["latest_adjustment"] = adj_map.get(str(row.get("target_id", "")), {"has_recent": False, "lines": []})
