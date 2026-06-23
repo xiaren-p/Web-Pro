@@ -352,6 +352,7 @@ const visibleColumns = [
   { prop: "service_status", label: "服务状态", minWidth: 160 },
   { prop: "match_type_label", label: "匹配方式", minWidth: 110 },
   { prop: "bid", label: "竞价", minWidth: 100 },
+  { prop: "time_pricing_bid", label: "分时竞价", minWidth: 100 },
   { prop: "portfolio_name", label: "广告组合", minWidth: 140 },
   { prop: "campaign_name", label: "广告活动", minWidth: 200 },
   { prop: "adgroup_name", label: "广告组", minWidth: 140 },
@@ -574,7 +575,7 @@ onMounted(fetchData);
     color: var(--el-text-color-secondary);
   }
   .bid-input {
-    width: 88px;
+    width: 60px;
   }
   .recent-star {
     position: relative;

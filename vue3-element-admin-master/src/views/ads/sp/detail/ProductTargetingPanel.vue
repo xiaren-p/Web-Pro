@@ -247,6 +247,7 @@ const defaultColumns = [
   { prop: "service_status", label: "服务状态", category: "设置", visible: true, minWidth: 160 },
   { prop: "campaign_name", label: "广告活动", category: "设置", visible: true, minWidth: 200 },
   { prop: "bid", label: "竞价", category: "设置", visible: true, minWidth: 100 },
+  { prop: "time_pricing_bid", label: "分时竞价", category: "设置", visible: true, minWidth: 100 },
   { prop: "impressions", label: "曝光量", category: "业绩", visible: true, minWidth: 120 },
   { prop: "clicks", label: "点击", category: "业绩", visible: true, minWidth: 100 },
   { prop: "spends", label: "花费", category: "业绩", visible: true, minWidth: 120 },
@@ -449,7 +450,7 @@ onMounted(() => {
     color: var(--el-text-color-secondary);
   }
   .bid-input {
-    width: 88px;
+    width: 60px;
   }
 }
 

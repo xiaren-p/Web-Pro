@@ -63,14 +63,14 @@ def _get_operator_name(request: Request) -> str:
 def _is_time_pricing_active(campaign_id: int, profile_id: int) -> bool:
     """检查指定广告活动是否正在分时生效中。
 
-    AdTimePricingHit.is_time_pricing == NO(0) 表示"分时生效中"。
+    is_time_pricing == 1(YES) 表示正在分时；0(NO) 表示分时结束。
     """
     from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
 
     return AdTimePricingHit.objects.filter(
         campaign_id=campaign_id,
         profile_id=profile_id,
-        is_time_pricing=TimePricingHitStatus.NO,
+        is_time_pricing=TimePricingHitStatus.YES,
     ).exists()
 
 
@@ -266,6 +266,13 @@ class KeywordViewSet(viewsets.ViewSet):
             row["latest_state_adjustment"] = state_adj_map.get(kid, {"has_recent": False, "lines": []})
             row["latest_bid_adjustment"] = bid_adj_map.get(kid, {"has_recent": False, "lines": []})
 
+        # ── 分时竞价展示（仅分时生效中显示，否则 -）──
+        tp_bid_map = _build_time_pricing_bid_map(
+            keyword_ids, "keyword_id", int(campaign_id), int(profile_id), currency_icon,
+        )
+        for row in res_list:
+            row["time_pricing_bid"] = tp_bid_map.get(str(row["keyword_id"]), "-")
+
         return drf_ok({
             "total": total,
             "list": res_list,
@@ -446,16 +453,14 @@ class KeywordViewSet(viewsets.ViewSet):
             BidExecutionTypeChoices.BID_ENABLE if state == "enabled"
             else BidExecutionTypeChoices.BID_PAUSE
         )
-        is_tp = _is_time_pricing_active(cid_int, pid_int)
         SpBidAdjustment.objects.create(
             keyword_id=kid_int,
             campaign_id=cid_int,
             profile_id=pid_int,
             execution_type=execution_type,
-            adjustment_status=AdjustmentStatusChoices.SUCCESS if is_tp else AdjustmentStatusChoices.PENDING,
-            execution_status=ExecutionStatusChoices.SUCCESS if is_tp else ExecutionStatusChoices.PENDING,
+            adjustment_status=AdjustmentStatusChoices.PENDING,
+            execution_status=ExecutionStatusChoices.PENDING,
             adjustment_time=timezone.now(),
-            msg="手动修改，分时生效中，已直接应用" if is_tp else "",
             operator=_get_operator_name(request),
         )
         LxSpKeyword.objects.filter(keyword_id=kid_int, profile_id=pid_int).update(state=state)
@@ -582,18 +587,21 @@ def _build_bid_lines(
 
     lines = [line1, local_time_str]
 
-    # 条件简述（规则触发时）
+    # 条件简述（规则触发时：遍历所有条件组）
     if is_rule and rule:
         try:
             cs = rule.condition_sets
             if isinstance(cs, list) and cs:
-                field_label = {"cost":"花费","sales":"广告销售额","acos":"ACoS","roas":"ROAS","clicks":"点击","impressions":"曝光量","orders":"广告订单","ctr":"CTR","cpc":"CPC","cvr":"CVR"}
+                field_label = {"cost":"花费","sales":"广告销售额","same_sales":"直接销售额","orders":"广告订单","same_orders":"直接订单","units":"广告销量","clicks":"点击","impressions":"曝光量","ctr":"CTR","cpc":"CPC","cpa":"CPA","acos":"ACoS","roas":"ROAS","cvr":"CVR","spend_rate":"花费占比","sales_rate":"销售额占比","is_ratio":"IS"}
                 op_label = {">":">","<":"<",">=":"≥","<=":"≤","==":"=","!=":"≠"}
-                parts = []
-                first = cs[0] if isinstance(cs[0], dict) else {}
-                conds = first.get("conditions") or []
-                if isinstance(conds, list):
-                    for c in conds[:3]:
+                group_parts = []
+                for cg in cs:
+                    if not isinstance(cg, dict): continue
+                    days = cg.get("days", "?")
+                    conds = cg.get("conditions") or []
+                    if not isinstance(conds, list) or not conds: continue
+                    cond_strs = []
+                    for c in conds:
                         if not isinstance(c, dict): continue
                         m = str(c.get("metric") or c.get("field") or "")
                         o = str(c.get("operator", ">"))
@@ -605,9 +613,11 @@ def _build_bid_lines(
                             o2 = str(c.get("operator2", "<"))
                             v2 = c.get("value2", "")
                             seg += f" 且 {op_label.get(o2, o2)} {v2}"
-                        parts.append(seg)
-                if parts:
-                    lines.append(f"详细内容: {', '.join(parts)}")
+                        cond_strs.append(seg)
+                    if cond_strs:
+                        group_parts.append(f"近{days}天: {', '.join(cond_strs)}")
+                if group_parts:
+                    lines.append(f"详细内容: {'；'.join(group_parts)}")
         except Exception:
             pass
 
@@ -626,3 +636,70 @@ def _build_bid_lines(
         lines.append("执行操作: 分时回调")
 
     return lines
+
+
+def _build_time_pricing_bid_map(
+    entity_ids: list[str],
+    entity_field: str,
+    campaign_id: int,
+    profile_id: int,
+    currency_icon: str,
+) -> dict[str, str]:
+    """构建分时竞价展示映射：分时生效中时显示最近一次 TIME_PRICING_START 的 bid_after，否则 "-"。
+
+    Args:
+        entity_ids: 实体 ID 列表。
+        entity_field: "keyword_id" 或 "target_id"。
+        campaign_id: 广告活动 ID。
+        profile_id: 店铺 Profile ID。
+        currency_icon: 货币符号。
+
+    Returns:
+        dict[str, str]: 实体 ID → 展示字符串（如 "$0.50" 或 "-"）。
+    """
+    from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
+
+    # 未分时直接返回全 -
+    if not AdTimePricingHit.objects.filter(
+        campaign_id=campaign_id, profile_id=profile_id,
+        is_time_pricing=TimePricingHitStatus.YES,
+    ).exists():
+        return {k: "-" for k in entity_ids}
+
+    from django.db.models import Max
+    from api_v2.models.sp_bid_adjustment import SpBidAdjustment, ExecutionTypeChoices as BidExecType
+
+    int_ids = [int(x) for x in entity_ids if x]
+    if not int_ids:
+        return {}
+
+    # 取每个实体最近一次 TIME_PRICING_START 记录的 bid_after
+    latest = (
+        SpBidAdjustment.objects
+        .filter(
+            **{f"{entity_field}__in": int_ids},
+            execution_type=BidExecType.TIME_PRICING_START,
+            campaign_id=campaign_id,
+            profile_id=profile_id,
+        )
+        .values(entity_field)
+        .annotate(max_id=Max("id"))
+    )
+    id_map = {row[entity_field]: row["max_id"] for row in latest if row["max_id"]}
+    if not id_map:
+        return {k: "-" for k in entity_ids}
+
+    records = SpBidAdjustment.objects.filter(id__in=list(id_map.values())).only(
+        entity_field, "bid_after",
+    )
+    rec_map = {getattr(r, entity_field): r for r in records if getattr(r, entity_field)}
+
+    result: dict[str, str] = {}
+    for kid in entity_ids:
+        kid_int = int(kid)
+        rec = rec_map.get(kid_int)
+        if rec and rec.bid_after is not None:
+            result[kid] = f"{currency_icon}{float(rec.bid_after):.2f}"
+        else:
+            result[kid] = "-"
+    return result

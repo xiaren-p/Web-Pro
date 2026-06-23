@@ -372,6 +372,7 @@ const activeColumns = ref([
   { prop: "service_status", label: "服务状态", visible: true, category: "设置" },
   { prop: "recommended_bid", label: "建议竞价", visible: true, category: "设置" },
   { prop: "bid", label: "竞价", visible: true, category: "设置" },
+  { prop: "time_pricing_bid", label: "分时竞价", visible: true, category: "设置" },
   { prop: "portfolio_name", label: "广告组合", visible: true, category: "设置" },
   {
     prop: "campaign_name",
@@ -687,7 +688,7 @@ onMounted(() => {
 
   .bid-input {
     flex: none;
-    width: 88px;
+    width: 60px;
 
     :deep(.el-input__wrapper) {
       height: 26px;

@@ -60,11 +60,11 @@ def _get_operator_name(request: Request) -> str:
 
 
 def _is_time_pricing_active(campaign_id: int, profile_id: int) -> bool:
-    """检查指定广告活动是否正在分时生效中。NO(0)=分时生效中。"""
+    """检查指定广告活动是否正在分时生效中。is_time_pricing==YES(1)=正在分时。"""
     from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
     return AdTimePricingHit.objects.filter(
         campaign_id=campaign_id, profile_id=profile_id,
-        is_time_pricing=TimePricingHitStatus.NO,
+        is_time_pricing=TimePricingHitStatus.YES,
     ).exists()
 
 
@@ -281,6 +281,13 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             row["latest_state_adjustment"] = state_adj_map.get(tid, {"has_recent": False, "lines": []})
             row["latest_bid_adjustment"] = bid_adj_map.get(tid, {"has_recent": False, "lines": []})
 
+        # ── 分时竞价展示 ──
+        tp_bid_map = _build_time_pricing_bid_map(
+            target_ids, "target_id", campaign_id, profile_id, currency_icon,
+        )
+        for row in res_list:
+            row["time_pricing_bid"] = tp_bid_map.get(str(row.get("target_id", "")), "-")
+
         return drf_ok({
             "total": total,
             "list": res_list,
@@ -490,6 +497,13 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             row["latest_state_adjustment"] = state_adj_map.get(tid, {"has_recent": False, "lines": []})
             row["latest_bid_adjustment"] = bid_adj_map.get(tid, {"has_recent": False, "lines": []})
 
+        # ── 分时竞价展示 ──
+        tp_bid_map = _build_time_pricing_bid_map(
+            target_ids, "target_id", int(campaign_id), int(profile_id), currency_icon,
+        )
+        for row in res_list:
+            row["time_pricing_bid"] = tp_bid_map.get(str(row.get("target_id", "")), "-")
+
         return drf_ok({
             "total": total,
             "list": res_list,
@@ -576,16 +590,14 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             BidExecutionTypeChoices.BID_ENABLE if state == "enabled"
             else BidExecutionTypeChoices.BID_PAUSE
         )
-        is_tp = _is_time_pricing_active(cid_int, pid_int)
         SpBidAdjustment.objects.create(
             target_id=tid_int,
             campaign_id=cid_int,
             profile_id=pid_int,
             execution_type=execution_type,
-            adjustment_status=AdjustmentStatusChoices.SUCCESS if is_tp else AdjustmentStatusChoices.PENDING,
-            execution_status=ExecutionStatusChoices.SUCCESS if is_tp else AdjustmentStatusChoices.PENDING,
+            adjustment_status=AdjustmentStatusChoices.PENDING,
+            execution_status=ExecutionStatusChoices.PENDING,
             adjustment_time=timezone.now(),
-            msg="手动修改，分时生效中，已直接应用" if is_tp else "",
             operator=_get_operator_name(request),
         )
         LxSpTarget.objects.filter(target_id=tid_int, profile_id=pid_int).update(state=state)
@@ -680,13 +692,16 @@ def _build_bid_lines(rec: Any, rule_map: dict[int, Any], country_name: str, tz_n
         try:
             cs = rule.condition_sets
             if isinstance(cs, list) and cs:
-                fl = {"cost":"花费","sales":"广告销售额","acos":"ACoS","roas":"ROAS","clicks":"点击","impressions":"曝光量","orders":"广告订单","ctr":"CTR","cpc":"CPC","cvr":"CVR"}
+                fl = {"cost":"花费","sales":"广告销售额","same_sales":"直接销售额","orders":"广告订单","same_orders":"直接订单","units":"广告销量","clicks":"点击","impressions":"曝光量","ctr":"CTR","cpc":"CPC","cpa":"CPA","acos":"ACoS","roas":"ROAS","cvr":"CVR","spend_rate":"花费占比","sales_rate":"销售额占比","is_ratio":"IS"}
                 ol = {">":">","<":"<",">=":"≥","<=":"≤","==":"=","!=":"≠"}
-                parts = []
-                first = cs[0] if isinstance(cs[0], dict) else {}
-                conds = first.get("conditions") or []
-                if isinstance(conds, list):
-                    for c in conds[:3]:
+                group_parts = []
+                for cg in cs:
+                    if not isinstance(cg, dict): continue
+                    days = cg.get("days", "?")
+                    conds = cg.get("conditions") or []
+                    if not isinstance(conds, list) or not conds: continue
+                    cond_strs = []
+                    for c in conds:
                         if not isinstance(c, dict): continue
                         m = str(c.get("metric") or c.get("field") or "")
                         o = str(c.get("operator", ">"))
@@ -697,9 +712,11 @@ def _build_bid_lines(rec: Any, rule_map: dict[int, Any], country_name: str, tz_n
                         if bool(c.get("isRange", False)):
                             o2 = str(c.get("operator2", "<")); v2 = c.get("value2", "")
                             seg += f" 且 {ol.get(o2, o2)} {v2}"
-                        parts.append(seg)
-                if parts:
-                    lines.append(f"详细内容: {', '.join(parts)}")
+                        cond_strs.append(seg)
+                    if cond_strs:
+                        group_parts.append(f"近{days}天: {', '.join(cond_strs)}")
+                if group_parts:
+                    lines.append(f"详细内容: {'；'.join(group_parts)}")
         except Exception:
             pass
     if etype == BidExecType.BID_PAUSE: lines.append("执行操作: 竞价暂停")
@@ -711,3 +728,54 @@ def _build_bid_lines(rec: Any, rule_map: dict[int, Any], country_name: str, tz_n
     elif etype == BidExecType.TIME_PRICING_START: lines.append("执行操作: 分时开始")
     elif etype == BidExecType.TIME_PRICING_CALLBACK: lines.append("执行操作: 分时回调")
     return lines
+
+
+def _build_time_pricing_bid_map(
+    entity_ids: list[str],
+    entity_field: str,
+    campaign_id: int,
+    profile_id: int,
+    currency_icon: str,
+) -> dict[str, str]:
+    """构建分时竞价展示映射：分时生效中时显示最近一次 TIME_PRICING_START 的 bid_after，否则 "-"。"""
+    from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
+
+    if not AdTimePricingHit.objects.filter(
+        campaign_id=campaign_id, profile_id=profile_id,
+        is_time_pricing=TimePricingHitStatus.YES,
+    ).exists():
+        return {k: "-" for k in entity_ids}
+
+    from django.db.models import Max
+    from api_v2.models.sp_bid_adjustment import SpBidAdjustment, ExecutionTypeChoices as BidExecType
+
+    int_ids = [int(x) for x in entity_ids if x]
+    if not int_ids:
+        return {}
+
+    latest = (
+        SpBidAdjustment.objects
+        .filter(
+            **{f"{entity_field}__in": int_ids},
+            execution_type=BidExecType.TIME_PRICING_START,
+            campaign_id=campaign_id,
+            profile_id=profile_id,
+        )
+        .values(entity_field)
+        .annotate(max_id=Max("id"))
+    )
+    id_map = {row[entity_field]: row["max_id"] for row in latest if row["max_id"]}
+    if not id_map:
+        return {k: "-" for k in entity_ids}
+
+    records = SpBidAdjustment.objects.filter(id__in=list(id_map.values())).only(entity_field, "bid_after")
+    rec_map = {getattr(r, entity_field): r for r in records if getattr(r, entity_field)}
+
+    result: dict[str, str] = {}
+    for eid in entity_ids:
+        rec = rec_map.get(int(eid))
+        if rec and rec.bid_after is not None:
+            result[eid] = f"{currency_icon}{float(rec.bid_after):.2f}"
+        else:
+            result[eid] = "-"
+    return result
