@@ -86,7 +86,7 @@ def _matches_sku_for_path(
     """判断一条 NC 路径是否匹配指定 SKU。
 
     移植自 search_sku_paths.py 的 matches_sku_for_dir()，
-    保留完整的三段匹配逻辑以覆盖各种 SKU 命名模式。
+    包含四段匹配策略以覆盖各种 SKU 命名模式（含变体后缀）。
 
     Args:
         path_components (list[str]): URL 解码后的目录名序列
@@ -150,6 +150,18 @@ def _matches_sku_for_path(
                 after_names = dir_names_lower[i + 1:]
                 if any(r in after_names for r in remaining_sku):
                     return True
+
+    # 策略 4：反向前缀匹配 —— 目录名的连字符段是 SKU 段的前缀（≥ 3 段）
+    # 例：目录 Z-HLS-AQBX-CR 匹配 SKU Z-HLS-AQBX-CR-HK1（SKU 含变体后缀）
+    for dname in path_components:
+        dh = _extract_hyphen_segs(dname)
+        if (
+            dh
+            and 3 <= len(dh) < len(sku_segs)
+            and dh == sku_segs[:len(dh)]
+        ):
+            return True
+
     return False
 
 
@@ -215,6 +227,34 @@ def _prune_by_depth(paths: list[str]) -> list[str]:
                 is_child = True
                 break
         if not is_child:
+            result.append(p)
+    return result
+
+
+def _filter_parent_prefixes(paths: list[str]) -> list[str]:
+    """去除父级匹配：如果某路径是另一匹配路径的父目录，则去除该父路径。
+
+    确保只保留最具体的匹配，避免父分类目录被误匹配。
+    例：Z-HLS-AQBX 和 Z-HLS-AQBX-CR 都匹配时，去除 Z-HLS-AQBX。
+
+    Args:
+        paths (list[str]): 相对路径列表。
+
+    Returns:
+        list[str]: 过滤后的路径列表（仅保留最具体匹配）。
+    """
+    if len(paths) <= 1:
+        return paths
+    result: list[str] = []
+    for p in paths:
+        norm_p = p.rstrip("/") + "/"
+        # 如果存在其他路径以当前路径为前缀，则当前路径是父目录，跳过
+        is_parent = any(
+            other.rstrip("/").startswith(norm_p)
+            for other in paths
+            if other != p
+        )
+        if not is_parent:
             result.append(p)
     return result
 
@@ -304,8 +344,9 @@ def search_nc_sku_paths(
                 relative = relative.strip("/")
                 results[sku].append(relative)
 
-    # 5. 按深度去重剪枝
+    # 5. 过滤父级匹配 + 深度剪枝
     for sku in results:
+        results[sku] = _filter_parent_prefixes(results[sku])
         results[sku] = _prune_by_depth(results[sku])
 
     matched_count = sum(1 for v in results.values() if v)
