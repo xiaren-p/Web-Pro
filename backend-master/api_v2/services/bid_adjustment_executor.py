@@ -266,8 +266,6 @@ def _execute() -> dict[str, Any]:
     records = list(SpBidAdjustment.objects.filter(
         adjustment_status=AdjustmentStatusChoices.PENDING,
         created_at__gte=timezone.now() - timezone.timedelta(hours=2),
-    ).exclude(
-        execution_type=ExecutionTypeChoices.MANUAL_ADJUSTMENT,
     ).order_by("profile_id"))
     if not records:
         logger.info("[bid_adjustment] 无待执行记录")

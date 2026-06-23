@@ -655,8 +655,15 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
             res_list.append(dic)
 
-        # ── 最近修改信息（7 天内最近一次调整记录，供前端星标 + tooltip 展示）──
-        latest_adj_map = self._build_latest_adjustment_map(items, sid_to_country)
+        # ── 最近修改信息（拆分为状态变更和预算变更两路，供两个星标各自展示）──
+        state_adj_map = self._build_latest_adjustment_map(
+            items, sid_to_country,
+            types={CampaignExecutionTypeChoices.CAMPAIGN_PAUSE, CampaignExecutionTypeChoices.CAMPAIGN_ENABLE},
+        )
+        budget_adj_map = self._build_latest_adjustment_map(
+            items, sid_to_country,
+            types={CampaignExecutionTypeChoices.RULE_BUDGET_ADJUSTMENT, CampaignExecutionTypeChoices.MANUAL_BUDGET_ADJUSTMENT},
+        )
 
         # ── 标签和负责人数据 ──
         item_keys = [(str(item.campaign_id), str(item.profile_id)) for item in items]
@@ -703,8 +710,9 @@ class AdCampaignViewSet(viewsets.ViewSet):
             for a in asins:
                 principals_set.update(asin_principal_map.get(a, []))
             dic["owners"] = sorted(principals_set)
-            # 最近修改信息（星标 + tooltip 文案）
-            dic["latest_adjustment"] = latest_adj_map.get(key, {"has_recent": False, "lines": []})
+            # 最近修改信息（星标 + tooltip 文案：拆分为状态和预算两路）
+            dic["latest_state_adjustment"] = state_adj_map.get(key, {"has_recent": False, "lines": []})
+            dic["latest_budget_adjustment"] = budget_adj_map.get(key, {"has_recent": False, "lines": []})
 
         result = {
             "total": total,
@@ -954,12 +962,14 @@ class AdCampaignViewSet(viewsets.ViewSet):
         self,
         items: list[LxSpCampaign],
         sid_to_country: dict[int, str],
+        types: set | None = None,
     ) -> dict[str, dict[str, Any]]:
         """批量构建当前页每个广告活动的最近修改展示信息。
 
         Args:
             items (list[LxSpCampaign]): 当前页广告活动对象列表。
             sid_to_country (dict[int, str]): sid → 中文国家名映射（list 方法已构建）。
+            types (set | None): 可选，限制只查这些 execution_type；None 表示全部。
 
         Returns:
             dict[str, dict[str, Any]]: 复合键 → {"has_recent": bool, "lines": [str]}
@@ -983,15 +993,18 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if not pairs:
             return {}
 
-        # 7 天内最近一条调整记录（全量查后内存分组取首条，避免子查询）
+        # 7 天内最近一条调整记录
         threshold = timezone.now() - timedelta(days=self._ADJ_LOOKBACK_DAYS)
+        filter_kwargs: dict[str, Any] = {
+            "campaign_id__in": [c for c, _ in pairs],
+            "profile_id__in": [p for _, p in pairs],
+            "created_at__gte": threshold,
+        }
+        if types:
+            filter_kwargs["execution_type__in"] = list(types)
         recent_qs = (
             SpCampaignAdjustment.objects
-            .filter(
-                campaign_id__in=[c for c, _ in pairs],
-                profile_id__in=[p for _, p in pairs],
-                created_at__gte=threshold,
-            )
+            .filter(**filter_kwargs)
             .order_by("-created_at")
         )
         latest_by_pair: dict[tuple[int, int], SpCampaignAdjustment] = {}

@@ -59,6 +59,15 @@ def _get_operator_name(request: Request) -> str:
     return "未知用户"
 
 
+def _is_time_pricing_active(campaign_id: int, profile_id: int) -> bool:
+    """检查指定广告活动是否正在分时生效中。NO(0)=分时生效中。"""
+    from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
+    return AdTimePricingHit.objects.filter(
+        campaign_id=campaign_id, profile_id=profile_id,
+        is_time_pricing=TimePricingHitStatus.NO,
+    ).exists()
+
+
 # ── 自动投放定位组 type → 中文标签映射 ──
 _AUTO_TARGETING_TYPE_MAP: dict[str, str] = {
     "queryHighRelMatches": "紧密匹配",
@@ -256,12 +265,21 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             row["is"] = "---"
             res_list.append(row)
 
-        # ── 最近修改信息 ──
-        adj_map = _build_bid_latest_adjustment_map(
-            [str(it.target_id) for it in items if it.target_id], "target_id", profile_id,
+        # ── 最近修改信息（拆分为状态变更和竞价变更两路）──
+        target_ids = [str(it.target_id) for it in items if it.target_id]
+        state_adj_map = _build_bid_latest_adjustment_map(
+            target_ids, "target_id", profile_id,
+            types={BidExecutionTypeChoices.BID_PAUSE, BidExecutionTypeChoices.BID_ENABLE},
+        )
+        bid_adj_map = _build_bid_latest_adjustment_map(
+            target_ids, "target_id", profile_id,
+            types={BidExecutionTypeChoices.MANUAL_ADJUSTMENT, BidExecutionTypeChoices.BID_ADJUSTMENT,
+                   BidExecutionTypeChoices.TIME_PRICING_START, BidExecutionTypeChoices.TIME_PRICING_CALLBACK},
         )
         for row in res_list:
-            row["latest_adjustment"] = adj_map.get(str(row.get("target_id", "")), {"has_recent": False, "lines": []})
+            tid = str(row.get("target_id", ""))
+            row["latest_state_adjustment"] = state_adj_map.get(tid, {"has_recent": False, "lines": []})
+            row["latest_bid_adjustment"] = bid_adj_map.get(tid, {"has_recent": False, "lines": []})
 
         return drf_ok({
             "total": total,
@@ -456,12 +474,21 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             )
             res_list.append(row)
 
-        # ── 最近修改信息（product targeting）──
-        adj_map = _build_bid_latest_adjustment_map(
-            [str(it.target_id) for it in items if it.target_id], "target_id", profile_id,
+        # ── 最近修改信息（product targeting - 拆分为状态和竞价两路）──
+        target_ids = [str(it.target_id) for it in items if it.target_id]
+        state_adj_map = _build_bid_latest_adjustment_map(
+            target_ids, "target_id", profile_id,
+            types={BidExecutionTypeChoices.BID_PAUSE, BidExecutionTypeChoices.BID_ENABLE},
+        )
+        bid_adj_map = _build_bid_latest_adjustment_map(
+            target_ids, "target_id", profile_id,
+            types={BidExecutionTypeChoices.MANUAL_ADJUSTMENT, BidExecutionTypeChoices.BID_ADJUSTMENT,
+                   BidExecutionTypeChoices.TIME_PRICING_START, BidExecutionTypeChoices.TIME_PRICING_CALLBACK},
         )
         for row in res_list:
-            row["latest_adjustment"] = adj_map.get(str(row.get("target_id", "")), {"has_recent": False, "lines": []})
+            tid = str(row.get("target_id", ""))
+            row["latest_state_adjustment"] = state_adj_map.get(tid, {"has_recent": False, "lines": []})
+            row["latest_bid_adjustment"] = bid_adj_map.get(tid, {"has_recent": False, "lines": []})
 
         return drf_ok({
             "total": total,
@@ -499,6 +526,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             return drf_ok({}, msg="未找到对应的投放条款")
 
         bid_before = tgt.bid
+        is_tp = _is_time_pricing_active(cid_int, pid_int)
         SpBidAdjustment.objects.create(
             target_id=tid_int,
             campaign_id=cid_int,
@@ -506,9 +534,10 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             execution_type=BidExecutionTypeChoices.MANUAL_ADJUSTMENT,
             bid_before=float(bid_before) if bid_before is not None else None,
             bid_after=float(bid_after),
-            adjustment_status=AdjustmentStatusChoices.PENDING,
-            execution_status=ExecutionStatusChoices.PENDING,
+            adjustment_status=AdjustmentStatusChoices.SUCCESS if is_tp else AdjustmentStatusChoices.PENDING,
+            execution_status=ExecutionStatusChoices.SUCCESS if is_tp else AdjustmentStatusChoices.PENDING,
             adjustment_time=timezone.now(),
+            msg="手动修改，分时生效中，已直接应用" if is_tp else "",
             operator=_get_operator_name(request),
         )
         LxSpTarget.objects.filter(target_id=tid_int, profile_id=pid_int).update(bid=bid_after)
@@ -547,14 +576,16 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             BidExecutionTypeChoices.BID_ENABLE if state == "enabled"
             else BidExecutionTypeChoices.BID_PAUSE
         )
+        is_tp = _is_time_pricing_active(cid_int, pid_int)
         SpBidAdjustment.objects.create(
             target_id=tid_int,
             campaign_id=cid_int,
             profile_id=pid_int,
             execution_type=execution_type,
-            adjustment_status=AdjustmentStatusChoices.PENDING,
-            execution_status=ExecutionStatusChoices.PENDING,
+            adjustment_status=AdjustmentStatusChoices.SUCCESS if is_tp else AdjustmentStatusChoices.PENDING,
+            execution_status=ExecutionStatusChoices.SUCCESS if is_tp else AdjustmentStatusChoices.PENDING,
             adjustment_time=timezone.now(),
+            msg="手动修改，分时生效中，已直接应用" if is_tp else "",
             operator=_get_operator_name(request),
         )
         LxSpTarget.objects.filter(target_id=tid_int, profile_id=pid_int).update(state=state)
@@ -571,6 +602,7 @@ def _build_bid_latest_adjustment_map(
     entity_ids: list[str],
     entity_field: str,
     profile_id: int,
+    types: set | None = None,
 ) -> dict[str, dict[str, Any]]:
     """构建投放实体最近修改星标信息（性能优化版：MAX(id) 子查询取每实体最新记录）。"""
     from datetime import timedelta
@@ -588,8 +620,13 @@ def _build_bid_latest_adjustment_map(
     if not int_ids:
         return {}
     threshold = timezone.now() - timedelta(days=7)
+    filter_kwargs: dict[str, Any] = {
+        f"{entity_field}__in": int_ids, "created_at__gte": threshold,
+    }
+    if types:
+        filter_kwargs["execution_type__in"] = list(types)
     base_qs = SpBidAdjustment.objects.filter(
-        **{f"{entity_field}__in": int_ids}, created_at__gte=threshold,
+        **filter_kwargs,
     ).only("id", entity_field, "execution_type", "auto_rule_id", "operator", "bid_before", "bid_after", "created_at")
 
     latest_ids = base_qs.values(entity_field).annotate(max_id=Max("id")).values_list("max_id", flat=True)

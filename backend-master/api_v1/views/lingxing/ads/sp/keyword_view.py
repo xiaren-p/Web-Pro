@@ -60,6 +60,20 @@ def _get_operator_name(request: Request) -> str:
     return "未知用户"
 
 
+def _is_time_pricing_active(campaign_id: int, profile_id: int) -> bool:
+    """检查指定广告活动是否正在分时生效中。
+
+    AdTimePricingHit.is_time_pricing == NO(0) 表示"分时生效中"。
+    """
+    from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
+
+    return AdTimePricingHit.objects.filter(
+        campaign_id=campaign_id,
+        profile_id=profile_id,
+        is_time_pricing=TimePricingHitStatus.NO,
+    ).exists()
+
+
 class KeywordViewSet(viewsets.ViewSet):
     """SP 手动广告关键词列表及指标聚合视图。支持手动调整竞价与启停状态。"""
 
@@ -235,12 +249,22 @@ class KeywordViewSet(viewsets.ViewSet):
             )
             res_list.append(row)
 
-        # ── 最近修改信息（7 天内最近一次 SpBidAdjustment，供前端星标 + tooltip）──
-        latest_adj_map = _build_bid_latest_adjustment_map(
-            [str(k.keyword_id) for k in items if k.keyword_id], "keyword_id", int(profile_id),
+        # ── 最近修改信息（拆分为状态变更和竞价变更两路，供两个星标各自展示）──
+        keyword_ids = [str(k.keyword_id) for k in items if k.keyword_id]
+        pid = int(profile_id)
+        state_adj_map = _build_bid_latest_adjustment_map(
+            keyword_ids, "keyword_id", pid,
+            types={BidExecutionTypeChoices.BID_PAUSE, BidExecutionTypeChoices.BID_ENABLE},
+        )
+        bid_adj_map = _build_bid_latest_adjustment_map(
+            keyword_ids, "keyword_id", pid,
+            types={BidExecutionTypeChoices.MANUAL_ADJUSTMENT, BidExecutionTypeChoices.BID_ADJUSTMENT,
+                   BidExecutionTypeChoices.TIME_PRICING_START, BidExecutionTypeChoices.TIME_PRICING_CALLBACK},
         )
         for row in res_list:
-            row["latest_adjustment"] = latest_adj_map.get(str(row["keyword_id"]), {"has_recent": False, "lines": []})
+            kid = str(row["keyword_id"])
+            row["latest_state_adjustment"] = state_adj_map.get(kid, {"has_recent": False, "lines": []})
+            row["latest_bid_adjustment"] = bid_adj_map.get(kid, {"has_recent": False, "lines": []})
 
         return drf_ok({
             "total": total,
@@ -372,6 +396,7 @@ class KeywordViewSet(viewsets.ViewSet):
             return drf_ok({}, msg="未找到对应的关键词")
 
         bid_before = kw.bid
+        is_tp = _is_time_pricing_active(cid_int, pid_int)
         SpBidAdjustment.objects.create(
             keyword_id=kid_int,
             campaign_id=cid_int,
@@ -379,9 +404,10 @@ class KeywordViewSet(viewsets.ViewSet):
             execution_type=BidExecutionTypeChoices.MANUAL_ADJUSTMENT,
             bid_before=float(bid_before) if bid_before is not None else None,
             bid_after=float(bid_after),
-            adjustment_status=AdjustmentStatusChoices.PENDING,
-            execution_status=ExecutionStatusChoices.PENDING,
+            adjustment_status=AdjustmentStatusChoices.SUCCESS if is_tp else AdjustmentStatusChoices.PENDING,
+            execution_status=ExecutionStatusChoices.SUCCESS if is_tp else ExecutionStatusChoices.PENDING,
             adjustment_time=timezone.now(),
+            msg="手动修改，分时生效中，已直接应用" if is_tp else "",
             operator=_get_operator_name(request),
         )
         LxSpKeyword.objects.filter(keyword_id=kid_int, profile_id=pid_int).update(bid=bid_after)
@@ -420,14 +446,16 @@ class KeywordViewSet(viewsets.ViewSet):
             BidExecutionTypeChoices.BID_ENABLE if state == "enabled"
             else BidExecutionTypeChoices.BID_PAUSE
         )
+        is_tp = _is_time_pricing_active(cid_int, pid_int)
         SpBidAdjustment.objects.create(
             keyword_id=kid_int,
             campaign_id=cid_int,
             profile_id=pid_int,
             execution_type=execution_type,
-            adjustment_status=AdjustmentStatusChoices.PENDING,
-            execution_status=ExecutionStatusChoices.PENDING,
+            adjustment_status=AdjustmentStatusChoices.SUCCESS if is_tp else AdjustmentStatusChoices.PENDING,
+            execution_status=ExecutionStatusChoices.SUCCESS if is_tp else ExecutionStatusChoices.PENDING,
             adjustment_time=timezone.now(),
+            msg="手动修改，分时生效中，已直接应用" if is_tp else "",
             operator=_get_operator_name(request),
         )
         LxSpKeyword.objects.filter(keyword_id=kid_int, profile_id=pid_int).update(state=state)
@@ -444,8 +472,16 @@ def _build_bid_latest_adjustment_map(
     entity_ids: list[str],
     entity_field: str,
     profile_id: int,
+    types: set | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """构建投放实体最近修改星标信息（性能优化版：用 MAX(id) 子查询取每实体最新记录）。"""
+    """构建投放实体最近修改星标信息（性能优化版：用 MAX(id) 子查询取每实体最新记录）。
+
+    Args:
+        entity_ids: 实体 ID 列表。
+        entity_field: "keyword_id" 或 "target_id"。
+        profile_id: 店铺 Profile ID。
+        types: 可选，限制只查这些 execution_type；None 表示全部。
+    """
     from datetime import timedelta
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -463,8 +499,13 @@ def _build_bid_latest_adjustment_map(
         return {}
 
     threshold = timezone.now() - timedelta(days=7)
+    filter_kwargs: dict[str, Any] = {
+        f"{entity_field}__in": int_ids, "created_at__gte": threshold,
+    }
+    if types:
+        filter_kwargs["execution_type__in"] = list(types)
     base_qs = SpBidAdjustment.objects.filter(
-        **{f"{entity_field}__in": int_ids}, created_at__gte=threshold,
+        **filter_kwargs,
     ).only("id", entity_field, "execution_type", "auto_rule_id", "operator", "bid_before", "bid_after", "created_at")
 
     # 用 MAX(id) GROUP BY 取每实体的最新一条记录 ID，避免全表 fetch

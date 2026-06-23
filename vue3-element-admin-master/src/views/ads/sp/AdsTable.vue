@@ -36,14 +36,14 @@
                 @change="(val: string | number | boolean) => onStateChange(row, val)"
               />
               <el-tooltip
-                v-if="row.latest_adjustment?.has_recent"
+                v-if="row.latest_state_adjustment?.has_recent"
                 placement="top"
                 popper-class="latest-adj-tooltip"
               >
                 <span class="recent-star" @click.stop>★</span>
                 <template #content>
                   <div class="latest-adj-content">
-                    <div v-for="(line, idx) in row.latest_adjustment.lines" :key="idx">
+                    <div v-for="(line, idx) in row.latest_state_adjustment.lines" :key="idx">
                       {{ line }}
                     </div>
                   </div>
@@ -145,7 +145,7 @@
                 {{ scope.row.budget != null ? formatValue(scope.row.budget) : "--" }}
               </span>
               <el-tooltip
-                v-else-if="scope.row.latest_adjustment?.has_recent"
+                v-else-if="scope.row.latest_budget_adjustment?.has_recent"
                 placement="top"
                 popper-class="latest-adj-tooltip"
               >
@@ -167,7 +167,7 @@
                 </div>
                 <template #content>
                   <div class="latest-adj-content">
-                    <div v-for="(line, idx) in scope.row.latest_adjustment.lines" :key="idx">
+                    <div v-for="(line, idx) in scope.row.latest_budget_adjustment.lines" :key="idx">
                       {{ line }}
                     </div>
                   </div>

@@ -72,14 +72,14 @@
                 @change="(val: string | number | boolean) => onSwitchChange(row, val)"
               />
               <el-tooltip
-                v-if="row.latest_adjustment?.has_recent"
+                v-if="row.latest_state_adjustment?.has_recent"
                 placement="top"
                 popper-class="latest-adj-tooltip"
               >
                 <span class="recent-star" @click.stop>★</span>
                 <template #content>
                   <div class="latest-adj-content">
-                    <div v-for="(line, idx) in row.latest_adjustment.lines" :key="idx">
+                    <div v-for="(line, idx) in row.latest_state_adjustment.lines" :key="idx">
                       {{ line }}
                     </div>
                   </div>
@@ -149,14 +149,14 @@
                   @blur="confirmBid(row)"
                 />
                 <el-tooltip
-                  v-if="row.latest_adjustment?.has_recent"
+                  v-if="row.latest_bid_adjustment?.has_recent"
                   placement="top"
                   popper-class="latest-adj-tooltip"
                 >
                   <span class="recent-star" @click.stop>★</span>
                   <template #content>
                     <div class="latest-adj-content">
-                      <div v-for="(line, idx) in row.latest_adjustment.lines" :key="idx">
+                      <div v-for="(line, idx) in row.latest_bid_adjustment.lines" :key="idx">
                         {{ line }}
                       </div>
                     </div>
@@ -449,7 +449,7 @@ onMounted(() => {
     color: var(--el-text-color-secondary);
   }
   .bid-input {
-    width: 100px;
+    width: 88px;
   }
 }
 
