@@ -644,9 +644,10 @@ def _process_sync_item(
             logger.error("[ImageSync][process_item] 处理 listing 异常", exc_info=True)
         time.sleep(1)
     # 6. 结果上报
+    main_img_url = pre_uploaded[0][1] if pre_uploaded else None
     if not err_list:
         msg = f"产品图片（{len(records)} 个）上传成功"
-        _report_result(sku, local_path, "INFO", msg)
+        _report_result(sku, local_path, "INFO", msg, image_url=main_img_url)
         _update_queue_status(item, ImageSyncStatus.SUCCESS)
     else:
         detail_parts = []
@@ -659,7 +660,7 @@ def _process_sync_item(
         if len(err_list) > 3:
             detail += f"; ...(共 {len(err_list)} 条错误)"
         msg = f"部分失败: {len(err_list)}/{len(records)} | {detail}"
-        _report_result(sku, local_path, "WARNING", msg)
+        _report_result(sku, local_path, "WARNING", msg, image_url=main_img_url)
         _update_queue_status(item, ImageSyncStatus.FAILED, msg)
     return {"sku": sku, "success": not err_list, "errors": err_list}
 
