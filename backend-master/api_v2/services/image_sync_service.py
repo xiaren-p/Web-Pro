@@ -689,7 +689,10 @@ def execute_image_sync() -> dict:
     result = {"processed": 0, "success": 0, "failed": 0, "errors": []}
     for item in pending:
         if not (item.local_path or "").strip():
-            result["errors"].append(f"SKU {item.sku} 路径仍为空")
+            msg = f"SKU {item.sku} 路径仍为空"
+            _report_result(item.sku, "", "WARNING", msg)
+            _update_queue_status(item, ImageSyncStatus.FAILED, msg)
+            result["errors"].append(msg)
             result["failed"] += 1
             continue
         try:
@@ -733,6 +736,10 @@ def _resolve_missing_paths(
         path_map = search_nc_sku_paths(nc_client, admin_user, scope, skus)
     except RuntimeError:
         logger.error("[ImageSync][resolve_paths] NC 搜索失败", exc_info=True)
+        for it in missing:
+            msg = "NC 路径搜索失败"
+            _report_result(it.sku, "", "WARNING", msg)
+            _update_queue_status(it, ImageSyncStatus.FAILED, msg)
         return
     for it in missing:
         paths = path_map.get(it.sku.strip(), [])
@@ -743,4 +750,5 @@ def _resolve_missing_paths(
         else:
             msg = f"匹配到 {len(paths)} 个路径，无法唯一确定"
             _report_result(it.sku, "", "WARNING", msg)
+            _update_queue_status(it, ImageSyncStatus.FAILED, msg)
             logger.warning("[ImageSync][resolve_paths] SKU %s: %s", it.sku, msg)
