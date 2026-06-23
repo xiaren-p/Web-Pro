@@ -159,7 +159,8 @@ def _matches_sku_for_path(
     # 禁止对分类目录使用（含有子目录的父目录可能误匹配多个变体）
     # 仅当叶子目录名本身包含 SKU 前缀时启用（排除“厂家图片”等通用目录）
     if not has_child_dirs and path_components:
-        leaf_dh = _extract_hyphen_segs(path_components[-1])
+        leaf_name = path_components[-1]
+        leaf_dh = _extract_hyphen_segs(leaf_name)
         if leaf_dh and leaf_dh == sku_segs[:len(leaf_dh)]:
             # 叶子目录名本身包含 SKU 前缀（如 Z-HLS-AQBX-CR 反光...）
             for dname in path_components:
@@ -170,25 +171,31 @@ def _matches_sku_for_path(
                     and dh == sku_segs[:len(dh)]
                 ):
                     return True
-        elif path_components[-1].isascii():
+        elif leaf_name.isascii():
             # 叶子目录名为纯 ASCII（如 BLUE、02 等变体目录）
-            # 检查叶子目录是否与 SKU 段冲突（如 01 ≠ 02）
-            leaf_seg = _extract_hyphen_segs(path_components[-1])
-            leaf_idx = len(path_components) - 1
-            if (
-                len(leaf_seg) == 1
-                and leaf_idx < len(sku_segs)
-                and leaf_seg[0] != sku_segs[leaf_idx]
-            ):
-                return False  # 变体冲突，直接拒绝
-            for dname in path_components:
+            # 找路径中最长的 SKU 前缀匹配组件
+            best_prefix_len = 0
+            best_match_idx = -1
+            for i, dname in enumerate(path_components):
                 dh = _extract_hyphen_segs(dname)
                 if (
                     dh
-                    and 3 <= len(dh) < len(sku_segs)
+                    and len(dh) >= 3
+                    and len(dh) <= len(sku_segs)
                     and dh == sku_segs[:len(dh)]
+                    and len(dh) > best_prefix_len
                 ):
-                    return True
+                    best_prefix_len = len(dh)
+                    best_match_idx = i
+            if best_match_idx >= 0:
+                # 叶子对应的 SKU 段位置 = 前缀长度 + 叶子到匹配组件的偏移量
+                leaf_offset = len(path_components) - 1 - best_match_idx
+                sku_pos = best_prefix_len + leaf_offset - 1
+                if len(leaf_dh) == 1 and sku_pos < len(sku_segs):
+                    # 变体冲突检查（如 01 ≠ 02）
+                    if leaf_dh[0] != sku_segs[sku_pos]:
+                        return False
+                return True
 
     return False
 
