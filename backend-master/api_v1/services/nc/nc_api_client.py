@@ -1123,7 +1123,7 @@ class NcApiClient:
             f"<d:literal>{content_type}</d:literal></d:like>"
             "</d:and></d:where>"
             "<d:orderby/>"
-            "<d:limit><d:nresults>10000</d:nresults></d:limit>"
+            "<d:limit><d:nresults>50000</d:nresults></d:limit>"
             "</d:basicsearch>"
             "</d:searchrequest>"
         )
@@ -1175,6 +1175,118 @@ class NcApiClient:
                 if displayname_el is not None and displayname_el.text
                 else unquote(href.rstrip("/").split("/")[-1])
             )
+            ct_el = prop.find("d:getcontenttype", ns)
+            ct = ct_el.text if ct_el is not None and ct_el.text else ""
+            entries.append({"name": name, "href": href, "content_type": ct})
+        return entries
+
+    def find_numbered_images_recursive(
+        self,
+        dav_path: str,
+    ) -> list[dict]:
+        """通过 PROPFIND（Depth: infinity）递归查找所有编号图片文件。
+
+        无结果数量限制（PROPFIND 不像 SEARCH 有 nresults 截断），
+        仅保留文件名为 1-12 + 图片扩展名的编号图片（如 1.jpg、3.png、12.webp），
+        结果集远小于目录中的文件总数。
+
+        Args:
+            dav_path (str): WebDAV 完整路径，
+                如 /remote.php/dav/files/admin/美工部/【产品图片】 。
+
+        Returns:
+            list[dict]: 编号图片文件列表，
+                每项含 {"name": str, "href": str, "content_type": str}。
+
+        Raises:
+            RuntimeError: 网络错误或非 207 响应时抛出。
+        """
+        import xml.etree.ElementTree as ET
+        from urllib.parse import unquote
+
+        # 编号图片文件名前缀（1-12）+ 支持的图片扩展名
+        numbered_prefixes = {str(i) for i in range(1, 13)}
+        image_exts = {
+            ".jpg", ".jpeg", ".png", ".webp",
+            ".bmp", ".gif", ".tif", ".tiff",
+        }
+
+        url = f"{self._base}{dav_path}"
+        xml_body = (
+            '<?xml version="1.0"?>'
+            '<d:propfind xmlns:d="DAV:">'
+            "<d:prop>"
+            "<d:resourcetype/><d:displayname/><d:getcontenttype/>"
+            "</d:prop>"
+            "</d:propfind>"
+        )
+        logger.info(
+            "[NcApiClient][find_numbered_images_recursive] %s",
+            dav_path,
+        )
+        try:
+            resp = self._session.request(
+                "PROPFIND",
+                url,
+                data=xml_body.encode("utf-8"),
+                headers={
+                    "Content-Type": "application/xml; charset=utf-8",
+                    "Depth": "infinity",
+                },
+                verify=self._verify,
+                timeout=300,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"[NcApiClient] PROPFIND(inf) {dav_path} 网络错误: {exc}"
+            ) from exc
+        if resp.status_code != 207:
+            raise RuntimeError(
+                f"[NcApiClient] PROPFIND(inf) {dav_path} 返回状态码 "
+                f"{resp.status_code}: {resp.text[:300]}"
+            )
+        try:
+            root = ET.fromstring(resp.text)
+        except ET.ParseError as exc:
+            raise RuntimeError(
+                f"[NcApiClient] PROPFIND(inf) XML 解析失败: {exc}"
+            ) from exc
+
+        ns = {"d": "DAV:"}
+        entries: list[dict] = []
+        for response in root.findall("d:response", ns):
+            href_el = response.find("d:href", ns)
+            if href_el is None:
+                continue
+            href = href_el.text or ""
+            propstat = response.find("d:propstat", ns)
+            if propstat is None:
+                continue
+            prop = propstat.find("d:prop", ns)
+            if prop is None:
+                continue
+            # 跳过目录（collection）
+            resourcetype = prop.find("d:resourcetype", ns)
+            if (
+                resourcetype is not None
+                and resourcetype.find("d:collection", ns) is not None
+            ):
+                continue
+            # 取文件名
+            displayname_el = prop.find("d:displayname", ns)
+            name = (
+                displayname_el.text
+                if displayname_el is not None and displayname_el.text
+                else unquote(href.rstrip("/").split("/")[-1])
+            )
+            # 过滤：仅保留编号图片（1-7 + 图片扩展名）
+            dot_idx = name.rfind(".")
+            if dot_idx <= 0:
+                continue
+            file_root = name[:dot_idx].lower()
+            file_ext = name[dot_idx:].lower()
+            if file_root not in numbered_prefixes or file_ext not in image_exts:
+                continue
             ct_el = prop.find("d:getcontenttype", ns)
             ct = ct_el.text if ct_el is not None and ct_el.text else ""
             entries.append({"name": name, "href": href, "content_type": ct})

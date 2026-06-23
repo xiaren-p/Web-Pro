@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 # 图片文件扩展名集合
 _IMAGE_EXTS: set[str] = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tif", ".tiff"}
 
-# 编号图片文件名前缀（不含扩展名）
-_NUMBERED_PREFIXES: set[str] = {str(i) for i in range(1, 8)}
+# 编号图片文件名前缀（1-12，不含扩展名）
+_NUMBERED_PREFIXES: set[str] = {str(i) for i in range(1, 13)}
 
 
 def _extract_hyphen_segs(name: str) -> list[str]:
@@ -48,7 +48,7 @@ def _extract_hyphen_segs(name: str) -> list[str]:
 
 
 def _has_numbered_image(filenames: list[str]) -> bool:
-    """判断文件名列表中是否包含编号图片（1-7 开头 + 图片扩展名）。
+    """判断文件名列表中是否包含编号图片（1-12 开头 + 图片扩展名）。
 
     Args:
         filenames (list[str]): 目录中的文件名列表。
@@ -227,13 +227,13 @@ def search_nc_sku_paths(
 ) -> tuple[dict[str, list[str]], str]:
     """在 NC 中搜索与给定 SKU 列表匹配的图片目录。
 
-    利用 WebDAV SEARCH 一次请求获取所有编号图片文件，
-    然后按父目录分组并应用 SKU 段匹配算法。
+    按编号图片文件名（1.% ~ 7.%）分次 SEARCH，每次结果集很小，
+    避免全量搜索的结果截断问题，然后按父目录分组并应用 SKU 段匹配算法。
 
     Args:
         client (NcApiClient): 已初始化的 NC API 客户端。
         admin_user (str): NC 管理员用户名。
-        scope_dav (str): 搜索范围 WebDAV 路径，
+        scope_dav (str): 搜索范围 WebDAV 完整路径，
                          如 /remote.php/dav/files/admin/美工部/【产品图片】 。
         skus (list[str]): 待搜索的 SKU 列表。
 
@@ -252,21 +252,20 @@ def search_nc_sku_paths(
         scope_dav, len(skus),
     )
 
-    # 1. 搜索所有 jpg 图片（一次 SEARCH 请求）
-    # scope_dav 可能是 /remote.php/dav/files/... 或 /files/... 格式
-    # SEARCH XML 需要 /files/{user}/... 格式
+    # 1. 按编号图片文件名分次 SEARCH（1.% ~ 7.%）
+    #    每次只搜一个编号前缀，结果集远小于 nresults 上限，不会被截断
     if scope_dav.startswith("/remote.php/dav"):
         scope_for_search = scope_dav[len("/remote.php/dav"):]
     else:
         scope_for_search = scope_dav
-    files = client.search_dav_files(scope_for_search, "%.jpg", "image/%")
-    if not files:
-        # 尝试 jpeg/png/webp
-        for ext in ("%.jpeg", "%.png", "%.webp"):
-            extra = client.search_dav_files(scope_for_search, ext, "image/%")
-            files.extend(extra)
+    files: list[dict] = []
+    for prefix in range(1, 13):
+        batch = client.search_dav_files(
+            scope_for_search, f"{prefix}.%", "image/%",
+        )
+        files.extend(batch)
     logger.info(
-        "[nc_sku_path_search][search_nc_sku_paths] 搜索到图片文件数=%d",
+        "[nc_sku_path_search][search_nc_sku_paths] 编号图片文件数=%d",
         len(files),
     )
 
@@ -316,7 +315,7 @@ def search_nc_sku_paths(
         comps = _href_to_path_components(debug_href, scope_prefix)
         sample_dirs.append("/".join(comps) if comps else "(empty)")
     debug_info = (
-        f"图片文件数={len(files)}, "
+        f"编号图片数={len(files)}, "
         f"编号目录数={len(numbered_dirs)}, "
         f"scope={scope_for_search}, "
         f"示例目录: {'; '.join(sample_dirs) or '(无)'}"
