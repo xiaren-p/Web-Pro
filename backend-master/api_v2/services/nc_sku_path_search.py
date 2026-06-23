@@ -172,6 +172,15 @@ def _matches_sku_for_path(
                     return True
         elif path_components[-1].isascii():
             # 叶子目录名为纯 ASCII（如 BLUE、02 等变体目录）
+            # 检查叶子目录是否与 SKU 段冲突（如 01 ≠ 02）
+            leaf_seg = _extract_hyphen_segs(path_components[-1])
+            leaf_idx = len(path_components) - 1
+            if (
+                len(leaf_seg) == 1
+                and leaf_idx < len(sku_segs)
+                and leaf_seg[0] != sku_segs[leaf_idx]
+            ):
+                return False  # 变体冲突，直接拒绝
             for dname in path_components:
                 dh = _extract_hyphen_segs(dname)
                 if (
