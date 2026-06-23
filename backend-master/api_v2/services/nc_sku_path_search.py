@@ -165,11 +165,13 @@ def _href_to_path_components(href: str, scope_prefix: str) -> list[str]:
     Returns:
         list[str]: URL 解码后的目录名序列（不含空字符串）。
     """
-    # 去除 scope 前缀得到相对路径
-    relative = href
-    if href.startswith(scope_prefix):
-        relative = href[len(scope_prefix):]
-    relative = unquote(relative).strip("/")
+    # 先 URL 解码，再去除 scope 前缀（NC 返回的 href 含 URL 编码中文）
+    decoded_href = unquote(href)
+    relative = decoded_href
+    decoded_scope = unquote(scope_prefix)
+    if decoded_href.startswith(decoded_scope):
+        relative = decoded_href[len(decoded_scope):]
+    relative = relative.strip("/")
     if not relative:
         return []
     return [part for part in relative.split("/") if part]
@@ -293,10 +295,13 @@ def search_nc_sku_paths(
         components = _href_to_path_components(href, scope_prefix)
         for sku in skus:
             if _matches_sku_for_path(components, sku, fnames):
-                # 存储相对于 scope 的路径
-                relative = href.rstrip("/").lstrip("/")
-                if relative.startswith(scope_prefix.lstrip("/")):
-                    relative = relative[len(scope_prefix.lstrip("/")):]
+                # 存储相对于 scope 的路径（需先 URL 解码）
+                decoded_href = unquote(href).rstrip("/").lstrip("/")
+                decoded_scope = unquote(scope_prefix).lstrip("/")
+                if decoded_href.startswith(decoded_scope):
+                    relative = decoded_href[len(decoded_scope):]
+                else:
+                    relative = decoded_href
                 relative = relative.strip("/")
                 results[sku].append(relative)
 
