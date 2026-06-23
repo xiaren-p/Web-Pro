@@ -89,7 +89,7 @@
                 size="small"
                 active-value="enabled"
                 inactive-value="paused"
-                @change="(val: string | number | boolean) => onStateChange(row, val)"
+                @change="(val: string | number | boolean) => onSwitchChange(row, val)"
               />
               <el-tooltip
                 v-if="row.latest_adjustment?.has_recent"
@@ -166,10 +166,13 @@
               <div v-else class="bid-cell">
                 <span class="bid-icon">{{ currencyIcon }}</span>
                 <el-input
-                  v-model="row.bid"
+                  v-model="row._bidInput"
                   size="small"
                   class="bid-input"
-                  @change="onBidChange(row)"
+                  type="number"
+                  @keyup.enter="confirmBid(row)"
+                  @keyup.esc="resetBid(row)"
+                  @blur="confirmBid(row)"
                 />
                 <el-tooltip
                   v-if="row.latest_adjustment?.has_recent"
@@ -295,16 +298,21 @@
  */
 import type { KeywordParams } from "@/api/ads";
 
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { Operation, VideoPause, CircleClose } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
-import { getKeywords, adjustKeywordBid, adjustKeywordState } from "@/api/ads";
+import { getKeywords } from "@/api/ads";
 
 const props = defineProps<{
   campaignId: string;
   profileId: string;
   initialDateRange?: string[];
+}>();
+
+const emit = defineEmits<{
+  (e: "update-bid", payload: { row: any; bid: number }): void;
+  (e: "update-state", payload: { row: any; state: "enabled" | "paused" }): void;
 }>();
 
 // ── 筛选状态 ──────────────────────────────────────────
@@ -326,9 +334,28 @@ const summaryRow = ref<Record<string, unknown> | null>(null);
 
 const displayData = computed<any[]>(() => {
   if (rows.value.length === 0) return [];
+  // 为数据行注入 _bidInput 临时字段，避免编辑时直接污染 row.bid
+  for (const row of rows.value) {
+    if (row._isSummary) continue;
+    if (row._bidInput === undefined || row._bidInput === null) {
+      row._bidInput = row.bid ?? 0;
+    }
+  }
   if (!summaryRow.value) return rows.value;
   return [{ ...summaryRow.value, _isSummary: true }, ...rows.value];
 });
+
+// 监听 rows 变化：父组件 API 成功回写 row.bid 后，同步刷新输入框
+watch(
+  rows,
+  (newRows) => {
+    for (const row of newRows) {
+      if (row._isSummary) continue;
+      row._bidInput = row.bid ?? 0;
+    }
+  },
+  { deep: true }
+);
 
 function rowClassName({ row }: { row: any }): string {
   return row._isSummary ? "is-summary-row" : "";
@@ -431,61 +458,53 @@ function onReset(): void {
   fetchData();
 }
 
-async function onBidChange(row: any): Promise<void> {
-  const val = Number(row.bid);
+// ── 竞价可编辑（emit 到父组件，不调 API）────────────────────────────────────
+function confirmBid(row: any): void {
+  if (row._confirming) return;
+  const val = Number(row._bidInput);
+  const original = Number(row.bid ?? 0);
   if (!val || val <= 0 || isNaN(val)) {
-    ElMessage.warning("竞价必须为大于 0 的数值");
+    row._bidInput = row.bid ?? 0;
     return;
   }
-  try {
-    await ElMessageBox.confirm(`确认将竞价修改为 ${val.toFixed(2)}？`, "确认修改竞价", {
-      confirmButtonText: "确认",
-      cancelButtonText: "取消",
-      type: "warning",
+  if (val === original) return;
+  row._confirming = true;
+  ElMessageBox.confirm(`确认将竞价修改为 ${val.toFixed(2)}？`, "确认修改竞价", {
+    confirmButtonText: "确认",
+    cancelButtonText: "取消",
+    type: "warning",
+  })
+    .then(() => {
+      emit("update-bid", { row, bid: val });
+    })
+    .catch(() => {
+      row._bidInput = row.bid ?? 0;
+    })
+    .finally(() => {
+      row._confirming = false;
     });
-  } catch {
-    return;
-  }
-  try {
-    await adjustKeywordBid({
-      campaign_id: props.campaignId,
-      profile_id: props.profileId,
-      keyword_id: row.keyword_id,
-      bid_after: val,
-    });
-    ElMessage.success("竞价修改已记录");
-  } catch {
-    ElMessage.error("竞价修改失败");
-  }
 }
 
-async function onStateChange(row: any, val: string | number | boolean): Promise<void> {
-  const s = String(val);
-  if (row.state === s) return;
+function resetBid(row: any): void {
+  row._bidInput = row.bid ?? 0;
+}
+
+// ── 状态可编辑（emit 到父组件，不调 API）──────────────────────────────────
+function onSwitchChange(row: any, val: string | number | boolean): void {
+  const s = String(val) as "enabled" | "paused";
   const oldVal = s === "enabled" ? "paused" : "enabled";
   const label = s === "enabled" ? "启用" : "暂停";
-  try {
-    await ElMessageBox.confirm(`确认将关键词状态修改为「${label}」？`, "确认修改状态", {
-      confirmButtonText: "确认",
-      cancelButtonText: "取消",
-      type: "warning",
+  ElMessageBox.confirm(`确认将关键词状态修改为「${label}」？`, "确认修改状态", {
+    confirmButtonText: "确认",
+    cancelButtonText: "取消",
+    type: "warning",
+  })
+    .then(() => {
+      emit("update-state", { row, state: s });
+    })
+    .catch(() => {
+      row.state = oldVal;
     });
-  } catch {
-    row.state = oldVal;
-    return;
-  }
-  try {
-    await adjustKeywordState({
-      campaign_id: props.campaignId,
-      profile_id: props.profileId,
-      keyword_id: row.keyword_id as string | number,
-      state: s as "enabled" | "paused",
-    });
-    ElMessage.success(`${label}已记录`);
-  } catch {
-    row.state = oldVal;
-    ElMessage.error("状态修改失败");
-  }
 }
 
 onMounted(fetchData);

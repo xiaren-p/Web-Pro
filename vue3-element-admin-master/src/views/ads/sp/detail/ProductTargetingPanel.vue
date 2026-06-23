@@ -69,7 +69,7 @@
                 size="small"
                 active-value="enabled"
                 inactive-value="paused"
-                @change="(val: string | number | boolean) => onStateChange(row, val)"
+                @change="(val: string | number | boolean) => onSwitchChange(row, val)"
               />
               <el-tooltip
                 v-if="row.latest_adjustment?.has_recent"
@@ -139,10 +139,13 @@
               <div v-else class="bid-cell">
                 <span class="bid-icon">{{ currencyIcon }}</span>
                 <el-input
-                  v-model="row.bid"
+                  v-model="row._bidInput"
                   size="small"
                   class="bid-input"
-                  @change="onBidChange(row)"
+                  type="number"
+                  @keyup.enter="confirmBid(row)"
+                  @keyup.esc="resetBid(row)"
+                  @blur="confirmBid(row)"
                 />
                 <el-tooltip
                   v-if="row.latest_adjustment?.has_recent"
@@ -210,15 +213,19 @@
  * 数据源：LxSpTarget(expression_type="manual") + LxSpTargetReport。
  * 支持手动调整竞价与启停状态。
  */
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { Operation, VideoPause } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import ColumnManager from "@/components/ColumnManager/index.vue";
-import { getProductTargeting, adjustProductTargetBid, adjustProductTargetState } from "@/api/ads";
+import { getProductTargeting } from "@/api/ads";
 
 defineOptions({ name: "ProductTargetingPanel" });
 
 const props = defineProps<{ campaignId: string; profileId: string }>();
+const emit = defineEmits<{
+  (e: "update-bid", payload: { row: any; bid: number }): void;
+  (e: "update-state", payload: { row: any; state: "enabled" | "paused" }): void;
+}>();
 
 const loading = ref(false);
 const tableData = ref<any[]>([]);
@@ -251,10 +258,27 @@ const activeColumns = ref(defaultColumns);
 const visibleColumns = computed(() => activeColumns.value.filter((c) => c.visible));
 
 const displayData = computed<any[]>(() => {
+  for (const row of tableData.value) {
+    if (row._isSummary) continue;
+    if (row._bidInput === undefined || row._bidInput === null) {
+      row._bidInput = row.bid ?? 0;
+    }
+  }
   if (tableData.value.length === 0) return [];
   if (!summaryRow.value) return tableData.value;
   return [{ ...summaryRow.value, _isSummary: true }, ...tableData.value];
 });
+
+watch(
+  tableData,
+  (newRows) => {
+    for (const row of newRows) {
+      if (row._isSummary) continue;
+      row._bidInput = row.bid ?? 0;
+    }
+  },
+  { deep: true }
+);
 
 defineExpose({ summaryRow });
 
@@ -329,61 +353,51 @@ async function loadData(): Promise<void> {
   }
 }
 
-async function onBidChange(row: any): Promise<void> {
-  const val = Number(row.bid);
+function confirmBid(row: any): void {
+  if (row._confirming) return;
+  const val = Number(row._bidInput);
+  const original = Number(row.bid ?? 0);
   if (!val || val <= 0 || isNaN(val)) {
-    ElMessage.warning("竞价必须为大于 0 的数值");
+    row._bidInput = row.bid ?? 0;
     return;
   }
-  try {
-    await ElMessageBox.confirm(`确认将竞价修改为 ${val.toFixed(2)}？`, "确认修改竞价", {
-      confirmButtonText: "确认",
-      cancelButtonText: "取消",
-      type: "warning",
+  if (val === original) return;
+  row._confirming = true;
+  ElMessageBox.confirm(`确认将竞价修改为 ${val.toFixed(2)}？`, "确认修改竞价", {
+    confirmButtonText: "确认",
+    cancelButtonText: "取消",
+    type: "warning",
+  })
+    .then(() => {
+      emit("update-bid", { row, bid: val });
+    })
+    .catch(() => {
+      row._bidInput = row.bid ?? 0;
+    })
+    .finally(() => {
+      row._confirming = false;
     });
-  } catch {
-    return;
-  }
-  try {
-    await adjustProductTargetBid({
-      campaign_id: props.campaignId,
-      profile_id: props.profileId,
-      target_id: row.target_id as string | number,
-      bid_after: val,
-    });
-    ElMessage.success("竞价修改已记录");
-  } catch {
-    ElMessage.error("竞价修改失败");
-  }
 }
 
-async function onStateChange(row: any, val: string | number | boolean): Promise<void> {
-  const s = String(val);
-  if (row.state === s) return;
+function resetBid(row: any): void {
+  row._bidInput = row.bid ?? 0;
+}
+
+function onSwitchChange(row: any, val: string | number | boolean): void {
+  const s = String(val) as "enabled" | "paused";
   const oldVal = s === "enabled" ? "paused" : "enabled";
   const label = s === "enabled" ? "启用" : "暂停";
-  try {
-    await ElMessageBox.confirm(`确认将商品投放状态修改为「${label}」？`, "确认修改状态", {
-      confirmButtonText: "确认",
-      cancelButtonText: "取消",
-      type: "warning",
+  ElMessageBox.confirm(`确认将商品投放状态修改为「${label}」？`, "确认修改状态", {
+    confirmButtonText: "确认",
+    cancelButtonText: "取消",
+    type: "warning",
+  })
+    .then(() => {
+      emit("update-state", { row, state: s });
+    })
+    .catch(() => {
+      row.state = oldVal;
     });
-  } catch {
-    row.state = oldVal;
-    return;
-  }
-  try {
-    await adjustProductTargetState({
-      campaign_id: props.campaignId,
-      profile_id: props.profileId,
-      target_id: row.target_id as string | number,
-      state: s as "enabled" | "paused",
-    });
-    ElMessage.success(`${label}已记录`);
-  } catch {
-    row.state = oldVal;
-    ElMessage.error("状态修改失败");
-  }
 }
 
 onMounted(() => {

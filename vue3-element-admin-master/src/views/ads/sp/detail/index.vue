@@ -71,6 +71,8 @@
             :campaign-id="campaignId"
             :profile-id="profileId"
             :initial-date-range="inheritedDateRange"
+            @update-bid="onTargetBid"
+            @update-state="onTargetState"
           />
         </template>
         <template v-else>
@@ -102,12 +104,16 @@
             :campaign-id="campaignId"
             :profile-id="profileId"
             :initial-date-range="inheritedDateRange"
+            @update-bid="onKeywordBid"
+            @update-state="onKeywordState"
           />
           <ProductTargetingPanel
             v-else
             ref="productTargetingRef"
             :campaign-id="campaignId"
             :profile-id="profileId"
+            @update-bid="onProductTargetBid"
+            @update-state="onProductTargetState"
           />
         </template>
       </el-tab-pane>
@@ -144,7 +150,17 @@ import { computed, ref, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ArrowLeft, VideoPause, CircleClose } from "@element-plus/icons-vue";
 import { useLocalStorage } from "@vueuse/core";
-import { getAdCampaignDetail, type AdCampaignDetailResponse } from "@/api/ads";
+import {
+  getAdCampaignDetail,
+  type AdCampaignDetailResponse,
+  adjustKeywordBid,
+  adjustKeywordState,
+  adjustTargetBid,
+  adjustTargetState,
+  adjustProductTargetBid,
+  adjustProductTargetState,
+} from "@/api/ads";
+import { ElMessage } from "element-plus";
 import AdGroupsPanel from "@/views/ads/sp/detail/AdGroupsPanel.vue";
 import AdsPanel from "@/views/ads/sp/detail/AdsPanel.vue";
 import AutoTargetingPanel from "@/views/ads/sp/detail/AutoTargetingPanel.vue";
@@ -243,6 +259,180 @@ function formatTargetingType(val: string): string {
  */
 function goBack(): void {
   router.back();
+}
+
+// ── 投放子面板事件接收 + API 调用 + 失败还原 ─────────────────────────────────
+// 架构对齐主页面 AdsTable.vue + index.vue 的 emit 范式：
+//   子面板只负责弹确认窗 + emit 事件；父组件统一调 API + 处理失败还原。
+
+/**
+ * 关键词竞价修改：写 SpBidAdjustment + 更新 LxSpKeyword.bid。
+ *
+ * @param {Object} payload - { row, bid }
+ */
+async function onKeywordBid({ row, bid }: { row: any; bid: number }): Promise<void> {
+  if (!row?.keyword_id || !row?.campaign_id || !row?.profile_id) {
+    ElMessage.error("缺少关键词标识，无法修改竞价");
+    return;
+  }
+  const oldBid = row.bid;
+  try {
+    await adjustKeywordBid({
+      campaign_id: row.campaign_id,
+      profile_id: row.profile_id,
+      keyword_id: row.keyword_id,
+      bid_after: bid,
+    });
+    row.bid = bid;
+    ElMessage.success("竞价修改已记录，待执行推送");
+  } catch (error) {
+    row.bid = oldBid;
+    console.error("[onKeywordBid] 修改竞价失败", error);
+    ElMessage.error("修改竞价失败");
+  }
+}
+
+/**
+ * 关键词启停修改：写 SpBidAdjustment(BID_ENABLE/BID_PAUSE) + 更新 LxSpKeyword.state。
+ */
+async function onKeywordState({
+  row,
+  state,
+}: {
+  row: any;
+  state: "enabled" | "paused";
+}): Promise<void> {
+  if (!row?.keyword_id || !row?.campaign_id || !row?.profile_id) {
+    ElMessage.error("缺少关键词标识，无法修改状态");
+    return;
+  }
+  const oldState = row.state;
+  try {
+    await adjustKeywordState({
+      campaign_id: row.campaign_id,
+      profile_id: row.profile_id,
+      keyword_id: row.keyword_id,
+      state,
+    });
+    row.state = state;
+    ElMessage.success(state === "enabled" ? "启用已记录，待执行推送" : "暂停已记录，待执行推送");
+  } catch (error) {
+    row.state = oldState;
+    console.error("[onKeywordState] 修改状态失败", error);
+    ElMessage.error("修改状态失败");
+  }
+}
+
+/**
+ * 自动定位组竞价修改：写 SpBidAdjustment + 更新 LxSpTarget.bid。
+ */
+async function onTargetBid({ row, bid }: { row: any; bid: number }): Promise<void> {
+  if (!row?.target_id || !row?.campaign_id || !row?.profile_id) {
+    ElMessage.error("缺少定位组标识，无法修改竞价");
+    return;
+  }
+  const oldBid = row.bid;
+  try {
+    await adjustTargetBid({
+      campaign_id: row.campaign_id,
+      profile_id: row.profile_id,
+      target_id: row.target_id,
+      bid_after: bid,
+    });
+    row.bid = bid;
+    ElMessage.success("竞价修改已记录，待执行推送");
+  } catch (error) {
+    row.bid = oldBid;
+    console.error("[onTargetBid] 修改竞价失败", error);
+    ElMessage.error("修改竞价失败");
+  }
+}
+
+/**
+ * 自动定位组启停修改：写 SpBidAdjustment(BID_ENABLE/BID_PAUSE) + 更新 LxSpTarget.state。
+ */
+async function onTargetState({
+  row,
+  state,
+}: {
+  row: any;
+  state: "enabled" | "paused";
+}): Promise<void> {
+  if (!row?.target_id || !row?.campaign_id || !row?.profile_id) {
+    ElMessage.error("缺少定位组标识，无法修改状态");
+    return;
+  }
+  const oldState = row.state;
+  try {
+    await adjustTargetState({
+      campaign_id: row.campaign_id,
+      profile_id: row.profile_id,
+      target_id: row.target_id,
+      state,
+    });
+    row.state = state;
+    ElMessage.success(state === "enabled" ? "启用已记录，待执行推送" : "暂停已记录，待执行推送");
+  } catch (error) {
+    row.state = oldState;
+    console.error("[onTargetState] 修改状态失败", error);
+    ElMessage.error("修改状态失败");
+  }
+}
+
+/**
+ * 商品投放竞价修改：写 SpBidAdjustment + 更新 LxSpTarget.bid（expression_type=manual）。
+ */
+async function onProductTargetBid({ row, bid }: { row: any; bid: number }): Promise<void> {
+  if (!row?.target_id || !row?.campaign_id || !row?.profile_id) {
+    ElMessage.error("缺少商品投放标识，无法修改竞价");
+    return;
+  }
+  const oldBid = row.bid;
+  try {
+    await adjustProductTargetBid({
+      campaign_id: row.campaign_id,
+      profile_id: row.profile_id,
+      target_id: row.target_id,
+      bid_after: bid,
+    });
+    row.bid = bid;
+    ElMessage.success("竞价修改已记录，待执行推送");
+  } catch (error) {
+    row.bid = oldBid;
+    console.error("[onProductTargetBid] 修改竞价失败", error);
+    ElMessage.error("修改竞价失败");
+  }
+}
+
+/**
+ * 商品投放启停修改：写 SpBidAdjustment(BID_ENABLE/BID_PAUSE) + 更新 LxSpTarget.state。
+ */
+async function onProductTargetState({
+  row,
+  state,
+}: {
+  row: any;
+  state: "enabled" | "paused";
+}): Promise<void> {
+  if (!row?.target_id || !row?.campaign_id || !row?.profile_id) {
+    ElMessage.error("缺少商品投放标识，无法修改状态");
+    return;
+  }
+  const oldState = row.state;
+  try {
+    await adjustProductTargetState({
+      campaign_id: row.campaign_id,
+      profile_id: row.profile_id,
+      target_id: row.target_id,
+      state,
+    });
+    row.state = state;
+    ElMessage.success(state === "enabled" ? "启用已记录，待执行推送" : "暂停已记录，待执行推送");
+  } catch (error) {
+    row.state = oldState;
+    console.error("[onProductTargetState] 修改状态失败", error);
+    ElMessage.error("修改状态失败");
+  }
 }
 
 onMounted(() => {
