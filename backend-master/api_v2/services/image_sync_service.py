@@ -23,6 +23,7 @@ from api_v1.models.file.image_sync_queue import ImageSyncStatus
 from api_v1.models.file.image_upload import ImageUploadStatus
 from api_v1.services.nc.nc_api_client import NcApiClient
 from api_v2.services.nc_sku_path_search import search_nc_sku_paths
+from api_v1.models import LxShops
 from api_v2.services.qinglong_env_service import get_cached_env
 
 logger = logging.getLogger(__name__)
@@ -200,80 +201,28 @@ def _download_nc_numbered_images(
     return pre_uploaded, local_map
 
 
-# ------------------------------------------------------------------ #
-#  领星 API 调用                                                      #
-# ------------------------------------------------------------------ #
+def _extract_proxy_images(attributes: dict) -> dict[int, dict]:
+    """从 proxy API 响应的 attributes 中提取图片数据。
 
-def _listing_search(headers: dict[str, str], sku: str) -> list[dict]:
-    """调用领星 listing 搜索接口。
-
-    对应 template.py 的 listing_search()。
+    提取 main_product_image_locator 与 other_product_image_locator_1~8，
+    每个字段为列表，元素含 media_location 与 marketplace_id。
 
     Args:
-        headers (dict[str, str]): 领星请求头。
-        sku (str): 待搜索的 SKU。
+        attributes (dict): proxy 响应 data.attributes 字典。
 
     Returns:
-        list[dict]: 匹配的 listing 行列表。
+        dict[int, dict]: {位置: {"media_location": str, "marketplace_id": str}}。
+                         位置 0 = 主图，1-8 = 副图。
     """
-    url = f"{_LX_BASE}/listing-api/api/product/showOnline"
-    payload = {
-        "offset": 0, "length": 200,
-        "search_field": "msku", "search_value": [sku],
-        "pvi_ids": "", "exact_search": 0, "sids": "",
-        "status": "1,0", "is_pair": "",
-        "fulfillment_channel_type": "", "global_tag_ids": "",
-    }
-    try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=15)
-        if resp.status_code != 200:
-            logger.error("[ImageSync][listing_search] status=%d", resp.status_code)
-            return []
-        data = resp.json().get("data") or {}
-        rows = data.get("list") or []
-        logger.info("[ImageSync][listing_search] sku=%s count=%d", sku, len(rows))
-        return rows
-    except Exception:
-        logger.error("[ImageSync][listing_search] 异常", exc_info=True)
-        return []
-
-
-def _fetch_other_image_urls(
-    headers: dict[str, str], row: dict,
-) -> list[str]:
-    """获取 listing 当前主图 + 副图 URL 列表。
-
-    对应 template.py 的 fetch_other_image_urls()。
-
-    Args:
-        headers (dict[str, str]): 领星请求头。
-        row (dict): listing 行数据。
-
-    Returns:
-        list[str]: 图片 URL 列表（主图在前）。
-    """
-    url = f"{_LX_BASE}/listing-publish-api/api/AmazonListingInfo/getListingInfo"
-    params = {
-        "store_id": row.get("store_id") or row.get("storeId"),
-        "msku": row.get("msku") or row.get("MSKU"),
-        "marketplace_id": row.get("marketplace_id") or row.get("marketplaceId"),
-    }
-    try:
-        resp = requests.get(url, params=params, headers=headers, timeout=15)
-        if resp.status_code != 200:
-            return []
-        content = (resp.json().get("data") or {}).get("content") or {}
-        result: list[str] = []
-        main = content.get("main_image_url")
-        if main:
-            result.append(main)
-        others = content.get("other_image_url")
-        if isinstance(others, list):
-            result.extend(others)
-        return result
-    except Exception:
-        logger.error("[ImageSync][fetch_other_image_urls] 异常", exc_info=True)
-        return []
+    result: dict[int, dict] = {}
+    main = attributes.get("main_product_image_locator")
+    if isinstance(main, list) and main:
+        result[0] = main[0]
+    for i in range(1, 9):
+        slot = attributes.get(f"other_product_image_locator_{i}")
+        if isinstance(slot, list) and slot:
+            result[i] = slot[0]
+    return result
 
 
 def _upload_to_upload_center(
@@ -319,52 +268,117 @@ def _upload_to_upload_center(
     return None
 
 
-def _update_listing_images(
-    headers: dict[str, str], row: dict, uploaded_urls: list[tuple[str, str | None]],
-) -> tuple[int, str]:
-    """调用领星 listingUpdate 更新图片，最多重试 3 次。
+def _build_edit_payload(
+    resolved_urls: list[tuple[str, str | None]],
+    product_type: str,
+    msku: str,
+    store_id: int,
+    marketplace_id: str,
+) -> dict:
+    """构造 listing edit API 的请求体。
 
-    对应 template.py 的 update_listing_images()。
+    Args:
+        resolved_urls (list[tuple]): 最终图片 URL 列表 [(name, url), ...]。
+        product_type (str): 产品类型（来自 proxy 响应）。
+        msku (str): MSKU。
+        store_id (int): 店铺 ID。
+        marketplace_id (str): Marketplace ID（来自 LxShops）。
+
+    Returns:
+        dict: edit API 请求体。
+    """
+    mp = {"marketplace_id": marketplace_id}
+    amazon_data: dict[str, list] = {}
+    main_url = resolved_urls[0][1] if resolved_urls else None
+    amazon_data["main_product_image_locator"] = [
+        {**mp, "media_location": main_url or ""},
+    ]
+    for i in range(1, 9):
+        url = resolved_urls[i][1] if i < len(resolved_urls) else None
+        amazon_data[f"other_product_image_locator_{i}"] = [
+            {**mp, "media_location": url or ""},
+        ]
+    amazon_data["swatch_product_image_locator"] = [
+        {**mp, "media_location": ""},
+    ]
+    return {
+        "amazon_data": amazon_data,
+        "product_type": product_type,
+        "msku": msku,
+        "store_id": store_id,
+        "req_time_sequence": "/listing-publish-api/api/amazon/listing/edit$$1",
+    }
+
+
+def _process_listing_record(
+    headers: dict[str, str],
+    record,
+    sku: str,
+    marketplace_id: str,
+    local_map: dict[int, bytes],
+    pre_uploaded: list[tuple[str, str | None]],
+) -> dict | None:
+    """处理单条 listing 记录：proxy 获取当前图片 → 比较 → edit 更新。
 
     Args:
         headers (dict[str, str]): 领星请求头。
-        row (dict): listing 行数据。
-        uploaded_urls (list[tuple]): [(name, url), ...] 图片列表。
+        record: LxListingData 记录。
+        sku (str): SKU。
+        marketplace_id (str): 该记录对应的 marketplace_id。
+        local_map (dict[int, bytes]): NC 图片二进制映射。
+        pre_uploaded (list[tuple]): 预上传结果。
 
     Returns:
-        tuple[int, str]: (状态码, 消息)。
+        dict | None: 失败时返回错误信息 dict，成功返回 None。
     """
-    url = f"{_LX_BASE}/listing-publish-api/api/AmazonPublishProduct/listingUpdate"
-    store_id = row.get("store_id") or row.get("storeId")
-    msku = row.get("msku") or row.get("MSKU")
-    if not store_id or not msku:
-        return 0, "missing store_id or msku"
-    main_url = uploaded_urls[0][1] if uploaded_urls else None
-    if not main_url:
-        return 0, "missing main_product_image_locator"
-    other_urls = [u for _, u in uploaded_urls[1:] if u]
-    payload = {
-        "store_id": int(store_id) if str(store_id).isdigit() else store_id,
-        "msku": msku, "is_image_required": 1,
-        "main_product_image_locator": main_url,
-        "init_other_product_image_count": len(other_urls),
-        "other_product_image_locator": other_urls,
-        "init_swatch_product_image_locator": "",
-        "swatch_product_image_locator": "",
+    sid = record.sid
+    proxy_payload = {
+        "store_id": sid,
+        "sku": sku,
+        "query": {"includedData": "productTypes,attributes,summaries"},
+        "path": "/listings/2021-08-01/items/{seller_id}/{sku}",
+        "req_time_sequence": "/listing-publish-api/api/amazon/proxy$$5",
     }
+    try:
+        resp = requests.post(
+            f"{_LX_BASE}/listing-publish-api/api/amazon/proxy",
+            json=proxy_payload, headers=headers, timeout=15,
+        )
+        if resp.status_code != 200:
+            return {"sku": sku, "shop": sid, "code": resp.status_code, "msg": "proxy failed"}
+        data = (resp.json().get("data") or {})
+        attrs = data.get("attributes") or {}
+        product_types = attrs.get("productTypes") or []
+        product_type = product_types[0].get("productType", "") if product_types else ""
+        proxy_images = _extract_proxy_images(attrs)
+    except Exception:
+        logger.error("[ImageSync][proxy] 异常 sid=%s", sid, exc_info=True)
+        return {"sku": sku, "shop": sid, "code": 0, "msg": "proxy exception"}
+    final_urls = _resolve_final_image_urls(proxy_images, local_map, pre_uploaded)
+    edit_payload = _build_edit_payload(final_urls, product_type, sku, sid, marketplace_id)
+    last_err: dict | None = None
     for attempt in range(1, 4):
         try:
-            resp = requests.post(url, json=payload, headers=headers, timeout=15)
+            resp = requests.post(
+                f"{_LX_BASE}/listing-publish-api/api/amazon/listing/edit",
+                json=edit_payload, headers=headers, timeout=15,
+            )
             if resp.status_code != 200:
+                last_err = {"sku": sku, "shop": sid, "code": resp.status_code, "msg": "edit http error"}
                 time.sleep(1)
                 continue
             j = resp.json()
             code = int(j.get("code", 0)) if str(j.get("code", "")).isdigit() else 0
-            return code, str(j.get("msg", j))
-        except Exception:
-            logger.error("[ImageSync][update_listing] attempt=%d 异常", attempt, exc_info=True)
+            msg = str(j.get("msg", j))
+            if code == 1 or "成功" in msg:
+                return None
+            last_err = {"sku": sku, "shop": sid, "code": code, "msg": msg}
             time.sleep(1)
-    return 0, "exception"
+        except Exception:
+            logger.error("[ImageSync][edit] attempt=%d 异常", attempt, exc_info=True)
+            last_err = {"sku": sku, "shop": sid, "code": 0, "msg": "edit exception"}
+            time.sleep(1)
+    return last_err
 
 
 # ------------------------------------------------------------------ #
@@ -450,36 +464,35 @@ def _preupload_numbered_images(
 
 
 def _resolve_final_image_urls(
-    other_images: list[str],
+    proxy_images: dict[int, dict],
     local_map: dict[int, bytes],
     pre_uploaded: list[tuple[str, str | None]],
 ) -> list[tuple[str, str | None]]:
-    """根据已有图片比较结果决定最终 URL 列表。
-
-    对应 template.py 的 upload_local_images_by_other_images()。
+    """根据 proxy 已有图片与 NC 图片比较结果决定最终 URL 列表。
 
     Args:
-        other_images (list[str]): listing 当前图片 URL 列表。
+        proxy_images (dict[int, dict]): proxy 返回的图片数据
+                                        {位置: {media_location, marketplace_id}}。
         local_map (dict[int, bytes]): NC 图片二进制映射。
         pre_uploaded (list[tuple]): 预上传结果。
 
     Returns:
         list[tuple[str, str | None]]: 最终 [(name, url), ...]。
     """
-    if not other_images:
-        return pre_uploaded
     result: list[tuple[str, str | None]] = []
-    for idx, (name, pre_url) in enumerate(pre_uploaded):
-        other_val = other_images[idx] if idx < len(other_images) else None
-        nc_bytes = local_map.get(idx + 1)
-        if not other_val or other_val == "":
+    for name, pre_url in pre_uploaded:
+        idx = int(name.split(".")[0])
+        proxy_img = proxy_images.get(idx)
+        proxy_url = (proxy_img or {}).get("media_location", "")
+        nc_bytes = local_map.get(idx)
+        if not proxy_url:
             result.append((name, pre_url))
             continue
         if not nc_bytes:
-            result.append((name, other_val))
+            result.append((name, proxy_url))
             continue
-        same = _are_images_visually_same(other_val, nc_bytes)
-        result.append((name, other_val if same else pre_url))
+        same = _are_images_visually_same(proxy_url, nc_bytes)
+        result.append((name, proxy_url if same else pre_url))
     return result
 
 
@@ -538,55 +551,6 @@ def _update_queue_status(
 #  单条处理                                                           #
 # ------------------------------------------------------------------ #
 
-def _filter_listing_rows(rows: list[dict], sku: str) -> list[dict]:
-    """过滤 listing 行，仅保留 msku/local_sku 包含 sku 的记录。
-
-    Args:
-        rows (list[dict]): 原始 listing 行。
-        sku (str): 目标 SKU。
-
-    Returns:
-        list[dict]: 过滤后的行。
-    """
-    return [
-        r for r in rows
-        if sku in (r.get("msku") or "") or sku in (r.get("local_sku") or "")
-    ]
-
-
-def _process_single_listing(
-    headers: dict[str, str],
-    row: dict,
-    sku: str,
-    local_map: dict[int, bytes],
-    pre_uploaded: list[tuple[str, str | None]],
-) -> dict | None:
-    """处理单条 listing：获取已有图片、比较、更新。
-
-    Args:
-        headers (dict[str, str]): 领星请求头。
-        row (dict): listing 行数据。
-        sku (str): SKU。
-        local_map (dict[int, bytes]): NC 图片映射。
-        pre_uploaded (list[tuple]): 预上传结果。
-
-    Returns:
-        dict | None: 失败时返回错误信息 dict，成功返回 None。
-    """
-    other_images = _fetch_other_image_urls(headers, row)
-    final_urls = _resolve_final_image_urls(other_images, local_map, pre_uploaded)
-    if not final_urls:
-        return {"sku": sku, "shop": row.get("shop"), "code": 0, "msg": "URL 列表为空"}
-    code, msg = _update_listing_images(headers, row, final_urls)
-    if code != 1 or "成功" not in msg:
-        return {
-            "sku": row.get("msku") or row.get("local_sku"),
-            "shop": row.get("shop") or row.get("seller_name"),
-            "code": code, "msg": msg,
-        }
-    return None
-
-
 def _process_sync_item(
     item: ImageSyncQueue,
     headers: dict[str, str],
@@ -621,15 +585,24 @@ def _process_sync_item(
         _update_queue_status(item, ImageSyncStatus.FAILED, msg)
         return {"sku": sku, "success": False, "msg": msg}
 
-    # 2. 搜索 listing
-    rows = _listing_search(headers, sku)
-    rows = _filter_listing_rows(rows, sku)
-    if not rows:
+    # 2. 内部搜索 listing（在售 + 停售，排除已删除）
+    from api_v1.models import LxListingData
+    records = list(LxListingData.objects.filter(
+        seller_sku=sku, is_delete=0,
+    ))
+    if not records:
         msg = f"SKU {sku} 未找到匹配的 listing"
         _report_result(sku, local_path, "WARNING", msg)
         return {"sku": sku, "success": False, "msg": msg}
 
-    # 3. 预上传
+    # 3. 批量获取 shop_id → marketplace_id 映射
+    sid_set = {r.sid for r in records}
+    shops_map = {
+        s.sid: s.marketplace_id or ""
+        for s in LxShops.objects.filter(sid__in=sid_set)
+    }
+
+    # 4. 统一预上传到 upload-center（只做一次，URL 各国家复用）
     pre_result = _preupload_numbered_images(headers, local_map)
     if pre_result[0] is None:
         msg = "预上传本地图片失败，请检查"
@@ -638,22 +611,29 @@ def _process_sync_item(
         return {"sku": sku, "success": False, "msg": msg}
     pre_uploaded, local_map = pre_result
 
-    # 4. 遍历 listing 逐条处理
+    # 5. 串行遍历每条 listing 记录
     err_list: list[dict] = []
-    for row in rows:
+    for record in records:
+        marketplace_id = shops_map.get(record.sid, "")
+        if not marketplace_id:
+            err_list.append({"sku": sku, "shop": record.sid, "code": 0, "msg": "no marketplace_id"})
+            continue
         try:
-            err = _process_single_listing(headers, row, sku, local_map, pre_uploaded)
+            err = _process_listing_record(
+                headers, record, sku, marketplace_id, local_map, pre_uploaded,
+            )
             if err:
                 err_list.append(err)
         except Exception:
             logger.error("[ImageSync][process_item] 处理 listing 异常", exc_info=True)
-    # 5. 结果上报
+        time.sleep(1)
+    # 6. 结果上报
     if not err_list:
-        msg = f"产品图片（{len(rows)} 个）上传成功"
+        msg = f"产品图片（{len(records)} 个）上传成功"
         _report_result(sku, local_path, "INFO", msg)
         _update_queue_status(item, ImageSyncStatus.SUCCESS)
     else:
-        msg = f"部分失败: {len(err_list)}/{len(rows)}"
+        msg = f"部分失败: {len(err_list)}/{len(records)}"
         _report_result(sku, local_path, "WARNING", msg)
         _update_queue_status(item, ImageSyncStatus.FAILED, msg)
     return {"sku": sku, "success": not err_list, "errors": err_list}
