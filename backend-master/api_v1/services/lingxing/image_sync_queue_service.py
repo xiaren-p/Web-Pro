@@ -8,8 +8,9 @@ import logging
 from django.db.models import QuerySet
 from django.utils import timezone
 
-from api_v1.models import ImageSyncQueue
+from api_v1.models import ImageSyncQueue, ImageUpload
 from api_v1.models.file.image_sync_queue import ImageSyncStatus
+from api_v1.models.file.image_upload import ImageUploadStatus
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,10 @@ def upsert_sync_task(image_upload) -> tuple[bool, str]:
                 "status": ImageSyncStatus.PENDING,
                 "error_msg": "",
             },
+        )
+        # 同步更新 ImageUpload 状态，前端展示用
+        ImageUpload.objects.filter(image_group=sku).update(
+            status=ImageUploadStatus.NORMAL,
         )
     except Exception as exc:
         logger.error(

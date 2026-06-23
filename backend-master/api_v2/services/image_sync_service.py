@@ -602,6 +602,7 @@ def _process_sync_item(
     if not records:
         msg = f"SKU {sku} 未找到匹配的 listing"
         _report_result(sku, local_path, "WARNING", msg)
+        _update_queue_status(item, ImageSyncStatus.FAILED, msg)
         return {"sku": sku, "success": False, "msg": msg}
 
     # 3. 批量获取 shop_id → marketplace_id 映射
