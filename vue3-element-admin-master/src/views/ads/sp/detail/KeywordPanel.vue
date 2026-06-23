@@ -169,7 +169,8 @@
                   v-model="row._bidInput"
                   size="small"
                   class="bid-input"
-                  type="number"
+                  type="text"
+                  inputmode="decimal"
                   @keyup.enter="confirmBid(row)"
                   @keyup.esc="resetBid(row)"
                   @blur="confirmBid(row)"
@@ -461,14 +462,22 @@ function onReset(): void {
 // ── 竞价可编辑（emit 到父组件，不调 API）────────────────────────────────────
 function confirmBid(row: any): void {
   if (row._confirming) return;
-  const val = Number(row._bidInput);
-  const original = Number(row.bid ?? 0);
+  const raw = Number(row._bidInput);
+  // 保留 2 位小数（四舍五入）
+  const val = Math.round(raw * 100) / 100;
+  const original = Math.round(Number(row.bid ?? 0) * 100) / 100;
   if (!val || val <= 0 || isNaN(val)) {
     row._bidInput = row.bid ?? 0;
     return;
   }
-  if (val === original) return;
+  if (val === original) {
+    // 即使值未变也同步显示规范化的两位小数
+    row._bidInput = val;
+    return;
+  }
   row._confirming = true;
+  // 输入框立即显示规范化值
+  row._bidInput = val;
   ElMessageBox.confirm(`确认将竞价修改为 ${val.toFixed(2)}？`, "确认修改竞价", {
     confirmButtonText: "确认",
     cancelButtonText: "取消",
@@ -580,7 +589,7 @@ onMounted(fetchData);
     color: var(--el-text-color-secondary);
   }
   .bid-input {
-    width: 80px;
+    width: 100px;
   }
   .recent-star {
     position: relative;

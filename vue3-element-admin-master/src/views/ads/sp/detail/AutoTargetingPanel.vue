@@ -171,7 +171,8 @@
                   v-model="row._bidInput"
                   size="small"
                   class="bid-input"
-                  type="number"
+                  type="text"
+                  inputmode="decimal"
                   @keyup.enter="confirmBid(row)"
                   @keyup.esc="resetBid(row)"
                   @blur="confirmBid(row)"
@@ -553,14 +554,19 @@ function fetchData(): void {
  */
 function confirmBid(row: any): void {
   if (row._confirming) return;
-  const val = Number(row._bidInput);
-  const original = Number(row.bid ?? 0);
+  const raw = Number(row._bidInput);
+  const val = Math.round(raw * 100) / 100;
+  const original = Math.round(Number(row.bid ?? 0) * 100) / 100;
   if (!val || val <= 0 || isNaN(val)) {
     row._bidInput = row.bid ?? 0;
     return;
   }
-  if (val === original) return;
+  if (val === original) {
+    row._bidInput = val;
+    return;
+  }
   row._confirming = true;
+  row._bidInput = val;
   ElMessageBox.confirm(`确认将竞价修改为 ${val.toFixed(2)}？`, "确认修改竞价", {
     confirmButtonText: "确认",
     cancelButtonText: "取消",
@@ -696,8 +702,8 @@ onMounted(() => {
   }
 
   .bid-input {
-    flex: 1;
-    min-width: 0;
+    flex: none;
+    width: 100px;
 
     :deep(.el-input__wrapper) {
       height: 26px;
