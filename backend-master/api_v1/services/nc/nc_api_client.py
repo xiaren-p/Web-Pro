@@ -1123,6 +1123,7 @@ class NcApiClient:
             f"<d:literal>{content_type}</d:literal></d:like>"
             "</d:and></d:where>"
             "<d:orderby/>"
+            "<d:limit><d:nresults>10000</d:nresults></d:limit>"
             "</d:basicsearch>"
             "</d:searchrequest>"
         )
