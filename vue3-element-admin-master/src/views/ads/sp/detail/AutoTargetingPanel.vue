@@ -151,7 +151,12 @@
               <template v-if="row._isSummary">---</template>
               <div v-else class="bid-cell">
                 <span class="bid-icon">{{ currencyIcon }}</span>
-                <el-input v-model="row.bid" size="small" class="bid-input" @change="onBidChange" />
+                <el-input
+                  v-model="row.bid"
+                  size="small"
+                  class="bid-input"
+                  @change="onBidChange(row)"
+                />
               </div>
             </template>
 

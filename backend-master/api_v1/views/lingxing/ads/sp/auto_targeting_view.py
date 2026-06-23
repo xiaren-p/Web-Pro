@@ -61,10 +61,10 @@ def _get_operator_name(request: Request) -> str:
 
 # ── 自动投放定位组 type → 中文标签映射 ──
 _AUTO_TARGETING_TYPE_MAP: dict[str, str] = {
-    "asinSameAs": "紧密匹配",
-    "asinSubstituteRelated": "宽泛匹配",
-    "asinComplementRelated": "同类商品",
-    "asinAccessoryRelated": "关联商品",
+    "queryHighRelMatches": "紧密匹配",
+    "queryBroadRelMatches": "宽泛匹配",
+    "asinAccessoryRelated": "同类商品",
+    "asinSubstituteRelated": "关联商品",
 }
 
 
@@ -249,6 +249,13 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             )
             row["is"] = "---"
             res_list.append(row)
+
+        # ── 最近修改信息 ──
+        adj_map = _build_bid_latest_adjustment_map(
+            [str(it.target_id) for it in items if it.target_id], "target_id", pid_int,
+        )
+        for row in res_list:
+            row["latest_adjustment"] = adj_map.get(str(row.get("target_id", "")), {"has_recent": False, "lines": []})
 
         return drf_ok({
             "total": total,
@@ -437,6 +444,13 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             )
             res_list.append(row)
 
+        # ── 最近修改信息（product targeting）──
+        adj_map = _build_bid_latest_adjustment_map(
+            [str(it.target_id) for it in items if it.target_id], "target_id", pid_int,
+        )
+        for row in res_list:
+            row["latest_adjustment"] = adj_map.get(str(row.get("target_id", "")), {"has_recent": False, "lines": []})
+
         return drf_ok({
             "total": total,
             "list": res_list,
@@ -539,3 +553,108 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             "profile_id": pid_int,
             "state": state,
         })
+
+
+def _build_bid_latest_adjustment_map(
+    entity_ids: list[str],
+    entity_field: str,
+    profile_id: int,
+) -> dict[str, dict[str, Any]]:
+    """构建投放实体最近修改星标信息。"""
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
+    from api_v1.models.lingxing.ads.lx_ad_rule import LxAdRule
+    from api_v2.models.sp_bid_adjustment import SpBidAdjustment, ExecutionTypeChoices as BidExecType
+    from api_v2.utils.timezone_utils import country_to_timezone
+
+    if not entity_ids:
+        return {}
+    threshold = timezone.now() - timedelta(days=7)
+    filter_kwargs = {
+        f"{entity_field}__in": [int(x) for x in entity_ids if x],
+        "created_at__gte": threshold,
+    }
+    recent_qs = SpBidAdjustment.objects.filter(**filter_kwargs).order_by("-created_at")
+    latest_by_id: dict[int, Any] = {}
+    for rec in recent_qs:
+        eid = getattr(rec, entity_field, None) or rec.keyword_id or rec.target_id
+        if eid is not None and eid not in latest_by_id:
+            latest_by_id[eid] = rec
+    if not latest_by_id:
+        return {}
+    rule_ids = {r.auto_rule_id for r in latest_by_id.values() if r.auto_rule_id}
+    rule_map: dict[int, Any] = {}
+    if rule_ids:
+        for rule in LxAdRule.objects.filter(id__in=rule_ids).only("id", "name", "condition_sets"):
+            rule_map[rule.id] = rule
+    tz_name, country_name = "", ""
+    prof = LxAdsProfile.objects.filter(profile_id=profile_id).only("country_code", "sid").first()
+    if prof:
+        tz_name = country_to_timezone(prof.country_code or "")
+        from api_v1.models.lingxing.basic.lx_shops import LxShops
+        country_name = LxShops.objects.filter(sid=prof.sid).values_list("country", flat=True).first() or (prof.country_code or "")
+    result: dict[str, dict[str, Any]] = {}
+    for eid, rec in latest_by_id.items():
+        lines = _build_bid_lines(rec, rule_map, country_name, tz_name)
+        result[str(eid)] = {"has_recent": True, "lines": lines}
+    return result
+
+
+def _build_bid_lines(rec: Any, rule_map: dict[int, Any], country_name: str, tz_name: str) -> list[str]:
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    from api_v2.models.sp_bid_adjustment import ExecutionTypeChoices as BidExecType
+    is_rule = bool(rec.auto_rule_id)
+    rule = rule_map.get(rec.auto_rule_id) if is_rule else None
+    rule_name = getattr(rule, "name", "") if rule else "未知规则"
+    operator = rec.operator or "未知用户"
+    etype = rec.execution_type
+    line1 = f"最近一次修改通过「{rule_name}」规则修改" if is_rule else f"最近一次修改由{operator}完成"
+    local_str = country_name + "时间: 未知"
+    if rec.created_at:
+        try:
+            tz = ZoneInfo(tz_name) if tz_name else None
+            local_dt = rec.created_at.astimezone(tz) if tz else rec.created_at
+            local_str = f"{country_name or '当地'}时间: {local_dt.strftime('%Y-%m-%d %H:%M')}"
+        except Exception:
+            try:
+                local_str = f"{country_name or '当地'}时间: {rec.created_at.strftime('%Y-%m-%d %H:%M')}"
+            except Exception:
+                pass
+    lines = [line1, local_str]
+    if is_rule and rule:
+        try:
+            cs = rule.condition_sets
+            if isinstance(cs, list) and cs:
+                fl = {"cost":"花费","sales":"广告销售额","acos":"ACoS","roas":"ROAS","clicks":"点击","impressions":"曝光量","orders":"广告订单","ctr":"CTR","cpc":"CPC","cvr":"CVR"}
+                ol = {">":">","<":"<",">=":"≥","<=":"≤","==":"=","!=":"≠"}
+                parts = []
+                first = cs[0] if isinstance(cs[0], dict) else {}
+                conds = first.get("conditions") or []
+                if isinstance(conds, list):
+                    for c in conds[:3]:
+                        if not isinstance(c, dict): continue
+                        m = str(c.get("metric") or c.get("field") or "")
+                        o = str(c.get("operator", ">"))
+                        v = c.get("value", "")
+                        nm = fl.get(m.lower(), m or "未知")
+                        osym = ol.get(o, o)
+                        seg = f"{nm} {osym} {v}"
+                        if bool(c.get("isRange", False)):
+                            o2 = str(c.get("operator2", "<")); v2 = c.get("value2", "")
+                            seg += f" 且 {ol.get(o2, o2)} {v2}"
+                        parts.append(seg)
+                if parts:
+                    lines.append(f"详细内容: {', '.join(parts)}")
+        except Exception:
+            pass
+    if etype == BidExecType.BID_PAUSE: lines.append("执行操作: 竞价暂停")
+    elif etype == BidExecType.BID_ENABLE: lines.append("执行操作: 竞价启用")
+    elif etype in (BidExecType.BID_ADJUSTMENT, BidExecType.MANUAL_ADJUSTMENT):
+        bf = float(rec.bid_before) if rec.bid_before is not None else 0
+        af = float(rec.bid_after) if rec.bid_after is not None else 0
+        lines.append(f"执行操作: 竞价 {bf:.2f} → {af:.2f}")
+    elif etype == BidExecType.TIME_PRICING_START: lines.append("执行操作: 分时开始")
+    elif etype == BidExecType.TIME_PRICING_CALLBACK: lines.append("执行操作: 分时回调")
+    return lines
