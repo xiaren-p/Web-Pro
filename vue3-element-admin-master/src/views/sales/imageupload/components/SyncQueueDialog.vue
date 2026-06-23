@@ -6,9 +6,9 @@
         placeholder="搜索图片组"
         clearable
         style="width: 200px; margin-right: 10px"
-        @keyup.enter="handleQueueQuery"
+        @keyup.enter="handleQueueSearch"
       />
-      <el-button type="primary" icon="search" @click="handleQueueQuery">搜索</el-button>
+      <el-button type="primary" icon="search" @click="handleQueueSearch">搜索</el-button>
     </div>
 
     <el-table v-loading="loading" :data="list" border>
@@ -82,6 +82,12 @@ function handleQueueQuery() {
     .finally(() => {
       loading.value = false;
     });
+}
+
+/** 搜索同步队列（重置到第 1 页后查询）。 */
+function handleQueueSearch() {
+  queryParams.pageNum = 1;
+  handleQueueQuery();
 }
 
 defineExpose({ open });

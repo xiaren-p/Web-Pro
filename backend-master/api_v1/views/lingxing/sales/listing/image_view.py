@@ -221,16 +221,21 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def queue(self, request):
-        """查询内部图片同步队列（后端分页 + imageGroup 过滤）。"""
+        """查询内部图片同步队列（手动分页 + imageGroup 过滤）。
+
+        DRF 未配置全局分页类，paginate_queryset 返回 None，
+        因此在此手动切片实现分页，返回 {list, total} 格式。
+        """
         qs = get_queue_queryset(request.query_params.dict())
+        total = qs.count()
 
-        page = self.paginate_queryset(qs)
-        if page is not None:
-            serializer = ImageSyncQueueSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+        page_num = int(request.query_params.get('pageNum', 1))
+        page_size = int(request.query_params.get('pageSize', 10))
+        start = (page_num - 1) * page_size
+        page_qs = qs[start:start + page_size]
 
-        serializer = ImageSyncQueueSerializer(qs, many=True)
-        return drf_ok({'list': serializer.data, 'total': qs.count()})
+        serializer = ImageSyncQueueSerializer(page_qs, many=True)
+        return drf_ok({'list': serializer.data, 'total': total})
 
     @action(detail=False, methods=['post'])
     def upload_image(self, request):

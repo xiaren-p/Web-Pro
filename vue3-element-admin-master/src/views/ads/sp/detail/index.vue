@@ -400,12 +400,13 @@ onMounted(() => {
   }
 
   .tab-indicators-wrapper {
+    margin-top: var(--spacing-4);
     margin-bottom: var(--spacing-4);
+    padding: 18px 4px 10px;
     background: rgba(255, 255, 255, 0.96);
     border: 1px solid var(--color-gray-200);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-sm);
-    overflow: hidden;
   }
 
   :deep(.el-tab-pane) {
