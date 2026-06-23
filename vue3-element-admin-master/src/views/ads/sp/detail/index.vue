@@ -271,15 +271,15 @@ function goBack(): void {
  * @param {Object} payload - { row, bid }
  */
 async function onKeywordBid({ row, bid }: { row: any; bid: number }): Promise<void> {
-  if (!row?.keyword_id || !row?.campaign_id || !row?.profile_id) {
+  if (!row?.keyword_id) {
     ElMessage.error("缺少关键词标识，无法修改竞价");
     return;
   }
   const oldBid = row.bid;
   try {
     await adjustKeywordBid({
-      campaign_id: row.campaign_id,
-      profile_id: row.profile_id,
+      campaign_id: campaignId.value,
+      profile_id: profileId.value,
       keyword_id: row.keyword_id,
       bid_after: bid,
     });
@@ -304,15 +304,15 @@ async function onKeywordState({
   row: any;
   state: "enabled" | "paused";
 }): Promise<void> {
-  if (!row?.keyword_id || !row?.campaign_id || !row?.profile_id) {
+  if (!row?.keyword_id) {
     ElMessage.error("缺少关键词标识，无法修改状态");
     return;
   }
   const oldState = row.state;
   try {
     await adjustKeywordState({
-      campaign_id: row.campaign_id,
-      profile_id: row.profile_id,
+      campaign_id: campaignId.value,
+      profile_id: profileId.value,
       keyword_id: row.keyword_id,
       state,
     });
@@ -329,15 +329,15 @@ async function onKeywordState({
  * 自动定位组竞价修改：写 SpBidAdjustment + 更新 LxSpTarget.bid。
  */
 async function onTargetBid({ row, bid }: { row: any; bid: number }): Promise<void> {
-  if (!row?.target_id || !row?.campaign_id || !row?.profile_id) {
+  if (!row?.target_id) {
     ElMessage.error("缺少定位组标识，无法修改竞价");
     return;
   }
   const oldBid = row.bid;
   try {
     await adjustTargetBid({
-      campaign_id: row.campaign_id,
-      profile_id: row.profile_id,
+      campaign_id: campaignId.value,
+      profile_id: profileId.value,
       target_id: row.target_id,
       bid_after: bid,
     });
@@ -369,8 +369,8 @@ async function onTargetState({
   const oldState = row.state;
   try {
     await adjustTargetState({
-      campaign_id: row.campaign_id,
-      profile_id: row.profile_id,
+      campaign_id: campaignId.value,
+      profile_id: profileId.value,
       target_id: row.target_id,
       state,
     });
@@ -394,8 +394,8 @@ async function onProductTargetBid({ row, bid }: { row: any; bid: number }): Prom
   const oldBid = row.bid;
   try {
     await adjustProductTargetBid({
-      campaign_id: row.campaign_id,
-      profile_id: row.profile_id,
+      campaign_id: campaignId.value,
+      profile_id: profileId.value,
       target_id: row.target_id,
       bid_after: bid,
     });
@@ -427,8 +427,8 @@ async function onProductTargetState({
   const oldState = row.state;
   try {
     await adjustProductTargetState({
-      campaign_id: row.campaign_id,
-      profile_id: row.profile_id,
+      campaign_id: campaignId.value,
+      profile_id: profileId.value,
       target_id: row.target_id,
       state,
     });
