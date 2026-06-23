@@ -222,7 +222,7 @@ def search_nc_sku_paths(
     admin_user: str,
     scope_dav: str,
     skus: list[str],
-) -> dict[str, list[str]]:
+) -> tuple[dict[str, list[str]], str]:
     """在 NC 中搜索与给定 SKU 列表匹配的图片目录。
 
     利用 WebDAV SEARCH 一次请求获取所有编号图片文件，
@@ -236,13 +236,14 @@ def search_nc_sku_paths(
         skus (list[str]): 待搜索的 SKU 列表。
 
     Returns:
-        dict[str, list[str]]: {sku: [相对路径, ...]}，路径相对于 scope_dav。
+        tuple[dict[str, list[str]], str]:
+            ({sku: [相对路径, ...]}, 调试摘要字符串)。
 
     Raises:
         RuntimeError: NC 通信失败时抛出。
     """
     if not skus:
-        return {}
+        return {}, "无 SKU"
 
     logger.info(
         "[nc_sku_path_search][search_nc_sku_paths] 开始搜索: scope=%s sku_count=%d",
@@ -286,13 +287,6 @@ def search_nc_sku_paths(
 
     # 4. 对每个编号图片目录匹配每个 SKU
     scope_prefix = scope_dav.rstrip("/")
-    # 调试：输出前 5 个编号图片目录的路径组件，便于排查匹配失败
-    for debug_href, debug_fnames in list(numbered_dirs.items())[:5]:
-        debug_comps = _href_to_path_components(debug_href, scope_prefix)
-        logger.info(
-            "[nc_sku_path_search][debug] 编号目录 components=%s files=%s",
-            debug_comps, debug_fnames[:5],
-        )
 
     results: dict[str, list[str]] = {sku: [] for sku in skus}
     for href, fnames in numbered_dirs.items():
@@ -311,8 +305,19 @@ def search_nc_sku_paths(
         results[sku] = _prune_by_depth(results[sku])
 
     matched_count = sum(1 for v in results.values() if v)
-    logger.info(
-        "[nc_sku_path_search][search_nc_sku_paths] 匹配到路径的 SKU 数=%d/%d",
-        matched_count, len(skus),
+    # 构建调试摘要
+    sample_dirs: list[str] = []
+    for debug_href, debug_fnames in list(numbered_dirs.items())[:8]:
+        comps = _href_to_path_components(debug_href, scope_prefix)
+        sample_dirs.append("/".join(comps) if comps else "(empty)")
+    debug_info = (
+        f"图片文件数={len(files)}, "
+        f"编号目录数={len(numbered_dirs)}, "
+        f"scope={scope_for_search}, "
+        f"示例目录: {'; '.join(sample_dirs) or '(无)'}"
     )
-    return results
+    logger.info(
+        "[nc_sku_path_search][search_nc_sku_paths] 匹配 SKU=%d/%d | %s",
+        matched_count, len(skus), debug_info,
+    )
+    return results, debug_info

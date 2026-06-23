@@ -733,7 +733,7 @@ def _resolve_missing_paths(
     scope = f"/remote.php/dav/files/{admin_user}/{mount_point}/【产品图片】"
     logger.info("[ImageSync][resolve_paths] 搜索 %d 个 SKU 路径", len(skus))
     try:
-        path_map = search_nc_sku_paths(nc_client, admin_user, scope, skus)
+        path_map, debug_info = search_nc_sku_paths(nc_client, admin_user, scope, skus)
     except RuntimeError as exc:
         logger.error("[ImageSync][resolve_paths] NC 搜索失败: %s", exc, exc_info=True)
         for it in missing:
@@ -748,7 +748,7 @@ def _resolve_missing_paths(
             it.save(update_fields=["local_path"])
             logger.info("[ImageSync][resolve_paths] SKU %s → %s", it.sku, paths[0])
         else:
-            msg = f"匹配到 {len(paths)} 个路径，无法唯一确定"
+            msg = f"匹配到 {len(paths)} 个路径，无法唯一确定 | {debug_info}"
             _report_result(it.sku, "", "WARNING", msg)
             _update_queue_status(it, ImageSyncStatus.FAILED, msg)
             logger.warning("[ImageSync][resolve_paths] SKU %s: %s", it.sku, msg)
