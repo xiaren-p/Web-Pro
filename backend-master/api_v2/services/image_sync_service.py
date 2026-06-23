@@ -643,7 +643,16 @@ def _process_sync_item(
         _report_result(sku, local_path, "INFO", msg)
         _update_queue_status(item, ImageSyncStatus.SUCCESS)
     else:
-        msg = f"部分失败: {len(err_list)}/{len(records)}"
+        detail_parts = []
+        for e in err_list[:3]:
+            shop = e.get("shop", "?")
+            code = e.get("code", "?")
+            emsg = e.get("msg", "?")
+            detail_parts.append(f"shop={shop} code={code} msg={emsg}")
+        detail = "; ".join(detail_parts)
+        if len(err_list) > 3:
+            detail += f"; ...(共 {len(err_list)} 条错误)"
+        msg = f"部分失败: {len(err_list)}/{len(records)} | {detail}"
         _report_result(sku, local_path, "WARNING", msg)
         _update_queue_status(item, ImageSyncStatus.FAILED, msg)
     return {"sku": sku, "success": not err_list, "errors": err_list}
