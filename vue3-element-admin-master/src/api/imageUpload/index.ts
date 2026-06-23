@@ -17,8 +17,8 @@ export interface ImageUploadVO {
   log?: string;
   imageUrl?: string;
   createTime?: string;
-  /** 是否已同步成功 */
-  synced?: boolean;
+  /** 失败店铺ID列表：null=从未同步，空串=全部成功，逗号分隔=部分失败 */
+  failedShops?: string | null;
 }
 
 export interface ImageUploadForm {

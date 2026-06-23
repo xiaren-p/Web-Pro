@@ -33,12 +33,23 @@ def upsert_sync_task(image_upload, force_resync: bool = False) -> tuple[bool, st
     sku = image_upload.image_group
     local_path = image_upload.cloud_path or ""
 
-    # 断点同步：已同步成功的不重复入队
-    if not force_resync and image_upload.synced:
+    # 断点同步：failed_shops="" 表示全部成功，跳过
+    if not force_resync and image_upload.failed_shops == "":
         now_str = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_line = f"[{now_str}] 跳过：已同步成功，断点同步无需重复提交"
+        log_line = f"[{now_str}] 跳过：已全部同步成功，断点同步无需重复提交"
         _append_log(image_upload, log_line)
         return True, log_line
+
+    # 断点同步且有失败店铺时，日志提示仅重试失败店铺
+    if not force_resync and image_upload.failed_shops:
+        failed_count = len([s for s in image_upload.failed_shops.split(",") if s.strip()])
+        now_str = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_line = f"[{now_str}] 断点续传：仅同步 {failed_count} 个失败店铺"
+        _append_log(image_upload, log_line)
+    elif force_resync:
+        # 重新同步：重置为从未同步状态
+        image_upload.failed_shops = None
+        image_upload.save(update_fields=["failed_shops"])
 
     try:
         ImageSyncQueue.objects.update_or_create(
@@ -50,10 +61,12 @@ def upsert_sync_task(image_upload, force_resync: bool = False) -> tuple[bool, st
             },
         )
         # 同步更新 ImageUpload 状态，前端展示用
-        ImageUpload.objects.filter(image_group=sku).update(
-            status=ImageUploadStatus.NORMAL,
-            synced=False,
-        )
+        update_fields = {
+            "status": ImageUploadStatus.NORMAL,
+        }
+        if force_resync:
+            update_fields["failed_shops"] = None
+        ImageUpload.objects.filter(image_group=sku).update(**update_fields)
     except Exception as exc:
         logger.error(
             "[ImageSyncQueueService][upsert_sync_task] upsert 失败 sku=%s: %s",

@@ -49,10 +49,12 @@ class ImageUpload(TimeStampedModel):
         verbose_name="图片 URL",
     )
 
-    synced = models.BooleanField(
-        default=False,
-        verbose_name="是否已同步成功",
-        help_text="True 表示上次同步成功；断点同步时仅处理 False 的记录",
+    failed_shops = models.TextField(
+        blank=True,
+        null=True,
+        default=None,
+        verbose_name="同步失败的店铺ID列表",
+        help_text="None=从未同步；空串=全部成功；逗号分隔 sid=部分失败待重试",
     )
 
     class Meta:

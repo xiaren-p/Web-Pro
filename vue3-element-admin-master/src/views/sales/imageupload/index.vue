@@ -113,9 +113,15 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="同步" width="80" align="center">
+        <el-table-column label="同步状态" width="100" align="center">
           <template #default="scope">
-            <el-tag v-if="scope.row.synced" type="success" size="small">已同步</el-tag>
+            <!--
+              failedShops 三态：null=未同步，""=全部成功，"123"=部分失败
+            -->
+            <el-tag v-if="scope.row.failedShops === ''" type="success" size="small">已同步</el-tag>
+            <el-tag v-else-if="scope.row.failedShops != null" type="warning" size="small">
+              部分失败
+            </el-tag>
             <el-tag v-else type="info" size="small">未同步</el-tag>
           </template>
         </el-table-column>
@@ -358,8 +364,12 @@ const handleImport = (options: UploadRequestOptions) => {
         return;
       }
 
-      // 弹窗提示，并询问是否立即同步
-      msg += `<p style="margin-top:15px">是否立即对成功的 <strong>${sIds.length}</strong> 条数据执行同步操作？</p>`;
+      // 弹窗提示，并询问同步方式
+      msg += `<p style="margin-top:15px">请选择同步方式：</p>`;
+      msg += `<div style="margin:10px 0">`;
+      msg += `<label style="display:block;margin:5px 0;cursor:pointer"><input type="radio" name="syncMode" value="breakpoint" checked style="margin-right:8px">断点同步（仅同步未成功项）</label>`;
+      msg += `<label style="display:block;margin:5px 0;cursor:pointer"><input type="radio" name="syncMode" value="resync" style="margin-right:8px">重新同步（全部重新同步）</label>`;
+      msg += `</div>`;
 
       ElMessageBox.confirm(msg, "导入完成", {
         distinguishCancelAndClose: true,
@@ -370,17 +380,25 @@ const handleImport = (options: UploadRequestOptions) => {
         draggable: true,
       })
         .then(() => {
-          // 用户点击“立即同步”（默认断点同步，仅同步未成功项）
+          // 读取用户选择的同步方式
+          const selectedRadio = document.querySelector(
+            'input[name="syncMode"]:checked'
+          ) as HTMLInputElement;
+          const forceResync = selectedRadio?.value === "resync";
+          const syncLabel = forceResync ? "重新同步" : "断点同步";
+
           if (sIds.length > 0) {
             loading.value = true;
-            ImageUploadAPI.batchSync(sIds, false)
+            ImageUploadAPI.batchSync(sIds, forceResync)
               .then((syncRes: any) => {
                 const successCount = syncRes.filter((r: any) => r.success).length;
                 const failCount = syncRes.length - successCount;
                 if (failCount === 0) {
-                  ElMessage.success(`同步成功 ${successCount} 条`);
+                  ElMessage.success(`${syncLabel}成功 ${successCount} 条`);
                 } else {
-                  ElMessage.warning(`同步完成: 成功 ${successCount} 条, 失败 ${failCount} 条`);
+                  ElMessage.warning(
+                    `${syncLabel}完成: 成功 ${successCount} 条, 失败 ${failCount} 条`
+                  );
                 }
                 handleQuery();
               })
@@ -393,7 +411,7 @@ const handleImport = (options: UploadRequestOptions) => {
           }
         })
         .catch(() => {
-          // 用户点击“稍后处理”或关闭弹窗
+          // 用户点击"稍后处理"或关闭弹窗
           handleQuery();
         });
     })
