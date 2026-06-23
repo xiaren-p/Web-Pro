@@ -430,21 +430,6 @@ const displayData = computed<any[]>(() => {
 });
 
 /**
- * 监听 tableData 变化（含父组件 onUpdateBudget 成功回写 row.budget 后），
- * 同步刷新 _budgetInput，保证输入框显示最新预算值。
- */
-watch(
-  () => props.tableData,
-  (rows) => {
-    for (const row of rows) {
-      if (row._isSummary) continue;
-      row._budgetInput = row.budget;
-    }
-  },
-  { deep: true }
-);
-
-/**
  * 为汇总行附加专属 CSS 类名，用于高亮显示。
  *
  * @param {{ row: any; rowIndex: number }} param0 - 当前行数据对象

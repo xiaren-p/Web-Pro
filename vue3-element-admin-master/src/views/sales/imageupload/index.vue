@@ -113,18 +113,6 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="同步状态" width="100" align="center">
-          <template #default="scope">
-            <!--
-              failedShops 三态：null=未同步，""=全部成功，"123"=部分失败
-            -->
-            <el-tag v-if="scope.row.failedShops === ''" type="success" size="small">已同步</el-tag>
-            <el-tag v-else-if="scope.row.failedShops != null" type="warning" size="small">
-              部分失败
-            </el-tag>
-            <el-tag v-else type="info" size="small">未同步</el-tag>
-          </template>
-        </el-table-column>
         <el-table-column label="操作" width="280" fixed="right" align="center">
           <template #default="scope">
             <el-button type="primary" link icon="edit" size="small" @click="handleEdit(scope.row)">

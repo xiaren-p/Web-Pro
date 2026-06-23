@@ -638,10 +638,12 @@ async function onUpdateBudget({ row, budget }: { row: any; budget: number }): Pr
       budget_after: budget,
     });
     row.budget = budget;
+    row._budgetInput = budget;
     ElMessage.success("预算修改已记录，待执行推送");
   } catch (error) {
     // 还原 UI 值，避免与后端不一致
     row.budget = oldBudget;
+    row._budgetInput = oldBudget;
     console.error("[onUpdateBudget] 修改预算失败", error);
     ElMessage.error("修改预算失败");
   }

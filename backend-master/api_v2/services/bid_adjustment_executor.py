@@ -244,22 +244,13 @@ def _apply_results(
 def execute_bid_adjustment() -> dict[str, Any]:
     """执行竞价调整与暂停：读 PENDING 记录，按 profile 分组，分关键词 / 定位组请求 API 并回写。
 
-    使用 Redis 分布式锁保证串行执行（API 令牌桶容量=1）。
-
+    TaskExecutionLock 已在任务体层做并发控制，此处不重复加锁。
     BID_ADJUSTMENT 与 BID_PAUSE 统一在一个 API 请求中执行。
 
     Returns:
         {"processed": int, "success": int, "failed": int, "errors": [str]}
     """
-    # API 调用锁：令牌桶容量=1，必须串行
-    if not cache.add(_API_LOCK_KEY, "1", timeout=_API_LOCK_TIMEOUT):
-        logger.warning("[bid_adjustment] 获取 API 锁失败，任务已在执行中")
-        return {"processed": 0, "success": 0, "failed": 0, "errors": ["任务已在执行中"]}
-
-    try:
-        return _execute()
-    finally:
-        cache.delete(_API_LOCK_KEY)
+    return _execute()
 
 
 def _execute() -> dict[str, Any]:
