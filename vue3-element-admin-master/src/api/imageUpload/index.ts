@@ -17,6 +17,8 @@ export interface ImageUploadVO {
   log?: string;
   imageUrl?: string;
   createTime?: string;
+  /** 是否已同步成功 */
+  synced?: boolean;
 }
 
 export interface ImageUploadForm {
@@ -68,11 +70,21 @@ export const ImageUploadAPI = {
   deleteByIds(ids: string) {
     return request({ url: `${IMAGE_UPLOAD_BASE_URL}/${ids}`, method: "delete" });
   },
-  sync(id: string) {
-    return request({ url: `${IMAGE_UPLOAD_BASE_URL}/${id}/sync`, method: "post" });
+  /** 同步单个图片组。forceResync=true 强制重新同步，false=断点同步（仅未成功项）。 */
+  sync(id: string, forceResync: boolean = false) {
+    return request({
+      url: `${IMAGE_UPLOAD_BASE_URL}/${id}/sync`,
+      method: "post",
+      data: { forceResync },
+    });
   },
-  batchSync(ids: string[]) {
-    return request({ url: `${IMAGE_UPLOAD_BASE_URL}/batch_sync`, method: "post", data: { ids } });
+  /** 批量同步。forceResync=true 强制重新同步，false=断点同步。 */
+  batchSync(ids: string[], forceResync: boolean = false) {
+    return request({
+      url: `${IMAGE_UPLOAD_BASE_URL}/batch_sync`,
+      method: "post",
+      data: { ids, forceResync },
+    });
   },
   getQueue(params: ImageSyncQueueQuery) {
     return request<any, PageResult<ImageSyncQueueVO[]>>({

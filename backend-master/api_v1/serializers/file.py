@@ -14,4 +14,4 @@ class ImageUploadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ImageUpload
-        fields = ["id", "imageGroup", "cloudPath", "status", "log", "imageUrl", "createTime"]
+        fields = ["id", "imageGroup", "cloudPath", "status", "log", "imageUrl", "synced", "createTime"]

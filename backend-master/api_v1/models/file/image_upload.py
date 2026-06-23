@@ -49,6 +49,12 @@ class ImageUpload(TimeStampedModel):
         verbose_name="图片 URL",
     )
 
+    synced = models.BooleanField(
+        default=False,
+        verbose_name="是否已同步成功",
+        help_text="True 表示上次同步成功；断点同步时仅处理 False 的记录",
+    )
+
     class Meta:
         db_table = "sys_image_upload"
         verbose_name = "图片上传记录"

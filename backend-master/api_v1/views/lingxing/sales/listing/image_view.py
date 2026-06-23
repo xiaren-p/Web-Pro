@@ -38,13 +38,21 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
         return qs
 
     def page(self, request):
+        """图片上传记录分页查询（手动分页 + imageGroup / status 过滤）。
+
+        DRF 未配置全局分页类，paginate_queryset 返回 None，
+        因此在此手动切片实现分页，返回 {list, total} 格式。
+        """
         qs = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(qs)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(qs, many=True)
-        return drf_ok({'list': serializer.data, 'total': qs.count()})
+        total = qs.count()
+
+        page_num = int(request.query_params.get('pageNum', 1))
+        page_size = int(request.query_params.get('pageSize', 20))
+        start = (page_num - 1) * page_size
+        page_qs = qs[start:start + page_size]
+
+        serializer = self.get_serializer(page_qs, many=True)
+        return drf_ok({'list': serializer.data, 'total': total})
 
     def form(self, request, pk=None):
         instance = self.get_object()
@@ -109,9 +117,13 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def sync(self, request, pk=None):
-        """同步单个图片组到内部同步队列。"""
+        """同步单个图片组到内部同步队列。
+
+        支持断点同步（forceResync=False）与重新同步（forceResync=True）。
+        """
         instance = self.get_object()
-        success, log_line = upsert_sync_task(instance)
+        force_resync = request.data.get('forceResync', False)
+        success, log_line = upsert_sync_task(instance, force_resync=force_resync)
 
         if success:
             return drf_ok({"msg": "Sync success", "log": log_line})
@@ -212,6 +224,7 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
 
         Args:
             ids (list[str] | str): ID 列表或逗号分隔的 ID 字符串。
+            forceResync (bool): True=重新同步全部，False=断点同步（仅未成功项）。
         """
         ids = request.data.get('ids', [])
         if isinstance(ids, str):
@@ -220,8 +233,9 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
         if not ids:
             return drf_error("No ids provided")
 
+        force_resync = request.data.get('forceResync', False)
         queryset = self.get_queryset().filter(id__in=ids)
-        results = batch_upsert_sync_tasks(list(queryset))
+        results = batch_upsert_sync_tasks(list(queryset), force_resync=force_resync)
 
         return drf_ok(results)
 

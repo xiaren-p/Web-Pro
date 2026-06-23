@@ -520,27 +520,36 @@ def _resolve_final_image_urls(
 
 def _report_result(
     sku: str, local_path: str, level: str, message: str,
-    image_url: str | None = None,
+    image_url: str | None = None, synced: bool | None = None,
 ) -> None:
     """上报执行结果到 ImageUpload 记录。
-
-    对应 template.py 的 report_execution_result()。
 
     Args:
         sku (str): 商品 SKU。
         local_path (str): NC 相对路径。
         level (str): INFO / WARNING / ERROR。
-        message (str): 详细结果信息。
+        message (str): 简洁结果描述。
         image_url (str | None): 预览图片 URL。
+        synced (bool | None): 是否同步成功；None 表示不更新此字段。
     """
     now_str = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_line = f"[{now_str}] [{level}] {message}"
-    status_map = {"INFO": ImageUploadStatus.NORMAL, "WARNING": ImageUploadStatus.WARNING, "ERROR": ImageUploadStatus.ERROR}
+    log_line = f"[{now_str}] {message}"
+    status_map = {
+        "INFO": ImageUploadStatus.NORMAL,
+        "WARNING": ImageUploadStatus.WARNING,
+        "ERROR": ImageUploadStatus.ERROR,
+    }
     status_val = status_map.get(level, ImageUploadStatus.NORMAL)
     record = ImageUpload.objects.filter(image_group=sku).first()
-    data: dict[str, Any] = {"image_group": sku, "cloud_path": local_path, "status": status_val}
+    data: dict[str, Any] = {
+        "image_group": sku,
+        "cloud_path": local_path,
+        "status": status_val,
+    }
     if image_url:
         data["image_url"] = image_url
+    if synced is not None:
+        data["synced"] = synced
     if record:
         current_log = record.log or ""
         data["log"] = f"{current_log}\n{log_line}".strip()
@@ -563,6 +572,31 @@ def _update_queue_status(
     item.status = status
     item.error_msg = error_msg
     item.save(update_fields=["status", "error_msg"])
+
+
+def _shorten_error_msg(raw_msg: str) -> str:
+    """将冗长的错误信息缩短为简洁描述。
+
+    Args:
+        raw_msg (str): 原始错误信息。
+
+    Returns:
+        str: 简洁的错误描述。
+    """
+    if not raw_msg:
+        return "未知错误"
+    msg = raw_msg.strip()
+    # 常见错误模式匹配
+    if "操作过于频繁" in msg or "限流" in msg:
+        return "平台限流"
+    if "no marketplace_id" in msg:
+        return "缺少 marketplace_id"
+    if "图片" in msg and ("不存在" in msg or "缺失" in msg):
+        return "NC 图片缺失"
+    if "listing" in msg.lower() and ("未找到" in msg or "不存在" in msg):
+        return "SKU 未匹配 listing"
+    # 兜底：截取前 50 字符
+    return msg[:50] if len(msg) > 50 else msg
 
 
 # ------------------------------------------------------------------ #
@@ -598,8 +632,8 @@ def _process_sync_item(
     dav_path = _build_product_image_dav_path(admin_user, mount_point, local_path)
     pre_uploaded, local_map = _download_nc_numbered_images(nc_client, dav_path)
     if not pre_uploaded or not local_map:
-        msg = f"NC 主图 1.jpg 不存在: {dav_path}"
-        _report_result(sku, local_path, "ERROR", msg)
+        msg = f"NC 主图缺失: {local_path}"
+        _report_result(sku, local_path, "ERROR", msg, synced=False)
         _update_queue_status(item, ImageSyncStatus.FAILED, msg)
         return {"sku": sku, "success": False, "msg": msg}
 
@@ -609,8 +643,8 @@ def _process_sync_item(
         seller_sku=sku, is_delete=0,
     ))
     if not records:
-        msg = f"SKU {sku} 未找到匹配的 listing"
-        _report_result(sku, local_path, "WARNING", msg)
+        msg = f"SKU 未匹配到 listing"
+        _report_result(sku, local_path, "WARNING", msg, synced=False)
         _update_queue_status(item, ImageSyncStatus.FAILED, msg)
         return {"sku": sku, "success": False, "msg": msg}
 
@@ -624,8 +658,8 @@ def _process_sync_item(
     # 4. 统一预上传到 upload-center（只做一次，URL 各国家复用）
     pre_result = _preupload_numbered_images(headers, local_map)
     if pre_result[0] is None:
-        msg = "预上传本地图片失败，请检查"
-        _report_result(sku, local_path, "ERROR", msg)
+        msg = "预上传图片失败"
+        _report_result(sku, local_path, "ERROR", msg, synced=False)
         _update_queue_status(item, ImageSyncStatus.FAILED, msg)
         return {"sku": sku, "success": False, "msg": msg}
     pre_uploaded, local_map = pre_result
@@ -649,21 +683,21 @@ def _process_sync_item(
     # 6. 结果上报
     main_img_url = pre_uploaded[0][1] if pre_uploaded else None
     if not err_list:
-        msg = f"产品图片（{len(records)} 个）上传成功"
-        _report_result(sku, local_path, "INFO", msg, image_url=main_img_url)
+        msg = f"同步成功：{len(records)} 个店铺全部完成"
+        _report_result(sku, local_path, "INFO", msg, image_url=main_img_url, synced=True)
         _update_queue_status(item, ImageSyncStatus.SUCCESS)
     else:
-        detail_parts = []
-        for e in err_list[:3]:
-            shop = e.get("shop", "?")
-            code = e.get("code", "?")
-            emsg = e.get("msg", "?")
-            detail_parts.append(f"shop={shop} code={code} msg={emsg}")
-        detail = "; ".join(detail_parts)
-        if len(err_list) > 3:
-            detail += f"; ...(共 {len(err_list)} 条错误)"
-        msg = f"部分失败: {len(err_list)}/{len(records)} | {detail}"
-        _report_result(sku, local_path, "WARNING", msg, image_url=main_img_url)
+        # 按错误信息分组统计，使日志更简洁
+        error_groups: dict[str, list[str]] = {}
+        for e in err_list:
+            short_msg = _shorten_error_msg(e.get("msg", "未知错误"))
+            error_groups.setdefault(short_msg, []).append(str(e.get("shop", "?")))
+
+        parts: list[str] = [f"{msg}({len(shops)}个)" for msg, shops in error_groups.items()]
+        suffix = f"，成功 {len(records) - len(err_list)}/{len(records)}" if len(err_list) < len(records) else ""
+        msg = f"同步失败：{len(err_list)} 个店铺{suffix} — " + "；".join(parts)
+
+        _report_result(sku, local_path, "WARNING", msg, image_url=main_img_url, synced=False)
         _update_queue_status(item, ImageSyncStatus.FAILED, msg)
     return {"sku": sku, "success": not err_list, "errors": err_list}
 
@@ -703,16 +737,18 @@ def execute_image_sync() -> dict:
 
     # 4. 处理 local_path 为空的条目：批量搜索 NC 路径
     _resolve_missing_paths(pending, nc_client, admin_user, mount_point)
-
+    
     # 5. 逐条处理
+    processed_ids: list[int] = []
     result = {"processed": 0, "success": 0, "failed": 0, "errors": []}
     for item in pending:
         if not (item.local_path or "").strip():
-            msg = f"SKU {item.sku} 路径仍为空"
-            _report_result(item.sku, "", "WARNING", msg)
+            msg = f"SKU {item.sku} 路径为空"
+            _report_result(item.sku, "", "WARNING", msg, synced=False)
             _update_queue_status(item, ImageSyncStatus.FAILED, msg)
             result["errors"].append(msg)
             result["failed"] += 1
+            processed_ids.append(item.id)
             continue
         try:
             item_result = _process_sync_item(item, headers, nc_client, admin_user, mount_point)
@@ -724,7 +760,14 @@ def execute_image_sync() -> dict:
         except Exception:
             logger.error("[ImageSync][execute] 处理异常 sku=%s", item.sku, exc_info=True)
             result["failed"] += 1
+        processed_ids.append(item.id)
         time.sleep(1)
+    
+    # 6. 清理同步队列：处理完成的记录全部删除，防止堆积
+    if processed_ids:
+        ImageSyncQueue.objects.filter(id__in=processed_ids).delete()
+        logger.info("[ImageSync][execute] 已清理队列 %d 条记录", len(processed_ids))
+    
     logger.info("[ImageSync][execute] 完成: %s", result)
     return result
 
@@ -757,7 +800,7 @@ def _resolve_missing_paths(
         logger.error("[ImageSync][resolve_paths] NC 搜索失败: %s", exc, exc_info=True)
         for it in missing:
             msg = f"NC 路径搜索失败: {exc}"
-            _report_result(it.sku, "", "WARNING", msg)
+            _report_result(it.sku, "", "WARNING", msg, synced=False)
             _update_queue_status(it, ImageSyncStatus.FAILED, msg)
         return
     for it in missing:
@@ -781,13 +824,13 @@ def _resolve_missing_paths(
                 path_list = " | ".join(deepest[:5])
                 msg = (
                     f"匹配到 {len(paths)} 个路径，同级 {len(deepest)} 个无法确定: "
-                    f"{path_list} | {debug_info}"
+                    f"{path_list}"
                 )
-                _report_result(it.sku, "", "WARNING", msg)
+                _report_result(it.sku, "", "WARNING", msg, synced=False)
                 _update_queue_status(it, ImageSyncStatus.FAILED, msg)
                 logger.warning("[ImageSync][resolve_paths] SKU %s: %s", it.sku, msg)
         else:
-            msg = f"匹配到 0 个路径，无法唯一确定 | {debug_info}"
-            _report_result(it.sku, "", "WARNING", msg)
+            msg = "NC 路径匹配为空"
+            _report_result(it.sku, "", "WARNING", msg, synced=False)
             _update_queue_status(it, ImageSyncStatus.FAILED, msg)
             logger.warning("[ImageSync][resolve_paths] SKU %s: %s", it.sku, msg)

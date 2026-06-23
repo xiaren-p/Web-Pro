@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container">
+  <div class="app-container image-upload-page">
     <!-- 搜索区域 -->
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
@@ -25,16 +25,31 @@
       </el-form>
     </div>
 
-    <el-card shadow="hover" class="data-table">
+    <el-card shadow="hover" class="data-table flex-1">
       <div class="data-table__toolbar">
         <div class="data-table__toolbar--actions">
           <el-button type="primary" icon="plus" @click="handleAdd">新增</el-button>
           <el-button type="danger" icon="delete" :disabled="multiple" @click="handleBatchDelete">
             批量删除
           </el-button>
-          <el-button type="primary" icon="refresh" :disabled="multiple" @click="handleBatchSync">
+          <el-dropdown
+            split-button
+            type="primary"
+            icon="refresh"
+            :disabled="multiple"
+            style="margin-right: 12px"
+            @click="handleBatchSync(false)"
+          >
             批量同步
-          </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="handleBatchSync(false)">
+                  断点同步（仅失败）
+                </el-dropdown-item>
+                <el-dropdown-item @click="handleBatchSync(true)">重新同步（全部）</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <el-button type="info" icon="list" @click="handleOpenQueue">同步队列</el-button>
           <el-upload
             action="#"
@@ -54,6 +69,8 @@
         v-loading="loading"
         :data="tableData"
         border
+        height="100%"
+        style="width: 100%"
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" align="center" />
@@ -96,7 +113,13 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="250" fixed="right" align="center">
+        <el-table-column label="同步" width="80" align="center">
+          <template #default="scope">
+            <el-tag v-if="scope.row.synced" type="success" size="small">已同步</el-tag>
+            <el-tag v-else type="info" size="small">未同步</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="280" fixed="right" align="center">
           <template #default="scope">
             <el-button type="primary" link icon="edit" size="small" @click="handleEdit(scope.row)">
               编辑
@@ -110,20 +133,26 @@
             >
               删除
             </el-button>
-            <el-button
-              type="success"
-              link
-              icon="refresh"
-              size="small"
-              @click="handleUpload(scope.row)"
+            <el-dropdown
+              trigger="click"
+              @command="(cmd: string) => handleSyncCommand(cmd, scope.row)"
             >
-              {{ !scope.row.status ? "同步" : "重新同步" }}
-            </el-button>
+              <el-button type="success" link icon="refresh" size="small">
+                同步
+                <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="breakpoint">断点同步</el-dropdown-item>
+                  <el-dropdown-item command="resync">重新同步</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </template>
         </el-table-column>
       </el-table>
 
-      <div class="flex-x-end mt-3">
+      <div class="pagination-container">
         <el-pagination
           background
           layout="total, sizes, prev, pager, next, jumper"
@@ -145,7 +174,7 @@
 </template>
 
 <script setup lang="ts">
-import { Picture as IconPicture } from "@element-plus/icons-vue";
+import { Picture as IconPicture, ArrowDown } from "@element-plus/icons-vue";
 import type { UploadProps, UploadRequestOptions } from "element-plus";
 import { ImageUploadAPI } from "@/api/imageUpload";
 import ImageGroupDialog from "./components/ImageGroupDialog.vue";
@@ -224,12 +253,14 @@ function handleDelete(row: any) {
   });
 }
 
-function handleUpload(row: any) {
-  const action = !row.status ? "同步" : "重新同步";
+/** 单行同步命令处理：breakpoint=断点同步，resync=重新同步。 */
+function handleSyncCommand(cmd: string, row: any) {
+  const forceResync = cmd === "resync";
+  const label = forceResync ? "重新同步" : "断点同步";
   loading.value = true;
-  ImageUploadAPI.sync(row.id)
+  ImageUploadAPI.sync(row.id, forceResync)
     .then(() => {
-      ElMessage.success(`${action}成功`);
+      ElMessage.success(`${label}成功`);
       handleQuery();
     })
     .finally(() => {
@@ -255,22 +286,23 @@ function handleBatchDelete() {
   });
 }
 
-function handleBatchSync() {
-  ElMessageBox.confirm(`确认同步选中的 ${ids.value.length} 条数据项?`, "提示", {
+/** 批量同步：forceResync=true 全部同步，false 仅同步未成功项。 */
+function handleBatchSync(forceResync: boolean) {
+  const label = forceResync ? "重新同步" : "断点同步";
+  ElMessageBox.confirm(`确认${label}选中的 ${ids.value.length} 条数据项?`, "提示", {
     confirmButtonText: "确定",
     cancelButtonText: "取消",
     type: "info",
   }).then(() => {
     loading.value = true;
-    ImageUploadAPI.batchSync(ids.value)
+    ImageUploadAPI.batchSync(ids.value, forceResync)
       .then((res: any) => {
-        // 简单统计成功失败
         const successCount = res.filter((r: any) => r.success).length;
         const failCount = res.length - successCount;
         if (failCount === 0) {
-          ElMessage.success(`批量同步成功 ${successCount} 条`);
+          ElMessage.success(`${label}成功 ${successCount} 条`);
         } else {
-          ElMessage.warning(`批量同步完成: 成功 ${successCount} 条, 失败 ${failCount} 条`);
+          ElMessage.warning(`${label}完成: 成功 ${successCount} 条, 失败 ${failCount} 条`);
         }
         handleQuery();
       })
@@ -338,12 +370,11 @@ const handleImport = (options: UploadRequestOptions) => {
         draggable: true,
       })
         .then(() => {
-          // 用户点击“立即同步”
+          // 用户点击“立即同步”（默认断点同步，仅同步未成功项）
           if (sIds.length > 0) {
             loading.value = true;
-            ImageUploadAPI.batchSync(sIds)
+            ImageUploadAPI.batchSync(sIds, false)
               .then((syncRes: any) => {
-                // 简单统计同步结果
                 const successCount = syncRes.filter((r: any) => r.success).length;
                 const failCount = syncRes.length - successCount;
                 if (failCount === 0) {
@@ -433,7 +464,47 @@ onMounted(() => {
 });
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+/* 页面整体 flex 布局：搜索区域固定高度，表格区域占满剩余空间 */
+.image-upload-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* 表格卡片区域弹性填充 */
+.data-table {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+
+  :deep(.el-card__body) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 16px;
+  }
+}
+
+/* 工具栏不缩不滚 */
+.data-table__toolbar {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+/* 分页栏不缩不滚 */
+.pagination-container {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+}
+
 .image-slot {
   display: flex;
   align-items: center;
@@ -444,6 +515,7 @@ onMounted(() => {
   color: #909399;
   background: #f5f7fa;
 }
+
 .log-cell {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -451,6 +523,7 @@ onMounted(() => {
   white-space: nowrap;
   cursor: pointer;
 }
+
 .log-cell:hover {
   text-decoration: underline;
 }

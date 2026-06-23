@@ -15,20 +15,30 @@ from api_v1.models.file.image_upload import ImageUploadStatus
 logger = logging.getLogger(__name__)
 
 
-def upsert_sync_task(image_upload) -> tuple[bool, str]:
+def upsert_sync_task(image_upload, force_resync: bool = False) -> tuple[bool, str]:
     """根据 ImageUpload 记录 upsert 同步队列。
 
     存在相同 sku 的队列记录则更新 local_path 并重置状态为 PENDING，
     不存在则创建新记录。同时向 ImageUpload.log 追加操作日志。
 
+    断点同步模式（force_resync=False）：若 ImageUpload.synced=True 则跳过。
+
     Args:
         image_upload: ImageUpload 模型实例。
+        force_resync: 是否强制重新同步（True=忽略 synced 状态）。
 
     Returns:
-        tuple[bool, str]: (是否成功, 日志行文本)。
+        tuple[bool, str]: (是否成功, 日志行文本)。跳过时返回 (True, 跳过日志)。
     """
     sku = image_upload.image_group
     local_path = image_upload.cloud_path or ""
+
+    # 断点同步：已同步成功的不重复入队
+    if not force_resync and image_upload.synced:
+        now_str = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_line = f"[{now_str}] 跳过：已同步成功，断点同步无需重复提交"
+        _append_log(image_upload, log_line)
+        return True, log_line
 
     try:
         ImageSyncQueue.objects.update_or_create(
@@ -42,6 +52,7 @@ def upsert_sync_task(image_upload) -> tuple[bool, str]:
         # 同步更新 ImageUpload 状态，前端展示用
         ImageUpload.objects.filter(image_group=sku).update(
             status=ImageUploadStatus.NORMAL,
+            synced=False,
         )
     except Exception as exc:
         logger.error(
@@ -62,18 +73,21 @@ def upsert_sync_task(image_upload) -> tuple[bool, str]:
     return True, log_line
 
 
-def batch_upsert_sync_tasks(image_uploads: list) -> list[dict]:
+def batch_upsert_sync_tasks(
+    image_uploads: list, force_resync: bool = False,
+) -> list[dict]:
     """批量 upsert 同步队列。
 
     Args:
         image_uploads: ImageUpload 实例列表。
+        force_resync: 是否强制重新同步。
 
     Returns:
         list[dict]: 每条结果，结构 {id, success, msg}。
     """
     results: list[dict] = []
     for instance in image_uploads:
-        success, log_line = upsert_sync_task(instance)
+        success, log_line = upsert_sync_task(instance, force_resync=force_resync)
         results.append({
             "id": instance.id,
             "success": success,
