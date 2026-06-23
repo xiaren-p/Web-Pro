@@ -345,10 +345,16 @@ def _process_listing_record(
         )
         if resp.status_code != 200:
             return {"sku": sku, "shop": sid, "code": resp.status_code, "msg": "proxy failed"}
-        data = (resp.json().get("data") or {})
+        resp_json = resp.json()
+        data = (resp_json.get("data") or {})
         attrs = data.get("attributes") or {}
-        product_types = attrs.get("productTypes") or []
-        product_type = product_types[0].get("productType", "") if product_types else ""
+        # productTypes 可能在 data.attributes 或 data 顶层
+        product_types = (attrs.get("productTypes") or data.get("productTypes") or [])
+        if not product_types:
+            logger.warning("[ImageSync][proxy] productTypes 为空 sid=%s keys=%s",
+                           sid, list(data.keys()))
+            return {"sku": sku, "shop": sid, "code": 0, "msg": "proxy 未返回 productTypes"}
+        product_type = product_types[0].get("productType", "")
         proxy_images = _extract_proxy_images(attrs)
     except Exception:
         logger.error("[ImageSync][proxy] 异常 sid=%s", sid, exc_info=True)
