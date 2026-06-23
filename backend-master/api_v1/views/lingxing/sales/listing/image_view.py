@@ -66,6 +66,10 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
+
+        # 新建后自动提交同步队列
+        upsert_sync_task(serializer.instance)
+
         return drf_ok(serializer.data)
 
     def update(self, request, *args, **kwargs):
@@ -179,10 +183,12 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
                     if existing:
                         existing.cloud_path = cloud_path
                         existing.save()
+                        upsert_sync_task(existing)
                         updated_count += 1
                         success_ids.append(existing.id)
                     else:
                         obj = ImageUpload.objects.create(image_group=image_group, cloud_path=cloud_path)
+                        upsert_sync_task(obj)
                         created_count += 1
                         success_ids.append(obj.id)
                 except Exception as e:

@@ -23,7 +23,6 @@ from api_v1.models.file.image_sync_queue import ImageSyncStatus
 from api_v1.models.file.image_upload import ImageUploadStatus
 from api_v1.services.nc.nc_api_client import NcApiClient
 from api_v2.services.nc_sku_path_search import search_nc_sku_paths
-from api_v1.models import LxShops
 from api_v2.services.qinglong_env_service import get_cached_env
 
 logger = logging.getLogger(__name__)
@@ -470,6 +469,12 @@ def _resolve_final_image_urls(
 ) -> list[tuple[str, str | None]]:
     """根据 proxy 已有图片与 NC 图片比较结果决定最终 URL 列表。
 
+    覆盖 slot 1-8：
+    - proxy 有图 + NC 有图 → 比较，相同保留旧图，不同用 NC
+    - proxy 有图 + NC 无图 → 保留旧图
+    - proxy 无图 + NC 有图 → 用 NC
+    - proxy 无图 + NC 无图 → 空串
+
     Args:
         proxy_images (dict[int, dict]): proxy 返回的图片数据
                                         {位置: {media_location, marketplace_id}}。
@@ -477,22 +482,26 @@ def _resolve_final_image_urls(
         pre_uploaded (list[tuple]): 预上传结果。
 
     Returns:
-        list[tuple[str, str | None]]: 最终 [(name, url), ...]。
+        list[tuple[str, str | None]]: 最终 [(name, url), ...]，slot 1-8。
     """
+    pre_map: dict[int, str | None] = {}
+    for name, url in pre_uploaded:
+        pre_map[int(name.split(".")[0])] = url
     result: list[tuple[str, str | None]] = []
-    for name, pre_url in pre_uploaded:
-        idx = int(name.split(".")[0])
+    for idx in range(1, 9):
+        name = f"{idx}.jpg"
         proxy_img = proxy_images.get(idx)
         proxy_url = (proxy_img or {}).get("media_location", "")
         nc_bytes = local_map.get(idx)
-        if not proxy_url:
-            result.append((name, pre_url))
-            continue
-        if not nc_bytes:
+        if proxy_url and nc_bytes:
+            same = _are_images_visually_same(proxy_url, nc_bytes)
+            result.append((name, proxy_url if same else pre_map.get(idx)))
+        elif proxy_url:
             result.append((name, proxy_url))
-            continue
-        same = _are_images_visually_same(proxy_url, nc_bytes)
-        result.append((name, proxy_url if same else pre_url))
+        elif nc_bytes:
+            result.append((name, pre_map.get(idx)))
+        else:
+            result.append((name, ""))
     return result
 
 
@@ -586,7 +595,7 @@ def _process_sync_item(
         return {"sku": sku, "success": False, "msg": msg}
 
     # 2. 内部搜索 listing（在售 + 停售，排除已删除）
-    from api_v1.models import LxListingData
+    from api_v1.models import LxListingData, LxShops
     records = list(LxListingData.objects.filter(
         seller_sku=sku, is_delete=0,
     ))
