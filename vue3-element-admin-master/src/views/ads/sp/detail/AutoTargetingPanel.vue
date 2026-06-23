@@ -69,13 +69,29 @@
         <!-- 固定左侧：有效 -->
         <el-table-column label="有效" width="80" fixed="left" align="center" :resizable="false">
           <template #default="{ row }">
-            <el-switch
-              v-if="!row._isSummary"
-              v-model="row.state"
-              active-value="enabled"
-              inactive-value="paused"
-              @change="(val: string | number | boolean) => onStateChange(row, val)"
-            />
+            <div v-if="!row._isSummary" class="state-cell">
+              <el-switch
+                v-model="row.state"
+                size="small"
+                active-value="enabled"
+                inactive-value="paused"
+                @change="(val: string | number | boolean) => onStateChange(row, val)"
+              />
+              <el-tooltip
+                v-if="row.latest_adjustment?.has_recent"
+                placement="top"
+                popper-class="latest-adj-tooltip"
+              >
+                <span class="recent-star" @click.stop>★</span>
+                <template #content>
+                  <div class="latest-adj-content">
+                    <div v-for="(line, idx) in row.latest_adjustment.lines" :key="idx">
+                      {{ line }}
+                    </div>
+                  </div>
+                </template>
+              </el-tooltip>
+            </div>
           </template>
         </el-table-column>
 
@@ -157,6 +173,20 @@
                   class="bid-input"
                   @change="onBidChange(row)"
                 />
+                <el-tooltip
+                  v-if="row.latest_adjustment?.has_recent"
+                  placement="top"
+                  popper-class="latest-adj-tooltip"
+                >
+                  <span class="recent-star" @click.stop>★</span>
+                  <template #content>
+                    <div class="latest-adj-content">
+                      <div v-for="(line, idx) in row.latest_adjustment.lines" :key="idx">
+                        {{ line }}
+                      </div>
+                    </div>
+                  </template>
+                </el-tooltip>
               </div>
             </template>
 
@@ -666,5 +696,29 @@ onMounted(() => {
   font-size: 13px;
   color: var(--color-primary-500);
   cursor: default;
+}
+
+.state-cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recent-star {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 2;
+  font-size: 12px;
+  color: #f59e0b;
+  text-shadow: 0 0 2px rgb(245 158 11 / 40%);
+  cursor: help;
+}
+
+.bid-cell .recent-star {
+  position: relative;
+  top: 0;
+  right: 0;
 }
 </style>

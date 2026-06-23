@@ -179,15 +179,21 @@ class KeywordViewSet(viewsets.ViewSet):
         })
         adgroup_map: dict[int, str] = {}
         adgroup_state_map: dict[int, str] = {}
+        adgroup_default_bid_map: dict[int, float] = {}
         if item_ad_group_ids:
             for g in LxSpAdGroup.objects.filter(
                 ad_group_id__in=item_ad_group_ids,
                 campaign_id=campaign_id,
                 profile_id=profile_id,
-            ).values("ad_group_id", "name", "state"):
+            ).values("ad_group_id", "name", "state", "default_bid"):
                 gid = g["ad_group_id"]
                 adgroup_map[gid] = g["name"] or ""
                 adgroup_state_map[gid] = g["state"] or ""
+                if g.get("default_bid") is not None:
+                    try:
+                        adgroup_default_bid_map[gid] = float(g["default_bid"])
+                    except (ValueError, TypeError):
+                        pass
 
         # ── 指标聚合（LxSpKeywordReport + DB Sum()）──
         date_start = str(data.get("date_start") or "").strip() or None
@@ -208,7 +214,7 @@ class KeywordViewSet(viewsets.ViewSet):
                 "keyword_text": item.keyword_text or "",
                 "match_type": match_type_val,
                 "match_type_label": KEYWORD_MATCH_TYPE_LABEL.get(match_type_val, match_type_val),
-                "bid": float(item.bid) if item.bid is not None else "-",
+                "bid": float(item.bid) if item.bid is not None else (adgroup_default_bid_map.get(item.ad_group_id) or "-"),
                 "state": item.state or "",
                 "service_status": item.serving_status or "",
                 **{
@@ -439,19 +445,11 @@ def _build_bid_latest_adjustment_map(
     entity_field: str,
     profile_id: int,
 ) -> dict[str, dict[str, Any]]:
-    """构建投放实体（关键词/定位组/商品投放）最近修改星标信息。
-
-    Args:
-        entity_ids: 实体 ID 列表（keyword_id 或 target_id 字符串）。
-        entity_field: 查询字段名（"keyword_id" 或 "target_id"）。
-        profile_id: 店铺 Profile ID。
-
-    Returns:
-        dict[str, dict]: 实体 ID → {"has_recent": bool, "lines": [str]}。
-    """
+    """构建投放实体最近修改星标信息（性能优化版：用 MAX(id) 子查询取每实体最新记录）。"""
     from datetime import timedelta
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+    from django.db.models import Max
     from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
     from api_v1.models.lingxing.ads.lx_ad_rule import LxAdRule
     from api_v2.models.sp_bid_adjustment import SpBidAdjustment, ExecutionTypeChoices as BidExecType
@@ -460,32 +458,33 @@ def _build_bid_latest_adjustment_map(
     if not entity_ids:
         return {}
 
+    int_ids = [int(x) for x in entity_ids if x]
+    if not int_ids:
+        return {}
+
     threshold = timezone.now() - timedelta(days=7)
-    filter_kwargs = {
-        f"{entity_field}__in": [int(x) for x in entity_ids if x],
-        "created_at__gte": threshold,
-    }
-    recent_qs = SpBidAdjustment.objects.filter(**filter_kwargs).order_by("-created_at")
+    base_qs = SpBidAdjustment.objects.filter(
+        **{f"{entity_field}__in": int_ids}, created_at__gte=threshold,
+    ).only("id", entity_field, "execution_type", "auto_rule_id", "operator", "bid_before", "bid_after", "created_at")
 
-    latest_by_id: dict[int, Any] = {}
-    for rec in recent_qs:
-        rec_entity_id = getattr(rec, entity_field, None) or rec.keyword_id or rec.target_id
-        if rec_entity_id is not None and rec_entity_id not in latest_by_id:
-            latest_by_id[rec_entity_id] = rec
+    # 用 MAX(id) GROUP BY 取每实体的最新一条记录 ID，避免全表 fetch
+    latest_ids = base_qs.values(entity_field).annotate(max_id=Max("id")).values_list("max_id", flat=True)
+    records = list(SpBidAdjustment.objects.filter(id__in=list(latest_ids)).only(
+        "id", entity_field, "execution_type", "auto_rule_id", "operator", "bid_before", "bid_after", "created_at",
+    ))
 
-    if not latest_by_id:
+    if not records:
         return {}
 
     # 批量查规则
-    rule_ids = {r.auto_rule_id for r in latest_by_id.values() if r.auto_rule_id}
+    rule_ids = {r.auto_rule_id for r in records if r.auto_rule_id}
     rule_map: dict[int, Any] = {}
     if rule_ids:
         for rule in LxAdRule.objects.filter(id__in=rule_ids).only("id", "name", "condition_sets"):
             rule_map[rule.id] = rule
 
     # 本地时间
-    tz_name = ""
-    country_name = ""
+    tz_name, country_name = "", ""
     prof = LxAdsProfile.objects.filter(profile_id=profile_id).only("country_code", "sid").first()
     if prof:
         tz_name = country_to_timezone(prof.country_code or "")
@@ -493,9 +492,11 @@ def _build_bid_latest_adjustment_map(
         country_name = LxShops.objects.filter(sid=prof.sid).values_list("country", flat=True).first() or (prof.country_code or "")
 
     result: dict[str, dict[str, Any]] = {}
-    for entity_id_int, rec in latest_by_id.items():
-        lines = _build_bid_lines(rec, rule_map, country_name, tz_name)
-        result[str(entity_id_int)] = {"has_recent": True, "lines": lines}
+    for rec in records:
+        eid = getattr(rec, entity_field, None) or rec.keyword_id or rec.target_id
+        if eid is not None:
+            lines = _build_bid_lines(rec, rule_map, country_name, tz_name)
+            result[str(eid)] = {"has_recent": True, "lines": lines}
     return result
 
 

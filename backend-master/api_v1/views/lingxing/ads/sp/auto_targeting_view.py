@@ -198,15 +198,21 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         })
         adgroup_map: dict[int, str] = {}
         adgroup_state_map: dict[int, str] = {}
+        adgroup_default_bid_map: dict[int, float] = {}
         if item_ad_group_ids:
             for g in LxSpAdGroup.objects.filter(
                 ad_group_id__in=item_ad_group_ids,
                 campaign_id=campaign_id,
                 profile_id=profile_id,
-            ).values("ad_group_id", "name", "state"):
+            ).values("ad_group_id", "name", "state", "default_bid"):
                 gid = g["ad_group_id"]
                 adgroup_map[gid] = g["name"] or ""
                 adgroup_state_map[gid] = g["state"] or ""
+                if g.get("default_bid") is not None:
+                    try:
+                        adgroup_default_bid_map[gid] = float(g["default_bid"])
+                    except (ValueError, TypeError):
+                        pass
 
         # ── 指标聚合（LxSpTargetReport + DB Sum()）──
         date_start = str(data.get("date_start") or "").strip() or None
@@ -230,7 +236,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
                     f"service_status_{k}": v
                     for k, v in resolve_service_status(item.serving_status).items()
                 },
-                "bid": float(item.bid) if item.bid is not None else "-",
+                "bid": float(item.bid) if item.bid is not None else (adgroup_default_bid_map.get(item.ad_group_id) or "-"),
                 "bidding_strategy": bidding_strategy,
                 "recommended_bid": "-",
                 "recommend_range_start": "-",
@@ -410,16 +416,22 @@ class AutoTargetingViewSet(viewsets.ViewSet):
 
         ad_group_ids = {it.ad_group_id for it in items if it.ad_group_id}
         adgroup_map = {}
+        adgroup_default_bid_map: dict[str, float] = {}
         campaign_map = {}
         if ad_group_ids:
             ag_qs = LxSpAdGroup.objects.filter(
                 ad_group_id__in=ad_group_ids, profile_id=profile_id,
-            ).values("ad_group_id", "name", "state", "campaign_id")
+            ).values("ad_group_id", "name", "state", "campaign_id", "default_bid")
             for ag in ag_qs:
                 adgroup_map[str(ag["ad_group_id"])] = {
                     "name": ag["name"], "state": ag["state"],
                 }
                 campaign_map[str(ag["ad_group_id"])] = ag["campaign_id"]
+                if ag.get("default_bid") is not None:
+                    try:
+                        adgroup_default_bid_map[str(ag["ad_group_id"])] = float(ag["default_bid"])
+                    except (ValueError, TypeError):
+                        pass
 
         res_list = []
         for item in items:
@@ -429,7 +441,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
                 "profile_id": item.profile_id,
                 "ad_group_id": item.ad_group_id,
                 "expression": item.expression,
-                "bid": float(item.bid) if item.bid is not None else None,
+                "bid": float(item.bid) if item.bid is not None else (adgroup_default_bid_map.get(str(item.ad_group_id)) or None),
                 "state": item.state,
                 "serving_status": item.serving_status or "",
             }
@@ -560,10 +572,11 @@ def _build_bid_latest_adjustment_map(
     entity_field: str,
     profile_id: int,
 ) -> dict[str, dict[str, Any]]:
-    """构建投放实体最近修改星标信息。"""
+    """构建投放实体最近修改星标信息（性能优化版：MAX(id) 子查询取每实体最新记录）。"""
     from datetime import timedelta
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+    from django.db.models import Max
     from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
     from api_v1.models.lingxing.ads.lx_ad_rule import LxAdRule
     from api_v2.models.sp_bid_adjustment import SpBidAdjustment, ExecutionTypeChoices as BidExecType
@@ -571,20 +584,21 @@ def _build_bid_latest_adjustment_map(
 
     if not entity_ids:
         return {}
-    threshold = timezone.now() - timedelta(days=7)
-    filter_kwargs = {
-        f"{entity_field}__in": [int(x) for x in entity_ids if x],
-        "created_at__gte": threshold,
-    }
-    recent_qs = SpBidAdjustment.objects.filter(**filter_kwargs).order_by("-created_at")
-    latest_by_id: dict[int, Any] = {}
-    for rec in recent_qs:
-        eid = getattr(rec, entity_field, None) or rec.keyword_id or rec.target_id
-        if eid is not None and eid not in latest_by_id:
-            latest_by_id[eid] = rec
-    if not latest_by_id:
+    int_ids = [int(x) for x in entity_ids if x]
+    if not int_ids:
         return {}
-    rule_ids = {r.auto_rule_id for r in latest_by_id.values() if r.auto_rule_id}
+    threshold = timezone.now() - timedelta(days=7)
+    base_qs = SpBidAdjustment.objects.filter(
+        **{f"{entity_field}__in": int_ids}, created_at__gte=threshold,
+    ).only("id", entity_field, "execution_type", "auto_rule_id", "operator", "bid_before", "bid_after", "created_at")
+
+    latest_ids = base_qs.values(entity_field).annotate(max_id=Max("id")).values_list("max_id", flat=True)
+    records = list(SpBidAdjustment.objects.filter(id__in=list(latest_ids)).only(
+        "id", entity_field, "execution_type", "auto_rule_id", "operator", "bid_before", "bid_after", "created_at",
+    ))
+    if not records:
+        return {}
+    rule_ids = {r.auto_rule_id for r in records if r.auto_rule_id}
     rule_map: dict[int, Any] = {}
     if rule_ids:
         for rule in LxAdRule.objects.filter(id__in=rule_ids).only("id", "name", "condition_sets"):
@@ -596,9 +610,11 @@ def _build_bid_latest_adjustment_map(
         from api_v1.models.lingxing.basic.lx_shops import LxShops
         country_name = LxShops.objects.filter(sid=prof.sid).values_list("country", flat=True).first() or (prof.country_code or "")
     result: dict[str, dict[str, Any]] = {}
-    for eid, rec in latest_by_id.items():
-        lines = _build_bid_lines(rec, rule_map, country_name, tz_name)
-        result[str(eid)] = {"has_recent": True, "lines": lines}
+    for rec in records:
+        eid = getattr(rec, entity_field, None) or rec.keyword_id or rec.target_id
+        if eid is not None:
+            lines = _build_bid_lines(rec, rule_map, country_name, tz_name)
+            result[str(eid)] = {"has_recent": True, "lines": lines}
     return result
 
 
