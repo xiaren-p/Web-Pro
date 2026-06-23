@@ -622,3 +622,144 @@ export function getLabelOptions(): Promise<TimePricingOption[]> {
     method: "get",
   });
 }
+
+// ── 投放实体调整（关键词 / 定位组 / 商品投放）───────────────────────────────
+
+/** 手动调整竞价请求参数（关键词 / 定位组 / 商品投放 通用） */
+export interface AdjustBidParams {
+  campaign_id: string | number;
+  profile_id: string | number;
+  /** 关键词 ID（调整关键词时传入） */
+  keyword_id?: string | number;
+  /** 投放条款 ID（调整定位组 / 商品投放时传入） */
+  target_id?: string | number;
+  /** 调整后竞价（必须 > 0） */
+  bid_after: number;
+}
+
+/** 手动调整状态请求参数 */
+export interface AdjustStateParams {
+  campaign_id: string | number;
+  profile_id: string | number;
+  /** 关键词 ID */
+  keyword_id?: string | number;
+  /** 投放条款 ID */
+  target_id?: string | number;
+  /** 目标状态：启用 / 暂停 */
+  state: "enabled" | "paused";
+}
+
+/** 手动调整竞价 / 状态通用响应 */
+export interface AdjustBidResponse {
+  campaign_id: number;
+  profile_id: number;
+  keyword_id?: number;
+  target_id?: number;
+  bid_before?: number | null;
+  bid_after?: number;
+  state?: string;
+}
+
+/**
+ * 手动调整关键词竞价：写 SpBidAdjustment + 更新 LxSpKeyword.bid。
+ */
+export function adjustKeywordBid(data: AdjustBidParams): Promise<AdjustBidResponse> {
+  return request({
+    url: "/ads/keywords/adjust-bid",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 手动调整关键词启停：写 SpBidAdjustment(BID_ENABLE/BID_PAUSE) + 更新 LxSpKeyword.state。
+ */
+export function adjustKeywordState(data: AdjustStateParams): Promise<AdjustBidResponse> {
+  return request({
+    url: "/ads/keywords/adjust-state",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 手动调整投放竞价（定位组 / 商品投放）：写 SpBidAdjustment + 更新 LxSpTarget.bid。
+ */
+export function adjustTargetBid(data: AdjustBidParams): Promise<AdjustBidResponse> {
+  return request({
+    url: "/ads/auto-targeting/adjust-bid",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 手动调整投放启停（定位组 / 商品投放）：写 SpBidAdjustment(BID_ENABLE/BID_PAUSE) + 更新 LxSpTarget.state。
+ */
+export function adjustTargetState(data: AdjustStateParams): Promise<AdjustBidResponse> {
+  return request({
+    url: "/ads/auto-targeting/adjust-state",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 手动调整商品投放竞价。
+ */
+export function adjustProductTargetBid(data: AdjustBidParams): Promise<AdjustBidResponse> {
+  return request({
+    url: "/ads/product-targeting/adjust-bid",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 手动调整商品投放启停。
+ */
+export function adjustProductTargetState(data: AdjustStateParams): Promise<AdjustBidResponse> {
+  return request({
+    url: "/ads/product-targeting/adjust-state",
+    method: "post",
+    data,
+  });
+}
+
+/** 产品投放列表请求参数 */
+export interface ProductTargetingParams {
+  campaign_id: string;
+  profile_id: string;
+  date_start?: string;
+  date_end?: string;
+  state?: string;
+  keyword?: string;
+  pageNum?: number;
+  pageSize?: number;
+}
+
+/** 产品投放列表分页响应 */
+export interface ProductTargetingResponse {
+  list: any[];
+  total: number;
+  summary?: Record<string, unknown>;
+  currency_icon?: string;
+  pageNum: number;
+  pageSize: number;
+}
+
+/**
+ * 获取产品投放（商品定位）列表及聚合指标。
+ *
+ * @param {ProductTargetingParams} data - 查询参数，campaign_id 和 profile_id 为必填
+ * @returns {Promise<ProductTargetingResponse>} 产品投放分页列表
+ */
+export function getProductTargeting(
+  data: ProductTargetingParams
+): Promise<ProductTargetingResponse> {
+  return request({
+    url: "/ads/product-targeting",
+    method: "post",
+    data,
+  });
+}

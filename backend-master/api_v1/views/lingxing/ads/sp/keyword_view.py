@@ -1,17 +1,20 @@
-"""SP 自动广告关键词列表及指标聚合视图（详情页 Tab：投放 - 关键词）。
+"""SP 手动广告关键词列表及指标聚合视图（详情页 Tab：投放 - 关键词）。
 
 接受 ``campaign_id`` + ``profile_id`` 为必填参数，
 可选日期范围、状态、匹配方式（match_type）与关键词筛选，
 返回带指标的关键词投放列表、汇总行及分页信息。
+支持手动调整关键词竞价与启停状态。
 
 关键词来源于 lx_sp_keyword 表，指标来源于 lx_sp_keyword_report 表。
 结构镜像 auto_targeting_view.py，字段适配 LxSpKeyword / LxSpKeywordReport。
 """
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from django.db.models import Sum
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -35,10 +38,30 @@ from api_v1.utils.ad_status import resolve_service_status
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_ok
 from api_v1.views.lingxing.ads._helpers import KEYWORD_MATCH_TYPE_LABEL
+from api_v2.models.sp_bid_adjustment import (
+    ExecutionTypeChoices as BidExecutionTypeChoices,
+    SpBidAdjustment,
+)
+from api_v2.models.sp_bid_adjustment import AdjustmentStatusChoices, ExecutionStatusChoices
+
+
+def _get_operator_name(request: Request) -> str:
+    """获取当前登录用户的展示名（昵称优先，降级 username）。"""
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated:
+        try:
+            profile = getattr(user, "profile", None)
+            if profile and profile.nickname:
+                return profile.nickname
+        except Exception:
+            pass
+        if hasattr(user, "username") and user.username:
+            return user.username
+    return "未知用户"
 
 
 class KeywordViewSet(viewsets.ViewSet):
-    """SP 自动广告关键词列表及指标聚合视图。"""
+    """SP 手动广告关键词列表及指标聚合视图。支持手动调整竞价与启停状态。"""
 
     def _resolve_currency_icon(self, profile_id: int) -> str:
         """根据 profile_id 查询货币符号（一步查表）。
@@ -308,3 +331,97 @@ class KeywordViewSet(viewsets.ViewSet):
             currency_icon,
         )
         return metrics_map, summary
+
+    @action(detail=False, methods=["post"], url_path="adjust-bid")
+    def adjust_bid(self, request: Request) -> Response:
+        """手动调整关键词竞价：写 SpBidAdjustment(MANUAL_ADJUSTMENT) + 更新 LxSpKeyword.bid。"""
+        data = request.data or {}
+        campaign_id = data.get("campaign_id")
+        profile_id = data.get("profile_id")
+        keyword_id = data.get("keyword_id")
+        bid_after_raw = data.get("bid_after")
+
+        if campaign_id is None or profile_id is None or keyword_id is None or bid_after_raw is None:
+            return drf_ok({}, msg="campaign_id、profile_id、keyword_id、bid_after 均为必填参数")
+        try:
+            bid_after = Decimal(str(bid_after_raw))
+        except (InvalidOperation, ValueError, TypeError):
+            return drf_ok({}, msg="bid_after 必须为有效数值")
+        if bid_after <= 0:
+            return drf_ok({}, msg="bid_after 必须大于 0")
+        try:
+            cid_int, pid_int, kid_int = int(campaign_id), int(profile_id), int(keyword_id)
+        except (ValueError, TypeError):
+            return drf_ok({}, msg="ID 参数必须为整数")
+
+        kw = LxSpKeyword.objects.filter(keyword_id=kid_int, profile_id=pid_int).only("bid").first()
+        if not kw:
+            return drf_ok({}, msg="未找到对应的关键词")
+
+        bid_before = kw.bid
+        SpBidAdjustment.objects.create(
+            keyword_id=kid_int,
+            campaign_id=cid_int,
+            profile_id=pid_int,
+            execution_type=BidExecutionTypeChoices.MANUAL_ADJUSTMENT,
+            bid_before=float(bid_before) if bid_before is not None else None,
+            bid_after=float(bid_after),
+            adjustment_status=AdjustmentStatusChoices.PENDING,
+            execution_status=ExecutionStatusChoices.PENDING,
+            adjustment_time=timezone.now(),
+            operator=_get_operator_name(request),
+        )
+        LxSpKeyword.objects.filter(keyword_id=kid_int, profile_id=pid_int).update(bid=bid_after)
+
+        return drf_ok({
+            "keyword_id": kid_int,
+            "campaign_id": cid_int,
+            "profile_id": pid_int,
+            "bid_before": float(bid_before) if bid_before is not None else None,
+            "bid_after": float(bid_after),
+        })
+
+    @action(detail=False, methods=["post"], url_path="adjust-state")
+    def adjust_state(self, request: Request) -> Response:
+        """手动调整关键词启停：写 SpBidAdjustment(BID_ENABLE/BID_PAUSE) + 更新 LxSpKeyword.state。"""
+        data = request.data or {}
+        campaign_id = data.get("campaign_id")
+        profile_id = data.get("profile_id")
+        keyword_id = data.get("keyword_id")
+        state = str(data.get("state") or "").strip().lower()
+
+        if campaign_id is None or profile_id is None or keyword_id is None or not state:
+            return drf_ok({}, msg="campaign_id、profile_id、keyword_id、state 均为必填参数")
+        if state not in ("enabled", "paused"):
+            return drf_ok({}, msg="state 仅支持 enabled / paused")
+        try:
+            cid_int, pid_int, kid_int = int(campaign_id), int(profile_id), int(keyword_id)
+        except (ValueError, TypeError):
+            return drf_ok({}, msg="ID 参数必须为整数")
+
+        kw = LxSpKeyword.objects.filter(keyword_id=kid_int, profile_id=pid_int).only("state").first()
+        if not kw:
+            return drf_ok({}, msg="未找到对应的关键词")
+
+        execution_type = (
+            BidExecutionTypeChoices.BID_ENABLE if state == "enabled"
+            else BidExecutionTypeChoices.BID_PAUSE
+        )
+        SpBidAdjustment.objects.create(
+            keyword_id=kid_int,
+            campaign_id=cid_int,
+            profile_id=pid_int,
+            execution_type=execution_type,
+            adjustment_status=AdjustmentStatusChoices.PENDING,
+            execution_status=ExecutionStatusChoices.PENDING,
+            adjustment_time=timezone.now(),
+            operator=_get_operator_name(request),
+        )
+        LxSpKeyword.objects.filter(keyword_id=kid_int, profile_id=pid_int).update(state=state)
+
+        return drf_ok({
+            "keyword_id": kid_int,
+            "campaign_id": cid_int,
+            "profile_id": pid_int,
+            "state": state,
+        })

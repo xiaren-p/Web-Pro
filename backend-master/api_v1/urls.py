@@ -72,8 +72,16 @@ urlpatterns = [
     path('ads/ad-groups', views.AdGroupViewSet.as_view({'post': 'list_groups', }), name='ads-adgroups-list'),
     path('ads/ads', views.AdViewSet.as_view({'post': 'list_ads', }), name='ads-ads-list'),
     path('ads/auto-targeting', views.AutoTargetingViewSet.as_view({'post': 'list_auto_targeting', }), name='ads-auto-targeting-list'),
+    path('ads/auto-targeting/adjust-bid', views.AutoTargetingViewSet.as_view({'post': 'adjust_bid', }), name='ads-auto-targeting-adjust-bid'),
+    path('ads/auto-targeting/adjust-state', views.AutoTargetingViewSet.as_view({'post': 'adjust_state', }), name='ads-auto-targeting-adjust-state'),
+    # 产品投放（商品定位，expression_type=manual）
+    path('ads/product-targeting', views.AutoTargetingViewSet.as_view({'post': 'list_product_targeting', }), name='ads-product-targeting-list'),
+    path('ads/product-targeting/adjust-bid', views.AutoTargetingViewSet.as_view({'post': 'adjust_bid', }), name='ads-product-targeting-adjust-bid'),
+    path('ads/product-targeting/adjust-state', views.AutoTargetingViewSet.as_view({'post': 'adjust_state', }), name='ads-product-targeting-adjust-state'),
     path('ads/auto-negative-targeting', views.AutoNegativeTargetingViewSet.as_view({'post': 'list_auto_negative_targeting', }), name='ads-auto-negative-targeting-list'),
     path('ads/keywords', views.KeywordViewSet.as_view({'post': 'list_keywords', }), name='ads-keywords-list'),
+    path('ads/keywords/adjust-bid', views.KeywordViewSet.as_view({'post': 'adjust_bid', }), name='ads-keywords-adjust-bid'),
+    path('ads/keywords/adjust-state', views.KeywordViewSet.as_view({'post': 'adjust_state', }), name='ads-keywords-adjust-state'),
     path('ads/negative-keywords', views.NegativeKeywordViewSet.as_view({'post': 'list_negative_keywords', }), name='ads-negative-keywords-list'),
     # 分时调价策略 CRUD
     path('ads/time-pricing-strategy', views.TimePricingStrategyViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='ads-time-pricing-strategy-list-create'),

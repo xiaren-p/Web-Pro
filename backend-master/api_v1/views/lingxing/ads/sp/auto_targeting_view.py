@@ -1,16 +1,20 @@
-"""SP 自动投放定向条款列表及指标聚合视图（详情页 Tab：投放 - 自动）。
+"""SP 投放定向条款列表及指标聚合视图（详情页 Tab：投放）。
 
 接受 ``campaign_id`` + ``profile_id`` 为必填参数，
-可选日期范围与状态筛选，返回带指标的自动投放条款列表、汇总行及分页信息。
+可选日期范围与状态筛选，返回带指标的投放条款列表、汇总行及分页信息。
 
 自动投放条款来源于 lx_sp_target 表（expression_type=auto），
+产品投放条款来源于 lx_sp_target 表（expression_type=manual），
 指标来源于 lx_sp_target_report 表。
+支持手动调整竞价与启停状态。
 """
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from django.db.models import Sum
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -33,6 +37,57 @@ from api_v1.services.lingxing.ads_metrics_service import (
 from api_v1.utils.ad_status import resolve_service_status
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_ok
+from api_v2.models.sp_bid_adjustment import (
+    ExecutionTypeChoices as BidExecutionTypeChoices,
+    SpBidAdjustment,
+)
+from api_v2.models.sp_bid_adjustment import AdjustmentStatusChoices, ExecutionStatusChoices
+
+
+def _get_operator_name(request: Request) -> str:
+    """获取当前登录用户的展示名（昵称优先，降级 username）。"""
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated:
+        try:
+            profile = getattr(user, "profile", None)
+            if profile and profile.nickname:
+                return profile.nickname
+        except Exception:
+            pass
+        if hasattr(user, "username") and user.username:
+            return user.username
+    return "未知用户"
+
+
+# ── 自动投放定位组 type → 中文标签映射 ──
+_AUTO_TARGETING_TYPE_MAP: dict[str, str] = {
+    "asinSameAs": "紧密匹配",
+    "asinSubstituteRelated": "宽泛匹配",
+    "asinComplementRelated": "同类商品",
+    "asinAccessoryRelated": "关联商品",
+}
+
+
+def _resolve_targeting_label(expression: list[dict[str, Any]] | None) -> str:
+    """将 expression JSON 数组中的 type 字段映射为中文标签。
+
+    Args:
+        expression (list[dict] | None): 表达式 JSON 数组，如 [{"type": "asinSameAs"}]。
+
+    Returns:
+        str: 中文标签，无法识别时返回 "-"。
+    """
+    if not expression or not isinstance(expression, list):
+        return "-"
+    labels = []
+    for item in expression:
+        if not isinstance(item, dict):
+            continue
+        t = item.get("type", "")
+        label = _AUTO_TARGETING_TYPE_MAP.get(t)
+        if label:
+            labels.append(label)
+    return " / ".join(labels) if labels else "-"
 
 
 class AutoTargetingViewSet(viewsets.ViewSet):
@@ -168,7 +223,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
 
             row: dict[str, Any] = {
                 "target_id": item.target_id,
-                "targeting_text": item.resolved_expression or "-",
+                "targeting_text": _resolve_targeting_label(item.expression),
                 "state": item.state or "",
                 "service_status": item.serving_status or "",
                 **{
@@ -305,3 +360,182 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         )
         summary["is"] = "---"
         return metrics_map, summary
+
+    @action(detail=False, methods=["post"], url_path="list-product-targeting")
+    def list_product_targeting(self, request: Request) -> Response:
+        """分页获取商品投放条款列表及聚合指标（expression_type=manual）。
+
+        结构镜像 list_auto_targeting，但过滤 expression_type="manual"。
+        """
+        data = request.data
+        campaign_id = data.get("campaign_id")
+        profile_id = data.get("profile_id")
+        if not campaign_id or not profile_id:
+            return drf_ok({}, msg="campaign_id 与 profile_id 均为必填参数")
+
+        date_start = data.get("date_start")
+        date_end = data.get("date_end")
+        state = data.get("state")
+        keyword = data.get("keyword")
+        p_num, p_size = self._get_page_params(data)
+
+        qs = LxSpTarget.objects.filter(
+            campaign_id=campaign_id,
+            profile_id=profile_id,
+            expression_type="manual",
+            state__in=["enabled", "paused"],
+        ).order_by("target_id")
+        if state:
+            qs = qs.filter(state=state)
+
+        total = qs.count()
+        start_idx = (p_num - 1) * p_size
+        end_idx = start_idx + p_size
+        items = list(qs[start_idx:end_idx])
+
+        currency_icon = self._resolve_currency_icon(int(profile_id))
+
+        target_ids = [str(it.target_id) for it in items]
+        metrics_map, summary = self._build_target_metrics(
+            target_ids, int(campaign_id), int(profile_id),
+            date_start, date_end, currency_icon,
+        )
+
+        ad_group_ids = {it.ad_group_id for it in items if it.ad_group_id}
+        adgroup_map = {}
+        campaign_map = {}
+        if ad_group_ids:
+            ag_qs = LxSpAdGroup.objects.filter(
+                ad_group_id__in=ad_group_ids, profile_id=profile_id,
+            ).values("ad_group_id", "name", "state", "campaign_id")
+            for ag in ag_qs:
+                adgroup_map[str(ag["ad_group_id"])] = {
+                    "name": ag["name"], "state": ag["state"],
+                }
+                campaign_map[str(ag["ad_group_id"])] = ag["campaign_id"]
+
+        res_list = []
+        for item in items:
+            row = {
+                "target_id": item.target_id,
+                "campaign_id": item.campaign_id,
+                "profile_id": item.profile_id,
+                "ad_group_id": item.ad_group_id,
+                "expression": item.expression,
+                "bid": float(item.bid) if item.bid is not None else None,
+                "state": item.state,
+                "serving_status": item.serving_status or "",
+            }
+            _ss = resolve_service_status(item.serving_status)
+            row["service_status_label"] = _ss["label"]
+            row["service_status_type"] = _ss["type"]
+            ag_info = adgroup_map.get(str(item.ad_group_id), {})
+            row["adgroup_name"] = ag_info.get("name", str(item.ad_group_id))
+            row["adgroup_state"] = ag_info.get("state", "")
+            row.update(
+                metrics_map.get(str(item.target_id), empty_adgroup_metrics())
+            )
+            res_list.append(row)
+
+        return drf_ok({
+            "total": total,
+            "list": res_list,
+            "summary": summary,
+            "currency_icon": currency_icon,
+            "pageNum": p_num,
+            "pageSize": p_size,
+        })
+
+    @action(detail=False, methods=["post"], url_path="adjust-bid")
+    def adjust_bid(self, request: Request) -> Response:
+        """手动调整投放竞价：写 SpBidAdjustment(MANUAL_ADJUSTMENT) + 更新 LxSpTarget.bid。"""
+        data = request.data or {}
+        campaign_id = data.get("campaign_id")
+        profile_id = data.get("profile_id")
+        target_id = data.get("target_id")
+        bid_after_raw = data.get("bid_after")
+
+        if campaign_id is None or profile_id is None or target_id is None or bid_after_raw is None:
+            return drf_ok({}, msg="campaign_id、profile_id、target_id、bid_after 均为必填参数")
+        try:
+            bid_after = Decimal(str(bid_after_raw))
+        except (InvalidOperation, ValueError, TypeError):
+            return drf_ok({}, msg="bid_after 必须为有效数值")
+        if bid_after <= 0:
+            return drf_ok({}, msg="bid_after 必须大于 0")
+        try:
+            cid_int, pid_int, tid_int = int(campaign_id), int(profile_id), int(target_id)
+        except (ValueError, TypeError):
+            return drf_ok({}, msg="ID 参数必须为整数")
+
+        tgt = LxSpTarget.objects.filter(target_id=tid_int, profile_id=pid_int).only("bid").first()
+        if not tgt:
+            return drf_ok({}, msg="未找到对应的投放条款")
+
+        bid_before = tgt.bid
+        SpBidAdjustment.objects.create(
+            target_id=tid_int,
+            campaign_id=cid_int,
+            profile_id=pid_int,
+            execution_type=BidExecutionTypeChoices.MANUAL_ADJUSTMENT,
+            bid_before=float(bid_before) if bid_before is not None else None,
+            bid_after=float(bid_after),
+            adjustment_status=AdjustmentStatusChoices.PENDING,
+            execution_status=ExecutionStatusChoices.PENDING,
+            adjustment_time=timezone.now(),
+            operator=_get_operator_name(request),
+        )
+        LxSpTarget.objects.filter(target_id=tid_int, profile_id=pid_int).update(bid=bid_after)
+
+        return drf_ok({
+            "target_id": tid_int,
+            "campaign_id": cid_int,
+            "profile_id": pid_int,
+            "bid_before": float(bid_before) if bid_before is not None else None,
+            "bid_after": float(bid_after),
+        })
+
+    @action(detail=False, methods=["post"], url_path="adjust-state")
+    def adjust_state(self, request: Request) -> Response:
+        """手动调整投放启停：写 SpBidAdjustment(BID_ENABLE/BID_PAUSE) + 更新 LxSpTarget.state。"""
+        data = request.data or {}
+        campaign_id = data.get("campaign_id")
+        profile_id = data.get("profile_id")
+        target_id = data.get("target_id")
+        state = str(data.get("state") or "").strip().lower()
+
+        if campaign_id is None or profile_id is None or target_id is None or not state:
+            return drf_ok({}, msg="campaign_id、profile_id、target_id、state 均为必填参数")
+        if state not in ("enabled", "paused"):
+            return drf_ok({}, msg="state 仅支持 enabled / paused")
+        try:
+            cid_int, pid_int, tid_int = int(campaign_id), int(profile_id), int(target_id)
+        except (ValueError, TypeError):
+            return drf_ok({}, msg="ID 参数必须为整数")
+
+        tgt = LxSpTarget.objects.filter(target_id=tid_int, profile_id=pid_int).only("state").first()
+        if not tgt:
+            return drf_ok({}, msg="未找到对应的投放条款")
+
+        execution_type = (
+            BidExecutionTypeChoices.BID_ENABLE if state == "enabled"
+            else BidExecutionTypeChoices.BID_PAUSE
+        )
+        SpBidAdjustment.objects.create(
+            target_id=tid_int,
+            campaign_id=cid_int,
+            profile_id=pid_int,
+            execution_type=execution_type,
+            adjustment_status=AdjustmentStatusChoices.PENDING,
+            execution_status=ExecutionStatusChoices.PENDING,
+            adjustment_time=timezone.now(),
+            operator=_get_operator_name(request),
+        )
+        LxSpTarget.objects.filter(target_id=tid_int, profile_id=pid_int).update(state=state)
+
+        return drf_ok({
+            "target_id": tid_int,
+            "campaign_id": cid_int,
+            "profile_id": pid_int,
+            "state": state,
+        })

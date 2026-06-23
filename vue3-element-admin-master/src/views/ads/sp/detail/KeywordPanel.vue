@@ -64,7 +64,8 @@
       <el-table
         v-loading="loading"
         class="data-table__content"
-        :data="rows"
+        :data="displayData"
+        :row-class-name="rowClassName"
         border
         height="calc(100vh - 460px)"
         style="width: 100%"
@@ -81,11 +82,13 @@
         <!-- 固定左：有效 -->
         <el-table-column label="有效" width="60" fixed="left" align="center" :resizable="false">
           <template #default="{ row }">
+            <span v-if="row._isSummary">--</span>
             <el-switch
+              v-else
               v-model="row.state"
               active-value="enabled"
               inactive-value="paused"
-              disabled
+              @change="(val: string | number | boolean) => onStateChange(row, val)"
             />
           </template>
         </el-table-column>
@@ -138,6 +141,20 @@
                   </template>
                 </span>
                 <span class="msku-text">{{ row.campaign_name || "-" }}</span>
+              </div>
+            </template>
+
+            <!-- 竞价可编辑 -->
+            <template v-else-if="col.prop === 'bid'">
+              <template v-if="row._isSummary">---</template>
+              <div v-else class="bid-cell">
+                <span class="bid-icon">{{ currencyIcon }}</span>
+                <el-input
+                  v-model="row.bid"
+                  size="small"
+                  class="bid-input"
+                  @change="onBidChange(row)"
+                />
               </div>
             </template>
 
@@ -248,11 +265,11 @@
  */
 import type { KeywordParams } from "@/api/ads";
 
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { Operation, VideoPause, CircleClose } from "@element-plus/icons-vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 
-import { getKeywords } from "@/api/ads";
+import { getKeywords, adjustKeywordBid, adjustKeywordState } from "@/api/ads";
 
 const props = defineProps<{
   campaignId: string;
@@ -275,6 +292,19 @@ const pagination = reactive({ pageNum: 1, pageSize: 25, total: 0 });
 const loading = ref(false);
 const rows = ref<any[]>([]);
 const currencyIcon = ref("$");
+const summaryRow = ref<Record<string, unknown> | null>(null);
+
+const displayData = computed<any[]>(() => {
+  if (rows.value.length === 0) return [];
+  if (!summaryRow.value) return rows.value;
+  return [{ ...summaryRow.value, _isSummary: true }, ...rows.value];
+});
+
+function rowClassName({ row }: { row: any }): string {
+  return row._isSummary ? "is-summary-row" : "";
+}
+
+defineExpose({ summaryRow });
 
 // ── 列配置 ──────────────────────────────────────────
 const columnConfigVisible = ref(false);
@@ -347,6 +377,7 @@ function fetchData(): void {
       rows.value = res.list ?? [];
       pagination.total = res.total ?? 0;
       currencyIcon.value = res.currency_icon ?? "$";
+      summaryRow.value = res.summary ?? null;
     })
     .catch(() => {
       ElMessage.error("加载关键词投放失败");
@@ -368,6 +399,63 @@ function onReset(): void {
   filters.keyword = "";
   pagination.pageNum = 1;
   fetchData();
+}
+
+async function onBidChange(row: any): Promise<void> {
+  const val = Number(row.bid);
+  if (!val || val <= 0 || isNaN(val)) {
+    ElMessage.warning("竞价必须为大于 0 的数值");
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(`确认将竞价修改为 ${val.toFixed(2)}？`, "确认修改竞价", {
+      confirmButtonText: "确认",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+  } catch {
+    return;
+  }
+  try {
+    await adjustKeywordBid({
+      campaign_id: props.campaignId,
+      profile_id: props.profileId,
+      keyword_id: row.keyword_id,
+      bid_after: val,
+    });
+    ElMessage.success("竞价修改已记录");
+  } catch {
+    ElMessage.error("竞价修改失败");
+  }
+}
+
+async function onStateChange(row: any, val: string | number | boolean): Promise<void> {
+  const s = String(val);
+  if (row.state === s) return;
+  const oldVal = s === "enabled" ? "paused" : "enabled";
+  const label = s === "enabled" ? "启用" : "暂停";
+  try {
+    await ElMessageBox.confirm(`确认将关键词状态修改为「${label}」？`, "确认修改状态", {
+      confirmButtonText: "确认",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+  } catch {
+    row.state = oldVal;
+    return;
+  }
+  try {
+    await adjustKeywordState({
+      campaign_id: props.campaignId,
+      profile_id: props.profileId,
+      keyword_id: row.keyword_id as string | number,
+      state: s as "enabled" | "paused",
+    });
+    ElMessage.success(`${label}已记录`);
+  } catch {
+    row.state = oldVal;
+    ElMessage.error("状态修改失败");
+  }
 }
 
 onMounted(fetchData);

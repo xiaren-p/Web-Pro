@@ -152,6 +152,7 @@ CELERY_TASK_ROUTES = {
     'api_v2.tasks.optimization_execution_task.run_optimization_execution_task':     {'queue': 'single_thread_queue'},
     'api_v2.tasks.listing_tag_sync_task.run_listing_tag_sync_task':                  {'queue': 'single_thread_queue'},
     'api_v2.tasks.listing_tag_modify_task.run_listing_tag_modify_task':                {'queue': 'single_thread_queue'},
+    'api_v2.tasks.image_sync_queue_task.run_image_sync_queue_task':                    {'queue': 'single_thread_queue'},
 }
 
 CELERY_BEAT_SCHEDULE = {
@@ -189,6 +190,13 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'api_v2.tasks.listing_tag_modify_task.run_listing_tag_modify_task',
         'schedule': 5.0,
         'options': {'expires': 4},
+    },
+    # 图片同步队列监控：每 30 秒扫描 PENDING 记录，从 NC 下载图片并调领星 API 更新 listing
+    # options.expires=25：队列中超过 25 秒未被消费的任务自动丢弃，防止 Beat 堆积
+    'image-sync-queue': {
+        'task': 'api_v2.tasks.image_sync_queue_task.run_image_sync_queue_task',
+        'schedule': 30.0,
+        'options': {'expires': 25},
     },
 }
 

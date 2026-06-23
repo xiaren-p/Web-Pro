@@ -74,7 +74,7 @@
               v-model="row.state"
               active-value="enabled"
               inactive-value="paused"
-              disabled
+              @change="(val: string | number | boolean) => onStateChange(row, val)"
             />
           </template>
         </el-table-column>
@@ -264,10 +264,10 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useLocalStorage } from "@vueuse/core";
 import { CopyDocument, Filter, Operation, VideoPause, CircleClose } from "@element-plus/icons-vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 
 import ColumnManager from "@/components/ColumnManager/index.vue";
-import { getAutoTargeting } from "@/api/ads";
+import { getAutoTargeting, adjustTargetBid, adjustTargetState } from "@/api/ads";
 
 defineOptions({ name: "AutoTargetingPanel" });
 
@@ -489,8 +489,62 @@ function fetchData(): void {
 /**
  * 竞价修改占位处理（后端接口待实现）。
  */
-function onBidChange(): void {
-  // TODO(后端联调): 调用修改自动投放竞价接口，提交 target_id + bid
+async function onBidChange(row: any): Promise<void> {
+  const val = Number(row.bid);
+  const tid = row.target_id as string | number;
+  if (!val || val <= 0 || isNaN(val)) {
+    ElMessage.warning("竞价必须为大于 0 的数值");
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(`确认将竞价修改为 ${val.toFixed(2)}？`, "确认修改竞价", {
+      confirmButtonText: "确认",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+  } catch {
+    return;
+  }
+  try {
+    await adjustTargetBid({
+      campaign_id: props.campaignId as string,
+      profile_id: props.profileId as string,
+      target_id: tid,
+      bid_after: val,
+    });
+    ElMessage.success("竞价修改已记录");
+  } catch {
+    ElMessage.error("竞价修改失败");
+  }
+}
+
+async function onStateChange(row: any, val: string | number | boolean): Promise<void> {
+  const s = String(val);
+  if (row.state === s) return;
+  const oldVal = s === "enabled" ? "paused" : "enabled";
+  const label = s === "enabled" ? "启用" : "暂停";
+  try {
+    await ElMessageBox.confirm(`确认将投放状态修改为「${label}」？`, "确认修改状态", {
+      confirmButtonText: "确认",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+  } catch {
+    row.state = oldVal;
+    return;
+  }
+  try {
+    await adjustTargetState({
+      campaign_id: props.campaignId as string,
+      profile_id: props.profileId as string,
+      target_id: row.target_id as string | number,
+      state: s as "enabled" | "paused",
+    });
+    ElMessage.success(`${label}已记录`);
+  } catch {
+    row.state = oldVal;
+    ElMessage.error("状态修改失败");
+  }
 }
 
 /**

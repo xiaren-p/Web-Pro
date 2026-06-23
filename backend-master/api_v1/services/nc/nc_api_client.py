@@ -1072,6 +1072,236 @@ class NcApiClient:
                 f"{resp.status_code}: {resp.text[:200]}"
             )
 
+    # ------------------------------------------------------------------ #
+    #  WebDAV 文件搜索、列举与下载                                          #
+    # ------------------------------------------------------------------ #
+
+    def search_dav_files(
+        self,
+        scope_path: str,
+        name_pattern: str,
+        content_type: str = "image/%",
+    ) -> list[dict]:
+        """通过 WebDAV SEARCH（RFC 5323）在 NC 服务器端递归搜索文件。
+
+        利用 NC 原生的 SEARCH 端点在指定范围内按文件名和内容类型过滤，
+        避免逐层 PROPFIND 的低效遍历。搜索深度为 infinity。
+
+        Args:
+            scope_path (str): 搜索范围路径（相对于 DAV 根），
+                              如 /files/admin/美工部/【产品图片】。
+            name_pattern (str): 文件名 LIKE 模式，支持 SQL 通配符 %，
+                                如 %.jpg 匹配所有 jpg 文件。
+            content_type (str): 内容类型 LIKE 模式，默认 image/%。
+
+        Returns:
+            list[dict]: 匹配文件列表，每项含
+                        {"name": str, "href": str, "content_type": str}。
+
+        Raises:
+            RuntimeError: 网络错误或非预期状态码时抛出。
+        """
+        import xml.etree.ElementTree as ET
+        from urllib.parse import unquote
+
+        url = f"{self._base}/remote.php/dav/"
+        xml_body = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<d:searchrequest xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">'
+            "<d:basicsearch>"
+            "<d:select><d:prop>"
+            "<d:displayname/><d:getcontenttype/>"
+            "</d:prop></d:select>"
+            "<d:from><d:scope>"
+            f"<d:href>{scope_path}</d:href>"
+            "<d:depth>infinity</d:depth>"
+            "</d:scope></d:from>"
+            "<d:where><d:and>"
+            "<d:like><d:prop><d:displayname/></d:prop>"
+            f"<d:literal>{name_pattern}</d:literal></d:like>"
+            "<d:like><d:prop><d:getcontenttype/></d:prop>"
+            f"<d:literal>{content_type}</d:literal></d:like>"
+            "</d:and></d:where>"
+            "<d:orderby/>"
+            "</d:basicsearch>"
+            "</d:searchrequest>"
+        )
+        logger.info(
+            "[NcApiClient][search_dav_files] scope=%s pattern=%s",
+            scope_path, name_pattern,
+        )
+        try:
+            resp = self._session.request(
+                "SEARCH",
+                url,
+                data=xml_body.encode("utf-8"),
+                headers={"Content-Type": "text/xml; charset=utf-8"},
+                verify=self._verify,
+                timeout=120,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"[NcApiClient] SEARCH {scope_path} 网络错误: {exc}"
+            ) from exc
+        if resp.status_code != 207:
+            raise RuntimeError(
+                f"[NcApiClient] SEARCH {scope_path} 返回状态码 "
+                f"{resp.status_code}: {resp.text[:300]}"
+            )
+        try:
+            root = ET.fromstring(resp.text)
+        except ET.ParseError as exc:
+            raise RuntimeError(
+                f"[NcApiClient] SEARCH 响应 XML 解析失败: {exc}"
+            ) from exc
+
+        ns = {"d": "DAV:"}
+        entries: list[dict] = []
+        for response in root.findall("d:response", ns):
+            href_el = response.find("d:href", ns)
+            if href_el is None:
+                continue
+            href = href_el.text or ""
+            propstat = response.find("d:propstat", ns)
+            if propstat is None:
+                continue
+            prop = propstat.find("d:prop", ns)
+            if prop is None:
+                continue
+            displayname_el = prop.find("d:displayname", ns)
+            name = (
+                displayname_el.text
+                if displayname_el is not None and displayname_el.text
+                else unquote(href.rstrip("/").split("/")[-1])
+            )
+            ct_el = prop.find("d:getcontenttype", ns)
+            ct = ct_el.text if ct_el is not None and ct_el.text else ""
+            entries.append({"name": name, "href": href, "content_type": ct})
+        return entries
+
+    def list_dav_entries(self, dav_path: str) -> list[dict]:
+        """通过 WebDAV PROPFIND（Depth: 1）列出指定目录的全部直属条目。
+
+        与 list_dav_folder 不同，本方法同时返回文件和子目录，
+        并在每条结果中标记 is_collection 字段。
+
+        Args:
+            dav_path (str): 相对于 NC server 根的 WebDAV 路径，
+                            如 /remote.php/dav/files/admin/美工部/ 。
+
+        Returns:
+            list[dict]: 条目列表，每项含
+                        {"name": str, "href": str,
+                         "is_collection": bool, "content_type": str}。
+
+        Raises:
+            RuntimeError: 网络错误或非 207 响应时抛出。
+        """
+        import xml.etree.ElementTree as ET
+        from urllib.parse import unquote
+
+        url = f"{self._base}{dav_path}"
+        xml_body = (
+            '<?xml version="1.0"?>'
+            '<d:propfind xmlns:d="DAV:">'
+            "<d:prop>"
+            "<d:resourcetype/><d:displayname/>"
+            "<d:getcontenttype/>"
+            "</d:prop>"
+            "</d:propfind>"
+        )
+        logger.info("[NcApiClient][list_dav_entries] %s", dav_path)
+        try:
+            resp = self._session.request(
+                "PROPFIND",
+                url,
+                data=xml_body.encode("utf-8"),
+                headers={
+                    "Content-Type": "application/xml; charset=utf-8",
+                    "Depth": "1",
+                },
+                verify=self._verify,
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"[NcApiClient] PROPFIND {dav_path} 网络错误: {exc}"
+            ) from exc
+        if resp.status_code != 207:
+            raise RuntimeError(
+                f"[NcApiClient] PROPFIND {dav_path} 返回状态码 "
+                f"{resp.status_code}: {resp.text[:200]}"
+            )
+        try:
+            root = ET.fromstring(resp.text)
+        except ET.ParseError as exc:
+            raise RuntimeError(
+                f"[NcApiClient] PROPFIND 响应 XML 解析失败: {exc}"
+            ) from exc
+
+        ns = {"d": "DAV:"}
+        entries: list[dict] = []
+        for response in root.findall("d:response", ns)[1:]:
+            href_el = response.find("d:href", ns)
+            if href_el is None:
+                continue
+            href = href_el.text or ""
+            propstat = response.find("d:propstat", ns)
+            if propstat is None:
+                continue
+            prop = propstat.find("d:prop", ns)
+            if prop is None:
+                continue
+            resourcetype = prop.find("d:resourcetype", ns)
+            is_collection = (
+                resourcetype is not None
+                and resourcetype.find("d:collection", ns) is not None
+            )
+            displayname_el = prop.find("d:displayname", ns)
+            name = (
+                displayname_el.text
+                if displayname_el is not None and displayname_el.text
+                else unquote(href.rstrip("/").split("/")[-1])
+            )
+            ct_el = prop.find("d:getcontenttype", ns)
+            ct = ct_el.text if ct_el is not None and ct_el.text else ""
+            entries.append({
+                "name": name,
+                "href": href,
+                "is_collection": is_collection,
+                "content_type": ct,
+            })
+        return entries
+
+    def download_dav_file(self, dav_path: str, timeout: int = 60) -> bytes:
+        """通过 WebDAV GET 下载单个文件的二进制内容。
+
+        Args:
+            dav_path (str): 相对于 NC server 根的文件 WebDAV 路径，
+                            如 /remote.php/dav/files/admin/美工部/1.jpg 。
+            timeout (int): 请求超时秒数，默认 60（图片文件可能较大）。
+
+        Returns:
+            bytes: 文件二进制内容。
+
+        Raises:
+            RuntimeError: 网络错误或非 200 响应时抛出。
+        """
+        url = f"{self._base}{dav_path}"
+        logger.info("[NcApiClient][download_dav_file] %s", dav_path)
+        try:
+            resp = self._session.get(url, verify=self._verify, timeout=timeout)
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"[NcApiClient] GET {dav_path} 网络错误: {exc}"
+            ) from exc
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"[NcApiClient] GET {dav_path} 返回状态码 "
+                f"{resp.status_code}: {resp.text[:200]}"
+            )
+        return resp.content
+
     def _extract_mount_point(self, dav_path: str) -> str:
         """从 WebDAV 路径中提取 Group Folder 挂载点名称。
 

@@ -84,6 +84,7 @@ def _build_payload(record: SpBidAdjustment) -> dict:
     """单条记录构建 API 参数字典。
 
     BID_PAUSE 类型传 state=paused + isBaseValue=0；
+    BID_ENABLE 类型传 state=enabled + isBaseValue=0；
     竞价类型传 bid + isBaseValue=0。
 
     Returns:
@@ -93,6 +94,11 @@ def _build_payload(record: SpBidAdjustment) -> dict:
         if record.keyword_id:
             return {"keywordId": record.keyword_id, "state": "paused", "isBaseValue": 0}
         return {"targetId": record.target_id, "state": "paused", "isBaseValue": 0}
+
+    if record.execution_type == ExecutionTypeChoices.BID_ENABLE:
+        if record.keyword_id:
+            return {"keywordId": record.keyword_id, "state": "enabled", "isBaseValue": 0}
+        return {"targetId": record.target_id, "state": "enabled", "isBaseValue": 0}
 
     bid = round(float(record.bid_after or 0), 2)
     if record.keyword_id:
@@ -179,7 +185,7 @@ def _apply_results(
 ) -> None:
     """将 API 返回结果按 keywordId / targetId 匹配并写入对应记录。
 
-    BID_PAUSE 类型：成功回写 msg="竞价暂停成功"，失败回写错误信息。
+    BID_PAUSE / BID_ENABLE 类型：成功回写对应操作消息，失败回写错误信息。
     竞价类型：成功回写竞价变动详情。
 
     Args:
@@ -205,11 +211,14 @@ def _apply_results(
             continue
 
         is_pause = record.execution_type == ExecutionTypeChoices.BID_PAUSE
+        is_enable = record.execution_type == ExecutionTypeChoices.BID_ENABLE
 
         if result.get("code") == "SUCCESS":
             record.execution_status = ExecutionStatusChoices.SUCCESS
             if is_pause:
                 record.msg = "竞价暂停成功"
+            elif is_enable:
+                record.msg = "竞价启用成功"
             else:
                 before = round(float(record.bid_before or 0), 4)
                 after = round(float(record.bid_after or 0), 4)
@@ -219,6 +228,8 @@ def _apply_results(
             error_desc = result.get("description", "unknown")
             if is_pause:
                 record.msg = f"竞价暂停失败，error: {error_desc}"
+            elif is_enable:
+                record.msg = f"竞价启用失败，error: {error_desc}"
             else:
                 record.msg = f"竞价调整失败，error: {error_desc}"
 

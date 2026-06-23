@@ -1,4 +1,7 @@
-"""SP 广告商品投放调整记录表（sp_bid_adjustment）。"""
+"""SP 广告商品投放调整记录表（sp_bid_adjustment）。
+
+记录定位组 / 关键词 / 商品投放维度的竞价调整、暂停、启用操作。
+"""
 from django.db import models
 
 from api_v2.models.ad_time_pricing_hit import TimePricingHitStatus
@@ -11,6 +14,7 @@ class ExecutionTypeChoices(models.TextChoices):
     TIME_PRICING_CALLBACK = "TIME_PRICING_CALLBACK", "分时回调"
     BID_ADJUSTMENT = "BID_ADJUSTMENT", "竞价调整"
     BID_PAUSE = "BID_PAUSE", "竞价暂停"
+    BID_ENABLE = "BID_ENABLE", "竞价启用"
     MANUAL_ADJUSTMENT = "MANUAL_ADJUSTMENT", "手动调整"
 
 
@@ -133,6 +137,14 @@ class SpBidAdjustment(models.Model):
         default="",
         blank=True,
         verbose_name="执行日志回写",
+    )
+
+    operator = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        verbose_name="操作人",
+        help_text="用户手动操作时写入用户昵称；任务自动写入时留空",
     )
 
     created_at = models.DateTimeField(

@@ -74,10 +74,30 @@
           />
         </template>
         <template v-else>
+          <div class="tab-indicators-wrapper">
+            <Indicators v-if="activeSummary" :summary="activeSummary" />
+          </div>
+          <div class="filter-bar" style="margin-bottom: 8px">
+            <el-radio-group v-model="targetingMode" size="small">
+              <el-radio-button label="keyword">关键词投放</el-radio-button>
+              <el-radio-button label="product">商品投放</el-radio-button>
+            </el-radio-group>
+            <span style="margin-left: 8px; font-size: 12px; color: var(--el-text-color-secondary)">
+              切换查看不同投放类型的数据与指标
+            </span>
+          </div>
           <KeywordPanel
+            v-if="targetingMode === 'keyword'"
+            ref="keywordRef"
             :campaign-id="campaignId"
             :profile-id="profileId"
             :initial-date-range="inheritedDateRange"
+          />
+          <ProductTargetingPanel
+            v-else
+            ref="productTargetingRef"
+            :campaign-id="campaignId"
+            :profile-id="profileId"
           />
         </template>
       </el-tab-pane>
@@ -121,6 +141,7 @@ import AutoTargetingPanel from "@/views/ads/sp/detail/AutoTargetingPanel.vue";
 import AutoNegativePanel from "@/views/ads/sp/detail/AutoNegativePanel.vue";
 import KeywordPanel from "@/views/ads/sp/detail/KeywordPanel.vue";
 import NegativeKeywordPanel from "@/views/ads/sp/detail/NegativeKeywordPanel.vue";
+import ProductTargetingPanel from "@/views/ads/sp/detail/ProductTargetingPanel.vue";
 import Indicators from "@/views/ads/sp/Indicators.vue";
 
 defineOptions({ name: "AdCampaignDetail" });
@@ -164,6 +185,11 @@ const campaignInfo = ref<AdCampaignDetailResponse | null>(null);
 const adGroupsRef = ref<InstanceType<typeof AdGroupsPanel>>();
 const adsRef = ref<InstanceType<typeof AdsPanel>>();
 const autoTargetingRef = ref<InstanceType<typeof AutoTargetingPanel>>();
+const keywordRef = ref<InstanceType<typeof KeywordPanel>>();
+const productTargetingRef = ref<InstanceType<typeof ProductTargetingPanel>>();
+
+/** 手动投放 Tab 的切换模式：关键词投放 / 商品投放 */
+const targetingMode = ref<"keyword" | "product">("keyword");
 
 /**
  * 当前激活 Tab 对应的汇总指标数据。
@@ -181,7 +207,10 @@ const activeSummary = computed<Record<string, unknown> | null>(() => {
       if (campaignInfo.value?.targeting_type?.toUpperCase() === "AUTO") {
         return (autoTargetingRef.value as any)?.summaryRow ?? null;
       }
-      return null;
+      if (targetingMode.value === "keyword") {
+        return (keywordRef.value as any)?.summaryRow ?? null;
+      }
+      return (productTargetingRef.value as any)?.summaryRow ?? null;
     default:
       return null;
   }
@@ -357,8 +386,7 @@ onMounted(() => {
       background: #ffffff;
       border: 1px solid var(--color-gray-200);
       border-top: none;
-      border-bottom: none;
-      border-radius: 0;
+      border-radius: 0 0 var(--radius-xl) var(--radius-xl);
       box-shadow: var(--shadow-xs);
     }
 
@@ -400,13 +428,12 @@ onMounted(() => {
   }
 
   .tab-indicators-wrapper {
-    margin-top: var(--spacing-4);
-    margin-bottom: var(--spacing-4);
     padding: 18px 4px 10px;
+    margin-top: var(--spacing-4);
+    margin-bottom: var(--spacing-3);
     background: rgba(255, 255, 255, 0.96);
     border: 1px solid var(--color-gray-200);
     border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-sm);
   }
 
   :deep(.el-tab-pane) {
