@@ -157,15 +157,29 @@ def _matches_sku_for_path(
     # 策略 4：反向前缀匹配 —— 目录名的连字符段是 SKU 段的前缀（≥ 3 段）
     # 例：目录 Z-HLS-AQBX-CR 匹配 SKU Z-HLS-AQBX-CR-HK1（SKU 含变体后缀）
     # 禁止对分类目录使用（含有子目录的父目录可能误匹配多个变体）
-    if not has_child_dirs:
-        for dname in path_components:
-            dh = _extract_hyphen_segs(dname)
-            if (
-                dh
-                and 3 <= len(dh) < len(sku_segs)
-                and dh == sku_segs[:len(dh)]
-            ):
-                return True
+    # 仅当叶子目录名本身包含 SKU 前缀时启用（排除“厂家图片”等通用目录）
+    if not has_child_dirs and path_components:
+        leaf_dh = _extract_hyphen_segs(path_components[-1])
+        if leaf_dh and leaf_dh == sku_segs[:len(leaf_dh)]:
+            # 叶子目录名本身包含 SKU 前缀（如 Z-HLS-AQBX-CR 反光...）
+            for dname in path_components:
+                dh = _extract_hyphen_segs(dname)
+                if (
+                    dh
+                    and 3 <= len(dh) < len(sku_segs)
+                    and dh == sku_segs[:len(dh)]
+                ):
+                    return True
+        elif path_components[-1].isascii():
+            # 叶子目录名为纯 ASCII（如 BLUE、02 等变体目录）
+            for dname in path_components:
+                dh = _extract_hyphen_segs(dname)
+                if (
+                    dh
+                    and 3 <= len(dh) < len(sku_segs)
+                    and dh == sku_segs[:len(dh)]
+                ):
+                    return True
 
     return False
 
