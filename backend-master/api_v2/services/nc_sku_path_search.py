@@ -82,6 +82,7 @@ def _matches_sku_for_path(
     path_components: list[str],
     sku: str,
     filenames: list[str],
+    has_child_dirs: bool = False,
 ) -> bool:
     """判断一条 NC 路径是否匹配指定 SKU。
 
@@ -93,6 +94,8 @@ def _matches_sku_for_path(
                                       （从挂载点根到叶子目录）。
         sku (str): 待匹配的 SKU 字符串。
         filenames (list[str]): 叶子目录中的文件名列表。
+        has_child_dirs (bool): 该目录是否含有其他编号图片子目录。
+            若有则视为分类目录，禁止反向前缀匹配（策略 4）。
 
     Returns:
         bool: 匹配时返回 True。
@@ -153,14 +156,16 @@ def _matches_sku_for_path(
 
     # 策略 4：反向前缀匹配 —— 目录名的连字符段是 SKU 段的前缀（≥ 3 段）
     # 例：目录 Z-HLS-AQBX-CR 匹配 SKU Z-HLS-AQBX-CR-HK1（SKU 含变体后缀）
-    for dname in path_components:
-        dh = _extract_hyphen_segs(dname)
-        if (
-            dh
-            and 3 <= len(dh) < len(sku_segs)
-            and dh == sku_segs[:len(dh)]
-        ):
-            return True
+    # 禁止对分类目录使用（含有子目录的父目录可能误匹配多个变体）
+    if not has_child_dirs:
+        for dname in path_components:
+            dh = _extract_hyphen_segs(dname)
+            if (
+                dh
+                and 3 <= len(dh) < len(sku_segs)
+                and dh == sku_segs[:len(dh)]
+            ):
+                return True
 
     return False
 
@@ -326,14 +331,22 @@ def search_nc_sku_paths(
         len(numbered_dirs),
     )
 
-    # 4. 对每个编号图片目录匹配每个 SKU
+    # 4. 预计算含有子目录的父目录（用于禁止策略 4 误匹配分类目录）
+    parent_hrefs: set[str] = set()
+    for href in numbered_dirs:
+        parent = _parent_href(href)
+        if parent in numbered_dirs:
+            parent_hrefs.add(parent)
+
+    # 5. 对每个编号图片目录匹配每个 SKU
     scope_prefix = scope_dav.rstrip("/")
 
     results: dict[str, list[str]] = {sku: [] for sku in skus}
     for href, fnames in numbered_dirs.items():
         components = _href_to_path_components(href, scope_prefix)
+        has_children = href in parent_hrefs
         for sku in skus:
-            if _matches_sku_for_path(components, sku, fnames):
+            if _matches_sku_for_path(components, sku, fnames, has_children):
                 # 存储相对于 scope 的路径（需先 URL 解码）
                 decoded_href = unquote(href).rstrip("/").lstrip("/")
                 decoded_scope = unquote(scope_prefix).lstrip("/")
@@ -344,7 +357,7 @@ def search_nc_sku_paths(
                 relative = relative.strip("/")
                 results[sku].append(relative)
 
-    # 5. 过滤父级匹配 + 深度剪枝
+    # 6. 过滤父级匹配 + 深度剪枝
     for sku in results:
         results[sku] = _filter_parent_prefixes(results[sku])
         results[sku] = _prune_by_depth(results[sku])

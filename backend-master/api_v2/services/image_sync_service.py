@@ -766,8 +766,28 @@ def _resolve_missing_paths(
             it.local_path = paths[0]
             it.save(update_fields=["local_path"])
             logger.info("[ImageSync][resolve_paths] SKU %s → %s", it.sku, paths[0])
+        elif len(paths) > 1:
+            # 多路径解析：优先选最深（最具体）的路径
+            max_depth = max(p.count("/") for p in paths)
+            deepest = [p for p in paths if p.count("/") == max_depth]
+            if len(deepest) == 1:
+                it.local_path = deepest[0]
+                it.save(update_fields=["local_path"])
+                logger.info(
+                    "[ImageSync][resolve_paths] SKU %s → %s (最深匹配)",
+                    it.sku, deepest[0],
+                )
+            else:
+                path_list = " | ".join(deepest[:5])
+                msg = (
+                    f"匹配到 {len(paths)} 个路径，同级 {len(deepest)} 个无法确定: "
+                    f"{path_list} | {debug_info}"
+                )
+                _report_result(it.sku, "", "WARNING", msg)
+                _update_queue_status(it, ImageSyncStatus.FAILED, msg)
+                logger.warning("[ImageSync][resolve_paths] SKU %s: %s", it.sku, msg)
         else:
-            msg = f"匹配到 {len(paths)} 个路径，无法唯一确定 | {debug_info}"
+            msg = f"匹配到 0 个路径，无法唯一确定 | {debug_info}"
             _report_result(it.sku, "", "WARNING", msg)
             _update_queue_status(it, ImageSyncStatus.FAILED, msg)
             logger.warning("[ImageSync][resolve_paths] SKU %s: %s", it.sku, msg)
