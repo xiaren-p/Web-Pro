@@ -214,7 +214,7 @@
  * 数据源：LxSpTarget(expression_type="manual") + LxSpTargetReport。
  * 支持手动调整竞价与启停状态。
  */
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { Operation, VideoPause } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import ColumnManager from "@/components/ColumnManager/index.vue";
@@ -269,17 +269,6 @@ const displayData = computed<any[]>(() => {
   if (!summaryRow.value) return tableData.value;
   return [{ ...summaryRow.value, _isSummary: true }, ...tableData.value];
 });
-
-watch(
-  tableData,
-  (newRows) => {
-    for (const row of newRows) {
-      if (row._isSummary) continue;
-      row._bidInput = row.bid ?? 0;
-    }
-  },
-  { deep: true }
-);
 
 defineExpose({ summaryRow });
 
@@ -347,6 +336,9 @@ async function loadData(): Promise<void> {
     total.value = res.total || 0;
     summaryRow.value = res.summary ?? null;
     currencyIcon.value = res.currency_icon || "$";
+    for (const row of tableData.value) {
+      if (!row._isSummary) row._bidInput = row.bid ?? 0;
+    }
   } catch {
     ElMessage.error("获取商品投放数据失败");
   } finally {

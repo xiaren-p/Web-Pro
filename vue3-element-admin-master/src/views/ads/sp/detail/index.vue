@@ -284,9 +284,11 @@ async function onKeywordBid({ row, bid }: { row: any; bid: number }): Promise<vo
       bid_after: bid,
     });
     row.bid = bid;
+    row._bidInput = bid;
     ElMessage.success("竞价修改已记录，待执行推送");
   } catch (error) {
     row.bid = oldBid;
+    row._bidInput = oldBid;
     console.error("[onKeywordBid] 修改竞价失败", error);
     ElMessage.error("修改竞价失败");
   }
@@ -340,9 +342,11 @@ async function onTargetBid({ row, bid }: { row: any; bid: number }): Promise<voi
       bid_after: bid,
     });
     row.bid = bid;
+    row._bidInput = bid;
     ElMessage.success("竞价修改已记录，待执行推送");
   } catch (error) {
     row.bid = oldBid;
+    row._bidInput = oldBid;
     console.error("[onTargetBid] 修改竞价失败", error);
     ElMessage.error("修改竞价失败");
   }
@@ -396,9 +400,11 @@ async function onProductTargetBid({ row, bid }: { row: any; bid: number }): Prom
       bid_after: bid,
     });
     row.bid = bid;
+    row._bidInput = bid;
     ElMessage.success("竞价修改已记录，待执行推送");
   } catch (error) {
     row.bid = oldBid;
+    row._bidInput = oldBid;
     console.error("[onProductTargetBid] 修改竞价失败", error);
     ElMessage.error("修改竞价失败");
   }

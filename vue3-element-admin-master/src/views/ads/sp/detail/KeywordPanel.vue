@@ -299,7 +299,7 @@
  */
 import type { KeywordParams } from "@/api/ads";
 
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { Operation, VideoPause, CircleClose } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
@@ -335,28 +335,9 @@ const summaryRow = ref<Record<string, unknown> | null>(null);
 
 const displayData = computed<any[]>(() => {
   if (rows.value.length === 0) return [];
-  // 为数据行注入 _bidInput 临时字段，避免编辑时直接污染 row.bid
-  for (const row of rows.value) {
-    if (row._isSummary) continue;
-    if (row._bidInput === undefined || row._bidInput === null) {
-      row._bidInput = row.bid ?? 0;
-    }
-  }
   if (!summaryRow.value) return rows.value;
   return [{ ...summaryRow.value, _isSummary: true }, ...rows.value];
 });
-
-// 监听 rows 变化：父组件 API 成功回写 row.bid 后，同步刷新输入框
-watch(
-  rows,
-  (newRows) => {
-    for (const row of newRows) {
-      if (row._isSummary) continue;
-      row._bidInput = row.bid ?? 0;
-    }
-  },
-  { deep: true }
-);
 
 function rowClassName({ row }: { row: any }): string {
   return row._isSummary ? "is-summary-row" : "";
@@ -436,6 +417,10 @@ function fetchData(): void {
       pagination.total = res.total ?? 0;
       currencyIcon.value = res.currency_icon ?? "$";
       summaryRow.value = res.summary ?? null;
+      // 为每行注入 _bidInput 临时字段
+      for (const row of rows.value) {
+        if (!row._isSummary) row._bidInput = row.bid ?? 0;
+      }
     })
     .catch(() => {
       ElMessage.error("加载关键词投放失败");

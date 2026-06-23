@@ -427,28 +427,9 @@ const visibleColumns = computed(() => activeColumns.value.filter((c) => c.visibl
  * @returns {any[]}
  */
 const displayData = computed<any[]>(() => {
-  // 注入 _bidInput 临时字段
-  for (const row of tableData.value) {
-    if (row._isSummary) continue;
-    if (row._bidInput === undefined || row._bidInput === null) {
-      row._bidInput = row.bid ?? 0;
-    }
-  }
   if (!summaryRow.value) return tableData.value;
   return [{ ...summaryRow.value, _isSummary: true }, ...tableData.value];
 });
-
-// 父组件 API 成功回写 row.bid 后同步刷新输入框
-watch(
-  tableData,
-  (newRows) => {
-    for (const row of newRows) {
-      if (row._isSummary) continue;
-      row._bidInput = row.bid ?? 0;
-    }
-  },
-  { deep: true }
-);
 
 /**
  * 为汇总行附加样式类。
@@ -540,6 +521,9 @@ function fetchData(): void {
       total.value = res.total ?? 0;
       summaryRow.value = res.summary ?? null;
       currencyIcon.value = res.currency_icon ?? "$";
+      for (const row of tableData.value) {
+        if (!row._isSummary) row._bidInput = row.bid ?? 0;
+      }
     })
     .catch(() => {
       ElMessage.error("自动投放数据加载失败");
