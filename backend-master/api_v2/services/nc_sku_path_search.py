@@ -286,6 +286,14 @@ def search_nc_sku_paths(
 
     # 4. 对每个编号图片目录匹配每个 SKU
     scope_prefix = scope_dav.rstrip("/")
+    # 调试：输出前 5 个编号图片目录的路径组件，便于排查匹配失败
+    for debug_href, debug_fnames in list(numbered_dirs.items())[:5]:
+        debug_comps = _href_to_path_components(debug_href, scope_prefix)
+        logger.info(
+            "[nc_sku_path_search][debug] 编号目录 components=%s files=%s",
+            debug_comps, debug_fnames[:5],
+        )
+
     results: dict[str, list[str]] = {sku: [] for sku in skus}
     for href, fnames in numbered_dirs.items():
         components = _href_to_path_components(href, scope_prefix)
