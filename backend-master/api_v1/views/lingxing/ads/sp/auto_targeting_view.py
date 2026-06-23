@@ -72,8 +72,8 @@ def _is_time_pricing_active(campaign_id: int, profile_id: int) -> bool:
 _AUTO_TARGETING_TYPE_MAP: dict[str, str] = {
     "queryHighRelMatches": "紧密匹配",
     "queryBroadRelMatches": "宽泛匹配",
-    "asinAccessoryRelated": "同类商品",
-    "asinSubstituteRelated": "关联商品",
+    "asinSubstituteRelated": "同类商品",
+    "asinAccessoryRelated": "关联商品",
 }
 
 

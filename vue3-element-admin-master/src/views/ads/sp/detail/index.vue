@@ -362,7 +362,7 @@ async function onTargetState({
   row: any;
   state: "enabled" | "paused";
 }): Promise<void> {
-  if (!row?.target_id || !row?.campaign_id || !row?.profile_id) {
+  if (!row?.target_id) {
     ElMessage.error("缺少定位组标识，无法修改状态");
     return;
   }
