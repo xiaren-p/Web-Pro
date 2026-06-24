@@ -69,6 +69,7 @@
         border
         height="calc(100vh - 460px)"
         style="width: 100%"
+        @selection-change="onSelectionChange"
       >
         <!-- 固定左：勾选 -->
         <el-table-column
@@ -210,6 +211,32 @@
 
     <!-- 分页 -->
     <div class="pagination-bar">
+      <!-- 批量操作按钮 -->
+      <el-dropdown v-if="selectedRows.length > 0" trigger="click" style="margin-right: 12px">
+        <el-button type="primary" size="small">
+          调状态
+          <el-icon><ArrowDown /></el-icon>
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="batchSetState('enabled')">启用</el-dropdown-item>
+            <el-dropdown-item @click="batchSetState('paused')">暂停</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      
+      <el-dropdown v-if="selectedRows.length > 0" trigger="click" style="margin-right: 12px">
+        <el-button size="small">
+          批量调竞价
+          <el-icon><ArrowDown /></el-icon>
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="openBatchBidDialog">批量调整竞价</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      
       <el-pagination
         v-model:current-page="pagination.pageNum"
         v-model:page-size="pagination.pageSize"
@@ -289,6 +316,14 @@
         </div>
       </div>
     </el-drawer>
+    
+    <!-- 批量调整竞价对话框 -->
+    <BatchBidAdjustDialog
+      v-model="batchBidDialogVisible"
+      :items="batchBidItems"
+      :currency-icon="currencyIcon"
+      @confirm="onBatchBidConfirm"
+    />
   </div>
 </template>
 
@@ -300,10 +335,11 @@
 import type { KeywordParams } from "@/api/ads";
 
 import { computed, onMounted, reactive, ref } from "vue";
-import { Operation, VideoPause, CircleClose } from "@element-plus/icons-vue";
+import { Operation, VideoPause, CircleClose, ArrowDown } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
-import { getKeywords } from "@/api/ads";
+import { getKeywords, batchAdjustKeywordState, batchAdjustKeywordBid } from "@/api/ads";
+import BatchBidAdjustDialog from "@/components/BatchBidAdjustDialog/index.vue";
 
 const props = defineProps<{
   campaignId: string;
@@ -332,6 +368,17 @@ const loading = ref(false);
 const rows = ref<any[]>([]);
 const currencyIcon = ref("$");
 const summaryRow = ref<Record<string, unknown> | null>(null);
+const selectedRows = ref<any[]>([]);
+
+// ── 批量操作状态 ───────────────────────────────────────
+const batchBidDialogVisible = ref(false);
+const batchBidItems = ref<Array<{
+  id: string | number;
+  targetingText: string;
+  campaignName: string;
+  adgroupName: string;
+  currentBid: number;
+}>>([]);
 
 const displayData = computed<any[]>(() => {
   if (rows.value.length === 0) return [];
@@ -390,6 +437,15 @@ function formatState(val: string): string {
 function openDrawer(row: any): void {
   activeRow.value = row;
   drawerVisible.value = true;
+}
+
+/**
+ * 表格勾选变化回调。
+ *
+ * @param {any[]} rows - 当前所有已勾选的行数据
+ */
+function onSelectionChange(rows: any[]): void {
+  selectedRows.value = rows;
 }
 
 // ── 查询 ──────────────────────────────────────────────
@@ -500,6 +556,124 @@ function onSwitchChange(row: any, val: string | number | boolean): void {
     .catch(() => {
       row.state = oldVal;
     });
+}
+
+/**
+ * 批量设置状态（启用/暂停）。
+ *
+ * @param {"enabled" | "paused"} state - 目标状态
+ */
+async function batchSetState(state: "enabled" | "paused"): Promise<void> {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning("请先选择要操作的行");
+    return;
+  }
+
+  const label = state === "enabled" ? "启用" : "暂停";
+  try {
+    await ElMessageBox.confirm(
+      `确认将选中的 ${selectedRows.value.length} 条关键词状态修改为「${label}」？`,
+      "确认批量修改状态",
+      {
+        confirmButtonText: "确认",
+        cancelButtonText: "取消",
+        type: "warning",
+      }
+    );
+  } catch {
+    return;
+  }
+
+  const ids = selectedRows.value.map((row) => row.keyword_id).filter(Boolean);
+  if (ids.length === 0) {
+    ElMessage.error("选中的行缺少有效标识");
+    return;
+  }
+
+  try {
+    const res = await batchAdjustKeywordState({
+      campaign_id: props.campaignId,
+      profile_id: props.profileId,
+      ids,
+      state,
+    });
+
+    ElMessage.success(
+      `批量${label}完成：成功 ${res.success_count} 条，失败 ${res.failed_count} 条`
+    );
+
+    // 更新本地状态
+    selectedRows.value.forEach((row) => {
+      row.state = state;
+    });
+
+    // 清空选中
+    selectedRows.value = [];
+  } catch (error) {
+    console.error("[batchSetState] 批量修改状态失败", error);
+    ElMessage.error("批量修改状态失败");
+  }
+}
+
+/**
+ * 打开批量调整竞价对话框。
+ */
+function openBatchBidDialog(): void {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning("请先选择要操作的行");
+    return;
+  }
+
+  batchBidItems.value = selectedRows.value.map((row) => ({
+    id: row.keyword_id,
+    targetingText: row.keyword_text || "-",
+    campaignName: row.campaign_name || "-",
+    adgroupName: row.adgroup_name || "-",
+    currentBid: row.bid ?? 0,
+  }));
+
+  batchBidDialogVisible.value = true;
+}
+
+/**
+ * 确认批量调整竞价。
+ *
+ * @param {Array<{ id: string | number; bid: number }>} items - 调整项列表
+ */
+async function onBatchBidConfirm(
+  items: Array<{ id: string | number; bid: number }>
+): Promise<void> {
+  if (items.length === 0) {
+    ElMessage.warning("没有要调整的竞价项");
+    return;
+  }
+
+  try {
+    const res = await batchAdjustKeywordBid({
+      campaign_id: props.campaignId,
+      profile_id: props.profileId,
+      items,
+    });
+
+    ElMessage.success(
+      `批量调整竞价完成：成功 ${res.success_count} 条，失败 ${res.failed_count} 条`
+    );
+
+    // 更新本地竞价
+    items.forEach(({ id, bid }) => {
+      const row = rows.value.find((r) => r.keyword_id === id);
+      if (row) {
+        row.bid = bid;
+        row._bidInput = bid;
+      }
+    });
+
+    // 清空选中
+    selectedRows.value = [];
+  } catch (error) {
+    console.error("[onBatchBidConfirm] 批量调整竞价失败", error);
+    ElMessage.error("批量调整竞价失败");
+  }
 }
 
 onMounted(fetchData);

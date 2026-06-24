@@ -17,7 +17,6 @@ from api_v1.models import (
     LxAdsProfile,
     LxExchangeRate,
     LxListingData,
-    LxProductInfo,
     LxShops,
     LxSpAd,
     LxSpCampaign,
@@ -46,17 +45,12 @@ _DORIS_PAIR_BATCH_SIZE = 500
 
 
 def _flat_parse_label(raw_label: str) -> list[str]:
-    """解析 LxProductInfo.label 字段，将其扁平化为标签字符串列表。
+    """[已废弃] 解析 LxProductInfo.label 字段。保留以兼容潜在外部引用。
 
-    label 字段存在两种格式：
-    1. JSON 数组字符串，如 ``'["清仓", "夏季"]'`` 或 ``'["促销"]'``。
-    2. 逗号分隔字符串，如 ``"清仓,夏季"``。
-
-    本函数依次尝试 JSON 解析和逗号分隔解析，确保无论哪种存储格式
-    都能正确扁平化为 ``["清仓", "夏季"]``。
+    新代码已切换到 LxListingData.global_tags（JSON 数组），不再使用此函数。
 
     Args:
-        raw_label (str): LxProductInfo.label 原始值。
+        raw_label (str): 原始值。
 
     Returns:
         list[str]: 扁平化后的标签字符串列表。
@@ -169,17 +163,16 @@ class AdCampaignViewSet(viewsets.ViewSet):
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
         # ── 标签筛选 ──
-        # 标签数据来源与展示侧保持一致：LxProductInfo.label → LxSpAd → LxSpCampaign，
-        # 不再依赖 LxSpCampaign.tags（两者可能不同步）。
+        # 数据来源：LxListingData.global_tags → ASIN → LxSpAd → LxSpCampaign
         tags = data.get("tags")
         if tags:
             tag_list = [t.strip() for t in tags.split(",") if t.strip()]
             if tag_list:
                 tag_asin_q = Q()
                 for t in tag_list:
-                    tag_asin_q |= Q(label__icontains=t)
+                    tag_asin_q |= Q(global_tags__contains=[{"tagName": t}])
                 tag_asins = set(
-                    LxProductInfo.objects.filter(tag_asin_q)
+                    LxListingData.objects.filter(tag_asin_q)
                     .values_list("asin", flat=True)
                     .distinct()
                 )
@@ -190,9 +183,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
                         .distinct()
                     )
                     if tag_ad_pairs:
-                        tag_q = Q()
-                        for cid, pid in tag_ad_pairs:
-                            tag_q |= Q(campaign_id=cid, profile_id=pid)
+                        tag_q = _build_pair_q(tag_ad_pairs)
                         qs = qs.filter(tag_q)
                     else:
                         qs = qs.filter(Q(pk__in=[]))
@@ -200,21 +191,20 @@ class AdCampaignViewSet(viewsets.ViewSet):
                     qs = qs.filter(Q(pk__in=[]))
 
         # ── 负责人筛选 ──
-        # 标签和负责人数据来源相同：LxProductInfo（label + principal_list），
-        # 因此负责人筛选复用 ASIN → LxSpAd → campaign 的链路，直接做筛选而不依赖展示层的二次查询。
+        # 数据来源：LxListingData.principal_info → ASIN → LxSpAd → LxSpCampaign
         owner_ids = data.get("owners")
         if owner_ids:
             owner_list = [str(o).strip() for o in owner_ids.split(",") if str(o).strip()]
             if owner_list:
-                # LxProductInfo.principal_list 为 [{uid, realname}, ...]
+                # LxListingData.principal_info 为 [{principal_uid, principal_name}, ...]
                 owner_q_parts = Q()
                 for uid in owner_list:
                     try:
-                        owner_q_parts |= Q(principal_list__contains=[{"uid": int(uid)}])
+                        owner_q_parts |= Q(principal_info__contains=[{"principal_uid": int(uid)}])
                     except (ValueError, TypeError):
                         continue
                 owner_asins = set(
-                    LxProductInfo.objects.filter(owner_q_parts)
+                    LxListingData.objects.filter(owner_q_parts)
                     .values_list("asin", flat=True)
                     .distinct()
                 )
@@ -225,9 +215,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
                         .distinct()
                     )
                     if owner_ad_pairs:
-                        owner_q = Q()
-                        for cid, pid in owner_ad_pairs:
-                            owner_q |= Q(campaign_id=cid, profile_id=pid)
+                        owner_q = _build_pair_q(owner_ad_pairs)
                         qs = qs.filter(owner_q)
                     else:
                         qs = qs.filter(Q(pk__in=[]))
@@ -924,6 +912,189 @@ class AdCampaignViewSet(viewsets.ViewSet):
             "campaign_id": cid_int,
             "profile_id": pid_int,
             "state": state,
+        })
+
+    @action(detail=False, methods=["post"], url_path="batch-adjust-state")
+    def batch_adjust_state(self, request: Request) -> Response:
+        """批量调整广告活动状态：为每个选中活动写 SpCampaignAdjustment 记录 + 更新 LxSpCampaign.state。
+
+        逐条校验并创建审计记录，最后统一批量更新实体状态，失败项不影响其他项。
+
+        Args:
+            request (Request): DRF 请求对象，body 需含：
+                - items (list): 每项含 campaign_id + profile_id + state
+
+        Returns:
+            Response: {success_count, failed_count, errors}
+        """
+        data = request.data or {}
+        items = data.get("items") or []
+        if not items or not isinstance(items, list):
+            return drf_ok({"success_count": 0, "failed_count": 0, "errors": []}, msg="items 不能为空")
+
+        operator = _get_operator_name(request)
+        records: list[SpCampaignAdjustment] = []
+        update_pairs: list[tuple[int, int, str]] = []
+        errors: list[dict[str, Any]] = []
+
+        for item in items:
+            cid = item.get("campaign_id")
+            pid = item.get("profile_id")
+            state = str(item.get("state") or "").strip().lower()
+
+            if cid is None or pid is None or state not in ("enabled", "paused"):
+                errors.append({"campaign_id": cid, "message": "参数不完整或 state 无效"})
+                continue
+
+            try:
+                cid_int = int(cid)
+                pid_int = int(pid)
+            except (ValueError, TypeError):
+                errors.append({"campaign_id": cid, "message": "campaign_id / profile_id 必须为整数"})
+                continue
+
+            execution_type = (
+                CampaignExecutionTypeChoices.CAMPAIGN_ENABLE
+                if state == "enabled"
+                else CampaignExecutionTypeChoices.CAMPAIGN_PAUSE
+            )
+            records.append(SpCampaignAdjustment(
+                campaign_id=cid_int,
+                profile_id=pid_int,
+                execution_type=execution_type,
+                adjustment_status=AdjustmentStatusChoices.PENDING,
+                execution_status=ExecutionStatusChoices.PENDING,
+                adjustment_time=timezone.now(),
+                operator=operator,
+            ))
+            update_pairs.append((cid_int, pid_int, state))
+
+        # 批量创建审计记录
+        if records:
+            SpCampaignAdjustment.objects.bulk_create(records)
+
+        # 批量更新实体状态（按 state 分组减少 SQL 数量）
+        for state_val in ("enabled", "paused"):
+            pairs_for_state = [(c, p) for c, p, s in update_pairs if s == state_val]
+            if pairs_for_state:
+                from django.db.models import Q
+                q = Q()
+                for c, p in pairs_for_state:
+                    q |= Q(campaign_id=c, profile_id=p)
+                LxSpCampaign.objects.filter(q).update(state=state_val)
+
+        success_count = len(update_pairs)
+        return drf_ok({
+            "success_count": success_count,
+            "failed_count": len(errors),
+            "errors": errors,
+        })
+
+    @action(detail=False, methods=["post"], url_path="batch-adjust-budget")
+    def batch_adjust_budget(self, request: Request) -> Response:
+        """批量调整广告活动预算：为每个选中活动写 SpCampaignAdjustment 记录 + 更新 LxSpCampaign.daily_budget。
+
+        逐条校验并创建审计记录，最后逐条更新实体预算（因每条预算值不同），失败项不影响其他项。
+
+        Args:
+            request (Request): DRF 请求对象，body 需含：
+                - items (list): 每项含 campaign_id + profile_id + budget_after
+
+        Returns:
+            Response: {success_count, failed_count, errors}
+        """
+        data = request.data or {}
+        items = data.get("items") or []
+        if not items or not isinstance(items, list):
+            return drf_ok({"success_count": 0, "failed_count": 0, "errors": []}, msg="items 不能为空")
+
+        operator = _get_operator_name(request)
+        records: list[SpCampaignAdjustment] = []
+        update_list: list[LxSpCampaign] = []
+        errors: list[dict[str, Any]] = []
+
+        # 批量查询现有活动，避免逐条查库
+        pair_list: list[tuple[int, int]] = []
+        raw_map: dict[tuple[int, int], Any] = {}
+        for item in items:
+            cid = item.get("campaign_id")
+            pid = item.get("profile_id")
+            budget_raw = item.get("budget_after")
+            raw_map_key = (cid, pid)
+            raw_map[raw_map_key] = budget_raw
+            try:
+                pair_list.append((int(cid), int(pid)))
+            except (ValueError, TypeError):
+                continue
+
+        existing_map: dict[tuple[int, int], LxSpCampaign] = {}
+        if pair_list:
+            from django.db.models import Q
+            q = Q()
+            for c, p in pair_list:
+                q |= Q(campaign_id=c, profile_id=p)
+            for obj in LxSpCampaign.objects.filter(q).only("campaign_id", "profile_id", "daily_budget"):
+                existing_map[(obj.campaign_id, obj.profile_id)] = obj
+
+        for item in items:
+            cid = item.get("campaign_id")
+            pid = item.get("profile_id")
+            budget_raw = item.get("budget_after")
+
+            if cid is None or pid is None or budget_raw is None:
+                errors.append({"campaign_id": cid, "message": "参数不完整"})
+                continue
+
+            try:
+                budget_after = Decimal(str(budget_raw))
+            except (InvalidOperation, ValueError, TypeError):
+                errors.append({"campaign_id": cid, "message": "budget_after 必须为有效数值"})
+                continue
+
+            if budget_after <= 0:
+                errors.append({"campaign_id": cid, "message": "budget_after 必须大于 0"})
+                continue
+
+            try:
+                cid_int = int(cid)
+                pid_int = int(pid)
+            except (ValueError, TypeError):
+                errors.append({"campaign_id": cid, "message": "campaign_id / profile_id 必须为整数"})
+                continue
+
+            campaign = existing_map.get((cid_int, pid_int))
+            if not campaign:
+                errors.append({"campaign_id": cid, "message": "广告活动不存在"})
+                continue
+
+            budget_before = campaign.daily_budget
+            records.append(SpCampaignAdjustment(
+                campaign_id=cid_int,
+                profile_id=pid_int,
+                execution_type=CampaignExecutionTypeChoices.MANUAL_BUDGET_ADJUSTMENT,
+                budget_before=float(budget_before) if budget_before is not None else None,
+                budget_after=float(budget_after),
+                adjustment_status=AdjustmentStatusChoices.PENDING,
+                execution_status=ExecutionStatusChoices.PENDING,
+                adjustment_time=timezone.now(),
+                operator=operator,
+            ))
+            campaign.daily_budget = budget_after
+            update_list.append(campaign)
+
+        # 批量创建审计记录
+        if records:
+            SpCampaignAdjustment.objects.bulk_create(records)
+
+        # 批量更新实体预算
+        if update_list:
+            LxSpCampaign.objects.bulk_update(update_list, ["daily_budget"])
+
+        success_count = len(update_list)
+        return drf_ok({
+            "success_count": success_count,
+            "failed_count": len(errors),
+            "errors": errors,
         })
 
     @staticmethod

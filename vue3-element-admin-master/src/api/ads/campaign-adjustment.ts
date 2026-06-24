@@ -60,6 +60,33 @@ export function createManualBudgetAdjustment(
   });
 }
 
+/** 批量调整广告活动状态请求参数 */
+export interface BatchAdjustCampaignStateParams {
+  /** 广告活动列表，每项含 campaign_id + profile_id + state */
+  items: Array<{
+    campaign_id: string | number;
+    profile_id: string | number;
+    state: CampaignState;
+  }>;
+}
+
+/** 批量调整广告活动预算请求参数 */
+export interface BatchAdjustCampaignBudgetParams {
+  /** 广告活动列表，每项含 campaign_id + profile_id + budget_after */
+  items: Array<{
+    campaign_id: string | number;
+    profile_id: string | number;
+    budget_after: number;
+  }>;
+}
+
+/** 批量操作响应 */
+export interface BatchAdjustCampaignResponse {
+  success_count: number;
+  failed_count: number;
+  errors?: Array<{ campaign_id: string | number; message: string }>;
+}
+
 /**
  * 手动调整广告活动状态：写 SpCampaignAdjustment 记录 + 更新 LxSpCampaign.state。
  *
@@ -76,6 +103,38 @@ export function createCampaignStateAdjustment(
 ): Promise<AdjustStateResponse> {
   return request({
     url: "/ads/campaigns/adjust-state",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 批量调整广告活动状态：为每个选中的广告活动写 SpCampaignAdjustment 记录 + 更新 LxSpCampaign.state。
+ *
+ * @param {BatchAdjustCampaignStateParams} data - 批量调整参数
+ * @returns {Promise<BatchAdjustCampaignResponse>} 批量操作结果
+ */
+export function batchAdjustCampaignState(
+  data: BatchAdjustCampaignStateParams
+): Promise<BatchAdjustCampaignResponse> {
+  return request({
+    url: "/ads/campaigns/batch-adjust-state",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 批量调整广告活动预算：为每个选中的广告活动写 SpCampaignAdjustment 记录 + 更新 LxSpCampaign.daily_budget。
+ *
+ * @param {BatchAdjustCampaignBudgetParams} data - 批量调整参数
+ * @returns {Promise<BatchAdjustCampaignResponse>} 批量操作结果
+ */
+export function batchAdjustCampaignBudget(
+  data: BatchAdjustCampaignBudgetParams
+): Promise<BatchAdjustCampaignResponse> {
+  return request({
+    url: "/ads/campaigns/batch-adjust-budget",
     method: "post",
     data,
   });

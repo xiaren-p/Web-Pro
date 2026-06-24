@@ -73,6 +73,8 @@
         @sort-change="handleSortChange"
         @update-budget="onUpdateBudget"
         @update-state="onUpdateState"
+        @batch-state="onBatchState"
+        @batch-budget="onBatchBudgetOpen"
       />
     </section>
 
@@ -86,6 +88,13 @@
     <AdQueueDrawer v-model:visible="queueDrawerVisible" />
     <!-- 新建广告上传对话框 -->
     <AdUploadDialog v-model:visible="uploadDialogVisible" @view-queue="queueDrawerVisible = true" />
+    <!-- 批量调整预算对话框 -->
+    <BatchBudgetDialog
+      v-model="batchBudgetDialogVisible"
+      :items="batchBudgetItems"
+      :currency-icon="batchBudgetCurrencyIcon"
+      @confirm="onBatchBudgetConfirm"
+    />
   </div>
 </template>
 
@@ -97,6 +106,8 @@ import Indicators from "./Indicators.vue";
 import AdsTable from "./AdsTable.vue";
 import AdQueueDrawer from "./AdQueueDrawer.vue";
 import AdUploadDialog from "./AdUploadDialog.vue";
+import BatchBudgetDialog from "@/components/BatchBudgetDialog/index.vue";
+import type { BatchBudgetItem } from "@/components/BatchBudgetDialog/index.vue";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import { ElMessage } from "element-plus";
 import {
@@ -109,6 +120,8 @@ import {
 import {
   createCampaignStateAdjustment,
   createManualBudgetAdjustment,
+  batchAdjustCampaignState,
+  batchAdjustCampaignBudget,
 } from "@/api/ads/campaign-adjustment";
 import { ShopsAPI } from "@/api/shops";
 
@@ -687,6 +700,92 @@ async function onUpdateState({
 }
 
 loadTableData();
+
+// ── 批量操作：调状态 / 调预算 ──────────────────────────────────────────────────────
+
+const batchBudgetDialogVisible = ref(false);
+const batchBudgetItems = ref<BatchBudgetItem[]>([]);
+const batchBudgetCurrencyIcon = ref("$");
+
+/**
+ * 批量调整状态：将选中行的 campaign_id + profile_id + state 发送到后端。
+ *
+ * @param {Object} payload - { rows, state }
+ * @param {any[]} payload.rows - 选中的表格行数据
+ * @param {string} payload.state - 目标状态 enabled / paused
+ * @returns {Promise<void>}
+ */
+async function onBatchState({
+  rows,
+  state,
+}: {
+  rows: any[];
+  state: "enabled" | "paused";
+}): Promise<void> {
+  if (!rows.length) return;
+  const items = rows.map((row) => ({
+    campaign_id: row.campaign_id,
+    profile_id: row.profile_id,
+    state,
+  }));
+  try {
+    const res = await batchAdjustCampaignState({ items });
+    ElMessage.success(`批量调状态完成：成功 ${res.success_count} 条，失败 ${res.failed_count} 条`);
+    if (res.errors?.length) {
+      res.errors.forEach((e) => ElMessage.warning(e.message));
+    }
+    loadTableData();
+  } catch (error) {
+    console.error("[onBatchState] 批量调状态失败", error);
+    ElMessage.error("批量调状态失败");
+  }
+}
+
+/**
+ * 打开批量调预算对话框：将选中行转为 BatchBudgetItem 数组。
+ *
+ * @param {any[]} rows - 选中的表格行数据
+ */
+function onBatchBudgetOpen(rows: any[]): void {
+  if (!rows.length) return;
+  batchBudgetCurrencyIcon.value = rows[0].currency_icon || "$";
+  batchBudgetItems.value = rows.map((row) => ({
+    campaignId: row.campaign_id,
+    profileId: row.profile_id,
+    name: row.name || `活动 ${row.campaign_id}`,
+    profileAlias: row.profile_alias || "",
+    currentBudget: Number(row.budget) || 0,
+  }));
+  batchBudgetDialogVisible.value = true;
+}
+
+/**
+ * 批量调预算确认：调用后端批量接口，成功后刷新表格。
+ *
+ * @param {Array} items - 每项含 campaignId + profileId + budget
+ * @returns {Promise<void>}
+ */
+async function onBatchBudgetConfirm(
+  items: Array<{ campaignId: string | number; profileId: string | number; budget: number }>
+): Promise<void> {
+  try {
+    const res = await batchAdjustCampaignBudget({
+      items: items.map((it) => ({
+        campaign_id: it.campaignId,
+        profile_id: it.profileId,
+        budget_after: it.budget,
+      })),
+    });
+    ElMessage.success(`批量调预算完成：成功 ${res.success_count} 条，失败 ${res.failed_count} 条`);
+    if (res.errors?.length) {
+      res.errors.forEach((e) => ElMessage.warning(e.message));
+    }
+    loadTableData();
+  } catch (error) {
+    console.error("[onBatchBudgetConfirm] 批量调预算失败", error);
+    ElMessage.error("批量调预算失败");
+  }
+}
 </script>
 
 <style scoped src="./ads.scss" lang="scss"></style>

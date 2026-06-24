@@ -609,6 +609,185 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             "state": state,
         })
 
+    @action(detail=False, methods=["post"], url_path="batch-adjust-state")
+    def batch_adjust_state(self, request: Request) -> Response:
+        """批量调整投放条款启停状态（定位组 / 商品投放通用）。
+
+        逐条创建 SpBidAdjustment 审计记录，批量更新 LxSpTarget.state。
+
+        Args:
+            request (Request): DRF 请求对象，body 字段：
+
+            - campaign_id (str|int): 必填，广告活动 ID。
+            - profile_id (str|int): 必填，店铺 Profile ID。
+            - ids (list): 必填，投放条款 ID 列表。
+            - state (str): 必填，目标状态（enabled / paused）。
+
+        Returns:
+            Response: ``{success_count, failed_count, errors}``。
+        """
+        data = request.data or {}
+        campaign_id = data.get("campaign_id")
+        profile_id = data.get("profile_id")
+        ids = data.get("ids")
+        state = str(data.get("state") or "").strip().lower()
+
+        if not campaign_id or not profile_id or not ids or not state:
+            return drf_ok({"success_count": 0, "failed_count": 0},
+                          msg="campaign_id、profile_id、ids、state 均为必填参数")
+        if state not in ("enabled", "paused"):
+            return drf_ok({"success_count": 0, "failed_count": 0},
+                          msg="state 仅支持 enabled / paused")
+        try:
+            cid_int, pid_int = int(campaign_id), int(profile_id)
+            int_ids = [int(i) for i in ids]
+        except (ValueError, TypeError):
+            return drf_ok({"success_count": 0, "failed_count": 0},
+                          msg="ID 参数必须为整数")
+
+        execution_type = (
+            BidExecutionTypeChoices.BID_ENABLE if state == "enabled"
+            else BidExecutionTypeChoices.BID_PAUSE
+        )
+        operator = _get_operator_name(request)
+
+        existing_map = {
+            t.target_id: t.state
+            for t in LxSpTarget.objects.filter(
+                target_id__in=int_ids, profile_id=pid_int,
+            ).only("target_id", "state")
+        }
+
+        success_count = 0
+        errors: list[dict[str, Any]] = []
+        records: list[SpBidAdjustment] = []
+
+        for tid in int_ids:
+            if tid not in existing_map:
+                errors.append({"id": tid, "message": "投放条款不存在"})
+                continue
+            records.append(SpBidAdjustment(
+                target_id=tid,
+                campaign_id=cid_int,
+                profile_id=pid_int,
+                execution_type=execution_type,
+                adjustment_status=AdjustmentStatusChoices.PENDING,
+                execution_status=ExecutionStatusChoices.PENDING,
+                adjustment_time=timezone.now(),
+                operator=operator,
+            ))
+            success_count += 1
+
+        if records:
+            SpBidAdjustment.objects.bulk_create(records)
+            LxSpTarget.objects.filter(
+                target_id__in=list(existing_map.keys()),
+                profile_id=pid_int,
+            ).update(state=state)
+
+        return drf_ok({
+            "success_count": success_count,
+            "failed_count": len(errors),
+            "errors": errors or None,
+        })
+
+    @action(detail=False, methods=["post"], url_path="batch-adjust-bid")
+    def batch_adjust_bid(self, request: Request) -> Response:
+        """批量调整投放条款竞价（定位组 / 商品投放通用）。
+
+        逐条创建 SpBidAdjustment 审计记录，批量更新 LxSpTarget.bid。
+
+        Args:
+            request (Request): DRF 请求对象，body 字段：
+
+            - campaign_id (str|int): 必填，广告活动 ID。
+            - profile_id (str|int): 必填，店铺 Profile ID。
+            - items (list[dict]): 必填，每项含 ``id``（target_id）和 ``bid``（目标竞价）。
+
+        Returns:
+            Response: ``{success_count, failed_count, errors}``。
+        """
+        data = request.data or {}
+        campaign_id = data.get("campaign_id")
+        profile_id = data.get("profile_id")
+        items = data.get("items")
+
+        if not campaign_id or not profile_id or not items:
+            return drf_ok({"success_count": 0, "failed_count": 0},
+                          msg="campaign_id、profile_id、items 均为必填参数")
+        try:
+            cid_int, pid_int = int(campaign_id), int(profile_id)
+        except (ValueError, TypeError):
+            return drf_ok({"success_count": 0, "failed_count": 0},
+                          msg="ID 参数必须为整数")
+
+        is_tp = _is_time_pricing_active(cid_int, pid_int)
+        operator = _get_operator_name(request)
+
+        item_ids = [int(it["id"]) for it in items if it.get("id")]
+        existing_bid_map: dict[int, Any] = {}
+        for t in LxSpTarget.objects.filter(
+            target_id__in=item_ids, profile_id=pid_int,
+        ).only("target_id", "bid"):
+            existing_bid_map[t.target_id] = t.bid
+
+        success_count = 0
+        errors: list[dict[str, Any]] = []
+        records: list[SpBidAdjustment] = []
+        update_targets: list[LxSpTarget] = []
+
+        for it in items:
+            tid_raw = it.get("id")
+            bid_raw = it.get("bid")
+            if tid_raw is None or bid_raw is None:
+                errors.append({"id": tid_raw, "message": "id 和 bid 均为必填"})
+                continue
+            try:
+                tid = int(tid_raw)
+                bid_after = float(bid_raw)
+            except (ValueError, TypeError):
+                errors.append({"id": tid_raw, "message": "id 或 bid 格式无效"})
+                continue
+            if bid_after <= 0:
+                errors.append({"id": tid, "message": "bid 必须大于 0"})
+                continue
+            if tid not in existing_bid_map:
+                errors.append({"id": tid, "message": "投放条款不存在"})
+                continue
+
+            bid_before = existing_bid_map[tid]
+            records.append(SpBidAdjustment(
+                target_id=tid,
+                campaign_id=cid_int,
+                profile_id=pid_int,
+                execution_type=BidExecutionTypeChoices.MANUAL_ADJUSTMENT,
+                bid_before=float(bid_before) if bid_before is not None else None,
+                bid_after=bid_after,
+                adjustment_status=(
+                    AdjustmentStatusChoices.SUCCESS if is_tp
+                    else AdjustmentStatusChoices.PENDING
+                ),
+                execution_status=(
+                    ExecutionStatusChoices.SUCCESS if is_tp
+                    else ExecutionStatusChoices.PENDING
+                ),
+                adjustment_time=timezone.now(),
+                msg="手动修改，分时生效中，已直接应用" if is_tp else "",
+                operator=operator,
+            ))
+            update_targets.append(LxSpTarget(target_id=tid, bid=bid_after))
+            success_count += 1
+
+        if records:
+            SpBidAdjustment.objects.bulk_create(records)
+            LxSpTarget.objects.bulk_update(update_targets, ["bid"])
+
+        return drf_ok({
+            "success_count": success_count,
+            "failed_count": len(errors),
+            "errors": errors or None,
+        })
+
 
 def _build_bid_latest_adjustment_map(
     entity_ids: list[str],

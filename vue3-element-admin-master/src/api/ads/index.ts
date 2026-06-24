@@ -726,6 +726,116 @@ export function adjustProductTargetState(data: AdjustStateParams): Promise<Adjus
   });
 }
 
+// ── 批量操作接口 ─────────────────────────────────────────────────────────────
+
+/** 批量调整状态请求参数 */
+export interface BatchAdjustStateParams {
+  campaign_id: string | number;
+  profile_id: string | number;
+  /** 关键词 ID 列表 / 投放条款 ID 列表 */
+  ids: (string | number)[];
+  /** 目标状态：启用 / 暂停 */
+  state: "enabled" | "paused";
+}
+
+/** 批量调整竞价请求参数 */
+export interface BatchAdjustBidParams {
+  campaign_id: string | number;
+  profile_id: string | number;
+  /** 调整项列表 */
+  items: Array<{
+    /** 关键词 ID 或投放条款 ID */
+    id: string | number;
+    /** 调整后的竞价 */
+    bid: number;
+  }>;
+}
+
+/** 批量操作响应 */
+export interface BatchAdjustResponse {
+  success_count: number;
+  failed_count: number;
+  errors?: Array<{ id: string | number; message: string }>;
+}
+
+/**
+ * 批量调整关键词状态。
+ */
+export function batchAdjustKeywordState(
+  data: BatchAdjustStateParams
+): Promise<BatchAdjustResponse> {
+  return request({
+    url: "/ads/keywords/batch-adjust-state",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 批量调整关键词竞价。
+ */
+export function batchAdjustKeywordBid(
+  data: BatchAdjustBidParams
+): Promise<BatchAdjustResponse> {
+  return request({
+    url: "/ads/keywords/batch-adjust-bid",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 批量调整自动定位组状态。
+ */
+export function batchAdjustTargetState(
+  data: BatchAdjustStateParams
+): Promise<BatchAdjustResponse> {
+  return request({
+    url: "/ads/auto-targeting/batch-adjust-state",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 批量调整自动定位组竞价。
+ */
+export function batchAdjustTargetBid(
+  data: BatchAdjustBidParams
+): Promise<BatchAdjustResponse> {
+  return request({
+    url: "/ads/auto-targeting/batch-adjust-bid",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 批量调整商品投放状态。
+ */
+export function batchAdjustProductTargetState(
+  data: BatchAdjustStateParams
+): Promise<BatchAdjustResponse> {
+  return request({
+    url: "/ads/product-targeting/batch-adjust-state",
+    method: "post",
+    data,
+  });
+}
+
+/**
+ * 批量调整商品投放竞价。
+ */
+export function batchAdjustProductTargetBid(
+  data: BatchAdjustBidParams
+): Promise<BatchAdjustResponse> {
+  return request({
+    url: "/ads/product-targeting/batch-adjust-bid",
+    method: "post",
+    data,
+  });
+}
+
 /** 产品投放列表请求参数 */
 export interface ProductTargetingParams {
   campaign_id: string;

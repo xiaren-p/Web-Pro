@@ -2,6 +2,7 @@
   <div ref="tableContainerRef" class="data-table-container">
     <div class="data-table__scroll">
       <el-table
+        ref="tableRef"
         v-loading="loading"
         class="data-table__content"
         :data="displayData"
@@ -10,6 +11,7 @@
         style="width: 100%"
         @sort-change="$emit('sort-change', $event)"
         @header-dragend="onHeaderDragEnd"
+        @selection-change="onSelectionChange"
       >
         <template #empty>
           <div class="table-empty">
@@ -19,7 +21,7 @@
             <p class="table-empty__text">暂无数据</p>
           </div>
         </template>
-        <el-table-column type="selection" width="48" fixed="left" align="center" :resizable="false">
+        <el-table-column type="selection" width="48" fixed="left" align="center" :resizable="false" :selectable="(row: any) => !row._isSummary">
           <template #default="{ row }">
             <span v-if="row._isSummary" />
           </template>
@@ -254,6 +256,20 @@
             <el-icon class="count-icon"><List /></el-icon>
             共 {{ total.toLocaleString() }} 条
           </span>
+          <template v-if="selectedRows.length > 0">
+            <span class="batch-divider" />
+            <span class="batch-info">已选 {{ selectedRows.length }} 条</span>
+            <el-dropdown trigger="click" @command="handleBatchStateCommand">
+              <el-button size="small" class="batch-btn">调状态</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="enabled">启用</el-dropdown-item>
+                  <el-dropdown-item command="paused">暂停</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-button size="small" class="batch-btn" @click="$emit('batch-budget', selectedRows)">调预算</el-button>
+          </template>
         </div>
         <div class="pager-center">
           <el-pagination
@@ -311,7 +327,11 @@ const emit = defineEmits([
   "sort-change",
   "update-budget",
   "update-state",
+  "batch-state",
+  "batch-budget",
 ]);
+const tableRef = ref();
+const selectedRows = ref<any[]>([]);
 const localPageSize = ref(props.pageSize || 25);
 const tableContainerRef = ref<HTMLElement | null>(null);
 const horizontalScrollRef = ref<HTMLElement | null>(null);
@@ -450,6 +470,25 @@ watch(
 
 function onPageSizeChange(v: number) {
   emit("page-size-change", v);
+}
+
+/**
+ * 表格选中行变更：过滤汇总行，仅保留数据行。
+ *
+ * @param {any[]} rows - Element Plus 返回的当前选中行
+ */
+function onSelectionChange(rows: any[]): void {
+  selectedRows.value = rows.filter((r) => !r._isSummary);
+}
+
+/**
+ * 批量调状态命令处理：向上 emit batch-state 事件。
+ *
+ * @param {string} state - 目标状态 enabled / paused
+ */
+function handleBatchStateCommand(state: string): void {
+  if (selectedRows.value.length === 0) return;
+  emit("batch-state", { rows: selectedRows.value, state });
 }
 
 // ── 预算/状态可编辑 ─────────────────────────────────────────────────────────────
@@ -1084,6 +1123,26 @@ function formatValue(val: any): string {
 .pager-left {
   flex: 1;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batch-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-strong);
+}
+
+.batch-info {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary-600);
+}
+
+.batch-btn {
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .pager-center {
