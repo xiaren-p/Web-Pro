@@ -8,7 +8,7 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from api_v1.models import LxAdsProfile, LxListingData, LxProductInfo, LxShops, LxSpCampaign
+from api_v1.models import LxAdsProfile, LxListingData, LxListingTag, LxProductInfo, LxShops, LxSpCampaign
 from api_v1.utils.ad_status import _LABEL_MAP as SERVICE_STATUS_LABEL
 from api_v1.utils.responses import drf_ok
 from api_v1.views.lingxing.ads._helpers import (
@@ -218,16 +218,21 @@ class ShopProfileViewSet(viewsets.ViewSet):
                     .values_list("global_tags", flat=True)
                     .distinct()
                 )
-                seen_tags: set[str] = set()
-                tags = []
+                all_tag_ids: set[str] = set()
                 for raw in raw_tags:
                     if isinstance(raw, list):
                         for entry in raw:
                             if isinstance(entry, dict):
-                                tn = str(entry.get("tagName") or "")
-                                if tn and tn not in seen_tags:
-                                    seen_tags.add(tn)
-                                    tags.append({"value": tn, "label": tn})
+                                gid = str(entry.get("globalTagId") or "")
+                                if gid:
+                                    all_tag_ids.add(gid)
+                tags = []
+                if all_tag_ids:
+                    tag_names = LxListingTag.objects.filter(
+                        global_tag_id__in=list(all_tag_ids),
+                        status="normal",
+                    ).values_list("tag_name", flat=True).distinct()
+                    tags = [{"value": tn, "label": tn} for tn in tag_names if tn]
                 cache.set(_TAGS_CACHE_KEY, tags, 300)
             return drf_ok({"labels": tags})
 

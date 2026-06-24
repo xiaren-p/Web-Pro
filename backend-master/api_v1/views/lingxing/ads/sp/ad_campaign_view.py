@@ -17,6 +17,7 @@ from api_v1.models import (
     LxAdsProfile,
     LxExchangeRate,
     LxListingData,
+    LxListingTag,
     LxShops,
     LxSpAd,
     LxSpCampaign,
@@ -184,19 +185,27 @@ class AdCampaignViewSet(viewsets.ViewSet):
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
         # ── 标签筛选 ──
-        # 数据来源：LxListingData.global_tags → ASIN → LxSpAd → LxSpCampaign
+        # 链路：用户选 tag_name → LxListingTag 查 global_tag_id → LxListingData.global_tags 匹配 → ASIN → LxSpAd → campaign
         tags = data.get("tags")
         if tags:
             tag_list = [t.strip() for t in tags.split(",") if t.strip()]
             if tag_list:
-                tag_asin_q = Q()
-                for t in tag_list:
-                    tag_asin_q |= Q(global_tags__contains=[{"tagName": t}])
-                tag_asins = set(
-                    LxListingData.objects.filter(tag_asin_q)
-                    .values_list("asin", flat=True)
-                    .distinct()
-                )
+                tag_gids = list(LxListingTag.objects.filter(
+                    tag_name__in=tag_list, status="normal"
+                ).values_list("global_tag_id", flat=True))
+                if tag_gids:
+                    tag_asin_q = Q()
+                    for gid in tag_gids:
+                        gid_str = str(gid)
+                        if gid_str:
+                            tag_asin_q |= Q(global_tags__contains=[{"globalTagId": gid_str}])
+                    tag_asins = set(
+                        LxListingData.objects.filter(tag_asin_q)
+                        .values_list("asin", flat=True)
+                        .distinct()
+                    )
+                else:
+                    tag_asins = set()
                 if tag_asins:
                     tag_ad_pairs = set(
                         LxSpAd.objects.filter(asin__in=tag_asins)
@@ -710,6 +719,8 @@ class AdCampaignViewSet(viewsets.ViewSet):
         all_asins = {a for aset in asin_by_key.values() for a in aset}
         asin_label_map: dict[str, list[str]] = {}
         asin_principal_map: dict[str, list[str]] = {}
+        tag_id_to_name: dict[str, str] = {}
+        all_tag_ids: set[str] = set()
         if all_asins:
             listing_rows = LxListingData.objects.filter(asin__in=all_asins).values(
                 "asin", "global_tags", "principal_info"
@@ -719,11 +730,12 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 asin_principal_map.setdefault(p["asin"], [])
                 gt = p.get("global_tags")
                 if isinstance(gt, list):
-                    tag_names = [
-                        x.get("tagName", "") for x in gt
-                        if isinstance(x, dict) and x.get("tagName")
-                    ]
-                    asin_label_map[p["asin"]].extend(tag_names)
+                    for entry in gt:
+                        if isinstance(entry, dict):
+                            gid = str(entry.get("globalTagId") or "")
+                            if gid:
+                                all_tag_ids.add(gid)
+                                asin_label_map[p["asin"]].append(gid)
                 pi = p.get("principal_info")
                 if isinstance(pi, list):
                     names = [
@@ -731,6 +743,17 @@ class AdCampaignViewSet(viewsets.ViewSet):
                         if isinstance(x, dict) and x.get("principal_name")
                     ]
                     asin_principal_map[p["asin"]].extend(names)
+        # 批量查 LxListingTag 把 globalTagId 映射为 tag_name
+        if all_tag_ids:
+            for t in LxListingTag.objects.filter(
+                global_tag_id__in=list(all_tag_ids), status="normal",
+            ).only("global_tag_id", "tag_name"):
+                if t.tag_name:
+                    tag_id_to_name[t.global_tag_id] = t.tag_name
+        # 把 asin_label_map 中的 globalTagId 字符串替换为 tag_name
+        for asin, values in asin_label_map.items():
+            resolved = [tag_id_to_name.get(v, v) for v in values]
+            asin_label_map[asin] = [v for v in resolved if v]
         for dic in res_list:
             if dic.get("_isSummary"):
                 continue
@@ -1667,7 +1690,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         cvr = f"{round(t_orders / t_clicks * 100, 2)}%" if t_clicks > 0 else "0"
         ctr = f"{round(t_clicks / t_impressions * 100, 2)}%" if t_impressions > 0 else "0"
         cpc_raw = round(t_cost / t_clicks, 2) if t_clicks > 0 else 0
-        cpa_raw = round(t_cost / r_orders, 2) if r_orders > 0 else 0
+        cpa_raw = round(t_cost / t_orders, 2) if t_orders > 0 else 0
 
         result: dict[str, Any] = {
             "adsSales": fmt_money(t_sales, icon),
