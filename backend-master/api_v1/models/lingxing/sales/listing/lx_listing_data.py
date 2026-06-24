@@ -73,6 +73,7 @@ class LxListingData(models.Model):
     asin = models.CharField(
         max_length=50,
         default="",
+        db_index=True,
         verbose_name="ASIN",
     )
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from django.core.cache import cache
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import viewsets
@@ -309,6 +310,11 @@ class KeywordViewSet(viewsets.ViewSet):
         if not keyword_ids:
             return {}, _build_summary_row(0.0, 0.0, 0, 0, 0, 0.0, 0, 0, currency_icon)
 
+        _cache_key = f"sp_keyword_agg:{campaign_id}|{profile_id}|{date_start or ''}|{date_end or ''}|{sorted(keyword_ids)}"
+        cached = cache.get(_cache_key)
+        if cached is not None:
+            return cached
+
         qs = LxSpKeywordReport.objects.using("analytics").filter(
             keyword_id__in=keyword_ids,
             campaign_id=campaign_id,
@@ -374,6 +380,10 @@ class KeywordViewSet(viewsets.ViewSet):
             tot_units, tot_cost, tot_clicks, tot_impressions,
             currency_icon,
         )
+        try:
+            cache.set(_cache_key, (metrics_map, summary), 60)
+        except Exception:
+            pass
         return metrics_map, summary
 
     @action(detail=False, methods=["post"], url_path="adjust-bid")

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from django.db.models import Q
+from django.core.cache import cache
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -207,19 +208,27 @@ class ShopProfileViewSet(viewsets.ViewSet):
             return drf_ok({"labels": []}, msg="module 参数为必填")
 
         if module == "tags":
-            raw_labels: list[str] = list(
-                LxProductInfo.objects
-                .exclude(label="")
-                .values_list("label", flat=True)
-                .distinct()
-            )
-            seen_tags: set[str] = set()
-            tags: list[dict[str, str]] = []
-            for raw in raw_labels:
-                for t in _flat_parse_label(raw or ""):
-                    if t and t not in seen_tags:
-                        seen_tags.add(t)
-                        tags.append({"value": t, "label": t})
+            _TAGS_CACHE_KEY = "shop_profile_view_tags_v1"
+            tags = cache.get(_TAGS_CACHE_KEY)
+            if tags is None:
+                raw_tags: list[str] = list(
+                    LxListingData.objects
+                    .exclude(global_tags__isnull=True)
+                    .exclude(global_tags=[])
+                    .values_list("global_tags", flat=True)
+                    .distinct()
+                )
+                seen_tags: set[str] = set()
+                tags = []
+                for raw in raw_tags:
+                    if isinstance(raw, list):
+                        for entry in raw:
+                            if isinstance(entry, dict):
+                                tn = str(entry.get("tagName") or "")
+                                if tn and tn not in seen_tags:
+                                    seen_tags.add(tn)
+                                    tags.append({"value": tn, "label": tn})
+                cache.set(_TAGS_CACHE_KEY, tags, 300)
             return drf_ok({"labels": tags})
 
         label_map = _ENUM_LABEL_REGISTRY.get(module)

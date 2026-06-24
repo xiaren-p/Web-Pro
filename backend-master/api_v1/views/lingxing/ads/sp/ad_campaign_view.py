@@ -314,11 +314,12 @@ class AdCampaignViewSet(viewsets.ViewSet):
         # ── 筛选集全体 campaign / profile 对 ──
         p_num, p_size = self._get_page_params(data)
 
-        # ── 拼接筛选特征参数用于 Redis 缓存键 ──
-        cache_key_parts = [
-            date_start or "_",
-            date_end or "_",
-            data.get("keyword") or "_",
+        # ── 两级 Redis 缓存设计 ──
+        # Level 1（base）：不含 tags/owners/skus/keyword 等高基数字段，命中率高
+        # Level 2（full）：含全部筛选字段，精确匹配，命中率低但可完全跳过 Q10
+        _high_card_fields = ["keyword", "tags", "owners", "skus", "asinSearchType"]
+        base_key_parts = [
+            date_start or "_", date_end or "_",
             data.get("state") or "_",
             data.get("service_status") or "_",
             data.get("sponsored_type") or "_",
@@ -326,15 +327,29 @@ class AdCampaignViewSet(viewsets.ViewSet):
             data.get("profiles") or "_",
             data.get("countries") or "_",
             data.get("portfolio_id") or "_",
-            data.get("tags") or "_",
-            data.get("owners") or "_",
-            data.get("skus") or "_",
-            data.get("asinSearchType") or "_",
         ]
-        cache_key = f"sp_campaign_agg:{'|'.join(cache_key_parts)}"
+        full_key_parts = base_key_parts + [
+            data.get(k) or "_" for k in _high_card_fields
+        ]
+        base_cache_key = f"sp_campaign_agg_base:{'|'.join(base_key_parts)}"
+        full_cache_key = f"sp_campaign_agg_full:{'|'.join(full_key_parts)}"
 
-        # ── 先查缓存 ──
-        agg_map = cache.get(cache_key)
+        agg_map: dict[str, dict[str, Any]] | None = None
+        cached_pairs: set[tuple[str, str]] | None = None
+
+        # 1. 先查 full cache（精确匹配，可完全跳过 Q10）
+        full_cached = cache.get(full_cache_key)
+        if isinstance(full_cached, dict) and "agg_map" in full_cached:
+            agg_map = full_cached["agg_map"]
+            cached_pairs = {(str(c), str(p)) for c, p in full_cached.get("pairs", [])}
+
+        # 2. full 未命中，查 base cache（命中率高，但需跑 Q10 取筛选后 pairs）
+        if agg_map is None:
+            base_cached = cache.get(base_cache_key) or {} if cache.get(base_cache_key) else {}
+            if isinstance(base_cached, dict) and "agg_map" in base_cached:
+                agg_map = base_cached["agg_map"]
+
+        # 3. 不论缓存命中与否，Q10 都要跑（获取筛选后的 campaign 对）
         all_pairs_list = list(
             qs.values_list("campaign_id", "profile_id").distinct()
         )
@@ -342,15 +357,10 @@ class AdCampaignViewSet(viewsets.ViewSet):
         all_profile_ids = sorted({p for _, p in all_pairs_list if p})
         all_campaign_pairs = [(c, p) for c, p in all_pairs_list if c and p]
 
-        if not isinstance(agg_map, dict):
-            # ── 缓存未命中：执行完整聚合查询 ──
-
+        # 4. 缓存未命中 agg_map → 走 Doris 聚合
+        if agg_map is None:
             agg_map: dict[str, dict[str, Any]] = {}
             if all_pairs_set:
-                # 性能：将笛卡尔积 IN×IN 替换为精确 pair OR 条件，
-                # 确保 MySQL 走 (campaign_id, profile_id, report_date) 复合索引。
-                # Doris 不支持超 3000 个 OR 节点，也不支持 (a,b) IN (...)
-                # 元组语法，因此分 batch 走 OR 查询，每批最多 500 对。
                 pairs_sorted = sorted(all_pairs_list)
                 for i in range(0, len(pairs_sorted), _DORIS_PAIR_BATCH_SIZE):
                     batch = pairs_sorted[i:i + _DORIS_PAIR_BATCH_SIZE]
@@ -405,12 +415,30 @@ class AdCampaignViewSet(viewsets.ViewSet):
                             "same_orders": 0, "units": 0, "cost": 0.0,
                             "clicks": 0, "impressions": 0,
                         }
-                # 写入缓存
+                # 写入两级缓存
                 ttl = 120 if date_start and date_end else 60
+                base_payload = {"agg_map": agg_map}
+                full_payload = {"agg_map": agg_map, "pairs": all_pairs_list}
                 try:
-                    cache.set(cache_key, agg_map, ttl)
+                    cache.set(base_cache_key, base_payload, max(ttl, 120))
+                    cache.set(full_cache_key, full_payload, ttl)
                 except Exception:
                     pass
+
+        # 5. 从 agg_map 中只取筛选后存在的 pair（base cache 可能包含更多 pair）
+        #    确保无冗余 pair 被用于排序和汇总计算
+        active_agg: dict[str, dict[str, Any]] = {}
+        for cp_key in (f"{c}::{p}" for c, p in all_pairs_set):
+            if cp_key in agg_map:
+                active_agg[cp_key] = agg_map[cp_key]
+            else:
+                active_agg[cp_key] = {
+                    "sales": 0.0, "same_sales": 0.0, "orders": 0,
+                    "same_orders": 0, "units": 0, "cost": 0.0,
+                    "clicks": 0, "impressions": 0,
+                }
+        # 用 active_agg 替换 agg_map 用于后续计算
+        agg_map = active_agg
 
         # ── 排序（全量数据按指标 / 模型字段排序后再分页）──
         # 排序依赖的指标字段映射：前端 sort_prop → agg_map 内部的 key
@@ -664,15 +692,10 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
             res_list.append(dic)
 
-        # ── 最近修改信息（拆分为状态变更和预算变更两路，供两个星标各自展示）──
-        state_adj_map = self._build_latest_adjustment_map(
-            items, sid_to_country,
-            types={CampaignExecutionTypeChoices.CAMPAIGN_PAUSE, CampaignExecutionTypeChoices.CAMPAIGN_ENABLE},
-        )
-        budget_adj_map = self._build_latest_adjustment_map(
-            items, sid_to_country,
-            types={CampaignExecutionTypeChoices.RULE_BUDGET_ADJUSTMENT, CampaignExecutionTypeChoices.MANUAL_BUDGET_ADJUSTMENT},
-        )
+        # ── 最近修改信息（一次查询，按 _etype 拆分为状态和预算两路）──
+        all_adj_map = self._build_latest_adjustment_map(items, sid_to_country)
+        state_types = {CampaignExecutionTypeChoices.CAMPAIGN_PAUSE, CampaignExecutionTypeChoices.CAMPAIGN_ENABLE}
+        budget_types = {CampaignExecutionTypeChoices.RULE_BUDGET_ADJUSTMENT, CampaignExecutionTypeChoices.MANUAL_BUDGET_ADJUSTMENT}
 
         # ── 标签和负责人数据 ──
         item_keys = [(str(item.campaign_id), str(item.profile_id)) for item in items]
@@ -724,8 +747,17 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 principals_set.update(asin_principal_map.get(a, []))
             dic["owners"] = sorted(principals_set)
             # 最近修改信息（星标 + tooltip 文案：拆分为状态和预算两路）
-            dic["latest_state_adjustment"] = state_adj_map.get(key, {"has_recent": False, "lines": []})
-            dic["latest_budget_adjustment"] = budget_adj_map.get(key, {"has_recent": False, "lines": []})
+            # 最近修改信息（从合并查询结果中按 _etype 拆分）
+            adj_entry = all_adj_map.get(key)
+            if adj_entry and adj_entry.get("_etype") in state_types:
+                dic["latest_state_adjustment"] = {"has_recent": True, "lines": adj_entry["lines"]}
+                dic["latest_budget_adjustment"] = {"has_recent": False, "lines": []}
+            elif adj_entry and adj_entry.get("_etype") in budget_types:
+                dic["latest_state_adjustment"] = {"has_recent": False, "lines": []}
+                dic["latest_budget_adjustment"] = {"has_recent": True, "lines": adj_entry["lines"]}
+            else:
+                dic["latest_state_adjustment"] = {"has_recent": False, "lines": []}
+                dic["latest_budget_adjustment"] = {"has_recent": False, "lines": []}
 
         result = {
             "total": total,
@@ -1251,6 +1283,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             result[build_campaign_profile_key(cid, pid)] = {
                 "has_recent": True,
                 "lines": lines,
+                "_etype": rec.execution_type,
             }
         return result
 

@@ -11,8 +11,10 @@
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from django.core.cache import cache
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import viewsets
@@ -327,6 +329,11 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             summary["is"] = "---"
             return {}, summary
 
+        _cache_key = f"sp_target_agg:{campaign_id}|{profile_id}|{date_start or ''}|{date_end or ''}|{sorted(target_ids)}"
+        cached = cache.get(_cache_key)
+        if cached is not None:
+            return cached
+
         qs = LxSpTargetReport.objects.using("analytics").filter(
             target_id__in=target_ids,
             campaign_id=campaign_id,
@@ -397,6 +404,10 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             currency_icon,
         )
         summary["is"] = "---"
+        try:
+            cache.set(_cache_key, (metrics_map, summary), 60)
+        except Exception:
+            pass
         return metrics_map, summary
 
     @action(detail=False, methods=["post"], url_path="list-product-targeting")
