@@ -44,6 +44,27 @@ from api_v2.models.sp_campaign_adjustment import (
 _DORIS_PAIR_BATCH_SIZE = 500
 
 
+def _build_pair_q(pairs: set[tuple[int, int]]) -> Q:
+    """构建 (campaign_id, profile_id) 复合对 OR 查询，分批防止超大 SQL。"""
+    if not pairs:
+        return Q(pk__in=[])
+    sorted_pairs = sorted(pairs)
+    if len(sorted_pairs) <= 500:
+        pair_q = Q()
+        for cid, pid in sorted_pairs:
+            pair_q |= Q(campaign_id=cid, profile_id=pid)
+        return pair_q
+    from functools import reduce
+    batch_qs = []
+    for i in range(0, len(sorted_pairs), 500):
+        batch = sorted_pairs[i:i + 500]
+        bq = Q()
+        for cid, pid in batch:
+            bq |= Q(campaign_id=cid, profile_id=pid)
+        batch_qs.append(bq)
+    return reduce(lambda a, b: a | b, batch_qs)
+
+
 def _flat_parse_label(raw_label: str) -> list[str]:
     """[已废弃] 解析 LxProductInfo.label 字段。保留以兼容潜在外部引用。
 
@@ -667,21 +688,25 @@ class AdCampaignViewSet(viewsets.ViewSet):
         asin_label_map: dict[str, list[str]] = {}
         asin_principal_map: dict[str, list[str]] = {}
         if all_asins:
-            product_rows = LxProductInfo.objects.filter(asin__in=all_asins).values(
-                "asin", "label", "principal_list"
+            listing_rows = LxListingData.objects.filter(asin__in=all_asins).values(
+                "asin", "global_tags", "principal_info"
             )
-            for p in product_rows:
+            for p in listing_rows:
                 asin_label_map.setdefault(p["asin"], [])
                 asin_principal_map.setdefault(p["asin"], [])
-                raw_label = (p["label"] or "").strip()
-                if raw_label:
-                    # label 字段可能包含 JSON 数组字符串如 '["清仓","夏季"]'，
-                    # 也可能是逗号分隔字符串如 "清仓,夏季"，统一解析后扁平化
-                    _parsed = _flat_parse_label(raw_label)
-                    asin_label_map[p["asin"]].extend(_parsed)
-                pl = p["principal_list"]
-                if isinstance(pl, list):
-                    names = [x.get("realname", "") for x in pl if isinstance(x, dict) and x.get("realname")]
+                gt = p.get("global_tags")
+                if isinstance(gt, list):
+                    tag_names = [
+                        x.get("tagName", "") for x in gt
+                        if isinstance(x, dict) and x.get("tagName")
+                    ]
+                    asin_label_map[p["asin"]].extend(tag_names)
+                pi = p.get("principal_info")
+                if isinstance(pi, list):
+                    names = [
+                        x.get("principal_name", "") for x in pi
+                        if isinstance(x, dict) and x.get("principal_name")
+                    ]
                     asin_principal_map[p["asin"]].extend(names)
         for dic in res_list:
             if dic.get("_isSummary"):
