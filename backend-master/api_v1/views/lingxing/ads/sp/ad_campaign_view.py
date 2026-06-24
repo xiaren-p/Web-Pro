@@ -625,12 +625,10 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         # ── 预算映射：全量筛选集 campaign → daily_budget（供汇总行统计预算，与销售额同口径）──
         budget_by_campaign_all: dict[str, float] = {}
-        for obj in campaigns:
-            if obj.campaign_id and obj.profile_id and obj.daily_budget is not None:
+        for cid, pid, budget in qs.values_list("campaign_id", "profile_id", "daily_budget"):
+            if cid and pid and budget is not None:
                 try:
-                    budget_by_campaign_all[
-                        build_campaign_profile_key(obj.campaign_id, obj.profile_id)
-                    ] = float(obj.daily_budget)
+                    budget_by_campaign_all[build_campaign_profile_key(cid, pid)] = float(budget)
                 except (ValueError, TypeError):
                     continue
 
