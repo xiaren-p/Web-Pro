@@ -449,8 +449,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         # 用 active_agg 替换 agg_map 用于后续计算
         agg_map = active_agg
 
-        # ── 排序（全量数据按指标 / 模型字段排序后再分页）──
-        # 排序依赖的指标字段映射：前端 sort_prop → agg_map 内部的 key
+        # ── 排序与分页（DB 层分页优化：不在内存加载全量 Model 实例）──
         _SORT_METRIC_MAP: dict[str, str] = {
             "impressions": "impressions",
             "clicks": "clicks",
@@ -465,7 +464,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
             "adsVolume": "units",
             "units": "units",
         }
-        # 模型字段映射：前端 sort_prop → LxSpCampaign 真实字段
         _SORT_MODEL_MAP: dict[str, str] = {
             "startDate": "start_date",
             "name": "name",
@@ -473,50 +471,62 @@ class AdCampaignViewSet(viewsets.ViewSet):
             "profile_alias": "profile_id",
         }
 
-        campaigns = list(
-            qs.only(
-                "id", "campaign_id", "profile_id", "name", "campaign_type",
-                "targeting_type", "daily_budget", "start_date", "end_date",
-                "state", "serving_status", "bidding", "portfolio_id", "tags",
-                "creation_date", "last_updated_date",
-            )
-        )
-        total = len(campaigns)
-
         reverse = sort_order == "desc"
         metric_key = _SORT_METRIC_MAP.get(sort_prop) if sort_prop else None
         model_key = _SORT_MODEL_MAP.get(sort_prop) if sort_prop else None
 
-        if metric_key:
-            campaigns.sort(
-                key=lambda obj: float(
-                    agg_map.get(
-                        f"{obj.campaign_id}::{obj.profile_id}", {}
-                    ).get(metric_key, 0) or 0
-                ),
-                reverse=reverse,
-            )
-        elif model_key:
-            def _model_sort_key(obj: Any, field: str = model_key) -> Any:
-                val = getattr(obj, field, None)
-                if val is None:
-                    return ""
-                return val
-            campaigns.sort(key=_model_sort_key, reverse=reverse)
-        else:
-            # 默认按曝光量降序
-            campaigns.sort(
-                key=lambda obj: float(
-                    agg_map.get(
-                        f"{obj.campaign_id}::{obj.profile_id}", {}
-                    ).get("impressions", 0) or 0
-                ),
-                reverse=True,
-            )
-
         start_idx = (p_num - 1) * p_size
         end_idx = start_idx + p_size
-        items = campaigns[start_idx:end_idx]
+
+        if model_key:
+            # 路径 A：模型字段排序 → DB 端 ORDER BY + LIMIT，只加载页内 25 条
+            order_field = model_key
+            if reverse:
+                order_field = f"-{order_field}"
+            total = qs.count()
+            items = list(qs.order_by(order_field)[start_idx:end_idx].only(
+                "id", "campaign_id", "profile_id", "name", "campaign_type",
+                "targeting_type", "daily_budget", "start_date", "end_date",
+                "state", "serving_status", "bidding", "portfolio_id", "tags",
+                "creation_date", "last_updated_date",
+            ))
+        else:
+            # 路径 B：指标排序 / 默认排序 → 只加载 (campaign_id, profile_id) 轻量对
+            # 排序后切片，再用 build_campaign_profile_query 查回页内 25 条 Model
+            sort_metric = metric_key if metric_key else "impressions"
+            sort_reverse = reverse if metric_key else True  # 默认：曝光量降序
+
+            # total 需要 count（指标排序时无法 DB 端 limit，先 count）
+            total = qs.count()
+
+            # 只加载轻量 (campaign_id, profile_id) 对
+            pairs = list(
+                qs.values_list("campaign_id", "profile_id")
+            )
+            # Python 排序（对轻量元组，比 Model 实例排序快两个数量级）
+            pairs.sort(
+                key=lambda p: float(
+                    agg_map.get(f"{p[0]}::{p[1]}", {}).get(sort_metric, 0) or 0
+                ),
+                reverse=sort_reverse,
+            )
+            page_pairs = pairs[start_idx:end_idx]
+
+            # 用精确对查询回页内 25 条 Model 实例
+            pair_q = Q()
+            for cid, pid in page_pairs:
+                pair_q |= Q(campaign_id=cid, profile_id=pid)
+            items = list(LxSpCampaign.objects.filter(pair_q).only(
+                "id", "campaign_id", "profile_id", "name", "campaign_type",
+                "targeting_type", "daily_budget", "start_date", "end_date",
+                "state", "serving_status", "bidding", "portfolio_id", "tags",
+                "creation_date", "last_updated_date",
+            ))
+            # 恢复排序顺序（filter(pair_q) 可能打乱 pairs 的顺序）
+            pair_order = {f"{c}::{p}": i for i, (c, p) in enumerate(page_pairs)}
+            items.sort(key=lambda obj: pair_order.get(
+                f"{obj.campaign_id}::{obj.profile_id}", len(page_pairs)
+            ))
 
         # ── 店铺与国家数据 ──
         item_profile_ids = [item.profile_id for item in items if item.profile_id]
