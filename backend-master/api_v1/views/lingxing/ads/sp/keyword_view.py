@@ -590,11 +590,11 @@ class KeywordViewSet(viewsets.ViewSet):
 
         item_ids = [int(it["id"]) for it in items if it.get("id")]
         # 批量查已存在的关键词当前竞价
-        existing_bid_map: dict[int, Any] = {}
+        existing_map: dict[int, LxSpKeyword] = {}
         for kw in LxSpKeyword.objects.filter(
             keyword_id__in=item_ids, profile_id=pid_int,
-        ).only("keyword_id", "bid"):
-            existing_bid_map[kw.keyword_id] = kw.bid
+        ).only("id", "keyword_id", "bid"):
+            existing_map[kw.keyword_id] = kw
 
         success_count = 0
         errors: list[dict[str, Any]] = []
@@ -616,11 +616,12 @@ class KeywordViewSet(viewsets.ViewSet):
             if bid_after <= 0:
                 errors.append({"id": kid, "message": "bid 必须大于 0"})
                 continue
-            if kid not in existing_bid_map:
+            if kid not in existing_map:
                 errors.append({"id": kid, "message": "关键词不存在"})
                 continue
 
-            bid_before = existing_bid_map[kid]
+            kw_obj = existing_map[kid]
+            bid_before = kw_obj.bid
             records.append(SpBidAdjustment(
                 keyword_id=kid,
                 campaign_id=cid_int,
@@ -640,7 +641,8 @@ class KeywordViewSet(viewsets.ViewSet):
                 msg="手动修改，分时生效中，已直接应用" if is_tp else "",
                 operator=operator,
             ))
-            update_keywords.append(LxSpKeyword(keyword_id=kid, bid=bid_after))
+            kw_obj.bid = bid_after
+            update_keywords.append(kw_obj)
             success_count += 1
 
         if records:

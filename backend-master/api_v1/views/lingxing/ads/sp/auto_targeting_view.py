@@ -725,11 +725,11 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         operator = _get_operator_name(request)
 
         item_ids = [int(it["id"]) for it in items if it.get("id")]
-        existing_bid_map: dict[int, Any] = {}
+        existing_map: dict[int, LxSpTarget] = {}
         for t in LxSpTarget.objects.filter(
             target_id__in=item_ids, profile_id=pid_int,
-        ).only("target_id", "bid"):
-            existing_bid_map[t.target_id] = t.bid
+        ).only("id", "target_id", "bid"):
+            existing_map[t.target_id] = t
 
         success_count = 0
         errors: list[dict[str, Any]] = []
@@ -751,11 +751,12 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             if bid_after <= 0:
                 errors.append({"id": tid, "message": "bid 必须大于 0"})
                 continue
-            if tid not in existing_bid_map:
+            if tid not in existing_map:
                 errors.append({"id": tid, "message": "投放条款不存在"})
                 continue
 
-            bid_before = existing_bid_map[tid]
+            target_obj = existing_map[tid]
+            bid_before = target_obj.bid
             records.append(SpBidAdjustment(
                 target_id=tid,
                 campaign_id=cid_int,
@@ -775,7 +776,8 @@ class AutoTargetingViewSet(viewsets.ViewSet):
                 msg="手动修改，分时生效中，已直接应用" if is_tp else "",
                 operator=operator,
             ))
-            update_targets.append(LxSpTarget(target_id=tid, bid=bid_after))
+            target_obj.bid = bid_after
+            update_targets.append(target_obj)
             success_count += 1
 
         if records:
