@@ -381,7 +381,7 @@ class KeywordViewSet(viewsets.ViewSet):
             currency_icon,
         )
         try:
-            cache.set(_cache_key, (metrics_map, summary), 60)
+            cache.set(_cache_key, (metrics_map, summary), 300)
         except Exception:
             pass
         return metrics_map, summary

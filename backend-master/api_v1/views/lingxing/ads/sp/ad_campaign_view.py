@@ -67,7 +67,7 @@ def _build_pair_q(pairs: set[tuple[int, int]]) -> Q:
 
 
 # ── 参考数据懒加载缓存（每 20 分钟自动刷新，省 5 次 DB 往返/请求）────────────
-_REF_TTL = 1200
+_REF_TTL = 300
 
 
 def _get_profile_map() -> dict[str, dict[str, str]]:
@@ -123,47 +123,99 @@ def _get_rate_map() -> dict[str, dict[str, Any]]:
     return result
 
 
-def _get_tag_asin_map() -> dict[str, set[str]]:
-    """globalTagId → {asin, ...} 全量缓存，避免 JSON_CONTAINS 逐行解析（1.86s → <10ms）。"""
+def _load_all_listing_caches() -> None:
+    """一次全表扫描 LxListingData，同时产出 tag/owner/asin_info 三个缓存。
+
+    避免 _get_tag_asin_map + _get_owner_asin_map 各自扫全表（2×1.2s → 1×1.2s）。
+    内部使用 cache.set_many 一次性写入所有 key。
+    """
     from collections import defaultdict
     from django.core.cache import cache as _cache
-    _key = "sp_tag_asin_map_v1"
-    cached = _cache.get(_key)
-    if cached is not None:
-        return cached
-    result = defaultdict(set)
-    for asin, global_tags in LxListingData.objects.exclude(
-        global_tags__isnull=True
-    ).values_list("asin", "global_tags"):
+
+    tag_asin: dict[str, set[str]] = defaultdict(set)
+    owner_asin: dict[str, set[str]] = defaultdict(set)
+    asin_tags: dict[str, list[str]] = defaultdict(list)
+    asin_owners: dict[str, list[str]] = defaultdict(list)
+
+    for asin_val, global_tags, principal_info in LxListingData.objects.values_list(
+        "asin", "global_tags", "principal_info"
+    ):
+        # 解析 global_tags
         if isinstance(global_tags, list):
             for entry in global_tags:
                 if isinstance(entry, dict):
                     gid = str(entry.get("globalTagId", ""))
                     if gid:
-                        result[gid].add(asin)
-    _cache.set(_key, dict(result), _REF_TTL)
-    return result
-
-
-def _get_owner_asin_map() -> dict[str, set[str]]:
-    """principal_uid → {asin, ...} 全量缓存，避免 JSON_CONTAINS 逐行解析（1.30s → <10ms）。"""
-    from collections import defaultdict
-    from django.core.cache import cache as _cache
-    _key = "sp_owner_asin_map_v1"
-    cached = _cache.get(_key)
-    if cached is not None:
-        return cached
-    result = defaultdict(set)
-    for asin, principal_info in LxListingData.objects.exclude(
-        principal_info__isnull=True
-    ).values_list("asin", "principal_info"):
+                        tag_asin[gid].add(asin_val)
+                        asin_tags[asin_val].append(gid)
+        # 解析 principal_info
         if isinstance(principal_info, list):
             for entry in principal_info:
                 if isinstance(entry, dict):
                     uid = entry.get("principal_uid")
+                    name = entry.get("principal_name", "")
                     if uid is not None:
-                        result[str(uid)].add(asin)
-    _cache.set(_key, dict(result), _REF_TTL)
+                        owner_asin[str(uid)].add(asin_val)
+                    if name:
+                        asin_owners[asin_val].append(name)
+
+    _cache.set_many(
+        {
+            "sp_tag_asin_map_v2": dict(tag_asin),
+            "sp_owner_asin_map_v2": dict(owner_asin),
+            "sp_asin_tags_map_v2": dict(asin_tags),
+            "sp_asin_owners_map_v2": dict(asin_owners),
+        },
+        _REF_TTL,
+    )
+
+
+def _get_tag_asin_map() -> dict[str, set[str]]:
+    """globalTagId → {asin, ...}。从 _load_all_listing_caches 的 Redis 缓存读取。"""
+    from django.core.cache import cache as _cache
+    _key = "sp_tag_asin_map_v2"
+    cached = _cache.get(_key)
+    if cached is not None:
+        return cached
+    _load_all_listing_caches()
+    return _cache.get(_key) or {}
+
+
+def _get_owner_asin_map() -> dict[str, set[str]]:
+    """principal_uid → {asin, ...}。从 _load_all_listing_caches 的 Redis 缓存读取。"""
+    from django.core.cache import cache as _cache
+    _key = "sp_owner_asin_map_v2"
+    cached = _cache.get(_key)
+    if cached is not None:
+        return cached
+    _load_all_listing_caches()
+    return _cache.get(_key) or {}
+
+
+def _get_asin_info_map() -> dict[str, dict[str, list[str]]]:
+    """asin → {tags: [globalTagId...], owners: [principal_name...]}。从缓存读取。"""
+    from django.core.cache import cache as _cache
+    _tags_key = "sp_asin_tags_map_v2"
+    _owners_key = "sp_asin_owners_map_v2"
+    tags = _cache.get(_tags_key)
+    owners = _cache.get(_owners_key)
+    if tags is not None and owners is not None:
+        result: dict[str, dict[str, list[str]]] = {}
+        for k in tags:
+            result[k] = {"tags": tags.get(k, []), "owners": owners.get(k, [])}
+        for k in owners:
+            if k not in result:
+                result[k] = {"tags": tags.get(k, []), "owners": owners.get(k, [])}
+        return result
+    _load_all_listing_caches()
+    tags = _cache.get(_tags_key) or {}
+    owners = _cache.get(_owners_key) or {}
+    result = {}
+    for k in tags:
+        result[k] = {"tags": tags.get(k, []), "owners": owners.get(k, [])}
+    for k in owners:
+        if k not in result:
+            result[k] = {"tags": tags.get(k, []), "owners": owners.get(k, [])}
     return result
 
 
@@ -799,41 +851,31 @@ class AdCampaignViewSet(viewsets.ViewSet):
         all_asins = {a for aset in asin_by_key.values() for a in aset}
         asin_label_map: dict[str, list[str]] = {}
         asin_principal_map: dict[str, list[str]] = {}
-        tag_id_to_name: dict[str, str] = {}
-        all_tag_ids: set[str] = set()
         if all_asins:
-            listing_rows = LxListingData.objects.filter(asin__in=all_asins).values(
-                "asin", "global_tags", "principal_info"
-            )
-            for p in listing_rows:
-                asin_label_map.setdefault(p["asin"], [])
-                asin_principal_map.setdefault(p["asin"], [])
-                gt = p.get("global_tags")
-                if isinstance(gt, list):
-                    for entry in gt:
-                        if isinstance(entry, dict):
-                            gid = str(entry.get("globalTagId") or "")
-                            if gid:
-                                all_tag_ids.add(gid)
-                                asin_label_map[p["asin"]].append(gid)
-                pi = p.get("principal_info")
-                if isinstance(pi, list):
-                    names = [
-                        x.get("principal_name", "") for x in pi
-                        if isinstance(x, dict) and x.get("principal_name")
-                    ]
-                    asin_principal_map[p["asin"]].extend(names)
-        # 批量查 LxListingTag 把 globalTagId 映射为 tag_name
-        if all_tag_ids:
-            for t in LxListingTag.objects.filter(
-                global_tag_id__in=list(all_tag_ids), status="normal",
-            ).only("global_tag_id", "tag_name"):
-                if t.tag_name:
-                    tag_id_to_name[t.global_tag_id] = t.tag_name
-        # 把 asin_label_map 中的 globalTagId 字符串替换为 tag_name
-        for asin, values in asin_label_map.items():
-            resolved = [tag_id_to_name.get(v, v) for v in values]
-            asin_label_map[asin] = [v for v in resolved if v]
+            asin_info = _get_asin_info_map()
+            # 批量查 LxListingTag 把 globalTagId 映射为 tag_name
+            all_tag_ids: set[str] = set()
+            for asin_val in all_asins:
+                info = asin_info.get(asin_val, {})
+                tag_ids = info.get("tags", [])
+                owners = info.get("owners", [])
+                if tag_ids:
+                    asin_label_map[asin_val] = list(tag_ids)
+                    all_tag_ids.update(str(t) for t in tag_ids)
+                if owners:
+                    asin_principal_map[asin_val] = list(owners)
+            # 批量查 LxListingTag 把 globalTagId 映射为 tag_name
+            tag_id_to_name: dict[str, str] = {}
+            if all_tag_ids:
+                for t in LxListingTag.objects.filter(
+                    global_tag_id__in=list(all_tag_ids), status="normal",
+                ).only("global_tag_id", "tag_name"):
+                    if t.tag_name:
+                        tag_id_to_name[t.global_tag_id] = t.tag_name
+            # 把 asin_label_map 中的 globalTagId 字符串替换为 tag_name
+            for asin_val, values in asin_label_map.items():
+                resolved = [tag_id_to_name.get(v, v) for v in values]
+                asin_label_map[asin_val] = [v for v in resolved if v]
         for dic in res_list:
             if dic.get("_isSummary"):
                 continue
@@ -1812,8 +1854,7 @@ import threading as _threading
 
 def _warmup_reference_caches():
     try:
-        _get_tag_asin_map()
-        _get_owner_asin_map()
+        _load_all_listing_caches()
         _get_profile_map()
         _get_sid_country_map()
         _get_rate_map()
