@@ -422,30 +422,38 @@ class AdCampaignViewSet(viewsets.ViewSet):
             if sku_list:
                 asin_cp_map = _get_asin_cp_map()
                 sku_cp_map = _get_sku_cp_map()
-                search_cp_keys = set()
-                if asin_search_type == "parent_asin":
-                    for val in sku_list:
-                        search_cp_keys |= sku_cp_map.get(val, set())
-                    child_skus = list(
-                        LxListingData.objects.filter(parent_asin__in=sku_list)
-                        .exclude(seller_sku="")
-                        .exclude(asin="")
-                        .values_list("seller_sku", flat=True)
-                        .distinct()
-                    )
-                    for s_val in child_skus:
-                        search_cp_keys |= sku_cp_map.get(s_val, set())
+                if not asin_cp_map and not sku_cp_map:
+                    search_cp_keys = None
                 else:
-                    for val in sku_list:
-                        search_cp_keys |= sku_cp_map.get(val, set())
-                    related_asins = list(
-                        LxListingData.objects.filter(seller_sku__in=sku_list)
-                        .exclude(asin="")
-                        .values_list("asin", flat=True)
-                        .distinct()
-                    )
-                    for asin_val in related_asins:
-                        search_cp_keys |= asin_cp_map.get(asin_val, set())
+                    search_cp_keys = set()
+                    if asin_search_type == "parent_asin":
+                        if asin_cp_map:
+                            for val in sku_list:
+                                search_cp_keys |= asin_cp_map.get(val, set())
+                        children = list(
+                            LxListingData.objects.filter(parent_asin__in=sku_list)
+                            .exclude(asin="")
+                            .values_list("seller_sku", "asin")
+                            .distinct()
+                        )
+                        for child_sku, child_asin in children:
+                            if child_sku and sku_cp_map:
+                                search_cp_keys |= sku_cp_map.get(child_sku, set())
+                            if child_asin and asin_cp_map:
+                                search_cp_keys |= asin_cp_map.get(child_asin, set())
+                    else:
+                        if sku_cp_map:
+                            for val in sku_list:
+                                search_cp_keys |= sku_cp_map.get(val, set())
+                        if asin_cp_map:
+                            related_asins = list(
+                                LxListingData.objects.filter(seller_sku__in=sku_list)
+                                .exclude(asin="")
+                                .values_list("asin", flat=True)
+                                .distinct()
+                            )
+                            for asin_val in related_asins:
+                                search_cp_keys |= asin_cp_map.get(asin_val, set())
 
         date_start = data.get("date_start")
         date_end = data.get("date_end")
