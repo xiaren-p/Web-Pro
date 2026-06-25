@@ -83,25 +83,6 @@
           <div class="tab-indicators-wrapper">
             <Indicators v-if="activeSummary" :summary="activeSummary" />
           </div>
-          <div class="targeting-mode-bar">
-            <span class="targeting-mode-hint">切换查看不同投放类型的数据与指标</span>
-            <el-button-group class="targeting-mode-toggle">
-              <el-button
-                size="small"
-                :type="targetingMode === 'keyword' ? 'primary' : 'default'"
-                @click="targetingMode = 'keyword'"
-              >
-                关键词投放
-              </el-button>
-              <el-button
-                size="small"
-                :type="targetingMode === 'product' ? 'primary' : 'default'"
-                @click="targetingMode = 'product'"
-              >
-                商品投放
-              </el-button>
-            </el-button-group>
-          </div>
           <KeywordPanel
             v-if="targetingMode === 'keyword'"
             ref="keywordRef"
@@ -110,14 +91,17 @@
             :initial-date-range="inheritedDateRange"
             @update-bid="onKeywordBid"
             @update-state="onKeywordState"
+            @switch-mode="targetingMode = 'product'"
           />
           <ProductTargetingPanel
             v-else
             ref="productTargetingRef"
             :campaign-id="campaignId"
             :profile-id="profileId"
+            :initial-date-range="inheritedDateRange"
             @update-bid="onProductTargetBid"
             @update-state="onProductTargetState"
+            @switch-mode="targetingMode = 'keyword'"
           />
         </template>
       </el-tab-pane>
@@ -667,40 +651,5 @@ onMounted(() => {
 }
 
 /* 投放类型切换按钮栏 */
-.targeting-mode-bar {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: flex-end;
-  margin-bottom: 4px;
-}
-
-.targeting-mode-hint {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.targeting-mode-toggle {
-  flex-shrink: 0;
-
-  :deep(.el-button) {
-    padding: 5px 14px;
-    font-size: 12px;
-    font-weight: 500;
-    border-radius: 6px;
-    transition: all 0.15s;
-  }
-
-  :deep(.el-button + .el-button) {
-    margin-left: -1px;
-  }
-
-  :deep(.el-button:first-child) {
-    border-radius: 6px 0 0 6px;
-  }
-
-  :deep(.el-button:last-child) {
-    border-radius: 0 6px 6px 0;
-  }
 }
 </style>

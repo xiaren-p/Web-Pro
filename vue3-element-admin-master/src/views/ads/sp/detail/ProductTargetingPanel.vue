@@ -29,6 +29,17 @@
 
       <span style="flex: 1" />
 
+      <el-tooltip content="切换查看不同投放类型" placement="top">
+        <el-icon
+          class="mode-switch-hint"
+          style="margin-right: 6px; font-size: 14px; color: var(--text-tertiary); cursor: help"
+        ><QuestionFilled /></el-icon>
+      </el-tooltip>
+      <el-button-group size="small" style="margin-right: 6px">
+        <el-button @click="emit('switch-mode')">关键词</el-button>
+        <el-button type="primary" disabled>商品</el-button>
+      </el-button-group>
+
       <el-tooltip content="列配置" placement="top">
         <el-button
           text
@@ -252,7 +263,7 @@
  */
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import { Operation, VideoPause, ArrowDown } from "@element-plus/icons-vue";
+import { Operation, VideoPause, ArrowDown, QuestionFilled } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import BatchBidAdjustDialog from "@/components/BatchBidAdjustDialog/index.vue";
@@ -273,6 +284,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "update-bid", payload: { row: any; bid: number }): void;
   (e: "update-state", payload: { row: any; state: "enabled" | "paused" }): void;
+  (e: "switch-mode"): void;
 }>();
 
 const loading = ref(false);

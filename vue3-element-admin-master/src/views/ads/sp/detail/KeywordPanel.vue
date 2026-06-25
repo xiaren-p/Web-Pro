@@ -48,6 +48,16 @@
       <el-button type="primary" size="small" @click="onSearch">查询</el-button>
       <el-button size="small" @click="onReset">重置</el-button>
       <span style="flex: 1" />
+      <el-tooltip content="切换查看不同投放类型" placement="top">
+        <el-icon
+          class="mode-switch-hint"
+          style="margin-right: 6px; font-size: 14px; color: var(--text-tertiary); cursor: help"
+        ><QuestionFilled /></el-icon>
+      </el-tooltip>
+      <el-button-group size="small" style="margin-right: 6px">
+        <el-button type="primary" disabled>关键词</el-button>
+        <el-button @click="emit('switch-mode')">商品</el-button>
+      </el-button-group>
       <el-tooltip content="列配置" placement="top">
         <el-button
           text
@@ -342,7 +352,7 @@ import type { KeywordParams } from "@/api/ads";
 
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import { Operation, VideoPause, CircleClose, ArrowDown } from "@element-plus/icons-vue";
+import { Operation, VideoPause, CircleClose, ArrowDown, QuestionFilled } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 import { getKeywords, batchAdjustKeywordState, batchAdjustKeywordBid } from "@/api/ads";
@@ -359,6 +369,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "update-bid", payload: { row: any; bid: number }): void;
   (e: "update-state", payload: { row: any; state: "enabled" | "paused" }): void;
+  (e: "switch-mode"): void;
 }>();
 
 // ── 筛选状态 ──────────────────────────────────────────
