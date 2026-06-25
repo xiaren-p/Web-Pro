@@ -66,6 +66,62 @@ def _build_pair_q(pairs: set[tuple[int, int]]) -> Q:
     return reduce(lambda a, b: a | b, batch_qs)
 
 
+# ── 参考数据懒加载缓存（每 20 分钟自动刷新，省 5 次 DB 往返/请求）────────────
+_REF_TTL = 1200
+
+
+def _get_profile_map() -> dict[str, dict[str, str]]:
+    """profile_id → {profile_alias, country_code, sid} 全量缓存。"""
+    from django.core.cache import cache as _cache
+    _key = "sp_ref_profile_map_v2"
+    cached = _cache.get(_key)
+    if cached is not None:
+        return cached
+    result: dict[str, dict[str, str]] = {}
+    for p in LxAdsProfile.objects.all().values("profile_id", "name", "country_code", "sid"):
+        result[str(p["profile_id"])] = {
+            "profile_alias": p["name"] or str(p["profile_id"]),
+            "country_code": p["country_code"] or "",
+            "sid": str(p["sid"] or ""),
+        }
+    _cache.set(_key, result, _REF_TTL)
+    return result
+
+
+def _get_sid_country_map() -> dict[int, str]:
+    """sid → 中文国家名 全量缓存。"""
+    from django.core.cache import cache as _cache
+    _key = "sp_ref_sid_country_v2"
+    cached = _cache.get(_key)
+    if cached is not None:
+        return cached
+    result: dict[int, str] = {}
+    for shop in LxShops.objects.all().only("sid", "country"):
+        if shop.sid:
+            result[int(shop.sid)] = shop.country or ""
+    _cache.set(_key, result, _REF_TTL)
+    return result
+
+
+def _get_rate_map() -> dict[str, dict[str, Any]]:
+    """currency_code → {icon, code, rate} 全量缓存（取每币种最新记录）。"""
+    from django.core.cache import cache as _cache
+    _key = "sp_ref_rate_map_v2"
+    cached = _cache.get(_key)
+    if cached is not None:
+        return cached
+    result: dict[str, dict[str, Any]] = {}
+    for r in LxExchangeRate.objects.all().order_by("-date"):
+        if r.code not in result:
+            result[r.code] = {
+                "icon": r.icon or "￥",
+                "code": r.code,
+                "rate": parse_exchange_rate(r.my_rate, r.rate_org),
+            }
+    _cache.set(_key, result, _REF_TTL)
+    return result
+
+
 def _flat_parse_label(raw_label: str) -> list[str]:
     """[已废弃] 解析 LxProductInfo.label 字段。保留以兼容潜在外部引用。
 
@@ -526,26 +582,23 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 f"{obj.campaign_id}::{obj.profile_id}", len(page_pairs)
             ))
 
-        # ── 店铺与国家数据 ──
+        # ── 店铺与国家数据（全量缓存，20 分钟刷新）──
         item_profile_ids = [item.profile_id for item in items if item.profile_id]
-        profiles_page = list(LxAdsProfile.objects.filter(profile_id__in=item_profile_ids))
-
-        # ── 从 LxShops 拉取国家中文名，不再依赖硬编码 COUNTRY_MAP ──
-        all_sids = {sp.sid for sp in profiles_page if sp.sid}
-        sid_to_country: dict[int, str] = {}
-        if all_sids:
-            for shop in LxShops.objects.filter(sid__in=all_sids).only("sid", "country"):
-                sid_to_country[shop.sid] = shop.country or ""
+        all_profile_info = _get_profile_map()
+        sid_country = _get_sid_country_map()
 
         profile_map: dict[str, dict[str, str]] = {}
-        for sp in profiles_page:
-            country_code = sp.country_code or ""
-            c_name = sid_to_country.get(sp.sid, country_code)
-            profile_map[str(sp.profile_id)] = {
-                "profile_alias": sp.name if sp.name else str(sp.profile_id),
-                "country_name": c_name,
-                "sid": sp.sid or "",
-            }
+        for pid in item_profile_ids:
+            info = all_profile_info.get(str(pid))
+            if info:
+                c_name = sid_country.get(int(info["sid"] or 0), info["country_code"])
+                profile_map[str(pid)] = {
+                    "profile_alias": info["profile_alias"],
+                    "country_name": c_name,
+                    "sid": info["sid"],
+                }
+        # 为其他代码可能的引用兜底 key（不在页内但也不影响逻辑）
+        sid_to_country: dict[int, str] = sid_country
 
         # ── 广告组合数据 ──
         portfolio_pairs = [
@@ -561,35 +614,22 @@ class AdCampaignViewSet(viewsets.ViewSet):
             for ap in LxAdsPortfolio.objects.filter(pf_q):
                 portfolio_map[f"{ap.portfolio_id}::{ap.profile_id}"] = ap.name or str(ap.portfolio_id)
 
-        # ── 汇率体系 ──
+        # ── 汇率体系（全量缓存，20 分钟刷新）──
         _default_ccy: dict[str, Any] = {"icon": "￥", "code": "CNY", "rate": 1.0}
+        rate_map_all = _get_rate_map()
 
-        all_profiles_in_qs = list(LxAdsProfile.objects.filter(profile_id__in=all_profile_ids))
-        all_currency_codes = {p.currency_code for p in all_profiles_in_qs if p.currency_code}
+        # 从缓存的 profile 信息中提取全量筛选集的币种集合
+        all_currency_codes: set[str] = set()
+        profile_to_rate_all: dict[str, dict[str, Any]] = {}
+        for pid in all_profile_ids:
+            info = all_profile_info.get(str(pid))
+            cc = info.get("country_code") if info else None
+            profile_to_rate_all[str(pid)] = rate_map_all.get(cc, _default_ccy) if cc else _default_ccy
+            if cc:
+                all_currency_codes.add(cc)
 
         if len(all_currency_codes) > 1:
             all_currency_codes.add("USD")
-
-        all_rates: list = []
-        try:
-            all_rates = list(LxExchangeRate.objects.filter(code__in=all_currency_codes).order_by("-date"))
-        except Exception:
-            pass
-        seen_codes: set[str] = set()
-        rate_map_all: dict[str, dict[str, Any]] = {}
-        for r in all_rates:
-            if r.code not in seen_codes:
-                seen_codes.add(r.code)
-                rate_map_all[r.code] = {
-                    "icon": r.icon or "￥",
-                    "code": r.code,
-                    "rate": parse_exchange_rate(r.my_rate, r.rate_org),
-                }
-
-        profile_to_rate_all: dict[str, dict[str, Any]] = {
-            str(p.profile_id): rate_map_all.get(p.currency_code, _default_ccy)
-            for p in all_profiles_in_qs
-        }
 
         unique_codes: set[str] = {
             rate_map_all.get(c, _default_ccy).get("code", "CNY")
@@ -1287,17 +1327,18 @@ class AdCampaignViewSet(viewsets.ViewSet):
             ):
                 rule_map[rule.id] = rule
 
-        # 批量查 profile 的 country_code + sid（用于本地时间 + 中文国家名）
+        # 批量查 profile 的 country_code + sid（从缓存取，省一次 DB 查询）
         profile_ids = {p for _, p in latest_by_pair.keys()}
         profile_info_map: dict[int, dict[str, str]] = {}
         if profile_ids:
-            for sp in LxAdsProfile.objects.filter(profile_id__in=profile_ids).only(
-                "profile_id", "country_code", "sid"
-            ):
-                profile_info_map[sp.profile_id] = {
-                    "country_code": sp.country_code or "",
-                    "sid": sp.sid or 0,
-                }
+            cached_profiles = _get_profile_map()
+            for pid in profile_ids:
+                info = cached_profiles.get(str(pid))
+                if info:
+                    profile_info_map[pid] = {
+                        "country_code": info.get("country_code", ""),
+                        "sid": int(info.get("sid") or 0),
+                    }
 
         result: dict[str, dict[str, Any]] = {}
         for (cid, pid), rec in latest_by_pair.items():
