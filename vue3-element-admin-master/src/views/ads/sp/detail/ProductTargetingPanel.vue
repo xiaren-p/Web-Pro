@@ -134,6 +134,7 @@
           :prop="col.prop"
           :label="col.label"
           :min-width="col.minWidth || 120"
+          :sortable="(col as any).sortable || false"
           align="center"
           show-overflow-tooltip
         >
@@ -335,7 +336,7 @@ const defaultColumns = [
     visible: false,
     category: "设置",
     minWidth: 140,
-    sortable: true,
+    sortable: "custom",
   },
   {
     prop: "campaign_name",
@@ -343,7 +344,7 @@ const defaultColumns = [
     category: "设置",
     visible: true,
     minWidth: 200,
-    sortable: true,
+    sortable: "custom",
   },
   {
     prop: "adgroup_name",
@@ -351,16 +352,23 @@ const defaultColumns = [
     visible: false,
     category: "设置",
     minWidth: 140,
-    sortable: true,
+    sortable: "custom",
   },
-  { prop: "bid", label: "竞价", category: "设置", visible: true, minWidth: 100, sortable: true },
+  {
+    prop: "bid",
+    label: "竞价",
+    category: "设置",
+    visible: true,
+    minWidth: 100,
+    sortable: "custom",
+  },
   {
     prop: "time_pricing_bid",
     label: "分时竞价",
     category: "设置",
     visible: true,
     minWidth: 100,
-    sortable: true,
+    sortable: "custom",
   },
   {
     prop: "created_at",
@@ -368,7 +376,7 @@ const defaultColumns = [
     visible: false,
     category: "设置",
     minWidth: 160,
-    sortable: true,
+    sortable: "custom",
   },
   {
     prop: "adsSales",
@@ -376,7 +384,7 @@ const defaultColumns = [
     category: "转化",
     visible: true,
     minWidth: 130,
-    sortable: true,
+    sortable: "custom",
   },
   {
     prop: "adsSalesPercent",
@@ -384,7 +392,7 @@ const defaultColumns = [
     visible: false,
     category: "转化",
     minWidth: 100,
-    sortable: true,
+    sortable: "custom",
   },
   {
     prop: "directSales",
@@ -392,17 +400,31 @@ const defaultColumns = [
     visible: false,
     category: "转化",
     minWidth: 110,
-    sortable: true,
+    sortable: "custom",
   },
-  { prop: "acos", label: "ACoS", category: "转化", visible: true, minWidth: 100, sortable: true },
-  { prop: "roas", label: "ROAS", category: "转化", visible: true, minWidth: 100, sortable: true },
+  {
+    prop: "acos",
+    label: "ACoS",
+    category: "转化",
+    visible: true,
+    minWidth: 100,
+    sortable: "custom",
+  },
+  {
+    prop: "roas",
+    label: "ROAS",
+    category: "转化",
+    visible: true,
+    minWidth: 100,
+    sortable: "custom",
+  },
   {
     prop: "adsOrders",
     label: "广告订单",
     category: "转化",
     visible: true,
     minWidth: 110,
-    sortable: true,
+    sortable: "custom",
   },
   {
     prop: "directOrders",
@@ -410,16 +432,16 @@ const defaultColumns = [
     visible: false,
     category: "转化",
     minWidth: 100,
-    sortable: true,
+    sortable: "custom",
   },
-  { prop: "cvr", label: "CVR", visible: false, category: "转化", minWidth: 80, sortable: true },
+  { prop: "cvr", label: "CVR", visible: false, category: "转化", minWidth: 80, sortable: "custom" },
   {
     prop: "adsOrderPrice",
     label: "广告笔单价",
     visible: false,
     category: "转化",
     minWidth: 100,
-    sortable: true,
+    sortable: "custom",
   },
   {
     prop: "adsVolume",
@@ -427,7 +449,7 @@ const defaultColumns = [
     visible: false,
     category: "转化",
     minWidth: 100,
-    sortable: true,
+    sortable: "custom",
   },
   {
     prop: "impressions",
@@ -435,7 +457,7 @@ const defaultColumns = [
     category: "业绩",
     visible: true,
     minWidth: 120,
-    sortable: true,
+    sortable: "custom",
   },
   {
     prop: "impressionsPercent",
@@ -443,29 +465,43 @@ const defaultColumns = [
     visible: false,
     category: "业绩",
     minWidth: 80,
-    sortable: true,
+    sortable: "custom",
   },
-  { prop: "clicks", label: "点击", category: "业绩", visible: true, minWidth: 100, sortable: true },
+  {
+    prop: "clicks",
+    label: "点击",
+    category: "业绩",
+    visible: true,
+    minWidth: 100,
+    sortable: "custom",
+  },
   {
     prop: "clicksPercent",
     label: "点击%",
     visible: false,
     category: "业绩",
     minWidth: 80,
-    sortable: true,
+    sortable: "custom",
   },
-  { prop: "ctr", label: "CTR", category: "业绩", visible: true, minWidth: 90, sortable: true },
-  { prop: "cpc", label: "CPC", category: "业绩", visible: true, minWidth: 90, sortable: true },
-  { prop: "spends", label: "花费", category: "业绩", visible: true, minWidth: 120, sortable: true },
+  { prop: "ctr", label: "CTR", category: "业绩", visible: true, minWidth: 90, sortable: "custom" },
+  { prop: "cpc", label: "CPC", category: "业绩", visible: true, minWidth: 90, sortable: "custom" },
+  {
+    prop: "spends",
+    label: "花费",
+    category: "业绩",
+    visible: true,
+    minWidth: 120,
+    sortable: "custom",
+  },
   {
     prop: "spendsPercent",
     label: "花费%",
     visible: false,
     category: "业绩",
     minWidth: 80,
-    sortable: true,
+    sortable: "custom",
   },
-  { prop: "cpa", label: "CPA", visible: false, category: "业绩", minWidth: 80, sortable: true },
+  { prop: "cpa", label: "CPA", visible: false, category: "业绩", minWidth: 80, sortable: "custom" },
 ];
 
 const _savedColVis = useLocalStorage<Record<string, boolean>>(

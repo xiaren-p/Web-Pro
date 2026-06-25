@@ -119,8 +119,8 @@
           :prop="col.prop"
           :label="col.label"
           :min-width="(col as any).minWidth || 120"
+          :sortable="(col as any).sortable || false"
           align="center"
-          :sortable="(col as any).sortable ?? false"
           show-overflow-tooltip
         >
           <template #default="{ row }">
@@ -312,45 +312,69 @@ const sortParams = ref<Record<string, string>>({});
 const activeColumns = ref([
   // 设置
   { prop: "service_status", label: "服务状态", visible: true, category: "设置" },
-  { prop: "portfolio_name", label: "广告组合", visible: true, category: "设置", sortable: true },
+  {
+    prop: "portfolio_name",
+    label: "广告组合",
+    visible: true,
+    category: "设置",
+    sortable: "custom",
+  },
   {
     prop: "campaign_name",
     label: "广告活动",
     visible: true,
     category: "设置",
     minWidth: 240,
-    sortable: true,
+    sortable: "custom",
   },
-  { prop: "default_bid", label: "默认竞价", visible: true, category: "设置", sortable: true },
+  { prop: "default_bid", label: "默认竞价", visible: true, category: "设置", sortable: "custom" },
   { prop: "product", label: "商品", visible: false, category: "设置" },
-  { prop: "created_at", label: "创建时间", visible: false, category: "设置", sortable: true },
+  { prop: "created_at", label: "创建时间", visible: false, category: "设置", sortable: "custom" },
   // 转化
-  { prop: "adsSales", label: "广告销售额", visible: true, category: "转化", sortable: true },
+  { prop: "adsSales", label: "广告销售额", visible: true, category: "转化", sortable: "custom" },
   {
     prop: "adsSalesPercent",
     label: "广告销售额%",
     visible: true,
     category: "转化",
-    sortable: true,
+    sortable: "custom",
   },
-  { prop: "directSales", label: "直接销售额", visible: false, category: "转化", sortable: true },
-  { prop: "acos", label: "ACoS", visible: true, category: "转化", sortable: true },
-  { prop: "roas", label: "ROAS", visible: true, category: "转化", sortable: true },
-  { prop: "adsOrders", label: "广告订单", visible: true, category: "转化", sortable: true },
-  { prop: "directOrders", label: "直接订单", visible: false, category: "转化", sortable: true },
-  { prop: "cvr", label: "CVR", visible: false, category: "转化", sortable: true },
-  { prop: "adsOrderPrice", label: "广告笔单价", visible: false, category: "转化", sortable: true },
-  { prop: "adsVolume", label: "广告销量", visible: false, category: "转化", sortable: true },
+  {
+    prop: "directSales",
+    label: "直接销售额",
+    visible: false,
+    category: "转化",
+    sortable: "custom",
+  },
+  { prop: "acos", label: "ACoS", visible: true, category: "转化", sortable: "custom" },
+  { prop: "roas", label: "ROAS", visible: true, category: "转化", sortable: "custom" },
+  { prop: "adsOrders", label: "广告订单", visible: true, category: "转化", sortable: "custom" },
+  { prop: "directOrders", label: "直接订单", visible: false, category: "转化", sortable: "custom" },
+  { prop: "cvr", label: "CVR", visible: false, category: "转化", sortable: "custom" },
+  {
+    prop: "adsOrderPrice",
+    label: "广告笔单价",
+    visible: false,
+    category: "转化",
+    sortable: "custom",
+  },
+  { prop: "adsVolume", label: "广告销量", visible: false, category: "转化", sortable: "custom" },
   // 业绩
-  { prop: "impressions", label: "曝光量", visible: true, category: "业绩", sortable: true },
-  { prop: "impressionsPercent", label: "曝光%", visible: false, category: "业绩", sortable: true },
-  { prop: "clicks", label: "点击", visible: true, category: "业绩", sortable: true },
-  { prop: "clicksPercent", label: "点击%", visible: false, category: "业绩", sortable: true },
-  { prop: "ctr", label: "CTR", visible: true, category: "业绩", sortable: true },
-  { prop: "cpc", label: "CPC", visible: true, category: "业绩", sortable: true },
-  { prop: "spends", label: "花费", visible: true, category: "业绩", sortable: true },
-  { prop: "spendsPercent", label: "花费%", visible: false, category: "业绩", sortable: true },
-  { prop: "cpa", label: "CPA", visible: false, category: "业绩", sortable: true },
+  { prop: "impressions", label: "曝光量", visible: true, category: "业绩", sortable: "custom" },
+  {
+    prop: "impressionsPercent",
+    label: "曝光%",
+    visible: false,
+    category: "业绩",
+    sortable: "custom",
+  },
+  { prop: "clicks", label: "点击", visible: true, category: "业绩", sortable: "custom" },
+  { prop: "clicksPercent", label: "点击%", visible: false, category: "业绩", sortable: "custom" },
+  { prop: "ctr", label: "CTR", visible: true, category: "业绩", sortable: "custom" },
+  { prop: "cpc", label: "CPC", visible: true, category: "业绩", sortable: "custom" },
+  { prop: "spends", label: "花费", visible: true, category: "业绩", sortable: "custom" },
+  { prop: "spendsPercent", label: "花费%", visible: false, category: "业绩", sortable: "custom" },
+  { prop: "cpa", label: "CPA", visible: false, category: "业绩", sortable: "custom" },
 ]);
 
 // 用存储的可见性覆盖默认定义（仅覆盖有记录的列，新列保留代码默认定义）

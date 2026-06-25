@@ -437,7 +437,7 @@ const activeColumns = ref([
     visible: true,
     category: "设置",
     minWidth: 240,
-    sortable: true,
+    sortable: "custom",
   },
   { prop: "created_at", label: "创建时间", visible: false, category: "设置" },
   { prop: "tag", label: "标签", visible: false, category: "设置" },
