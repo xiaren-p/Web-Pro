@@ -489,19 +489,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         # ── 筛选集全体 campaign / profile 对 ──
         p_num, p_size = self._get_page_params(data)
 
-        # ── Doris 聚合缓存 ──
-        # key 仅含 date_start/date_end（per-campaign 指标不依赖 profile/state/tag 等筛选）
-        # 不同筛选共享同一份 agg_map，命中的情况通过 active_agg subset 取子集
-        base_cache_key = f"sp_campaign_agg:{date_start or '_'}|{date_end or '_'}"
-
-        agg_map: dict[str, dict[str, Any]] | None = None
-
-        # 1. 查缓存
-        base_cached = cache.get(base_cache_key)
-        if isinstance(base_cached, dict) and "agg_map" in base_cached:
-            agg_map = base_cached["agg_map"]
-
-        # 2. 获取筛选后的 campaign 对（Q10，必跑）
+        # ── Doris 聚合（每次直接查，不缓存——Doris 0.17s/批，缓存反而引入数据一致性问题）──
         all_pairs_list = list(
             qs.values_list("campaign_id", "profile_id").distinct()
         )
@@ -509,83 +497,58 @@ class AdCampaignViewSet(viewsets.ViewSet):
         all_profile_ids = sorted({p for _, p in all_pairs_list if p})
         all_campaign_pairs = [(c, p) for c, p in all_pairs_list if c and p]
 
-        # 3. 缓存未命中 → Doris 聚合
-        if agg_map is None:
-            agg_map: dict[str, dict[str, Any]] = {}
-            if all_pairs_set:
-                pairs_sorted = sorted(all_pairs_list)
-                for i in range(0, len(pairs_sorted), _DORIS_PAIR_BATCH_SIZE):
-                    batch = pairs_sorted[i:i + _DORIS_PAIR_BATCH_SIZE]
-                    pair_q = Q()
-                    for cid_val, pid_val in batch:
-                        pair_q |= Q(campaign_id=cid_val, profile_id=pid_val)
+        agg_map: dict[str, dict[str, Any]] = {}
+        if all_pairs_set:
+            pairs_sorted = sorted(all_pairs_list)
+            for i in range(0, len(pairs_sorted), _DORIS_PAIR_BATCH_SIZE):
+                batch = pairs_sorted[i:i + _DORIS_PAIR_BATCH_SIZE]
+                pair_q = Q()
+                for cid_val, pid_val in batch:
+                    pair_q |= Q(campaign_id=cid_val, profile_id=pid_val)
 
-                    agg_qs = LxSpCampaignReport.objects.using("analytics").filter(pair_q)
-                    if date_start:
-                        agg_qs = agg_qs.filter(report_date__gte=date_start)
-                    if date_end:
-                        agg_qs = agg_qs.filter(report_date__lte=date_end)
+                agg_qs = LxSpCampaignReport.objects.using("analytics").filter(pair_q)
+                if date_start:
+                    agg_qs = agg_qs.filter(report_date__gte=date_start)
+                if date_end:
+                    agg_qs = agg_qs.filter(report_date__lte=date_end)
 
-                    agg_qs = agg_qs.values("campaign_id", "profile_id").annotate(
-                        s_sales=Sum("sales"),
-                        s_same_sales=Sum("same_sales"),
-                        s_orders=Sum("orders"),
-                        s_same_orders=Sum("same_orders"),
-                        s_units=Sum("units"),
-                        s_cost=Sum("cost"),
-                        s_clicks=Sum("clicks"),
-                        s_impressions=Sum("impressions"),
-                    )
-                    for row in agg_qs:
-                        cp_key = f"{row['campaign_id']}::{row['profile_id']}"
-                        if cp_key in agg_map:
-                            agg_map[cp_key]["sales"] += float(row["s_sales"] or 0)
-                            agg_map[cp_key]["same_sales"] += float(row["s_same_sales"] or 0)
-                            agg_map[cp_key]["orders"] += int(row["s_orders"] or 0)
-                            agg_map[cp_key]["same_orders"] += int(row["s_same_orders"] or 0)
-                            agg_map[cp_key]["units"] += int(row["s_units"] or 0)
-                            agg_map[cp_key]["cost"] += float(row["s_cost"] or 0)
-                            agg_map[cp_key]["clicks"] += int(row["s_clicks"] or 0)
-                            agg_map[cp_key]["impressions"] += int(row["s_impressions"] or 0)
-                        else:
-                            agg_map[cp_key] = {
-                                "sales": float(row["s_sales"] or 0),
-                                "same_sales": float(row["s_same_sales"] or 0),
-                                "orders": int(row["s_orders"] or 0),
-                                "same_orders": int(row["s_same_orders"] or 0),
-                                "units": int(row["s_units"] or 0),
-                                "cost": float(row["s_cost"] or 0),
-                                "clicks": int(row["s_clicks"] or 0),
-                                "impressions": int(row["s_impressions"] or 0),
-                            }
-                # 给无数据的 campaign 补齐空值
-                for cid_val, pid_val in all_pairs_list:
-                    cp_key = f"{cid_val}::{pid_val}"
-                    if cp_key not in agg_map:
+                agg_qs = agg_qs.values("campaign_id", "profile_id").annotate(
+                    s_sales=Sum("sales"), s_same_sales=Sum("same_sales"),
+                    s_orders=Sum("orders"), s_same_orders=Sum("same_orders"),
+                    s_units=Sum("units"), s_cost=Sum("cost"),
+                    s_clicks=Sum("clicks"), s_impressions=Sum("impressions"),
+                )
+                for row in agg_qs:
+                    cp_key = f"{row['campaign_id']}::{row['profile_id']}"
+                    if cp_key in agg_map:
+                        agg_map[cp_key]["sales"] += float(row["s_sales"] or 0)
+                        agg_map[cp_key]["same_sales"] += float(row["s_same_sales"] or 0)
+                        agg_map[cp_key]["orders"] += int(row["s_orders"] or 0)
+                        agg_map[cp_key]["same_orders"] += int(row["s_same_orders"] or 0)
+                        agg_map[cp_key]["units"] += int(row["s_units"] or 0)
+                        agg_map[cp_key]["cost"] += float(row["s_cost"] or 0)
+                        agg_map[cp_key]["clicks"] += int(row["s_clicks"] or 0)
+                        agg_map[cp_key]["impressions"] += int(row["s_impressions"] or 0)
+                    else:
                         agg_map[cp_key] = {
-                            "sales": 0.0, "same_sales": 0.0, "orders": 0,
-                            "same_orders": 0, "units": 0, "cost": 0.0,
-                            "clicks": 0, "impressions": 0,
+                            "sales": float(row["s_sales"] or 0),
+                            "same_sales": float(row["s_same_sales"] or 0),
+                            "orders": int(row["s_orders"] or 0),
+                            "same_orders": int(row["s_same_orders"] or 0),
+                            "units": int(row["s_units"] or 0),
+                            "cost": float(row["s_cost"] or 0),
+                            "clicks": int(row["s_clicks"] or 0),
+                            "impressions": int(row["s_impressions"] or 0),
                         }
-                ttl = 120 if date_start and date_end else 60
-                try:
-                    cache.set(base_cache_key, {"agg_map": agg_map}, max(ttl, 120))
-                except Exception:
-                    pass
-
-        # 4. 从 agg_map 中只取筛选后存在的 pair
-        active_agg: dict[str, dict[str, Any]] = {}  # type: ignore[no-redef]
-        for cp_key in (f"{c}::{p}" for c, p in all_pairs_set):
-            if cp_key in agg_map:
-                active_agg[cp_key] = agg_map[cp_key]
-            else:
-                active_agg[cp_key] = {
-                    "sales": 0.0, "same_sales": 0.0, "orders": 0,
-                    "same_orders": 0, "units": 0, "cost": 0.0,
-                    "clicks": 0, "impressions": 0,
-                }
-        # 用 active_agg 替换 agg_map 用于后续计算
-        agg_map = active_agg
+            # 给无数据的 campaign 补齐空值
+            for cid_val, pid_val in all_pairs_list:
+                cp_key = f"{cid_val}::{pid_val}"
+                if cp_key not in agg_map:
+                    agg_map[cp_key] = {
+                        "sales": 0.0, "same_sales": 0.0, "orders": 0,
+                        "same_orders": 0, "units": 0, "cost": 0.0,
+                        "clicks": 0, "impressions": 0,
+                    }
 
         # ── 排序与分页（DB 层分页优化：不在内存加载全量 Model 实例）──
         _SORT_METRIC_MAP: dict[str, str] = {
