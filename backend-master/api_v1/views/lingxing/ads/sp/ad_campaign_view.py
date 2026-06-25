@@ -496,13 +496,11 @@ class AdCampaignViewSet(viewsets.ViewSet):
             sort_metric = metric_key if metric_key else "impressions"
             sort_reverse = reverse if metric_key else True  # 默认：曝光量降序
 
-            # total 需要 count（指标排序时无法 DB 端 limit，先 count）
-            total = qs.count()
-
             # 只加载轻量 (campaign_id, profile_id) 对
             pairs = list(
                 qs.values_list("campaign_id", "profile_id")
             )
+            total = len(pairs)
             # Python 排序（对轻量元组，比 Model 实例排序快两个数量级）
             pairs.sort(
                 key=lambda p: float(
