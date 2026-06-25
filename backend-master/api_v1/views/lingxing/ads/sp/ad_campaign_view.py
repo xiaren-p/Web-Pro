@@ -483,31 +483,48 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         agg_map: dict[str, dict[str, Any]] = {}
         if all_pairs_set:
-            doris_qs = LxSpCampaignReport.objects.using("analytics").all()
-            if date_start:
-                doris_qs = doris_qs.filter(report_date__gte=date_start)
-            if date_end:
-                doris_qs = doris_qs.filter(report_date__lte=date_end)
-            doris_rows = doris_qs.values("campaign_id", "profile_id").annotate(
-                s_sales=Sum("sales"), s_same_sales=Sum("same_sales"),
-                s_orders=Sum("orders"), s_same_orders=Sum("same_orders"),
-                s_units=Sum("units"), s_cost=Sum("cost"),
-                s_clicks=Sum("clicks"), s_impressions=Sum("impressions"),
-            )
-            for row in doris_rows:
-                cp_key = f"{row['campaign_id']}::{row['profile_id']}"
-                if cp_key not in all_pairs_set:
-                    continue
-                agg_map[cp_key] = {
-                    "sales": float(row["s_sales"] or 0),
-                    "same_sales": float(row["s_same_sales"] or 0),
-                    "orders": int(row["s_orders"] or 0),
-                    "same_orders": int(row["s_same_orders"] or 0),
-                    "units": int(row["s_units"] or 0),
-                    "cost": float(row["s_cost"] or 0),
-                    "clicks": int(row["s_clicks"] or 0),
-                    "impressions": int(row["s_impressions"] or 0),
-                }
+            # 分批 OR 查询 Doris，每批 5000 对（原 500 导致 25 批 × 0.8s = 20s，现 3 批）
+            _BATCH_SIZE = 5000
+            for i in range(0, len(all_pairs_list), _BATCH_SIZE):
+                batch = all_pairs_list[i:i + _BATCH_SIZE]
+                pair_q = Q()
+                for cid_val, pid_val in batch:
+                    pair_q |= Q(campaign_id=cid_val, profile_id=pid_val)
+
+                doris_qs = LxSpCampaignReport.objects.using("analytics").filter(pair_q)
+                if date_start:
+                    doris_qs = doris_qs.filter(report_date__gte=date_start)
+                if date_end:
+                    doris_qs = doris_qs.filter(report_date__lte=date_end)
+
+                doris_rows = doris_qs.values("campaign_id", "profile_id").annotate(
+                    s_sales=Sum("sales"), s_same_sales=Sum("same_sales"),
+                    s_orders=Sum("orders"), s_same_orders=Sum("same_orders"),
+                    s_units=Sum("units"), s_cost=Sum("cost"),
+                    s_clicks=Sum("clicks"), s_impressions=Sum("impressions"),
+                )
+                for row in doris_rows:
+                    cp_key = f"{row['campaign_id']}::{row['profile_id']}"
+                    if cp_key in agg_map:
+                        agg_map[cp_key]["sales"] += float(row["s_sales"] or 0)
+                        agg_map[cp_key]["same_sales"] += float(row["s_same_sales"] or 0)
+                        agg_map[cp_key]["orders"] += int(row["s_orders"] or 0)
+                        agg_map[cp_key]["same_orders"] += int(row["s_same_orders"] or 0)
+                        agg_map[cp_key]["units"] += int(row["s_units"] or 0)
+                        agg_map[cp_key]["cost"] += float(row["s_cost"] or 0)
+                        agg_map[cp_key]["clicks"] += int(row["s_clicks"] or 0)
+                        agg_map[cp_key]["impressions"] += int(row["s_impressions"] or 0)
+                    else:
+                        agg_map[cp_key] = {
+                            "sales": float(row["s_sales"] or 0),
+                            "same_sales": float(row["s_same_sales"] or 0),
+                            "orders": int(row["s_orders"] or 0),
+                            "same_orders": int(row["s_same_orders"] or 0),
+                            "units": int(row["s_units"] or 0),
+                            "cost": float(row["s_cost"] or 0),
+                            "clicks": int(row["s_clicks"] or 0),
+                            "impressions": int(row["s_impressions"] or 0),
+                        }
             # 给无数据的 campaign 补齐空值
             for cid_val, pid_val in all_pairs_list:
                 cp_key = f"{cid_val}::{pid_val}"
