@@ -572,6 +572,8 @@ async function loadTableData() {
       countries: filters.countries.join(","),
       date_start: filters.range?.[0] || "",
       date_end: filters.range?.[1] || "",
+      skus: filters.skus.join(","),
+      asinSearchType: filters.asinSearchType,
     };
 
     if (sortParams.prop && sortParams.order) {
