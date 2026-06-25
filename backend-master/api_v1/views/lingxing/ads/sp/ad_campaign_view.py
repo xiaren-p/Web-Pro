@@ -1804,3 +1804,20 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if budget_by_campaign_all is not None:
             result["budget"] = fmt_money(t_budget, icon)
         return result
+
+
+# ── 启动时后台预加载全量参考数据 + 标签/负责人 ASIN 映射缓存 ──
+# 避免首个 HTTP 请求触发冷查询（标签 JSON_CONTAINS 1.86s → Redis 命中 <10ms）
+import threading as _threading
+
+def _warmup_reference_caches():
+    try:
+        _get_tag_asin_map()
+        _get_owner_asin_map()
+        _get_profile_map()
+        _get_sid_country_map()
+        _get_rate_map()
+    except Exception:
+        pass  # Redis 不可用时静默失败，不影响服务启动
+
+_threading.Thread(target=_warmup_reference_caches, daemon=True).start()
