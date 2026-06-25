@@ -139,6 +139,8 @@ CELERY_TASK_ROUTES = {
     'api_v1.tasks.nc_sync_tasks.process_pending_nc_tasks':        {'queue': 'celery'},
     'api_v1.tasks.nc_sync_tasks.retry_failed_nc_tasks':           {'queue': 'celery'},
     'api_v1.tasks.maintenance_tasks.cleanup_orphan_uploads':      {'queue': 'celery'},
+    # 广告活动参考数据缓存刷新（定时预热，280s 一轮，保证页面缓存永不过期）
+    'api_v2.tasks.listing_cache_refresh_task.refresh_listing_caches': {'queue': 'celery'},
     # ── parallel_queue（concurrency=4）：可并行的批量任务 ────────────────────
     'api_v2.tasks.ai_chat_task.run_ai_chat_task':                         {'queue': 'parallel_queue'},
     # ── single_thread_queue（concurrency=1）：须顺序执行的任务 ───────────────
@@ -197,6 +199,12 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'api_v2.tasks.image_sync_queue_task.run_image_sync_queue_task',
         'schedule': 30.0,
         'options': {'expires': 25},
+    },
+    # 广告活动参考数据缓存刷新：每 280 秒预热一次 Redis，保证页面缓存永不过期
+    # schedule=280 比缓存 TTL（300s）略短，确保不会出现真空期
+    'listing-cache-refresh': {
+        'task': 'api_v2.tasks.listing_cache_refresh_task.refresh_listing_caches',
+        'schedule': 280.0,
     },
 }
 

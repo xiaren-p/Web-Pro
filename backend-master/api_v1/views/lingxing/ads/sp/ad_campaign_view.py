@@ -1,6 +1,8 @@
 """SP 广告活动基础数据视图（LxSpCampaign），提供查询与手动预算/状态调整。"""
 from __future__ import annotations
 
+import threading
+import time
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -48,7 +50,7 @@ _DORIS_PAIR_BATCH_SIZE = 500
 def _build_pair_q(pairs: set[tuple[int, int]]) -> Q:
     """构建 (campaign_id, profile_id) 复合对 OR 查询，分批防止超大 SQL。"""
     if not pairs:
-        return Q(pk__in=[])
+        return Q(pk=-1)
     sorted_pairs = sorted(pairs)
     if len(sorted_pairs) <= 500:
         pair_q = Q()
@@ -123,8 +125,6 @@ def _get_rate_map() -> dict[str, dict[str, Any]]:
     return result
 
 
-import threading
-
 _listing_cache_lock = threading.Lock()
 
 
@@ -136,14 +136,24 @@ def _load_all_listing_caches() -> None:
 
     避免 _get_tag_asin_map + _get_owner_asin_map 各自扫全表（2×1.2s → 1×1.2s）。
     内部使用 cache.set_many 一次性写入所有 key。
-    """
+"""
     if not _listing_cache_lock.acquire(blocking=False):
-        return  # 已有其他线程在加载，本次请求直接返回
+        waited = 0.0
+        while not _listing_cache_lock.acquire(blocking=False):
+            time.sleep(0.5)
+            waited += 0.5
+            if waited >= 5.0:
+                return
 
     from collections import defaultdict
     from django.core.cache import cache as _cache
 
     try:
+        if all(_cache.get(k) for k in (
+            "sp_tag_asin_map_v2", "sp_owner_asin_map_v2",
+            "sp_asin_tags_map_v2", "sp_asin_owners_map_v2",
+        )):
+            return
         tag_asin: dict[str, set[str]] = defaultdict(set)
         owner_asin: dict[str, set[str]] = defaultdict(set)
         asin_tags: dict[str, list[str]] = defaultdict(list)
@@ -379,9 +389,9 @@ class AdCampaignViewSet(viewsets.ViewSet):
                         tag_q = _build_pair_q(tag_ad_pairs)
                         qs = qs.filter(tag_q)
                     else:
-                        qs = qs.filter(Q(pk__in=[]))
+                        qs = qs.filter(Q(pk=-1))
                 else:
-                    qs = qs.filter(Q(pk__in=[]))
+                    qs = qs.filter(Q(pk=-1))
 
         # ── 负责人筛选 ──
         # 链路：owner_uid → Redis 缓存(uid→ASIN) → LxSpAd → campaign
@@ -404,9 +414,9 @@ class AdCampaignViewSet(viewsets.ViewSet):
                         owner_q = _build_pair_q(owner_ad_pairs)
                         qs = qs.filter(owner_q)
                     else:
-                        qs = qs.filter(Q(pk__in=[]))
+                        qs = qs.filter(Q(pk=-1))
                 else:
-                    qs = qs.filter(Q(pk__in=[]))
+                    qs = qs.filter(Q(pk=-1))
 
         portfolio_id = data.get("portfolio_id")
         if portfolio_id:
@@ -1860,17 +1870,3 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if budget_by_campaign_all is not None:
             result["budget"] = fmt_money(t_budget, icon)
         return result
-
-
-# ── 启动时后台预加载全量参考数据 + 标签/负责人 ASIN 映射缓存 ──
-# 避免首个 HTTP 请求触发冷查询（标签 JSON_CONTAINS 1.86s → Redis 命中 <10ms）
-def _warmup_reference_caches():
-    try:
-        _load_all_listing_caches()
-        _get_profile_map()
-        _get_sid_country_map()
-        _get_rate_map()
-    except Exception:
-        pass  # Redis 不可用时静默失败，不影响服务启动
-
-threading.Thread(target=_warmup_reference_caches, daemon=True).start()
