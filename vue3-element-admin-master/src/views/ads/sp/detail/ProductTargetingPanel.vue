@@ -51,6 +51,7 @@
         style="width: 100%"
         @selection-change="onSelectionChange"
         @header-dragend="onHeaderDragEnd"
+        @sort-change="handleSortChange"
       >
         <el-table-column
           type="selection"
@@ -200,7 +201,7 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      
+
       <el-dropdown v-if="selectedRows.length > 0" trigger="click" style="margin-right: 12px">
         <el-button size="small">
           批量调竞价
@@ -212,7 +213,7 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      
+
       <span>共 {{ total }} 条</span>
       <el-pagination
         v-model:current-page="currentPage"
@@ -230,7 +231,7 @@
       :columns="activeColumns"
       @save="onColumnConfigSave"
     />
-    
+
     <!-- 批量调整竞价对话框 -->
     <BatchBidAdjustDialog
       v-model="batchBidDialogVisible"
@@ -248,7 +249,8 @@
  * 数据源：LxSpTarget(expression_type="manual") + LxSpTargetReport。
  * 支持手动调整竞价与启停状态。
  */
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useLocalStorage } from "@vueuse/core";
 import { Operation, VideoPause, ArrowDown } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import ColumnManager from "@/components/ColumnManager/index.vue";
@@ -258,10 +260,15 @@ import {
   batchAdjustProductTargetState,
   batchAdjustProductTargetBid,
 } from "@/api/ads";
+import { getDefaultDateRange, DATE_RANGE_KEY } from "@/utils/date";
 
 defineOptions({ name: "ProductTargetingPanel" });
 
-const props = defineProps<{ campaignId: string; profileId: string }>();
+const props = defineProps<{
+  campaignId: string;
+  profileId: string;
+  initialDateRange?: string[];
+}>();
 const emit = defineEmits<{
   (e: "update-bid", payload: { row: any; bid: number }): void;
   (e: "update-state", payload: { row: any; state: "enabled" | "paused" }): void;
@@ -277,35 +284,81 @@ const summaryRow = ref<Record<string, unknown> | null>(null);
 const selectedRows = ref<any[]>([]);
 const columnConfigVisible = ref(false);
 
+/** 排序状态 */
+const sortParams = ref<Record<string, string>>({});
+
 // ── 批量操作状态 ───────────────────────────────────────
 const batchBidDialogVisible = ref(false);
-const batchBidItems = ref<Array<{
-  id: string | number;
-  targetingText: string;
-  campaignName: string;
-  adgroupName: string;
-  currentBid: number;
-}>>([]);
+const batchBidItems = ref<
+  Array<{
+    id: string | number;
+    targetingText: string;
+    campaignName: string;
+    adgroupName: string;
+    currentBid: number;
+  }>
+>([]);
 
 const filters = reactive({
-  range: [] as string[],
+  range: props.initialDateRange?.length === 2 ? [...props.initialDateRange] : getDefaultDateRange(),
   state: "",
 });
 
+watch(
+  () => filters.range,
+  (val) => {
+    if (val?.length === 2) {
+      localStorage.setItem(DATE_RANGE_KEY, JSON.stringify(val));
+    }
+  }
+);
+
 const defaultColumns = [
   { prop: "service_status", label: "服务状态", category: "设置", visible: true, minWidth: 160 },
+  { prop: "portfolio_name", label: "广告组合", visible: false, category: "设置", minWidth: 140 },
   { prop: "campaign_name", label: "广告活动", category: "设置", visible: true, minWidth: 200 },
+  { prop: "adgroup_name", label: "广告组", visible: false, category: "设置", minWidth: 140 },
   { prop: "bid", label: "竞价", category: "设置", visible: true, minWidth: 100 },
   { prop: "time_pricing_bid", label: "分时竞价", category: "设置", visible: true, minWidth: 100 },
-  { prop: "impressions", label: "曝光量", category: "业绩", visible: true, minWidth: 120 },
-  { prop: "clicks", label: "点击", category: "业绩", visible: true, minWidth: 100 },
-  { prop: "spends", label: "花费", category: "业绩", visible: true, minWidth: 120 },
+  { prop: "created_at", label: "创建时间", visible: false, category: "设置", minWidth: 160 },
   { prop: "adsSales", label: "广告销售额", category: "转化", visible: true, minWidth: 130 },
-  { prop: "adsOrders", label: "广告订单", category: "转化", visible: true, minWidth: 110 },
+  {
+    prop: "adsSalesPercent",
+    label: "广告销售额%",
+    visible: false,
+    category: "转化",
+    minWidth: 100,
+  },
+  { prop: "directSales", label: "直接销售额", visible: false, category: "转化", minWidth: 110 },
   { prop: "acos", label: "ACoS", category: "转化", visible: true, minWidth: 100 },
+  { prop: "roas", label: "ROAS", category: "转化", visible: true, minWidth: 100 },
+  { prop: "adsOrders", label: "广告订单", category: "转化", visible: true, minWidth: 110 },
+  { prop: "directOrders", label: "直接订单", visible: false, category: "转化", minWidth: 100 },
+  { prop: "cvr", label: "CVR", visible: false, category: "转化", minWidth: 80 },
+  { prop: "adsOrderPrice", label: "广告笔单价", visible: false, category: "转化", minWidth: 100 },
+  { prop: "adsVolume", label: "广告销量", visible: false, category: "转化", minWidth: 100 },
+  { prop: "impressions", label: "曝光量", category: "业绩", visible: true, minWidth: 120 },
+  { prop: "impressionsPercent", label: "曝光%", visible: false, category: "业绩", minWidth: 80 },
+  { prop: "clicks", label: "点击", category: "业绩", visible: true, minWidth: 100 },
+  { prop: "clicksPercent", label: "点击%", visible: false, category: "业绩", minWidth: 80 },
+  { prop: "ctr", label: "CTR", category: "业绩", visible: true, minWidth: 90 },
+  { prop: "cpc", label: "CPC", category: "业绩", visible: true, minWidth: 90 },
+  { prop: "spends", label: "花费", category: "业绩", visible: true, minWidth: 120 },
+  { prop: "spendsPercent", label: "花费%", visible: false, category: "业绩", minWidth: 80 },
+  { prop: "cpa", label: "CPA", visible: false, category: "业绩", minWidth: 80 },
 ];
 
-const activeColumns = ref(defaultColumns);
+const _savedColVis = useLocalStorage<Record<string, boolean>>(
+  "product_targeting_panel_col_vis",
+  {}
+);
+
+const activeColumns = ref(
+  defaultColumns.map((col) => {
+    const saved = _savedColVis.value[col.prop];
+    return { ...col, visible: saved !== undefined ? saved : col.visible };
+  })
+);
 const visibleColumns = computed(() => activeColumns.value.filter((c) => c.visible));
 
 const displayData = computed<any[]>(() => {
@@ -355,7 +408,25 @@ function onSelectionChange(rows: any[]): void {
 
 function onColumnConfigSave(cols: any[]): void {
   activeColumns.value = cols;
+  const vis: Record<string, boolean> = {};
+  for (const c of cols) {
+    vis[c.prop] = c.visible;
+  }
+  _savedColVis.value = vis;
   ElMessage.success("列配置已保存");
+}
+
+/**
+ * 表格排序变化回调。
+ *
+ * @param {{ prop: string; order: string }} sort - Element Plus 排序事件参数
+ */
+function handleSortChange({ prop, order }: { prop: string; order: string }): void {
+  sortParams.value = {
+    sort_prop: prop || "",
+    sort_order: order === "ascending" ? "asc" : order === "descending" ? "desc" : "",
+  };
+  loadData();
 }
 
 function onSearch(): void {
@@ -381,6 +452,8 @@ async function loadData(): Promise<void> {
       state: filters.state || "",
       pageNum: currentPage.value,
       pageSize: pageSize.value,
+      sort_prop: sortParams.value.sort_prop || undefined,
+      sort_order: sortParams.value.sort_order || undefined,
     });
     tableData.value = res.list || [];
     total.value = res.total || 0;

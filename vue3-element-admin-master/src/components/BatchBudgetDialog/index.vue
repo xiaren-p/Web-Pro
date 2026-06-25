@@ -31,7 +31,7 @@
         type="number"
         inputmode="decimal"
       />
-      <el-button size="small" @click="applyBatchSet" :disabled="!batchSetValue || !batchSetMode">
+      <el-button size="small" :disabled="!batchSetValue || !batchSetMode" @click="applyBatchSet">
         预览
       </el-button>
     </div>
@@ -77,9 +77,7 @@
       </el-table-column>
       <el-table-column label="操作" width="60" align="center" fixed="right">
         <template #default="{ $index }">
-          <el-button type="danger" link size="small" @click="removeRow($index)">
-            ×
-          </el-button>
+          <el-button type="danger" link size="small" @click="removeRow($index)">×</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -87,7 +85,7 @@
     <!-- 底部按钮 -->
     <template #footer>
       <el-button @click="onClose">取消</el-button>
-      <el-button type="primary" @click="onConfirm" :loading="confirming">保存</el-button>
+      <el-button type="primary" :loading="confirming" @click="onConfirm">保存</el-button>
     </template>
   </el-dialog>
 </template>
@@ -275,8 +273,8 @@ function onClose(): void {
 }
 
 .campaign-name {
-  color: var(--el-color-primary);
   font-weight: 500;
+  color: var(--el-color-primary);
 }
 
 .budget-icon {

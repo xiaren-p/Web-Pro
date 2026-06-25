@@ -70,6 +70,7 @@
         height="calc(100vh - 460px)"
         style="width: 100%"
         @selection-change="onSelectionChange"
+        @sort-change="handleSortChange"
       >
         <!-- 固定左：勾选 -->
         <el-table-column
@@ -224,7 +225,7 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      
+
       <el-dropdown v-if="selectedRows.length > 0" trigger="click" style="margin-right: 12px">
         <el-button size="small">
           批量调竞价
@@ -236,7 +237,7 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      
+
       <el-pagination
         v-model:current-page="pagination.pageNum"
         v-model:page-size="pagination.pageSize"
@@ -249,8 +250,12 @@
       />
     </div>
 
-    <!-- 列配置抽屉（占位） -->
-    <el-drawer v-model="columnConfigVisible" title="列配置" size="360px" />
+    <!-- 列配置抽屉 -->
+    <ColumnManager
+      v-model="columnConfigVisible"
+      :columns="activeColumns"
+      @save="onColumnConfigSave"
+    />
 
     <!-- 分析抽屉 -->
     <el-drawer
@@ -316,7 +321,7 @@
         </div>
       </div>
     </el-drawer>
-    
+
     <!-- 批量调整竞价对话框 -->
     <BatchBidAdjustDialog
       v-model="batchBidDialogVisible"
@@ -334,12 +339,15 @@
  */
 import type { KeywordParams } from "@/api/ads";
 
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useLocalStorage } from "@vueuse/core";
 import { Operation, VideoPause, CircleClose, ArrowDown } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 import { getKeywords, batchAdjustKeywordState, batchAdjustKeywordBid } from "@/api/ads";
 import BatchBidAdjustDialog from "@/components/BatchBidAdjustDialog/index.vue";
+import ColumnManager from "@/components/ColumnManager/index.vue";
+import { getDefaultDateRange, DATE_RANGE_KEY } from "@/utils/date";
 
 const props = defineProps<{
   campaignId: string;
@@ -354,11 +362,24 @@ const emit = defineEmits<{
 
 // ── 筛选状态 ──────────────────────────────────────────
 const filters = reactive({
-  range: props.initialDateRange ?? (null as string[] | null),
+  range: (props.initialDateRange?.length === 2
+    ? [...props.initialDateRange]
+    : getDefaultDateRange()) as string[],
   state: "",
   matchType: "",
   keyword: "",
 });
+
+// 主题：日期双向同步 — 写入 localStorage 供主页回读
+watch(
+  () => filters.range,
+  (val) => {
+    if (val?.length === 2) {
+      localStorage.setItem(DATE_RANGE_KEY, JSON.stringify(val));
+    }
+  },
+  { deep: true }
+);
 
 // ── 分页状态 ──────────────────────────────────────────
 const pagination = reactive({ pageNum: 1, pageSize: 25, total: 0 });
@@ -370,15 +391,20 @@ const currencyIcon = ref("$");
 const summaryRow = ref<Record<string, unknown> | null>(null);
 const selectedRows = ref<any[]>([]);
 
+/** 排序状态 */
+const sortParams = ref<Record<string, string>>({});
+
 // ── 批量操作状态 ───────────────────────────────────────
 const batchBidDialogVisible = ref(false);
-const batchBidItems = ref<Array<{
-  id: string | number;
-  targetingText: string;
-  campaignName: string;
-  adgroupName: string;
-  currentBid: number;
-}>>([]);
+const batchBidItems = ref<
+  Array<{
+    id: string | number;
+    targetingText: string;
+    campaignName: string;
+    adgroupName: string;
+    currentBid: number;
+  }>
+>([]);
 
 const displayData = computed<any[]>(() => {
   if (rows.value.length === 0) return [];
@@ -395,20 +421,61 @@ defineExpose({ summaryRow });
 // ── 列配置 ──────────────────────────────────────────
 const columnConfigVisible = ref(false);
 
-const visibleColumns = [
-  { prop: "service_status", label: "服务状态", minWidth: 160 },
-  { prop: "match_type_label", label: "匹配方式", minWidth: 110 },
-  { prop: "bid", label: "竞价", minWidth: 100 },
-  { prop: "time_pricing_bid", label: "分时竞价", minWidth: 100 },
-  { prop: "portfolio_name", label: "广告组合", minWidth: 140 },
-  { prop: "campaign_name", label: "广告活动", minWidth: 200 },
-  { prop: "adgroup_name", label: "广告组", minWidth: 140 },
-  { prop: "created_at", label: "创建时间", minWidth: 160 },
-  { prop: "spends", label: "花费", minWidth: 110 },
-  { prop: "adsSales", label: "广告销售额", minWidth: 120 },
-  { prop: "adsOrders", label: "广告订单", minWidth: 100 },
-  { prop: "acos", label: "ACoS", minWidth: 100 },
+const defaultColumns = [
+  { prop: "service_status", label: "服务状态", visible: true, category: "设置", minWidth: 160 },
+  { prop: "match_type_label", label: "匹配方式", visible: true, category: "设置", minWidth: 110 },
+  { prop: "bid", label: "竞价", visible: true, category: "设置", minWidth: 100 },
+  { prop: "time_pricing_bid", label: "分时竞价", visible: true, category: "设置", minWidth: 100 },
+  { prop: "portfolio_name", label: "广告组合", visible: false, category: "设置", minWidth: 140 },
+  { prop: "campaign_name", label: "广告活动", visible: true, category: "设置", minWidth: 200 },
+  { prop: "adgroup_name", label: "广告组", visible: true, category: "设置", minWidth: 140 },
+  { prop: "created_at", label: "创建时间", visible: false, category: "设置", minWidth: 160 },
+  { prop: "adsSales", label: "广告销售额", visible: true, category: "转化", minWidth: 120 },
+  {
+    prop: "adsSalesPercent",
+    label: "广告销售额%",
+    visible: false,
+    category: "转化",
+    minWidth: 100,
+  },
+  { prop: "directSales", label: "直接销售额", visible: false, category: "转化", minWidth: 110 },
+  { prop: "acos", label: "ACoS", visible: true, category: "转化", minWidth: 100 },
+  { prop: "roas", label: "ROAS", visible: true, category: "转化", minWidth: 100 },
+  { prop: "adsOrders", label: "广告订单", visible: true, category: "转化", minWidth: 100 },
+  { prop: "directOrders", label: "直接订单", visible: false, category: "转化", minWidth: 100 },
+  { prop: "cvr", label: "CVR", visible: false, category: "转化", minWidth: 80 },
+  { prop: "adsOrderPrice", label: "广告笔单价", visible: false, category: "转化", minWidth: 100 },
+  { prop: "adsVolume", label: "广告销量", visible: false, category: "转化", minWidth: 100 },
+  { prop: "impressions", label: "曝光量", visible: true, category: "业绩", minWidth: 120 },
+  { prop: "impressionsPercent", label: "曝光%", visible: false, category: "业绩", minWidth: 80 },
+  { prop: "clicks", label: "点击", visible: true, category: "业绩", minWidth: 100 },
+  { prop: "clicksPercent", label: "点击%", visible: false, category: "业绩", minWidth: 80 },
+  { prop: "ctr", label: "CTR", visible: true, category: "业绩", minWidth: 90 },
+  { prop: "cpc", label: "CPC", visible: true, category: "业绩", minWidth: 90 },
+  { prop: "spends", label: "花费", visible: true, category: "业绩", minWidth: 110 },
+  { prop: "spendsPercent", label: "花费%", visible: false, category: "业绩", minWidth: 80 },
+  { prop: "cpa", label: "CPA", visible: false, category: "业绩", minWidth: 80 },
 ];
+
+const _savedColVis = useLocalStorage<Record<string, boolean>>("keyword_panel_col_vis", {});
+
+const activeColumns = ref(
+  defaultColumns.map((col) => {
+    const saved = _savedColVis.value[col.prop];
+    return { ...col, visible: saved !== undefined ? saved : col.visible };
+  })
+);
+
+const visibleColumns = computed(() => activeColumns.value.filter((c) => c.visible));
+
+function onColumnConfigSave(cols: typeof defaultColumns): void {
+  activeColumns.value = cols;
+  const vis: Record<string, boolean> = {};
+  for (const c of cols) {
+    vis[c.prop] = c.visible;
+  }
+  _savedColVis.value = vis;
+}
 
 // ── 抽屉状态 ──────────────────────────────────────────
 const drawerVisible = ref(false);
@@ -466,6 +533,8 @@ function fetchData(): void {
     keyword: filters.keyword || undefined,
     pageNum: pagination.pageNum,
     pageSize: pagination.pageSize,
+    sort_prop: sortParams.value.sort_prop || undefined,
+    sort_order: sortParams.value.sort_order || undefined,
   };
 
   getKeywords(params)
@@ -487,13 +556,27 @@ function fetchData(): void {
     });
 }
 
+/**
+ * 表格排序变化回调。
+ *
+ * @param {{ prop: string; order: string }} sort - Element Plus 排序事件参数
+ */
+function handleSortChange({ prop, order }: { prop: string; order: string }): void {
+  sortParams.value = {
+    sort_prop: prop || "",
+    sort_order: order === "ascending" ? "asc" : order === "descending" ? "desc" : "",
+  };
+  fetchData();
+}
+
 function onSearch(): void {
   pagination.pageNum = 1;
   fetchData();
 }
 
 function onReset(): void {
-  filters.range = props.initialDateRange ?? null;
+  filters.range =
+    props.initialDateRange?.length === 2 ? [...props.initialDateRange] : getDefaultDateRange();
   filters.state = "";
   filters.matchType = "";
   filters.keyword = "";

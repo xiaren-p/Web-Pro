@@ -74,6 +74,7 @@
         style="width: 100%"
         @selection-change="onSelectionChange"
         @header-dragend="onHeaderDragEnd"
+        @sort-change="handleSortChange"
       >
         <!-- 固定左侧：勾选列 -->
         <el-table-column
@@ -328,6 +329,7 @@ import { ElMessage } from "element-plus";
 
 import { getAds } from "@/api/ads";
 import ColumnManager from "@/components/ColumnManager/index.vue";
+import { getDefaultDateRange, DATE_RANGE_KEY } from "@/utils/date";
 
 defineOptions({ name: "AdsPanel" });
 
@@ -356,13 +358,25 @@ const _savedFilters = useLocalStorage("ads_panel_filters", {
   productTag: "",
 });
 
-/** 筛选条件，range 以父页面传入日期初始化 */
+/** 筛选条件，range 以父页面传入日期初始化，无则默认前7天 */
 const filters = ref({
-  range: (props.initialDateRange?.length === 2 ? [...props.initialDateRange] : []) as string[],
+  range: (props.initialDateRange?.length === 2
+    ? [...props.initialDateRange]
+    : getDefaultDateRange()) as string[],
   state: _savedFilters.value.state,
   productTag: _savedFilters.value.productTag,
   keyword: _savedFilters.value.keyword,
 });
+
+watch(
+  () => filters.value.range,
+  (val) => {
+    if (val?.length === 2) {
+      localStorage.setItem(DATE_RANGE_KEY, JSON.stringify(val));
+    }
+  },
+  { deep: true }
+);
 
 /** 列配置抽屉显示状态（持久化，刷新后保持上次开关状态） */
 const columnConfigVisible = useLocalStorage<boolean>("ads_panel_drawer", false);
@@ -385,6 +399,9 @@ defineExpose({ summaryRow });
 
 /** 货币符号（从接口响应中获取） */
 const currencyIcon = ref<string>("$");
+
+/** 排序状态 */
+const sortParams = ref<Record<string, string>>({});
 
 /** 当前勾选的行数据 */
 const selectedRows = ref<any[]>([]);
@@ -518,6 +535,19 @@ watch(
 );
 
 /**
+ * 表格排序变化回调。
+ *
+ * @param {{ prop: string; order: string }} sort - Element Plus 排序事件参数
+ */
+function handleSortChange({ prop, order }: { prop: string; order: string }): void {
+  sortParams.value = {
+    sort_prop: prop || "",
+    sort_order: order === "ascending" ? "asc" : order === "descending" ? "desc" : "",
+  };
+  fetchData();
+}
+
+/**
  * 触发搜索，重置到第一页后加载数据。
  */
 function onSearch(): void {
@@ -588,6 +618,8 @@ function fetchData(): void {
     keyword: filters.value.keyword || undefined,
     pageNum: currentPage.value,
     pageSize: pageSize.value,
+    sort_prop: sortParams.value.sort_prop || undefined,
+    sort_order: sortParams.value.sort_order || undefined,
   })
     .then((res: AdsResponse) => {
       tableData.value = res.list ?? [];

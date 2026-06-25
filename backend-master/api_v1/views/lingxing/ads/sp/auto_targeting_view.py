@@ -429,7 +429,6 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         date_end = data.get("date_end")
         state = data.get("state")
         keyword = data.get("keyword")
-        p_num, p_size = self._get_page_params(data)
 
         qs = LxSpTarget.objects.filter(
             campaign_id=campaign_id,
@@ -440,10 +439,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         if state:
             qs = qs.filter(state=state)
 
-        total = qs.count()
-        start_idx = (p_num - 1) * p_size
-        end_idx = start_idx + p_size
-        items = list(qs[start_idx:end_idx])
+        total, items, p_num, p_size = paginate_queryset(request, qs)
 
         currency_icon = self._resolve_currency_icon(int(profile_id))
 

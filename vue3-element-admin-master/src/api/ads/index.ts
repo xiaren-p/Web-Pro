@@ -53,6 +53,7 @@ export interface AdCampaignDetailResponse {
   targeting_type: string;
   state: string;
   sponsored_type: string;
+  profile_name: string;
 }
 
 /**
@@ -83,6 +84,8 @@ export interface AdGroupsParams {
   keyword?: string;
   pageNum?: number;
   pageSize?: number;
+  sort_prop?: string;
+  sort_order?: string;
 }
 
 /** 广告组列表分页响应结构 */
@@ -121,6 +124,8 @@ export interface AdsParams {
   keyword?: string;
   pageNum?: number;
   pageSize?: number;
+  sort_prop?: string;
+  sort_order?: string;
 }
 
 /** 广告投放列表分页响应结构 */
@@ -271,6 +276,8 @@ export interface KeywordParams {
   keyword?: string;
   pageNum?: number;
   pageSize?: number;
+  sort_prop?: string;
+  sort_order?: string;
 }
 
 /** 关键词列表分页响应结构 */
@@ -774,9 +781,7 @@ export function batchAdjustKeywordState(
 /**
  * 批量调整关键词竞价。
  */
-export function batchAdjustKeywordBid(
-  data: BatchAdjustBidParams
-): Promise<BatchAdjustResponse> {
+export function batchAdjustKeywordBid(data: BatchAdjustBidParams): Promise<BatchAdjustResponse> {
   return request({
     url: "/ads/keywords/batch-adjust-bid",
     method: "post",
@@ -787,9 +792,7 @@ export function batchAdjustKeywordBid(
 /**
  * 批量调整自动定位组状态。
  */
-export function batchAdjustTargetState(
-  data: BatchAdjustStateParams
-): Promise<BatchAdjustResponse> {
+export function batchAdjustTargetState(data: BatchAdjustStateParams): Promise<BatchAdjustResponse> {
   return request({
     url: "/ads/auto-targeting/batch-adjust-state",
     method: "post",
@@ -800,9 +803,7 @@ export function batchAdjustTargetState(
 /**
  * 批量调整自动定位组竞价。
  */
-export function batchAdjustTargetBid(
-  data: BatchAdjustBidParams
-): Promise<BatchAdjustResponse> {
+export function batchAdjustTargetBid(data: BatchAdjustBidParams): Promise<BatchAdjustResponse> {
   return request({
     url: "/ads/auto-targeting/batch-adjust-bid",
     method: "post",
@@ -846,6 +847,8 @@ export interface ProductTargetingParams {
   keyword?: string;
   pageNum?: number;
   pageSize?: number;
+  sort_prop?: string;
+  sort_order?: string;
 }
 
 /** 产品投放列表分页响应 */

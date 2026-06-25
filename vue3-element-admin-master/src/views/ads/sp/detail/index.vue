@@ -34,6 +34,10 @@
           </template>
         </span>
         <h1 class="campaign-name">{{ campaignInfo?.name || campaignId }}</h1>
+        <span v-if="campaignInfo?.profile_name" class="store-name">
+          <el-icon class="store-icon"><Shop /></el-icon>
+          {{ campaignInfo.profile_name }}
+        </span>
       </div>
     </div>
 
@@ -148,7 +152,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ArrowLeft, VideoPause, CircleClose } from "@element-plus/icons-vue";
+import { ArrowLeft, VideoPause, CircleClose, Shop } from "@element-plus/icons-vue";
 import { useLocalStorage } from "@vueuse/core";
 import {
   getAdCampaignDetail,
@@ -582,6 +586,21 @@ onMounted(() => {
     line-height: 1.4;
     color: var(--color-gray-900);
     white-space: nowrap;
+  }
+
+  .store-name {
+    display: flex;
+    flex-shrink: 0;
+    gap: 4px;
+    align-items: center;
+    padding: 2px 10px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    background: var(--surface-subtle);
+    border-radius: var(--radius-md);
+    .store-icon {
+      font-size: 14px;
+    }
   }
 
   /* ── 导航 Tab（上圆角归零，与 header-card 无缝衔接）── */

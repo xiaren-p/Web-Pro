@@ -262,7 +262,7 @@
       <!-- 分页栏 -->
       <div class="pager-row">
         <span class="total-count">共 {{ total.toLocaleString() }} 条</span>
-        
+
         <!-- 批量操作按钮 -->
         <el-dropdown v-if="selectedRows.length > 0" trigger="click" style="margin-left: 12px">
           <el-button type="primary" size="small">
@@ -276,7 +276,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        
+
         <el-dropdown v-if="selectedRows.length > 0" trigger="click" style="margin-left: 8px">
           <el-button size="small">
             批量调竞价
@@ -288,7 +288,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        
+
         <el-select
           v-model="pageSize"
           placeholder="每页"
@@ -317,7 +317,7 @@
       :columns="activeColumns"
       @save="onColumnConfigSave"
     />
-    
+
     <!-- 批量调整竞价对话框 -->
     <BatchBidAdjustDialog
       v-model="batchBidDialogVisible"
@@ -410,13 +410,15 @@ const selectedRows = ref<any[]>([]);
 const batchBidDialogVisible = ref(false);
 
 /** 批量调整竞价项列表 */
-const batchBidItems = ref<Array<{
-  id: string | number;
-  targetingText: string;
-  campaignName: string;
-  adgroupName: string;
-  currentBid: number;
-}>>([]);
+const batchBidItems = ref<
+  Array<{
+    id: string | number;
+    targetingText: string;
+    campaignName: string;
+    adgroupName: string;
+    currentBid: number;
+  }>
+>([]);
 
 /**
  * 列定义（含 category，供 ColumnManager 分组展示）。

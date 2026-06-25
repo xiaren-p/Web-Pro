@@ -882,7 +882,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
     def campaign_info(self, request: Request) -> Response:
         """根据 ``campaign_id`` 与 ``profile_id`` 返回单条 SP 广告活动基础信息。
 
-        主要供详情页面加载面包屑标题与投放类型使用，不包含指标数据。
+        主要供详情页面加载面包屑标题、店铺名与投放类型使用，不包含指标数据。
 
         Args:
             request (Request): DRF 请求对象，需携带 query param：
@@ -898,6 +898,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             - targeting_type (str | None): 投放类型（AUTO / MANUAL）。
             - state (str): 活动状态。
             - sponsored_type (str): 广告类型（兼容前端，实际取 campaign_type）。
+            - profile_name (str): 店铺/账号名称（取自 LxAdsProfile.name）。
         """
         campaign_id = request.query_params.get("campaign_id", "").strip()
         profile_id = request.query_params.get("profile_id", "").strip()
@@ -910,12 +911,17 @@ class AdCampaignViewSet(viewsets.ViewSet):
         except LxSpCampaign.DoesNotExist:
             return drf_ok({}, msg="未找到对应的广告活动")
 
+        profile_name = LxAdsProfile.objects.filter(
+            profile_id=int(profile_id)
+        ).values_list("name", flat=True).first() or ""
+
         return drf_ok({
             "campaign_id": obj.campaign_id,
             "name": obj.name,
             "targeting_type": obj.targeting_type or "",
             "state": obj.state,
             "sponsored_type": obj.campaign_type,
+            "profile_name": profile_name,
         })
 
     @action(detail=False, methods=["post"], url_path="adjust-budget")

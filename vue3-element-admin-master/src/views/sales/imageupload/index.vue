@@ -482,18 +482,18 @@ onMounted(() => {
 /* 表格卡片区域弹性填充 */
 .data-table {
   display: flex;
-  flex-direction: column;
   flex: 1;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
 
   :deep(.el-card__body) {
     display: flex;
-    flex-direction: column;
     flex: 1;
+    flex-direction: column;
     min-height: 0;
-    overflow: hidden;
     padding: 16px;
+    overflow: hidden;
   }
 }
 
@@ -505,8 +505,8 @@ onMounted(() => {
 
 /* 分页栏不缩不滚 */
 .pagination-container {
-  flex-shrink: 0;
   display: flex;
+  flex-shrink: 0;
   justify-content: flex-end;
   padding-top: 12px;
 }

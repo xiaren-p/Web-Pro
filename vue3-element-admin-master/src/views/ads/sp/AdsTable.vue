@@ -21,7 +21,14 @@
             <p class="table-empty__text">暂无数据</p>
           </div>
         </template>
-        <el-table-column type="selection" width="48" fixed="left" align="center" :resizable="false" :selectable="(row: any) => !row._isSummary">
+        <el-table-column
+          type="selection"
+          width="48"
+          fixed="left"
+          align="center"
+          :resizable="false"
+          :selectable="(row: any) => !row._isSummary"
+        >
           <template #default="{ row }">
             <span v-if="row._isSummary" />
           </template>
@@ -268,7 +275,9 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button size="small" class="batch-btn" @click="$emit('batch-budget', selectedRows)">调预算</el-button>
+            <el-button size="small" class="batch-btn" @click="$emit('batch-budget', selectedRows)">
+              调预算
+            </el-button>
           </template>
         </div>
         <div class="pager-center">
@@ -1121,11 +1130,11 @@ function formatValue(val: any): string {
 }
 
 .pager-left {
+  display: flex;
   flex: 1;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
 }
 
 .batch-divider {
