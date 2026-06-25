@@ -123,51 +123,65 @@ def _get_rate_map() -> dict[str, dict[str, Any]]:
     return result
 
 
+import threading
+
+_listing_cache_lock = threading.Lock()
+
+
 def _load_all_listing_caches() -> None:
     """一次全表扫描 LxListingData，同时产出 tag/owner/asin_info 三个缓存。
+
+    互斥锁保证全局同时只有一个线程在扫描——后续请求看到锁被持有直接返回，
+    回退到原始 DB 查询（几十 ms），不排队等 19s。
 
     避免 _get_tag_asin_map + _get_owner_asin_map 各自扫全表（2×1.2s → 1×1.2s）。
     内部使用 cache.set_many 一次性写入所有 key。
     """
+    if not _listing_cache_lock.acquire(blocking=False):
+        return  # 已有其他线程在加载，本次请求直接返回
+
     from collections import defaultdict
     from django.core.cache import cache as _cache
 
-    tag_asin: dict[str, set[str]] = defaultdict(set)
-    owner_asin: dict[str, set[str]] = defaultdict(set)
-    asin_tags: dict[str, list[str]] = defaultdict(list)
-    asin_owners: dict[str, list[str]] = defaultdict(list)
+    try:
+        tag_asin: dict[str, set[str]] = defaultdict(set)
+        owner_asin: dict[str, set[str]] = defaultdict(set)
+        asin_tags: dict[str, list[str]] = defaultdict(list)
+        asin_owners: dict[str, list[str]] = defaultdict(list)
 
-    for asin_val, global_tags, principal_info in LxListingData.objects.values_list(
-        "asin", "global_tags", "principal_info"
-    ):
-        # 解析 global_tags
-        if isinstance(global_tags, list):
-            for entry in global_tags:
-                if isinstance(entry, dict):
-                    gid = str(entry.get("globalTagId", ""))
-                    if gid:
-                        tag_asin[gid].add(asin_val)
-                        asin_tags[asin_val].append(gid)
-        # 解析 principal_info
-        if isinstance(principal_info, list):
-            for entry in principal_info:
-                if isinstance(entry, dict):
-                    uid = entry.get("principal_uid")
-                    name = entry.get("principal_name", "")
-                    if uid is not None:
-                        owner_asin[str(uid)].add(asin_val)
-                    if name:
-                        asin_owners[asin_val].append(name)
+        for asin_val, global_tags, principal_info in LxListingData.objects.values_list(
+            "asin", "global_tags", "principal_info"
+        ):
+            # 解析 global_tags
+            if isinstance(global_tags, list):
+                for entry in global_tags:
+                    if isinstance(entry, dict):
+                        gid = str(entry.get("globalTagId", ""))
+                        if gid:
+                            tag_asin[gid].add(asin_val)
+                            asin_tags[asin_val].append(gid)
+            # 解析 principal_info
+            if isinstance(principal_info, list):
+                for entry in principal_info:
+                    if isinstance(entry, dict):
+                        uid = entry.get("principal_uid")
+                        name = entry.get("principal_name", "")
+                        if uid is not None:
+                            owner_asin[str(uid)].add(asin_val)
+                        if name:
+                            asin_owners[asin_val].append(name)
 
-    _cache.set_many(
-        {
-            "sp_tag_asin_map_v2": dict(tag_asin),
-            "sp_owner_asin_map_v2": dict(owner_asin),
-            "sp_asin_tags_map_v2": dict(asin_tags),
-            "sp_asin_owners_map_v2": dict(asin_owners),
-        },
-        _REF_TTL,
-    )
+        _cache.set_many(
+            {
+                "sp_tag_asin_map_v2": dict(tag_asin),
+                "sp_owner_asin_map_v2": dict(owner_asin),
+                "sp_asin_tags_map_v2": dict(asin_tags),
+                "sp_asin_owners_map_v2": dict(asin_owners),
+            },
+            _REF_TTL,
+        )
+    finally:
+        _listing_cache_lock.release()
 
 
 def _get_tag_asin_map() -> dict[str, set[str]]:
@@ -1850,8 +1864,6 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
 # ── 启动时后台预加载全量参考数据 + 标签/负责人 ASIN 映射缓存 ──
 # 避免首个 HTTP 请求触发冷查询（标签 JSON_CONTAINS 1.86s → Redis 命中 <10ms）
-import threading as _threading
-
 def _warmup_reference_caches():
     try:
         _load_all_listing_caches()
@@ -1861,4 +1873,4 @@ def _warmup_reference_caches():
     except Exception:
         pass  # Redis 不可用时静默失败，不影响服务启动
 
-_threading.Thread(target=_warmup_reference_caches, daemon=True).start()
+threading.Thread(target=_warmup_reference_caches, daemon=True).start()
