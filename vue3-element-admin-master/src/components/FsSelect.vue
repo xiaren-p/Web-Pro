@@ -264,7 +264,7 @@ const containerStyle = computed((): Record<string, string> => {
   );
   const countPx = vals.length > 1 ? 42 : 0; // "+N" 徽标宽度
   const total = charPx + countPx + 56; // 56 = 内边距 + 箭头图标 + 安全余量
-  return { minWidth: `${total}px` };
+  return { minWidth: `${Math.min(total, 260)}px`, maxWidth: "260px" };
 });
 </script>
 
