@@ -73,15 +73,16 @@ _REF_TTL = 1200
 def _get_profile_map() -> dict[str, dict[str, str]]:
     """profile_id → {profile_alias, country_code, sid} 全量缓存。"""
     from django.core.cache import cache as _cache
-    _key = "sp_ref_profile_map_v2"
+    _key = "sp_ref_profile_map_v3"
     cached = _cache.get(_key)
     if cached is not None:
         return cached
     result: dict[str, dict[str, str]] = {}
-    for p in LxAdsProfile.objects.all().values("profile_id", "name", "country_code", "sid"):
+    for p in LxAdsProfile.objects.all().values("profile_id", "name", "country_code", "currency_code", "sid"):
         result[str(p["profile_id"])] = {
             "profile_alias": p["name"] or str(p["profile_id"]),
             "country_code": p["country_code"] or "",
+            "currency_code": p["currency_code"] or "",
             "sid": str(p["sid"] or ""),
         }
     _cache.set(_key, result, _REF_TTL)
@@ -623,7 +624,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         profile_to_rate_all: dict[str, dict[str, Any]] = {}
         for pid in all_profile_ids:
             info = all_profile_info.get(str(pid))
-            cc = info.get("country_code") if info else None
+            cc = info.get("currency_code") if info else None
             profile_to_rate_all[str(pid)] = rate_map_all.get(cc, _default_ccy) if cc else _default_ccy
             if cc:
                 all_currency_codes.add(cc)
