@@ -489,42 +489,19 @@ class AdCampaignViewSet(viewsets.ViewSet):
         # ── 筛选集全体 campaign / profile 对 ──
         p_num, p_size = self._get_page_params(data)
 
-        # ── 两级 Redis 缓存设计 ──
-        # Level 1（base）：不含 tags/owners/skus/keyword 等高基数字段，命中率高
-        # Level 2（full）：含全部筛选字段，精确匹配，命中率低但可完全跳过 Q10
-        _high_card_fields = ["keyword", "tags", "owners", "skus", "asinSearchType"]
-        base_key_parts = [
-            date_start or "_", date_end or "_",
-            data.get("state") or "_",
-            data.get("service_status") or "_",
-            data.get("sponsored_type") or "_",
-            data.get("bidding_type") or "_",
-            data.get("profiles") or "_",
-            data.get("countries") or "_",
-            data.get("portfolio_id") or "_",
-        ]
-        full_key_parts = base_key_parts + [
-            data.get(k) or "_" for k in _high_card_fields
-        ]
-        base_cache_key = f"sp_campaign_agg_base:{'|'.join(base_key_parts)}"
-        full_cache_key = f"sp_campaign_agg_full:{'|'.join(full_key_parts)}"
+        # ── Doris 聚合缓存 ──
+        # key 仅含 date_start/date_end（per-campaign 指标不依赖 profile/state/tag 等筛选）
+        # 不同筛选共享同一份 agg_map，命中的情况通过 active_agg subset 取子集
+        base_cache_key = f"sp_campaign_agg:{date_start or '_'}|{date_end or '_'}"
 
         agg_map: dict[str, dict[str, Any]] | None = None
-        cached_pairs: set[tuple[str, str]] | None = None
 
-        # 1. 先查 full cache（精确匹配，可完全跳过 Q10）
-        full_cached = cache.get(full_cache_key)
-        if isinstance(full_cached, dict) and "agg_map" in full_cached:
-            agg_map = full_cached["agg_map"]
-            cached_pairs = {(str(c), str(p)) for c, p in full_cached.get("pairs", [])}
+        # 1. 查缓存
+        base_cached = cache.get(base_cache_key)
+        if isinstance(base_cached, dict) and "agg_map" in base_cached:
+            agg_map = base_cached["agg_map"]
 
-        # 2. full 未命中，查 base cache（命中率高，但需跑 Q10 取筛选后 pairs）
-        if agg_map is None:
-            base_cached = cache.get(base_cache_key)
-            if isinstance(base_cached, dict) and "agg_map" in base_cached:
-                agg_map = base_cached["agg_map"]
-
-        # 3. 不论缓存命中与否，Q10 都要跑（获取筛选后的 campaign 对）
+        # 2. 获取筛选后的 campaign 对（Q10，必跑）
         all_pairs_list = list(
             qs.values_list("campaign_id", "profile_id").distinct()
         )
@@ -532,7 +509,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         all_profile_ids = sorted({p for _, p in all_pairs_list if p})
         all_campaign_pairs = [(c, p) for c, p in all_pairs_list if c and p]
 
-        # 4. 缓存未命中 agg_map → 走 Doris 聚合
+        # 3. 缓存未命中 → Doris 聚合
         if agg_map is None:
             agg_map: dict[str, dict[str, Any]] = {}
             if all_pairs_set:
@@ -590,19 +567,14 @@ class AdCampaignViewSet(viewsets.ViewSet):
                             "same_orders": 0, "units": 0, "cost": 0.0,
                             "clicks": 0, "impressions": 0,
                         }
-                # 写入两级缓存
                 ttl = 120 if date_start and date_end else 60
-                base_payload = {"agg_map": agg_map}
-                full_payload = {"agg_map": agg_map, "pairs": all_pairs_list}
                 try:
-                    cache.set(base_cache_key, base_payload, max(ttl, 120))
-                    cache.set(full_cache_key, full_payload, ttl)
+                    cache.set(base_cache_key, {"agg_map": agg_map}, max(ttl, 120))
                 except Exception:
                     pass
 
-        # 5. 从 agg_map 中只取筛选后存在的 pair（base cache 可能包含更多 pair）
-        #    确保无冗余 pair 被用于排序和汇总计算
-        active_agg: dict[str, dict[str, Any]] = {}
+        # 4. 从 agg_map 中只取筛选后存在的 pair
+        active_agg: dict[str, dict[str, Any]] = {}  # type: ignore[no-redef]
         for cp_key in (f"{c}::{p}" for c, p in all_pairs_set):
             if cp_key in agg_map:
                 active_agg[cp_key] = agg_map[cp_key]
