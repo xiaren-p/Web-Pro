@@ -110,6 +110,7 @@ class SpCampaignAdjustment(models.Model):
             models.Index(fields=["execution_type"]),
             models.Index(fields=["execution_status"]),
             models.Index(fields=["adjustment_time"]),
+            models.Index(fields=["campaign_id", "profile_id", "created_at"]),
         ]
 
     def __str__(self) -> str:

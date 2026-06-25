@@ -167,6 +167,8 @@ class SpBidAdjustment(models.Model):
             models.Index(fields=["execution_type"]),
             models.Index(fields=["execution_status"]),
             models.Index(fields=["adjustment_time"]),
+            models.Index(fields=["keyword_id", "created_at"]),
+            models.Index(fields=["target_id", "created_at"]),
         ]
 
     def __str__(self) -> str:
