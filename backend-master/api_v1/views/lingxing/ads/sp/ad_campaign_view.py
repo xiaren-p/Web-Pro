@@ -579,21 +579,24 @@ class AdCampaignViewSet(viewsets.ViewSet):
             )
             page_pairs = pairs[start_idx:end_idx]
 
-            # 用精确对查询回页内 25 条 Model 实例
-            pair_q = Q()
-            for cid, pid in page_pairs:
-                pair_q |= Q(campaign_id=cid, profile_id=pid)
-            items = list(LxSpCampaign.objects.filter(pair_q).only(
-                "id", "campaign_id", "profile_id", "name", "campaign_type",
-                "targeting_type", "daily_budget", "start_date", "end_date",
-                "state", "serving_status", "bidding", "portfolio_id", "tags",
-                "creation_date", "last_updated_date",
-            ))
-            # 恢复排序顺序（filter(pair_q) 可能打乱 pairs 的顺序）
-            pair_order = {f"{c}::{p}": i for i, (c, p) in enumerate(page_pairs)}
-            items.sort(key=lambda obj: pair_order.get(
-                f"{obj.campaign_id}::{obj.profile_id}", len(page_pairs)
-            ))
+            if not page_pairs:
+                items = []
+            else:
+                # 用精确对查询回页内 25 条 Model 实例
+                pair_q = Q()
+                for cid, pid in page_pairs:
+                    pair_q |= Q(campaign_id=cid, profile_id=pid)
+                items = list(LxSpCampaign.objects.filter(pair_q).only(
+                    "id", "campaign_id", "profile_id", "name", "campaign_type",
+                    "targeting_type", "daily_budget", "start_date", "end_date",
+                    "state", "serving_status", "bidding", "portfolio_id", "tags",
+                    "creation_date", "last_updated_date",
+                ))
+                # 恢复排序顺序（filter(pair_q) 可能打乱 pairs 的顺序）
+                pair_order = {f"{c}::{p}": i for i, (c, p) in enumerate(page_pairs)}
+                items.sort(key=lambda obj: pair_order.get(
+                    f"{obj.campaign_id}::{obj.profile_id}", len(page_pairs)
+                ))
 
         # ── 店铺与国家数据（全量缓存，20 分钟刷新）──
         item_profile_ids = [item.profile_id for item in items if item.profile_id]
