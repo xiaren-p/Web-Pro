@@ -92,6 +92,8 @@
             <el-switch
               v-if="!row._isSummary"
               v-model="row.state"
+              size="small"
+              style="--el-switch-width: 32px; --el-switch-height: 16px"
               active-value="enabled"
               inactive-value="paused"
               disabled
