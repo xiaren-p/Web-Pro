@@ -59,9 +59,15 @@
           />
           <img v-if="option.img" :src="option.img" class="fs-option-img" />
           <span class="fs-option-content">
-            <span class="fs-option-title" :title="option.title || option.label">
-              {{ option.title || option.label }}
-            </span>
+            <el-tooltip
+              :content="option.title || option.label"
+              :show-after="500"
+              placement="top-start"
+            >
+              <span class="fs-option-title">
+                {{ option.title || option.label }}
+              </span>
+            </el-tooltip>
             <small v-if="option.code" class="sku-code">
               {{ option.code }}
               <span v-if="option.value && option.value !== option.code">{{ option.value }}</span>
@@ -310,6 +316,7 @@ const containerStyle = computed((): Record<string, string> => {
   min-width: 0;
 }
 .fs-option-title {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text-primary);
@@ -332,6 +339,7 @@ const containerStyle = computed((): Record<string, string> => {
  * 必须用不带 scoped 的 <style> 块，因为 el-select 的下拉面板 teleport 到 body 下。
  */
 .fs-select-popper {
+  max-width: 480px;
   border-radius: var(--radius-lg) !important;
   box-shadow: var(--shadow-popover) !important;
 
