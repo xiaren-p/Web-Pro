@@ -485,15 +485,15 @@ function openTemplates() {
 }
 
 .date-picker {
-  flex: 0 0 210px;
-  width: 210px;
+  flex: 0 0 250px;
+  width: 250px;
   overflow: hidden;
 }
 
 :deep(.date-picker .el-range-editor),
 :deep(.el-range-editor.el-input__wrapper) {
-  width: 210px !important;
-  max-width: 210px !important;
+  width: 250px !important;
+  max-width: 250px !important;
   padding: 0 8px;
 }
 
