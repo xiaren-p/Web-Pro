@@ -8,6 +8,10 @@
 """
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from typing import Any
 
 from django.db.models import Q
@@ -57,6 +61,7 @@ class AdViewSet(viewsets.ViewSet):
                 code=profile.currency_code
             ).order_by("-date").first()
         except Exception:
+            logger.warning("[_resolve_currency_icon] 汇率查询失败", exc_info=True)
             return "?"
         return rate.icon if rate and rate.icon else "?"
 
@@ -129,10 +134,10 @@ class AdViewSet(viewsets.ViewSet):
         # 分页
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
-        # ── 货币符号（LxAdsProfile.currency_code → LxExchangeRate.code，一步查表）──
+        # 主题：货币符号（LxAdsProfile.currency_code → LxExchangeRate.code，一步查表）
         currency_icon = self._resolve_currency_icon(profile_id)
 
-        # ── 父广告活动基础信息（单次点查）──
+        # 主题：父广告活动基础信息（单次点查）
         campaign_name = ""
         campaign_state = ""
         campaign_portfolio_name = ""
@@ -151,7 +156,7 @@ class AdViewSet(viewsets.ViewSet):
         except LxSpCampaign.DoesNotExist:
             pass
 
-        # ── 广告组名称批量映射 ──
+        # 主题：广告组名称批量映射
         item_ad_group_ids = list({
             item.ad_group_id for item in items if item.ad_group_id
         })
@@ -167,7 +172,7 @@ class AdViewSet(viewsets.ViewSet):
                 adgroup_map[gid] = g["name"] or ""
                 adgroup_state_map[gid] = g["state"] or ""
 
-        # ── 产品详情（通过 LxSpAd.sku + LxAdsProfile.sid → LxListingData 批量获取）──
+        # 主题：产品详情（通过 LxSpAd.sku + LxAdsProfile.sid → LxListingData 批量获取）
         # Step 1：获取当前 profile 的 sid
         ads_profile = LxAdsProfile.objects.filter(profile_id=profile_id).first()
         sid = ads_profile.sid if ads_profile else 0
@@ -185,7 +190,7 @@ class AdViewSet(viewsets.ViewSet):
             ):
                 listing_map[ld["seller_sku"]] = ld
 
-        # ── 指标聚合（传入全量 ad_id，1 次 SQL GROUP BY ad_id + Python 两轮遍历）──
+        # 主题：指标聚合（传入全量 ad_id，1 次 SQL GROUP BY ad_id + Python 两轮遍历）
         date_start = str(data.get("date_start") or "").strip() or None
         date_end = str(data.get("date_end") or "").strip() or None
         metrics_map, summary = build_ad_metrics_map(
@@ -193,7 +198,7 @@ class AdViewSet(viewsets.ViewSet):
             date_start, date_end, currency_icon,
         )
 
-        # ── 组装响应列表 ──
+        # 主题：组装响应列表
         res_list: list[dict[str, Any]] = []
         for item in items:
             ld = listing_map.get(item.sku, {})

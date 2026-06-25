@@ -1,10 +1,13 @@
 """SP 广告活动基础数据视图（LxSpCampaign），提供查询与手动预算/状态调整。"""
 from __future__ import annotations
 
+import logging
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from django.core.cache import cache
+logger = logging.getLogger(__name__)
+
+from django.core.cache import cache as _cache
 from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework import viewsets
@@ -41,13 +44,13 @@ from api_v2.models.sp_campaign_adjustment import (
     SpCampaignAdjustment,
 )
 
-# ── 参考数据懒加载缓存（每 20 分钟自动刷新，省 5 次 DB 往返/请求）────────────
+# 主题：参考数据懒加载缓存（每 20 分钟自动刷新，省 5 次 DB 往返/请求）
 _REF_TTL = 600
 
 
 def _get_profile_map() -> dict[str, dict[str, str]]:
     """profile_id → {profile_alias, country_code, sid} 全量缓存。"""
-    from django.core.cache import cache as _cache
+
     _key = "sp_ref_profile_map_v3"
     cached = _cache.get(_key)
     if cached is not None:
@@ -66,7 +69,7 @@ def _get_profile_map() -> dict[str, dict[str, str]]:
 
 def _get_sid_country_map() -> dict[int, str]:
     """sid → 中文国家名 全量缓存。"""
-    from django.core.cache import cache as _cache
+
     _key = "sp_ref_sid_country_v2"
     cached = _cache.get(_key)
     if cached is not None:
@@ -81,7 +84,7 @@ def _get_sid_country_map() -> dict[int, str]:
 
 def _get_rate_map() -> dict[str, dict[str, Any]]:
     """currency_code → {icon, code, rate} 全量缓存（取每币种最新记录）。"""
-    from django.core.cache import cache as _cache
+
     _key = "sp_ref_rate_map_v2"
     cached = _cache.get(_key)
     if cached is not None:
@@ -105,7 +108,7 @@ def _load_all_listing_caches() -> None:
     若缓存已存在则直接返回，仅冷启动时执行一次全表扫描。
     """
     from collections import defaultdict
-    from django.core.cache import cache as _cache
+
 
     # 缓存已全部存在则跳过（Celery Beat 280s 刷新保证大部分请求命中）
     if all(_cache.get(k) for k in (
@@ -152,7 +155,7 @@ def _load_all_listing_caches() -> None:
         _REF_TTL,
     )
 
-    # ═══ LxSpAd 桥接缓存（聚后筛选用） ═══
+    # 主题：LxSpAd 桥接缓存（聚后筛选用）
     cp_asin: dict[str, set[str]] = defaultdict(set)
     asin_cp: dict[str, set[str]] = defaultdict(set)
     sku_cp: dict[str, set[str]] = defaultdict(set)
@@ -180,19 +183,19 @@ def _load_all_listing_caches() -> None:
 
 def _get_tag_asin_map() -> dict[str, set[str]]:
     """globalTagId → {asin, ...}。Celery 280s 刷新保证缓存有效，miss 时返回空字典。"""
-    from django.core.cache import cache as _cache
+
     return _cache.get("sp_tag_asin_map_v2") or {}
 
 
 def _get_owner_asin_map() -> dict[str, set[str]]:
     """principal_uid → {asin, ...}。Celery 280s 刷新保证缓存有效，miss 时返回空字典。"""
-    from django.core.cache import cache as _cache
+
     return _cache.get("sp_owner_asin_map_v2") or {}
 
 
 def _get_asin_info_map() -> dict[str, dict[str, list[str]]]:
     """asin → {tags: [globalTagId...], owners: [principal_name...]}。Celery 280s 刷新保证缓存有效。"""
-    from django.core.cache import cache as _cache
+
     tags = _cache.get("sp_asin_tags_map_v2") or {}
     owners = _cache.get("sp_asin_owners_map_v2") or {}
     result: dict[str, dict[str, list[str]]] = {}
@@ -206,19 +209,19 @@ def _get_asin_info_map() -> dict[str, dict[str, list[str]]]:
 
 def _get_asin_cp_map() -> dict[str, set[str]]:
     """ASIN → {cp_key, ...} 映射。聚后负责人/标签/MSKU/parent_asin 筛选用。"""
-    from django.core.cache import cache as _cache
+
     return _cache.get("sp_asin_cp_map_v1") or {}
 
 
 def _get_sku_cp_map() -> dict[str, set[str]]:
     """MSKU → {cp_key, ...} 映射。聚后 MSKU 搜索筛选用。"""
-    from django.core.cache import cache as _cache
+
     return _cache.get("sp_sku_cp_map_v1") or {}
 
 
 def _get_cp_asin_map() -> dict[str, set[str]]:
     """cp_key → {asin, ...} 映射。响应中补充 ASIN 字段用。"""
-    from django.core.cache import cache as _cache
+
     return _cache.get("sp_cp_asin_map_v1") or {}
 
 
@@ -267,7 +270,7 @@ def _get_operator_name(request: Request) -> str:
             if profile and profile.nickname:
                 return profile.nickname
         except Exception:
-            pass
+            logger.warning("[_get_operator_name] 获取用户昵称失败", exc_info=True)
         if hasattr(user, "username") and user.username:
             return user.username
     return "未知用户"
@@ -308,7 +311,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         data = request.data
 
-        # ── 关键词搜索 ──
+        # 主题：关键词搜索
         keyword = data.get("keyword") or data.get("name")
         if isinstance(keyword, str) and keyword.strip():
             kw = keyword.strip()
@@ -340,7 +343,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if bidding_strategy:
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
-        # ── 标签筛选（聚后：计算 cp_key 集，不修改 qs）──
+        # 主题：标签筛选（聚后：计算 cp_key 集，不修改 qs）
         # 链路：tag_name → LxListingTag.global_tag_id → Redis(tagId→ASIN) → asin_cp_map → cp_keys
         tag_cp_keys: set[str] | None = None
         tags = data.get("tags")
@@ -367,7 +370,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 else:
                     tag_cp_keys = set()
 
-        # ── 负责人筛选（聚后：计算 cp_key 集，不修改 qs）──
+        # 主题：负责人筛选（聚后：计算 cp_key 集，不修改 qs）
         # 链路：owner_uid → Redis(uid→ASIN) → asin_cp_map → cp_keys
         owner_cp_keys: set[str] | None = None
         owner_ids = data.get("owners")
@@ -410,7 +413,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             ).values_list("profile_id", flat=True)
             qs = qs.filter(profile_id__in=profile_ids)
 
-        # ── ASIN / MSKU / parent_asin 搜索（聚后：计算 cp_key 集，不修改 qs）──
+        # 主题：ASIN / MSKU / parent_asin 搜索（聚后：计算 cp_key 集，不修改 qs）
         search_cp_keys: set[str] | None = None
         skus = data.get("skus")
         asin_search_type = data.get("asinSearchType", "sku")
@@ -450,14 +453,14 @@ class AdCampaignViewSet(viewsets.ViewSet):
         sort_prop = data.get("sort_prop")
         sort_order = data.get("sort_order")
 
-        # ── 筛选集全体 campaign / profile 对（只含 DB 层筛选：店铺/国家/状态/组合）──
+        # 主题：筛选集全体 campaign / profile 对（只含 DB 层筛选：店铺/国家/状态/组合）
         p_num, p_size = self._get_page_params(data)
         all_pairs_list: list[tuple[int, int]] = list(
             qs.values_list("campaign_id", "profile_id").distinct()
         )
         all_pairs_key_set: set[str] = {f"{c}::{p}" for c, p in all_pairs_list}
 
-        # ── 聚后筛选：owner / tag / 搜索 cp_key 交集 ──
+        # 主题：聚后筛选：owner / tag / 搜索 cp_key 交集
         for _s in (owner_cp_keys, tag_cp_keys, search_cp_keys):
             if _s is not None:
                 if not _s:
@@ -509,7 +512,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
                         "clicks": 0, "impressions": 0,
                     }
 
-        # ── 排序与分页（DB 层分页优化：不在内存加载全量 Model 实例）──
+        # 主题：排序与分页（DB 层分页优化：不在内存加载全量 Model 实例）
         _SORT_METRIC_MAP: dict[str, str] = {
             "impressions": "impressions",
             "clicks": "clicks",
@@ -598,7 +601,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
                     f"{obj.campaign_id}::{obj.profile_id}", len(page_pairs)
                 ))
 
-        # ── 店铺与国家数据（全量缓存，20 分钟刷新）──
+        # 主题：店铺与国家数据（全量缓存，20 分钟刷新）
         item_profile_ids = [item.profile_id for item in items if item.profile_id]
         all_profile_info = _get_profile_map()
         sid_country = _get_sid_country_map()
@@ -616,7 +619,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         # 为其他代码可能的引用兜底 key（不在页内但也不影响逻辑）
         sid_to_country: dict[int, str] = sid_country
 
-        # ── 广告组合数据 ──
+        # 主题：广告组合数据
         portfolio_pairs = [
             (item.portfolio_id, item.profile_id)
             for item in items
@@ -630,7 +633,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             for ap in LxAdsPortfolio.objects.filter(pf_q):
                 portfolio_map[f"{ap.portfolio_id}::{ap.profile_id}"] = ap.name or str(ap.portfolio_id)
 
-        # ── 汇率体系（全量缓存，20 分钟刷新）──
+        # 主题：汇率体系（全量缓存，20 分钟刷新）
         _default_ccy: dict[str, Any] = {"icon": "￥", "code": "CNY", "rate": 1.0}
         rate_map_all = _get_rate_map()
 
@@ -677,7 +680,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 for cid, pid in all_campaign_pairs
             }
 
-        # ── 预算映射：全量筛选集 campaign → daily_budget（供汇总行统计预算，与销售额同口径）──
+        # 主题：预算映射：全量筛选集 campaign → daily_budget（供汇总行统计预算，与销售额同口径）
         budget_by_campaign_all: dict[str, float] = {}
         for cid, pid, budget in qs.values_list("campaign_id", "profile_id", "daily_budget"):
             if cid and pid and budget is not None:
@@ -686,7 +689,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
                 except (ValueError, TypeError):
                     continue
 
-        # ── 从 agg_map 计算汇总行 ──
+        # 主题：从 agg_map 计算汇总行
         summary = self._compute_summary_from_agg(
             agg_map, all_pairs_set,
             is_single_currency=is_single_currency,
@@ -697,7 +700,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         )
         meta = summary.pop("_meta", {})
 
-        # ── 从 agg_map 计算当前分页指标 ──
+        # 主题：从 agg_map 计算当前分页指标
         campaign_pairs = [
             (str(item.campaign_id), str(item.profile_id))
             for item in items
@@ -763,12 +766,12 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
             res_list.append(dic)
 
-        # ── 最近修改信息（一次查询，按 _etype 拆分为状态和预算两路）──
+        # 主题：最近修改信息（一次查询，按 _etype 拆分为状态和预算两路）
         all_adj_map = self._build_latest_adjustment_map(items, sid_to_country)
         state_types = {CampaignExecutionTypeChoices.CAMPAIGN_PAUSE, CampaignExecutionTypeChoices.CAMPAIGN_ENABLE}
         budget_types = {CampaignExecutionTypeChoices.RULE_BUDGET_ADJUSTMENT, CampaignExecutionTypeChoices.MANUAL_BUDGET_ADJUSTMENT}
 
-        # ── 标签和负责人数据 ──
+        # 主题：标签和负责人数据
         item_keys = [(str(item.campaign_id), str(item.profile_id)) for item in items]
         ad_rows = LxSpAd.objects.filter(
             build_campaign_profile_query(item_keys)
@@ -1255,7 +1258,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             "cpa": 0,
         }
 
-    # ── 最近修改信息构建 ──────────────────────────────────────────────────────
+    # 主题：最近修改信息构建
     # 查询每个广告活动 7 天内最近一次 SpCampaignAdjustment 记录，
     # 按 execution_type + auto_rule_id 是否为空区分规则/手动，构建多行展示文案。
 
@@ -1392,6 +1395,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             try:
                 return f"{country_name}时间: {created_at.strftime('%Y-%m-%d %H:%M')}"
             except Exception:
+                logger.warning("[_format_local_time] 格式化时间失败: %s, %s", country_name, created_at, exc_info=True)
                 return f"{country_name}时间: 未知"
 
     def _build_adjustment_lines(

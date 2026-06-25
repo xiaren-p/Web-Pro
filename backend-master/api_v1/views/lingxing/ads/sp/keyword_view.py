@@ -10,6 +10,10 @@
 """
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -55,7 +59,7 @@ def _get_operator_name(request: Request) -> str:
             if profile and profile.nickname:
                 return profile.nickname
         except Exception:
-            pass
+            logger.warning("[_get_operator_name] 获取用户昵称失败", exc_info=True)
         if hasattr(user, "username") and user.username:
             return user.username
     return "未知用户"
@@ -159,10 +163,10 @@ class KeywordViewSet(viewsets.ViewSet):
         # 分页
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
-        # ── 货币符号（LxAdsProfile → LxExchangeRate，一步查表）──
+        # 主题：货币符号（LxAdsProfile → LxExchangeRate，一步查表）
         currency_icon = self._resolve_currency_icon(profile_id)
 
-        # ── 父广告活动基础信息（单次点查）──
+        # 主题：父广告活动基础信息（单次点查）
         campaign_name = ""
         campaign_state = ""
         campaign_portfolio_name = ""
@@ -188,7 +192,7 @@ class KeywordViewSet(viewsets.ViewSet):
         except LxSpCampaign.DoesNotExist:
             pass
 
-        # ── 广告组名称批量映射 ──
+        # 主题：广告组名称批量映射
         item_ad_group_ids = list({
             item.ad_group_id for item in items if item.ad_group_id
         })
@@ -210,7 +214,7 @@ class KeywordViewSet(viewsets.ViewSet):
                     except (ValueError, TypeError):
                         pass
 
-        # ── 指标聚合（LxSpKeywordReport + DB Sum()）──
+        # 主题：指标聚合（LxSpKeywordReport + DB Sum()）
         date_start = str(data.get("date_start") or "").strip() or None
         date_end = str(data.get("date_end") or "").strip() or None
         metrics_map, summary = self._build_metrics(
@@ -218,7 +222,7 @@ class KeywordViewSet(viewsets.ViewSet):
             date_start, date_end, currency_icon,
         )
 
-        # ── 组装响应列表 ──
+        # 主题：组装响应列表
         res_list: list[dict[str, Any]] = []
         for item in items:
             gid_val = item.ad_group_id
@@ -250,7 +254,7 @@ class KeywordViewSet(viewsets.ViewSet):
             )
             res_list.append(row)
 
-        # ── 最近修改信息（拆分为状态变更和竞价变更两路，供两个星标各自展示）──
+        # 主题：最近修改信息（拆分为状态变更和竞价变更两路，供两个星标各自展示）
         keyword_ids = [str(k.keyword_id) for k in items if k.keyword_id]
         pid = int(profile_id)
         state_adj_map = _build_bid_latest_adjustment_map(
@@ -267,7 +271,7 @@ class KeywordViewSet(viewsets.ViewSet):
             row["latest_state_adjustment"] = state_adj_map.get(kid, {"has_recent": False, "lines": []})
             row["latest_bid_adjustment"] = bid_adj_map.get(kid, {"has_recent": False, "lines": []})
 
-        # ── 分时竞价展示（仅分时生效中显示，否则 -）──
+        # 主题：分时竞价展示（仅分时生效中显示，否则 -）
         tp_bid_map = _build_time_pricing_bid_map(
             keyword_ids, "keyword_id", int(campaign_id), int(profile_id), currency_icon,
         )
@@ -383,7 +387,7 @@ class KeywordViewSet(viewsets.ViewSet):
         try:
             cache.set(_cache_key, (metrics_map, summary), 300)
         except Exception:
-            pass
+            logger.warning("[_build_metrics] 缓存写入失败", exc_info=True)
         return metrics_map, summary
 
     @action(detail=False, methods=["post"], url_path="adjust-bid")
@@ -773,10 +777,11 @@ def _build_bid_lines(
             else:
                 local_time_str = f"{country_name or '当地'}时间: {rec.created_at.strftime('%Y-%m-%d %H:%M')}"
         except (ZoneInfoNotFoundError, Exception):
+            logger.warning("[_build_bid_lines] 时区转换失败，降级为 UTC 时间格式", exc_info=True)
             try:
                 local_time_str = f"{country_name or '当地'}时间: {rec.created_at.strftime('%Y-%m-%d %H:%M')}"
             except Exception:
-                pass
+                logger.warning("[_build_bid_lines] UTC 时间格式化失败", exc_info=True)
 
     lines = [line1, local_time_str]
 
@@ -812,7 +817,7 @@ def _build_bid_lines(
                 if group_parts:
                     lines.append(f"详细内容: {'；'.join(group_parts)}")
         except Exception:
-            pass
+            logger.warning("[_build_bid_lines] 规则条件解析失败", exc_info=True)
 
     # 执行操作
     if etype == BidExecType.BID_PAUSE:

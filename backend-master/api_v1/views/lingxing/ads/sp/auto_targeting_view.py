@@ -10,7 +10,10 @@
 """
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
+import logging
+
+logger = logging.getLogger(__name__)
+
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -55,7 +58,7 @@ def _get_operator_name(request: Request) -> str:
             if profile and profile.nickname:
                 return profile.nickname
         except Exception:
-            pass
+            logger.warning("[_get_operator_name] 获取用户昵称失败", exc_info=True)
         if hasattr(user, "username") and user.username:
             return user.username
     return "未知用户"
@@ -70,7 +73,7 @@ def _is_time_pricing_active(campaign_id: int, profile_id: int) -> bool:
     ).exists()
 
 
-# ── 自动投放定位组 type → 中文标签映射 ──
+# 主题：自动投放定位组 type → 中文标签映射
 _AUTO_TARGETING_TYPE_MAP: dict[str, str] = {
     "queryHighRelMatches": "紧密匹配",
     "queryBroadRelMatches": "宽泛匹配",
@@ -174,10 +177,10 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         # 分页
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
-        # ── 货币符号（LxAdsProfile → LxExchangeRate，一步查表）──
+        # 主题：货币符号（LxAdsProfile → LxExchangeRate，一步查表）
         currency_icon = self._resolve_currency_icon(profile_id)
 
-        # ── 父广告活动基础信息（单次点查）──
+        # 主题：父广告活动基础信息（单次点查）
         campaign_name = ""
         campaign_state = ""
         campaign_portfolio_name = ""
@@ -203,7 +206,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         except LxSpCampaign.DoesNotExist:
             pass
 
-        # ── 广告组名称批量映射 ──
+        # 主题：广告组名称批量映射
         item_ad_group_ids = list({
             item.ad_group_id for item in items if item.ad_group_id
         })
@@ -225,7 +228,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
                     except (ValueError, TypeError):
                         pass
 
-        # ── 指标聚合（LxSpTargetReport + DB Sum()）──
+        # 主题：指标聚合（LxSpTargetReport + DB Sum()）
         date_start = str(data.get("date_start") or "").strip() or None
         date_end = str(data.get("date_end") or "").strip() or None
         metrics_map, summary = self._build_target_metrics(
@@ -233,7 +236,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             date_start, date_end, currency_icon,
         )
 
-        # ── 组装响应列表 ──
+        # 主题：组装响应列表
         res_list: list[dict[str, Any]] = []
         for item in items:
             gid_val = item.ad_group_id
@@ -267,7 +270,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             row["is"] = "---"
             res_list.append(row)
 
-        # ── 最近修改信息（拆分为状态变更和竞价变更两路）──
+         # 主题：最近修改信息（拆分为状态变更和竞价变更两路）
         target_ids = [str(it.target_id) for it in items if it.target_id]
         state_adj_map = _build_bid_latest_adjustment_map(
             target_ids, "target_id", profile_id,
@@ -283,7 +286,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             row["latest_state_adjustment"] = state_adj_map.get(tid, {"has_recent": False, "lines": []})
             row["latest_bid_adjustment"] = bid_adj_map.get(tid, {"has_recent": False, "lines": []})
 
-        # ── 分时竞价展示 ──
+        # 主题：分时竞价展示
         tp_bid_map = _build_time_pricing_bid_map(
             target_ids, "target_id", campaign_id, profile_id, currency_icon,
         )
@@ -407,7 +410,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         try:
             cache.set(_cache_key, (metrics_map, summary), 300)
         except Exception:
-            pass
+            logger.warning("[_build_target_metrics] 缓存写入失败", exc_info=True)
         return metrics_map, summary
 
     @action(detail=False, methods=["post"], url_path="list-product-targeting")
@@ -492,7 +495,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             )
             res_list.append(row)
 
-        # ── 最近修改信息（product targeting - 拆分为状态和竞价两路）──
+         # 主题：最近修改信息（product targeting - 拆分为状态和竞价两路）
         target_ids = [str(it.target_id) for it in items if it.target_id]
         state_adj_map = _build_bid_latest_adjustment_map(
             target_ids, "target_id", profile_id,
@@ -508,7 +511,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             row["latest_state_adjustment"] = state_adj_map.get(tid, {"has_recent": False, "lines": []})
             row["latest_bid_adjustment"] = bid_adj_map.get(tid, {"has_recent": False, "lines": []})
 
-        # ── 分时竞价展示 ──
+        # 主题：分时竞价展示
         tp_bid_map = _build_time_pricing_bid_map(
             target_ids, "target_id", int(campaign_id), int(profile_id), currency_icon,
         )
@@ -875,10 +878,11 @@ def _build_bid_lines(rec: Any, rule_map: dict[int, Any], country_name: str, tz_n
             local_dt = rec.created_at.astimezone(tz) if tz else rec.created_at
             local_str = f"{country_name or '当地'}时间: {local_dt.strftime('%Y-%m-%d %H:%M')}"
         except Exception:
+            logger.warning("[_build_bid_lines] ZoneInfo 时区转换失败，降级为 UTC 时间格式", exc_info=True)
             try:
                 local_str = f"{country_name or '当地'}时间: {rec.created_at.strftime('%Y-%m-%d %H:%M')}"
             except Exception:
-                pass
+                logger.warning("[_build_bid_lines] UTC 时间格式化失败", exc_info=True)
     lines = [line1, local_str]
     if is_rule and rule:
         try:
@@ -910,7 +914,7 @@ def _build_bid_lines(rec: Any, rule_map: dict[int, Any], country_name: str, tz_n
                 if group_parts:
                     lines.append(f"详细内容: {'；'.join(group_parts)}")
         except Exception:
-            pass
+            logger.warning("[_build_bid_lines] 规则条件解析失败", exc_info=True)
     if etype == BidExecType.BID_PAUSE: lines.append("执行操作: 竞价暂停")
     elif etype == BidExecType.BID_ENABLE: lines.append("执行操作: 竞价启用")
     elif etype in (BidExecType.BID_ADJUSTMENT, BidExecType.MANUAL_ADJUSTMENT):

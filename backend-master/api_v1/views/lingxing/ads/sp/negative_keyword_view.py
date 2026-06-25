@@ -119,10 +119,10 @@ class NegativeKeywordViewSet(viewsets.ViewSet):
         # 分页
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
-        # ── 货币符号（LxAdsProfile → LxExchangeRate，一步查表）──
+        # 主题：货币符号（LxAdsProfile → LxExchangeRate，一步查表）
         currency_icon = self._resolve_currency_icon(profile_id)
 
-        # ── 父广告活动基础信息（单次点查）──
+        # 主题：父广告活动基础信息（单次点查）
         campaign_name = ""
         campaign_state = ""
         campaign_portfolio_name = ""
@@ -141,7 +141,7 @@ class NegativeKeywordViewSet(viewsets.ViewSet):
         except LxSpCampaign.DoesNotExist:
             pass
 
-        # ── 指标聚合（LxSpKeywordReport + DB Sum()）──
+        # 主题：指标聚合（LxSpKeywordReport + DB Sum()）
         date_start = str(data.get("date_start") or "").strip() or None
         date_end = str(data.get("date_end") or "").strip() or None
         metrics_map, summary = self._build_keyword_metrics(
@@ -149,7 +149,7 @@ class NegativeKeywordViewSet(viewsets.ViewSet):
             date_start, date_end, currency_icon,
         )
 
-        # ── 组装响应列表 ──
+        # 主题：组装响应列表
         res_list: list[dict[str, Any]] = []
         for item in items:
             match_type_val = str(item.negative_match_type or "")

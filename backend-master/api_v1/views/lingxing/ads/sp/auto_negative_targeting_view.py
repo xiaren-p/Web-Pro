@@ -120,10 +120,10 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
         # 分页
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
-        # ── 货币符号（LxAdsProfile → LxExchangeRate，一步查表）──
+        # 主题：货币符号（LxAdsProfile → LxExchangeRate，一步查表）
         currency_icon = self._resolve_currency_icon(profile_id)
 
-        # ── 父广告活动基础信息（单次点查）──
+        # 主题：父广告活动基础信息（单次点查）
         campaign_name = ""
         campaign_state = ""
         campaign_portfolio_name = ""
@@ -141,7 +141,7 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
         except LxSpCampaign.DoesNotExist:
             pass
 
-        # ── 广告组名称批量映射 ──
+        # 主题：广告组名称批量映射
         item_ad_group_ids = list({
             item.ad_group_id for item in items if item.ad_group_id
         })
@@ -157,7 +157,7 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
                 adgroup_map[gid] = g["name"] or ""
                 adgroup_state_map[gid] = g["state"] or ""
 
-        # ── 指标聚合（LxSpKeywordReport + DB Sum()，否定定向 target_id 关联 keyword_id）──
+        # 主题：指标聚合（LxSpKeywordReport + DB Sum()，否定定向 target_id 关联 keyword_id）
         date_start = str(data.get("date_start") or "").strip() or None
         date_end = str(data.get("date_end") or "").strip() or None
         metrics_map, summary = self._build_negative_metrics(
@@ -165,7 +165,7 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
             date_start, date_end, currency_icon,
         )
 
-        # ── 组装响应列表 ──
+        # 主题：组装响应列表
         res_list: list[dict[str, Any]] = []
         for item in items:
             gid_val = item.ad_group_id

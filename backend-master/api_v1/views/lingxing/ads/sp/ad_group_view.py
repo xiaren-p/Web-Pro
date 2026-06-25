@@ -8,6 +8,10 @@
 """
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from typing import Any
 
 from django.db.models import Count, Sum
@@ -58,6 +62,7 @@ class AdGroupViewSet(viewsets.ViewSet):
                 code=profile.currency_code
             ).order_by("-date").first()
         except Exception:
+            logger.warning("[_resolve_currency_icon] 汇率查询失败", exc_info=True)
             return "?"
         return rate.icon if rate and rate.icon else "?"
 
@@ -114,7 +119,7 @@ class AdGroupViewSet(viewsets.ViewSet):
         # 分页
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
-        # ── 父广告活动基础信息（同 campaign 下所有广告组共用，单次点查）──
+        # 主题：父广告活动基础信息（同 campaign 下所有广告组共用，单次点查）
         campaign_name = ""
         campaign_state = ""
         campaign_portfolio_name = ""
@@ -133,10 +138,10 @@ class AdGroupViewSet(viewsets.ViewSet):
         except LxSpCampaign.DoesNotExist:
             pass
 
-        # ── 货币符号（LxAdsProfile.currency_code → LxExchangeRate.code，一步查表）──
+        # 主题：货币符号（LxAdsProfile.currency_code → LxExchangeRate.code，一步查表）
         currency_icon = self._resolve_currency_icon(profile_id_int)
 
-        # ── 商品广告数量统计（通过 LxSpAd 按 campaign_id + ad_group_id 分组统计）──
+        # 主题：商品广告数量统计（通过 LxSpAd 按 campaign_id + ad_group_id 分组统计）
         item_ad_group_ids = [item.ad_group_id for item in items if item.ad_group_id]
         product_counts: dict[int, int] = {}
         if item_ad_group_ids:
@@ -148,7 +153,7 @@ class AdGroupViewSet(viewsets.ViewSet):
                 .values_list("ad_group_id", "cnt")
             )
 
-        # ── 指标聚合（LxSpAdGroupReport：1 次 SQL GROUP BY + Python 两轮遍历）──
+        # 主题：指标聚合（LxSpAdGroupReport：1 次 SQL GROUP BY + Python 两轮遍历）
         date_start = str(data.get("date_start") or "").strip() or None
         date_end = str(data.get("date_end") or "").strip() or None
         metrics_map, summary = self._build_metrics(
@@ -156,7 +161,7 @@ class AdGroupViewSet(viewsets.ViewSet):
             date_start, date_end, currency_icon,
         )
 
-        # ── 组装响应列表 ──
+        # 主题：组装响应列表
         res_list = []
         for item in items:
             row: dict[str, Any] = {

@@ -59,9 +59,9 @@ class TimePricingStrategyViewSet(viewsets.ViewSet):
 
     permission_classes = [IsAuthenticated]
 
-    # ============================================================
+    # 主题：校验按 ID 提取
     # 下拉选项接口
-    # ============================================================
+    # 主题：快速提取辅助函数注册
 
     @action(detail=False, methods=["get"], url_path="shops")
     def shops(self, request):
@@ -117,9 +117,9 @@ class TimePricingStrategyViewSet(viewsets.ViewSet):
         data = [{"value": v, "label": v} for v in sorted(flat)]
         return drf_ok(data)
 
-    # ============================================================
+    # 主题：校验按 ID 提取
     # CRUD
-    # ============================================================
+    # 主题：快速提取辅助函数注册
 
     @action(detail=False, methods=["get", "post"], url_path="")
     def list_or_create(self, request):
