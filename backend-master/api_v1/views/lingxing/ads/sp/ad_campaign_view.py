@@ -41,31 +41,6 @@ from api_v2.models.sp_campaign_adjustment import (
     SpCampaignAdjustment,
 )
 
-# Doris 表达式树深度限制为 3000，因此分 batch 查询，每批最多 500 对 (campaign_id, profile_id)。
-_DORIS_PAIR_BATCH_SIZE = 500  # [已废弃] 当前版本使用全量 GROUP BY，不再分批次查询 Doris
-
-
-def _build_pair_q(pairs: set[tuple[int, int]]) -> Q:
-    """构建 (campaign_id, profile_id) 复合对 OR 查询，分批防止超大 SQL。"""
-    if not pairs:
-        return Q(pk=-1)
-    sorted_pairs = sorted(pairs)
-    if len(sorted_pairs) <= 500:
-        pair_q = Q()
-        for cid, pid in sorted_pairs:
-            pair_q |= Q(campaign_id=cid, profile_id=pid)
-        return pair_q
-    from functools import reduce
-    batch_qs = []
-    for i in range(0, len(sorted_pairs), 500):
-        batch = sorted_pairs[i:i + 500]
-        bq = Q()
-        for cid, pid in batch:
-            bq |= Q(campaign_id=cid, profile_id=pid)
-        batch_qs.append(bq)
-    return reduce(lambda a, b: a | b, batch_qs)
-
-
 # ── 参考数据懒加载缓存（每 20 分钟自动刷新，省 5 次 DB 往返/请求）────────────
 _REF_TTL = 600
 
@@ -132,10 +107,11 @@ def _load_all_listing_caches() -> None:
     from collections import defaultdict
     from django.core.cache import cache as _cache
 
-    # 缓存已存在则跳过（Celery Beat 280s 刷新保证大部分请求命中）
+    # 缓存已全部存在则跳过（Celery Beat 280s 刷新保证大部分请求命中）
     if all(_cache.get(k) for k in (
         "sp_tag_asin_map_v2", "sp_owner_asin_map_v2",
         "sp_asin_tags_map_v2", "sp_asin_owners_map_v2",
+        "sp_cp_asin_map_v1", "sp_asin_cp_map_v1", "sp_sku_cp_map_v1",
     )):
         return
 
@@ -176,55 +152,74 @@ def _load_all_listing_caches() -> None:
         _REF_TTL,
     )
 
+    # ═══ LxSpAd 桥接缓存（聚后筛选用） ═══
+    cp_asin: dict[str, set[str]] = defaultdict(set)
+    asin_cp: dict[str, set[str]] = defaultdict(set)
+    sku_cp: dict[str, set[str]] = defaultdict(set)
+
+    for cid, pid, sku_val, asin_val in LxSpAd.objects.values_list(
+        "campaign_id", "profile_id", "sku", "asin"
+    ):
+        cp_key = f"{cid}::{pid}"
+        if asin_val:
+            cp_asin[cp_key].add(asin_val)
+            asin_cp[asin_val].add(cp_key)
+        if sku_val:
+            sku_cp[sku_val].add(cp_key)
+
+    _cache.set_many(
+        {
+            "sp_cp_asin_map_v1": dict(cp_asin),
+            "sp_asin_cp_map_v1": dict(asin_cp),
+            "sp_sku_cp_map_v1": dict(sku_cp),
+        },
+        _REF_TTL,
+    )
+
 
 
 def _get_tag_asin_map() -> dict[str, set[str]]:
-    """globalTagId → {asin, ...}。从 _load_all_listing_caches 的 Redis 缓存读取。"""
+    """globalTagId → {asin, ...}。Celery 280s 刷新保证缓存有效，miss 时返回空字典。"""
     from django.core.cache import cache as _cache
-    _key = "sp_tag_asin_map_v2"
-    cached = _cache.get(_key)
-    if cached is not None:
-        return cached
-    _load_all_listing_caches()
-    return _cache.get(_key) or {}
+    return _cache.get("sp_tag_asin_map_v2") or {}
 
 
 def _get_owner_asin_map() -> dict[str, set[str]]:
-    """principal_uid → {asin, ...}。从 _load_all_listing_caches 的 Redis 缓存读取。"""
+    """principal_uid → {asin, ...}。Celery 280s 刷新保证缓存有效，miss 时返回空字典。"""
     from django.core.cache import cache as _cache
-    _key = "sp_owner_asin_map_v2"
-    cached = _cache.get(_key)
-    if cached is not None:
-        return cached
-    _load_all_listing_caches()
-    return _cache.get(_key) or {}
+    return _cache.get("sp_owner_asin_map_v2") or {}
 
 
 def _get_asin_info_map() -> dict[str, dict[str, list[str]]]:
-    """asin → {tags: [globalTagId...], owners: [principal_name...]}。从缓存读取。"""
+    """asin → {tags: [globalTagId...], owners: [principal_name...]}。Celery 280s 刷新保证缓存有效。"""
     from django.core.cache import cache as _cache
-    _tags_key = "sp_asin_tags_map_v2"
-    _owners_key = "sp_asin_owners_map_v2"
-    tags = _cache.get(_tags_key)
-    owners = _cache.get(_owners_key)
-    if tags is not None and owners is not None:
-        result: dict[str, dict[str, list[str]]] = {}
-        for k in tags:
-            result[k] = {"tags": tags.get(k, []), "owners": owners.get(k, [])}
-        for k in owners:
-            if k not in result:
-                result[k] = {"tags": tags.get(k, []), "owners": owners.get(k, [])}
-        return result
-    _load_all_listing_caches()
-    tags = _cache.get(_tags_key) or {}
-    owners = _cache.get(_owners_key) or {}
-    result = {}
+    tags = _cache.get("sp_asin_tags_map_v2") or {}
+    owners = _cache.get("sp_asin_owners_map_v2") or {}
+    result: dict[str, dict[str, list[str]]] = {}
     for k in tags:
         result[k] = {"tags": tags.get(k, []), "owners": owners.get(k, [])}
     for k in owners:
         if k not in result:
             result[k] = {"tags": tags.get(k, []), "owners": owners.get(k, [])}
     return result
+
+
+def _get_asin_cp_map() -> dict[str, set[str]]:
+    """ASIN → {cp_key, ...} 映射。聚后负责人/标签/MSKU/parent_asin 筛选用。"""
+    from django.core.cache import cache as _cache
+    return _cache.get("sp_asin_cp_map_v1") or {}
+
+
+def _get_sku_cp_map() -> dict[str, set[str]]:
+    """MSKU → {cp_key, ...} 映射。聚后 MSKU 搜索筛选用。"""
+    from django.core.cache import cache as _cache
+    return _cache.get("sp_sku_cp_map_v1") or {}
+
+
+def _get_cp_asin_map() -> dict[str, set[str]]:
+    """cp_key → {asin, ...} 映射。响应中补充 ASIN 字段用。"""
+    from django.core.cache import cache as _cache
+    return _cache.get("sp_cp_asin_map_v1") or {}
 
 
 def _flat_parse_label(raw_label: str) -> list[str]:
@@ -345,8 +340,9 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if bidding_strategy:
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
-        # ── 标签筛选 ──
-        # 链路：tag_name → LxListingTag.global_tag_id → Redis 缓存(tagId→ASIN) → LxSpAd → campaign
+        # ── 标签筛选（聚后：计算 cp_key 集，不修改 qs）──
+        # 链路：tag_name → LxListingTag.global_tag_id → Redis(tagId→ASIN) → asin_cp_map → cp_keys
+        tag_cp_keys: set[str] | None = None
         tags = data.get("tags")
         if tags:
             tag_list = [t.strip() for t in tags.split(",") if t.strip()]
@@ -361,24 +357,19 @@ class AdCampaignViewSet(viewsets.ViewSet):
                         gid_str = str(gid)
                         if gid_str and gid_str in tag_asin_cache:
                             tag_asins |= tag_asin_cache[gid_str]
-                else:
-                    tag_asins = set()
-                if tag_asins:
-                    tag_ad_pairs = set(
-                        LxSpAd.objects.filter(asin__in=tag_asins)
-                        .values_list("campaign_id", "profile_id")
-                        .distinct()
-                    )
-                    if tag_ad_pairs:
-                        tag_q = _build_pair_q(tag_ad_pairs)
-                        qs = qs.filter(tag_q)
+                    if tag_asins:
+                        asin_cp_map = _get_asin_cp_map()
+                        tag_cp_keys = set()
+                        for asin_val in tag_asins:
+                            tag_cp_keys |= asin_cp_map.get(asin_val, set())
                     else:
-                        qs = qs.filter(Q(pk=-1))
+                        tag_cp_keys = set()
                 else:
-                    qs = qs.filter(Q(pk=-1))
+                    tag_cp_keys = set()
 
-        # ── 负责人筛选 ──
-        # 链路：owner_uid → Redis 缓存(uid→ASIN) → LxSpAd → campaign
+        # ── 负责人筛选（聚后：计算 cp_key 集，不修改 qs）──
+        # 链路：owner_uid → Redis(uid→ASIN) → asin_cp_map → cp_keys
+        owner_cp_keys: set[str] | None = None
         owner_ids = data.get("owners")
         if owner_ids:
             owner_list = [str(o).strip() for o in owner_ids.split(",") if str(o).strip()]
@@ -389,18 +380,12 @@ class AdCampaignViewSet(viewsets.ViewSet):
                     if uid in owner_asin_cache:
                         owner_asins |= owner_asin_cache[uid]
                 if owner_asins:
-                    owner_ad_pairs = set(
-                        LxSpAd.objects.filter(asin__in=owner_asins)
-                        .values_list("campaign_id", "profile_id")
-                        .distinct()
-                    )
-                    if owner_ad_pairs:
-                        owner_q = _build_pair_q(owner_ad_pairs)
-                        qs = qs.filter(owner_q)
-                    else:
-                        qs = qs.filter(Q(pk=-1))
+                    asin_cp_map = _get_asin_cp_map()
+                    owner_cp_keys = set()
+                    for asin_val in owner_asins:
+                        owner_cp_keys |= asin_cp_map.get(asin_val, set())
                 else:
-                    qs = qs.filter(Q(pk=-1))
+                    owner_cp_keys = set()
 
         portfolio_id = data.get("portfolio_id")
         if portfolio_id:
@@ -425,15 +410,19 @@ class AdCampaignViewSet(viewsets.ViewSet):
             ).values_list("profile_id", flat=True)
             qs = qs.filter(profile_id__in=profile_ids)
 
-        # ── ASIN / MSKU 搜索 ──
+        # ── ASIN / MSKU / parent_asin 搜索（聚后：计算 cp_key 集，不修改 qs）──
+        search_cp_keys: set[str] | None = None
         skus = data.get("skus")
         asin_search_type = data.get("asinSearchType", "sku")
         if skus:
             sku_list = [s.strip() for s in skus.split(",") if s.strip()]
             if sku_list:
-                listing_filter = Q()
+                asin_cp_map = _get_asin_cp_map()
+                sku_cp_map = _get_sku_cp_map()
+                search_cp_keys = set()
                 if asin_search_type == "parent_asin":
-                    listing_filter |= Q(sku__in=sku_list)
+                    for val in sku_list:
+                        search_cp_keys |= sku_cp_map.get(val, set())
                     child_skus = list(
                         LxListingData.objects.filter(parent_asin__in=sku_list)
                         .exclude(seller_sku="")
@@ -441,28 +430,19 @@ class AdCampaignViewSet(viewsets.ViewSet):
                         .values_list("seller_sku", flat=True)
                         .distinct()
                     )
-                    if child_skus:
-                        listing_filter |= Q(sku__in=child_skus)
+                    for s_val in child_skus:
+                        search_cp_keys |= sku_cp_map.get(s_val, set())
                 else:
-                    listing_filter |= Q(sku__in=sku_list)
+                    for val in sku_list:
+                        search_cp_keys |= sku_cp_map.get(val, set())
                     related_asins = list(
                         LxListingData.objects.filter(seller_sku__in=sku_list)
                         .exclude(asin="")
                         .values_list("asin", flat=True)
                         .distinct()
                     )
-                    if related_asins:
-                        listing_filter |= Q(asin__in=related_asins)
-
-                matched_ads = LxSpAd.objects.filter(listing_filter).values(
-                    "campaign_id", "profile_id"
-                ).distinct()
-                campaign_pairs = {(a["campaign_id"], a["profile_id"]) for a in matched_ads}
-                if campaign_pairs:
-                    pair_q = Q()
-                    for cid, pid in campaign_pairs:
-                        pair_q |= Q(campaign_id=cid, profile_id=pid)
-                    qs = qs.filter(pair_q)
+                    for asin_val in related_asins:
+                        search_cp_keys |= asin_cp_map.get(asin_val, set())
 
         date_start = data.get("date_start")
         date_end = data.get("date_end")
@@ -470,21 +450,29 @@ class AdCampaignViewSet(viewsets.ViewSet):
         sort_prop = data.get("sort_prop")
         sort_order = data.get("sort_order")
 
-        # ── 筛选集全体 campaign / profile 对 ──
+        # ── 筛选集全体 campaign / profile 对（只含 DB 层筛选：店铺/国家/状态/组合）──
         p_num, p_size = self._get_page_params(data)
-
-        # ── Doris 聚合：一次全量 GROUP BY 替代 N 批 OR 对查询（25 批 × 0.8s → 1 次 <1s）──
-        all_pairs_list = list(
+        all_pairs_list: list[tuple[int, int]] = list(
             qs.values_list("campaign_id", "profile_id").distinct()
         )
-        all_pairs_set = {(str(c), str(p)) for c, p in all_pairs_list}
-        all_profile_ids = sorted({p for _, p in all_pairs_list if p})
-        all_campaign_pairs = [(c, p) for c, p in all_pairs_list if c and p]
+        all_pairs_key_set: set[str] = {f"{c}::{p}" for c, p in all_pairs_list}
 
-        # ── 全量 GROUP BY 查询 Doris（一次查询替代 N 批 OR 对）──
-        # all_pairs_set 是元组集合（供 _compute_summary_from_agg 使用），
-        # all_pairs_key_set 是字符串集合（供此处的 cp_key 过滤使用），格式对齐。
-        all_pairs_key_set = {f"{c}::{p}" for c, p in all_pairs_list}
+        # ── 聚后筛选：owner / tag / 搜索 cp_key 交集 ──
+        for _s in (owner_cp_keys, tag_cp_keys, search_cp_keys):
+            if _s is not None:
+                if not _s:
+                    all_pairs_key_set.clear()
+                    break
+                all_pairs_key_set &= _s
+        # 交集后重建列表（空交集 = 无结果）
+        all_pairs_list = [
+            (int(c), int(p))
+            for cp in all_pairs_key_set
+            for c, p in [cp.split("::")]
+        ] if all_pairs_key_set else []
+        all_pairs_set: set[tuple[str, str]] = {(str(c), str(p)) for c, p in all_pairs_list}
+        all_profile_ids: list[int] = sorted({p for _, p in all_pairs_list if p})
+        all_campaign_pairs: list[tuple[int, int]] = [(c, p) for c, p in all_pairs_list if c and p]
 
         agg_map: dict[str, dict[str, Any]] = {}
         if all_pairs_set:
@@ -555,23 +543,32 @@ class AdCampaignViewSet(viewsets.ViewSet):
             order_field = model_key
             if reverse:
                 order_field = f"-{order_field}"
-            total = qs.count()
-            items = list(qs.order_by(order_field)[start_idx:end_idx].only(
-                "id", "campaign_id", "profile_id", "name", "campaign_type",
-                "targeting_type", "daily_budget", "start_date", "end_date",
-                "state", "serving_status", "bidding", "portfolio_id", "tags",
-                "creation_date", "last_updated_date",
-            ))
+            total = len(all_pairs_list)
+            if not all_pairs_list:
+                items = []
+            elif owner_cp_keys is not None or tag_cp_keys is not None or search_cp_keys is not None:
+                pair_q = Q()
+                for cid, pid in all_pairs_list:
+                    pair_q |= Q(campaign_id=cid, profile_id=pid)
+                items = list(LxSpCampaign.objects.filter(pair_q).order_by(order_field)[start_idx:end_idx].only(
+                    "id", "campaign_id", "profile_id", "name", "campaign_type",
+                    "targeting_type", "daily_budget", "start_date", "end_date",
+                    "state", "serving_status", "bidding", "portfolio_id", "tags",
+                    "creation_date", "last_updated_date",
+                ))
+            else:
+                items = list(qs.order_by(order_field)[start_idx:end_idx].only(
+                    "id", "campaign_id", "profile_id", "name", "campaign_type",
+                    "targeting_type", "daily_budget", "start_date", "end_date",
+                    "state", "serving_status", "bidding", "portfolio_id", "tags",
+                    "creation_date", "last_updated_date",
+                ))
         else:
-            # 路径 B：指标排序 / 默认排序 → 只加载 (campaign_id, profile_id) 轻量对
-            # 排序后切片，再用 build_campaign_profile_query 查回页内 25 条 Model
+            # 路径 B：指标排序 / 默认排序 → 对筛选后的 all_pairs_list 排序切片
             sort_metric = metric_key if metric_key else "impressions"
             sort_reverse = reverse if metric_key else True  # 默认：曝光量降序
 
-            # 只加载轻量 (campaign_id, profile_id) 对
-            pairs = list(
-                qs.values_list("campaign_id", "profile_id")
-            )
+            pairs = all_pairs_list
             total = len(pairs)
             # Python 排序（对轻量元组，比 Model 实例排序快两个数量级）
             pairs.sort(
