@@ -398,11 +398,11 @@ function openTemplates() {
 }
 
 .filter-row-main {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .filter-row-secondary {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .filter-item {
@@ -487,11 +487,13 @@ function openTemplates() {
 .date-picker {
   flex: 0 0 210px;
   width: 210px;
+  overflow: hidden;
 }
 
-:deep(.date-picker .el-range-editor.el-input__wrapper),
-:deep(.date-picker.el-range-editor.el-input__wrapper) {
+:deep(.date-picker .el-range-editor),
+:deep(.el-range-editor.el-input__wrapper) {
   width: 210px !important;
+  max-width: 210px !important;
   padding: 0 8px;
 }
 
@@ -621,12 +623,5 @@ function openTemplates() {
 
 .clear-all-icon:hover {
   color: var(--color-danger-600);
-}
-
-@media (max-width: 1400px) {
-  .filter-row-main,
-  .filter-row-secondary {
-    flex-wrap: wrap;
-  }
 }
 </style>
