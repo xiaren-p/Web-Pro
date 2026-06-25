@@ -140,28 +140,30 @@
     line-height: 1.5;
   }
 
-  /* ═══ Switch ════════════════════════════════════════ */
+  /* 主题：Switch 缩小版（匹配主页面 AdsTable 尺寸） */
   .el-table .el-switch {
-    height: 20px;
+    height: 16px;
   }
 
   .el-table .el-switch .el-switch__core {
-    width: 36px !important;
-    min-width: 36px !important;
-    height: 20px !important;
-    border: 2px solid var(--border-strong);
+    width: 28px !important;
+    min-width: 28px !important;
+    height: 16px !important;
+    border: 1.5px solid var(--border-strong);
     border-radius: var(--radius-full) !important;
+    transition: all 160ms ease;
   }
 
   .el-table .el-switch .el-switch__core .el-switch__action {
     top: 1px;
     left: 1px;
-    width: 14px !important;
-    height: 14px !important;
+    width: 10px !important;
+    height: 10px !important;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 14%);
   }
 
   .el-table .el-switch.is-checked .el-switch__core .el-switch__action {
-    left: 19px !important;
+    left: 15px !important;
   }
 
   .el-table .el-switch.is-checked .el-switch__core {
