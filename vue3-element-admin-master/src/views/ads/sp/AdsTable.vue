@@ -49,7 +49,7 @@
                 placement="top"
                 popper-class="latest-adj-tooltip"
               >
-                <span class="recent-star" @click.stop>★</span>
+                <span class="recent-star" @click.stop>*</span>
                 <template #content>
                   <div class="latest-adj-content">
                     <div v-for="(line, idx) in row.latest_state_adjustment.lines" :key="idx">
@@ -172,7 +172,7 @@
                       <span class="budget-icon">{{ scope.row.currency_icon || "$" }}</span>
                     </template>
                   </el-input>
-                  <span class="recent-star" @click.stop>★</span>
+                  <span class="recent-star" @click.stop>*</span>
                 </div>
                 <template #content>
                   <div class="latest-adj-content">
@@ -1240,8 +1240,7 @@ function formatValue(val: any): string {
   right: -6px;
   z-index: 2;
   font-size: 12px;
-  color: #f59e0b;
-  text-shadow: 0 0 2px rgb(245 158 11 / 40%);
+  color: var(--color-danger-500);
   cursor: help;
 }
 

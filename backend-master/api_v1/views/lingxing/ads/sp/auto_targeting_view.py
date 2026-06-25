@@ -279,13 +279,17 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         )
         bid_adj_map = _build_bid_latest_adjustment_map(
             target_ids, "target_id", profile_id,
-            types={BidExecutionTypeChoices.MANUAL_ADJUSTMENT, BidExecutionTypeChoices.BID_ADJUSTMENT,
-                   BidExecutionTypeChoices.TIME_PRICING_START, BidExecutionTypeChoices.TIME_PRICING_CALLBACK},
+            types={BidExecutionTypeChoices.MANUAL_ADJUSTMENT, BidExecutionTypeChoices.BID_ADJUSTMENT},
+        )
+        tp_adj_map = _build_bid_latest_adjustment_map(
+            target_ids, "target_id", profile_id,
+            types={BidExecutionTypeChoices.TIME_PRICING_START, BidExecutionTypeChoices.TIME_PRICING_CALLBACK},
         )
         for row in res_list:
             tid = str(row.get("target_id", ""))
             row["latest_state_adjustment"] = state_adj_map.get(tid, {"has_recent": False, "lines": []})
             row["latest_bid_adjustment"] = bid_adj_map.get(tid, {"has_recent": False, "lines": []})
+            row["latest_time_pricing_adjustment"] = tp_adj_map.get(tid, {"has_recent": False, "lines": []})
 
         # 主题：分时竞价展示
         tp_bid_map = _build_time_pricing_bid_map(
@@ -507,13 +511,17 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         )
         bid_adj_map = _build_bid_latest_adjustment_map(
             target_ids, "target_id", profile_id,
-            types={BidExecutionTypeChoices.MANUAL_ADJUSTMENT, BidExecutionTypeChoices.BID_ADJUSTMENT,
-                   BidExecutionTypeChoices.TIME_PRICING_START, BidExecutionTypeChoices.TIME_PRICING_CALLBACK},
+            types={BidExecutionTypeChoices.MANUAL_ADJUSTMENT, BidExecutionTypeChoices.BID_ADJUSTMENT},
+        )
+        tp_adj_map = _build_bid_latest_adjustment_map(
+            target_ids, "target_id", profile_id,
+            types={BidExecutionTypeChoices.TIME_PRICING_START, BidExecutionTypeChoices.TIME_PRICING_CALLBACK},
         )
         for row in res_list:
             tid = str(row.get("target_id", ""))
             row["latest_state_adjustment"] = state_adj_map.get(tid, {"has_recent": False, "lines": []})
             row["latest_bid_adjustment"] = bid_adj_map.get(tid, {"has_recent": False, "lines": []})
+            row["latest_time_pricing_adjustment"] = tp_adj_map.get(tid, {"has_recent": False, "lines": []})
 
         # 主题：分时竞价展示
         tp_bid_map = _build_time_pricing_bid_map(

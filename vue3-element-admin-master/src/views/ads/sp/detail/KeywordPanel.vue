@@ -110,7 +110,7 @@
                 placement="top"
                 popper-class="latest-adj-tooltip"
               >
-                <span class="recent-star" @click.stop>★</span>
+                <span class="recent-star" @click.stop>*</span>
                 <template #content>
                   <div class="latest-adj-content">
                     <div v-for="(line, idx) in row.latest_state_adjustment.lines" :key="idx">
@@ -195,10 +195,35 @@
                   placement="top"
                   popper-class="latest-adj-tooltip"
                 >
-                  <span class="recent-star" @click.stop>★</span>
+                  <span class="recent-star" @click.stop>*</span>
                   <template #content>
                     <div class="latest-adj-content">
                       <div v-for="(line, idx) in row.latest_bid_adjustment.lines" :key="idx">
+                        {{ line }}
+                      </div>
+                    </div>
+                  </template>
+                </el-tooltip>
+              </div>
+            </template>
+
+            <!-- 分时竞价（含星标） -->
+            <template v-else-if="col.prop === 'time_pricing_bid'">
+              <template v-if="row._isSummary">---</template>
+              <div v-else class="bid-cell">
+                <span>{{ row.time_pricing_bid ?? "-" }}</span>
+                <el-tooltip
+                  v-if="row.latest_time_pricing_adjustment?.has_recent"
+                  placement="top"
+                  popper-class="latest-adj-tooltip"
+                >
+                  <span class="recent-star" @click.stop>*</span>
+                  <template #content>
+                    <div class="latest-adj-content">
+                      <div
+                        v-for="(line, idx) in row.latest_time_pricing_adjustment.lines"
+                        :key="idx"
+                      >
                         {{ line }}
                       </div>
                     </div>
@@ -978,8 +1003,7 @@ onMounted(fetchData);
   right: -6px;
   z-index: 2;
   font-size: 12px;
-  color: #f59e0b;
-  text-shadow: 0 0 2px rgb(245 158 11 / 40%);
+  color: var(--color-danger-500);
   cursor: help;
 }
 
@@ -994,6 +1018,16 @@ onMounted(fetchData);
   }
   .bid-input {
     width: 60px;
+    :deep(.el-input__wrapper) {
+      height: 26px;
+      min-height: 26px;
+      padding: 0 6px;
+    }
+    :deep(.el-input__inner) {
+      height: 24px;
+      font-size: 12px;
+      text-align: right;
+    }
   }
   .recent-star {
     position: relative;
