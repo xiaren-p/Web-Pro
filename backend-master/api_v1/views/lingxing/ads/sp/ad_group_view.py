@@ -37,6 +37,7 @@ from api_v1.services.lingxing.ads_metrics_service import (
 from api_v1.utils.ad_status import resolve_service_status
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_ok
+from api_v1.views.lingxing.ads._helpers import _sortable_val
 
 
 class AdGroupViewSet(viewsets.ViewSet):
@@ -186,6 +187,13 @@ class AdGroupViewSet(viewsets.ViewSet):
                 metrics_map.get(str(item.ad_group_id), empty_adgroup_metrics())
             )
             res_list.append(row)
+
+        # 主题：排序 — 根据前端 sort_prop / sort_order 对 res_list 排序
+        sort_prop = str(data.get("sort_prop") or "").strip()
+        sort_order = str(data.get("sort_order") or "").strip()
+        if sort_prop and res_list:
+            reverse = sort_order == "desc"
+            res_list.sort(key=lambda r: _sortable_val(r.get(sort_prop)), reverse=reverse)
 
         return drf_ok({
             "total": total,

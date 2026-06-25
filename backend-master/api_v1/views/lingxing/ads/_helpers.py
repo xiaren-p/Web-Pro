@@ -166,3 +166,22 @@ def fmt_money(value: float | int, icon: str) -> str:
         str: 格式化后的货币字符串，例如 ``"€123.45"``。
     """
     return f"{icon}{round(float(value), 2)}"
+
+
+def _sortable_val(val: Any) -> tuple[int, float | str]:
+    """将任意值转换为可排序的元组 (优先级, 排序值)。
+
+    数值排前，None/"-" 排末，字符串在最前之后。
+
+    Args:
+        val (Any): 待排序的值。
+
+    Returns:
+        tuple[int, float | str]: (0=兜底, 1=数值/字符串) + 排序值。
+    """
+    if val is None or val == "-":
+        return (0, "")
+    try:
+        return (1, float(str(val).replace("￥", "").replace("$", "").replace(",", "").replace("%", "").strip()))
+    except (ValueError, TypeError):
+        return (2, str(val).lower())

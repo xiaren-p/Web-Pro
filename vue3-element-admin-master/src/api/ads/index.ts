@@ -161,6 +161,8 @@ export interface AutoTargetingParams {
   state?: string;
   pageNum?: number;
   pageSize?: number;
+  sort_prop?: string;
+  sort_order?: string;
 }
 
 /** 自动投放条款列表分页响应结构 */

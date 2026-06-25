@@ -42,7 +42,7 @@ from api_v1.services.lingxing.ads_metrics_service import (
 from api_v1.utils.ad_status import resolve_service_status
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_ok
-from api_v1.views.lingxing.ads._helpers import KEYWORD_MATCH_TYPE_LABEL
+from api_v1.views.lingxing.ads._helpers import KEYWORD_MATCH_TYPE_LABEL, _sortable_val
 from api_v2.models.sp_bid_adjustment import (
     ExecutionTypeChoices as BidExecutionTypeChoices,
     SpBidAdjustment,
@@ -277,6 +277,16 @@ class KeywordViewSet(viewsets.ViewSet):
         )
         for row in res_list:
             row["time_pricing_bid"] = tp_bid_map.get(str(row["keyword_id"]), "-")
+
+        # 主题：排序 — 根据 sort_prop / sort_order 对 res_list 排序
+        sort_prop = str(data.get("sort_prop") or "").strip()
+        sort_order = str(data.get("sort_order") or "").strip()
+        if sort_prop and res_list:
+            reverse = sort_order == "desc"
+            res_list.sort(
+                key=lambda r: _sortable_val(r.get(sort_prop)),
+                reverse=reverse,
+            )
 
         return drf_ok({
             "total": total,
