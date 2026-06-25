@@ -309,6 +309,7 @@ function confirmAdd() {
 
 .charts-slected-list {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: flex-start;
 }
@@ -317,7 +318,7 @@ function confirmAdd() {
   display: flex;
   flex: 1 1 0;
   align-items: center;
-  min-width: 160px;
+  min-width: 120px;
   height: 76px;
   padding: 16px 20px 16px 24px;
   overflow: hidden;
@@ -366,13 +367,13 @@ function confirmAdd() {
 }
 .metric-label {
   margin: 0;
-  font-size: 14px;
+  font-size: clamp(11px, 1.4vw, 14px);
   font-weight: 500;
   color: var(--text-secondary);
 }
 .metric-value {
   margin: 0;
-  font-size: 26px;
+  font-size: clamp(18px, 2.2vw, 26px);
   font-weight: bold;
   line-height: 1.2;
   color: var(--text-primary);
@@ -401,7 +402,7 @@ function confirmAdd() {
   flex: 1 1 0;
   align-items: center;
   justify-content: center;
-  min-width: 140px;
+  min-width: 100px;
   height: 76px;
   padding: 10px;
   font-weight: 500;
