@@ -1,8 +1,6 @@
 """SP 广告活动基础数据视图（LxSpCampaign），提供查询与手动预算/状态调整。"""
 from __future__ import annotations
 
-import threading
-import time
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -44,7 +42,7 @@ from api_v2.models.sp_campaign_adjustment import (
 )
 
 # Doris 表达式树深度限制为 3000，因此分 batch 查询，每批最多 500 对 (campaign_id, profile_id)。
-_DORIS_PAIR_BATCH_SIZE = 500
+_DORIS_PAIR_BATCH_SIZE = 500  # [已废弃] 当前版本使用全量 GROUP BY，不再分批次查询 Doris
 
 
 def _build_pair_q(pairs: set[tuple[int, int]]) -> Q:
@@ -125,73 +123,59 @@ def _get_rate_map() -> dict[str, dict[str, Any]]:
     return result
 
 
-_listing_cache_lock = threading.Lock()
-
-
 def _load_all_listing_caches() -> None:
     """一次全表扫描 LxListingData，同时产出 tag/owner/asin_info 三个缓存。
 
-    互斥锁保证全局同时只有一个线程在扫描——后续请求看到锁被持有直接返回，
-    回退到原始 DB 查询（几十 ms），不排队等 19s。
-
-    避免 _get_tag_asin_map + _get_owner_asin_map 各自扫全表（2×1.2s → 1×1.2s）。
-    内部使用 cache.set_many 一次性写入所有 key。
-"""
-    if not _listing_cache_lock.acquire(blocking=False):
-        waited = 0.0
-        while not _listing_cache_lock.acquire(blocking=False):
-            time.sleep(0.5)
-            waited += 0.5
-            if waited >= 5.0:
-                return
-
+    Celery Beat 280s 刷新保证缓存有效，请求端不应触发重建——
+    若缓存已存在则直接返回，仅冷启动时执行一次全表扫描。
+    """
     from collections import defaultdict
     from django.core.cache import cache as _cache
 
-    try:
-        if all(_cache.get(k) for k in (
-            "sp_tag_asin_map_v2", "sp_owner_asin_map_v2",
-            "sp_asin_tags_map_v2", "sp_asin_owners_map_v2",
-        )):
-            return
-        tag_asin: dict[str, set[str]] = defaultdict(set)
-        owner_asin: dict[str, set[str]] = defaultdict(set)
-        asin_tags: dict[str, list[str]] = defaultdict(list)
-        asin_owners: dict[str, list[str]] = defaultdict(list)
+    # 缓存已存在则跳过（Celery Beat 280s 刷新保证大部分请求命中）
+    if all(_cache.get(k) for k in (
+        "sp_tag_asin_map_v2", "sp_owner_asin_map_v2",
+        "sp_asin_tags_map_v2", "sp_asin_owners_map_v2",
+    )):
+        return
 
-        for asin_val, global_tags, principal_info in LxListingData.objects.values_list(
-            "asin", "global_tags", "principal_info"
-        ):
-            # 解析 global_tags
-            if isinstance(global_tags, list):
-                for entry in global_tags:
-                    if isinstance(entry, dict):
-                        gid = str(entry.get("globalTagId", ""))
-                        if gid:
-                            tag_asin[gid].add(asin_val)
-                            asin_tags[asin_val].append(gid)
-            # 解析 principal_info
-            if isinstance(principal_info, list):
-                for entry in principal_info:
-                    if isinstance(entry, dict):
-                        uid = entry.get("principal_uid")
-                        name = entry.get("principal_name", "")
-                        if uid is not None:
-                            owner_asin[str(uid)].add(asin_val)
-                        if name:
-                            asin_owners[asin_val].append(name)
+    tag_asin: dict[str, set[str]] = defaultdict(set)
+    owner_asin: dict[str, set[str]] = defaultdict(set)
+    asin_tags: dict[str, list[str]] = defaultdict(list)
+    asin_owners: dict[str, list[str]] = defaultdict(list)
 
-        _cache.set_many(
-            {
-                "sp_tag_asin_map_v2": dict(tag_asin),
-                "sp_owner_asin_map_v2": dict(owner_asin),
-                "sp_asin_tags_map_v2": dict(asin_tags),
-                "sp_asin_owners_map_v2": dict(asin_owners),
-            },
-            _REF_TTL,
-        )
-    finally:
-        _listing_cache_lock.release()
+    for asin_val, global_tags, principal_info in LxListingData.objects.values_list(
+        "asin", "global_tags", "principal_info"
+    ):
+        # 解析 global_tags
+        if isinstance(global_tags, list):
+            for entry in global_tags:
+                if isinstance(entry, dict):
+                    gid = str(entry.get("globalTagId", ""))
+                    if gid:
+                        tag_asin[gid].add(asin_val)
+                        asin_tags[asin_val].append(gid)
+        # 解析 principal_info
+        if isinstance(principal_info, list):
+            for entry in principal_info:
+                if isinstance(entry, dict):
+                    uid = entry.get("principal_uid")
+                    name = entry.get("principal_name", "")
+                    if uid is not None:
+                        owner_asin[str(uid)].add(asin_val)
+                    if name:
+                        asin_owners[asin_val].append(name)
+
+    _cache.set_many(
+        {
+            "sp_tag_asin_map_v2": dict(tag_asin),
+            "sp_owner_asin_map_v2": dict(owner_asin),
+            "sp_asin_tags_map_v2": dict(asin_tags),
+            "sp_asin_owners_map_v2": dict(asin_owners),
+        },
+        _REF_TTL,
+    )
+
 
 
 def _get_tag_asin_map() -> dict[str, set[str]]:
@@ -489,7 +473,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         # ── 筛选集全体 campaign / profile 对 ──
         p_num, p_size = self._get_page_params(data)
 
-        # ── Doris 聚合（每次直接查，不缓存——Doris 0.17s/批，缓存反而引入数据一致性问题）──
+        # ── Doris 聚合：一次全量 GROUP BY 替代 N 批 OR 对查询（25 批 × 0.8s → 1 次 <1s）──
         all_pairs_list = list(
             qs.values_list("campaign_id", "profile_id").distinct()
         )
@@ -499,47 +483,31 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         agg_map: dict[str, dict[str, Any]] = {}
         if all_pairs_set:
-            pairs_sorted = sorted(all_pairs_list)
-            for i in range(0, len(pairs_sorted), _DORIS_PAIR_BATCH_SIZE):
-                batch = pairs_sorted[i:i + _DORIS_PAIR_BATCH_SIZE]
-                pair_q = Q()
-                for cid_val, pid_val in batch:
-                    pair_q |= Q(campaign_id=cid_val, profile_id=pid_val)
-
-                agg_qs = LxSpCampaignReport.objects.using("analytics").filter(pair_q)
-                if date_start:
-                    agg_qs = agg_qs.filter(report_date__gte=date_start)
-                if date_end:
-                    agg_qs = agg_qs.filter(report_date__lte=date_end)
-
-                agg_qs = agg_qs.values("campaign_id", "profile_id").annotate(
-                    s_sales=Sum("sales"), s_same_sales=Sum("same_sales"),
-                    s_orders=Sum("orders"), s_same_orders=Sum("same_orders"),
-                    s_units=Sum("units"), s_cost=Sum("cost"),
-                    s_clicks=Sum("clicks"), s_impressions=Sum("impressions"),
-                )
-                for row in agg_qs:
-                    cp_key = f"{row['campaign_id']}::{row['profile_id']}"
-                    if cp_key in agg_map:
-                        agg_map[cp_key]["sales"] += float(row["s_sales"] or 0)
-                        agg_map[cp_key]["same_sales"] += float(row["s_same_sales"] or 0)
-                        agg_map[cp_key]["orders"] += int(row["s_orders"] or 0)
-                        agg_map[cp_key]["same_orders"] += int(row["s_same_orders"] or 0)
-                        agg_map[cp_key]["units"] += int(row["s_units"] or 0)
-                        agg_map[cp_key]["cost"] += float(row["s_cost"] or 0)
-                        agg_map[cp_key]["clicks"] += int(row["s_clicks"] or 0)
-                        agg_map[cp_key]["impressions"] += int(row["s_impressions"] or 0)
-                    else:
-                        agg_map[cp_key] = {
-                            "sales": float(row["s_sales"] or 0),
-                            "same_sales": float(row["s_same_sales"] or 0),
-                            "orders": int(row["s_orders"] or 0),
-                            "same_orders": int(row["s_same_orders"] or 0),
-                            "units": int(row["s_units"] or 0),
-                            "cost": float(row["s_cost"] or 0),
-                            "clicks": int(row["s_clicks"] or 0),
-                            "impressions": int(row["s_impressions"] or 0),
-                        }
+            doris_qs = LxSpCampaignReport.objects.using("analytics").all()
+            if date_start:
+                doris_qs = doris_qs.filter(report_date__gte=date_start)
+            if date_end:
+                doris_qs = doris_qs.filter(report_date__lte=date_end)
+            doris_rows = doris_qs.values("campaign_id", "profile_id").annotate(
+                s_sales=Sum("sales"), s_same_sales=Sum("same_sales"),
+                s_orders=Sum("orders"), s_same_orders=Sum("same_orders"),
+                s_units=Sum("units"), s_cost=Sum("cost"),
+                s_clicks=Sum("clicks"), s_impressions=Sum("impressions"),
+            )
+            for row in doris_rows:
+                cp_key = f"{row['campaign_id']}::{row['profile_id']}"
+                if cp_key not in all_pairs_set:
+                    continue
+                agg_map[cp_key] = {
+                    "sales": float(row["s_sales"] or 0),
+                    "same_sales": float(row["s_same_sales"] or 0),
+                    "orders": int(row["s_orders"] or 0),
+                    "same_orders": int(row["s_same_orders"] or 0),
+                    "units": int(row["s_units"] or 0),
+                    "cost": float(row["s_cost"] or 0),
+                    "clicks": int(row["s_clicks"] or 0),
+                    "impressions": int(row["s_impressions"] or 0),
+                }
             # 给无数据的 campaign 补齐空值
             for cid_val, pid_val in all_pairs_list:
                 cp_key = f"{cid_val}::{pid_val}"
