@@ -69,7 +69,7 @@ def _build_pair_q(pairs: set[tuple[int, int]]) -> Q:
 
 
 # ── 参考数据懒加载缓存（每 20 分钟自动刷新，省 5 次 DB 往返/请求）────────────
-_REF_TTL = 300
+_REF_TTL = 600
 
 
 def _get_profile_map() -> dict[str, dict[str, str]]:
@@ -520,7 +520,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         # 2. full 未命中，查 base cache（命中率高，但需跑 Q10 取筛选后 pairs）
         if agg_map is None:
-            base_cached = cache.get(base_cache_key) or {} if cache.get(base_cache_key) else {}
+            base_cached = cache.get(base_cache_key)
             if isinstance(base_cached, dict) and "agg_map" in base_cached:
                 agg_map = base_cached["agg_map"]
 
