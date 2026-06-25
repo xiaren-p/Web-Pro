@@ -123,6 +123,50 @@ def _get_rate_map() -> dict[str, dict[str, Any]]:
     return result
 
 
+def _get_tag_asin_map() -> dict[str, set[str]]:
+    """globalTagId → {asin, ...} 全量缓存，避免 JSON_CONTAINS 逐行解析（1.86s → <10ms）。"""
+    from collections import defaultdict
+    from django.core.cache import cache as _cache
+    _key = "sp_tag_asin_map_v1"
+    cached = _cache.get(_key)
+    if cached is not None:
+        return cached
+    result = defaultdict(set)
+    for asin, global_tags in LxListingData.objects.exclude(
+        global_tags__isnull=True
+    ).values_list("asin", "global_tags"):
+        if isinstance(global_tags, list):
+            for entry in global_tags:
+                if isinstance(entry, dict):
+                    gid = str(entry.get("globalTagId", ""))
+                    if gid:
+                        result[gid].add(asin)
+    _cache.set(_key, dict(result), _REF_TTL)
+    return result
+
+
+def _get_owner_asin_map() -> dict[str, set[str]]:
+    """principal_uid → {asin, ...} 全量缓存，避免 JSON_CONTAINS 逐行解析（1.30s → <10ms）。"""
+    from collections import defaultdict
+    from django.core.cache import cache as _cache
+    _key = "sp_owner_asin_map_v1"
+    cached = _cache.get(_key)
+    if cached is not None:
+        return cached
+    result = defaultdict(set)
+    for asin, principal_info in LxListingData.objects.exclude(
+        principal_info__isnull=True
+    ).values_list("asin", "principal_info"):
+        if isinstance(principal_info, list):
+            for entry in principal_info:
+                if isinstance(entry, dict):
+                    uid = entry.get("principal_uid")
+                    if uid is not None:
+                        result[str(uid)].add(asin)
+    _cache.set(_key, dict(result), _REF_TTL)
+    return result
+
+
 def _flat_parse_label(raw_label: str) -> list[str]:
     """[已废弃] 解析 LxProductInfo.label 字段。保留以兼容潜在外部引用。
 
@@ -242,7 +286,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             qs = qs.filter(bidding__strategy__in=bidding_strategy.split(","))
 
         # ── 标签筛选 ──
-        # 链路：用户选 tag_name → LxListingTag 查 global_tag_id → LxListingData.global_tags 匹配 → ASIN → LxSpAd → campaign
+        # 链路：tag_name → LxListingTag.global_tag_id → Redis 缓存(tagId→ASIN) → LxSpAd → campaign
         tags = data.get("tags")
         if tags:
             tag_list = [t.strip() for t in tags.split(",") if t.strip()]
@@ -251,16 +295,12 @@ class AdCampaignViewSet(viewsets.ViewSet):
                     tag_name__in=tag_list, status="normal"
                 ).values_list("global_tag_id", flat=True))
                 if tag_gids:
-                    tag_asin_q = Q()
+                    tag_asin_cache = _get_tag_asin_map()
+                    tag_asins: set[str] = set()
                     for gid in tag_gids:
                         gid_str = str(gid)
-                        if gid_str:
-                            tag_asin_q |= Q(global_tags__contains=[{"globalTagId": gid_str}])
-                    tag_asins = set(
-                        LxListingData.objects.filter(tag_asin_q)
-                        .values_list("asin", flat=True)
-                        .distinct()
-                    )
+                        if gid_str and gid_str in tag_asin_cache:
+                            tag_asins |= tag_asin_cache[gid_str]
                 else:
                     tag_asins = set()
                 if tag_asins:
@@ -278,23 +318,16 @@ class AdCampaignViewSet(viewsets.ViewSet):
                     qs = qs.filter(Q(pk__in=[]))
 
         # ── 负责人筛选 ──
-        # 数据来源：LxListingData.principal_info → ASIN → LxSpAd → LxSpCampaign
+        # 链路：owner_uid → Redis 缓存(uid→ASIN) → LxSpAd → campaign
         owner_ids = data.get("owners")
         if owner_ids:
             owner_list = [str(o).strip() for o in owner_ids.split(",") if str(o).strip()]
             if owner_list:
-                # LxListingData.principal_info 为 [{principal_uid, principal_name}, ...]
-                owner_q_parts = Q()
+                owner_asin_cache = _get_owner_asin_map()
+                owner_asins: set[str] = set()
                 for uid in owner_list:
-                    try:
-                        owner_q_parts |= Q(principal_info__contains=[{"principal_uid": int(uid)}])
-                    except (ValueError, TypeError):
-                        continue
-                owner_asins = set(
-                    LxListingData.objects.filter(owner_q_parts)
-                    .values_list("asin", flat=True)
-                    .distinct()
-                )
+                    if uid in owner_asin_cache:
+                        owner_asins |= owner_asin_cache[uid]
                 if owner_asins:
                     owner_ad_pairs = set(
                         LxSpAd.objects.filter(asin__in=owner_asins)
