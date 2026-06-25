@@ -52,7 +52,9 @@
         <el-icon
           class="mode-switch-hint"
           style="margin-right: 6px; font-size: 14px; color: var(--text-tertiary); cursor: help"
-        ><QuestionFilled /></el-icon>
+        >
+          <QuestionFilled />
+        </el-icon>
       </el-tooltip>
       <el-button-group size="small" style="margin-right: 6px">
         <el-button type="primary" disabled>关键词</el-button>
@@ -352,7 +354,13 @@ import type { KeywordParams } from "@/api/ads";
 
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import { Operation, VideoPause, CircleClose, ArrowDown, QuestionFilled } from "@element-plus/icons-vue";
+import {
+  Operation,
+  VideoPause,
+  CircleClose,
+  ArrowDown,
+  QuestionFilled,
+} from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 import { getKeywords, batchAdjustKeywordState, batchAdjustKeywordBid } from "@/api/ads";

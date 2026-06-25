@@ -33,7 +33,9 @@
         <el-icon
           class="mode-switch-hint"
           style="margin-right: 6px; font-size: 14px; color: var(--text-tertiary); cursor: help"
-        ><QuestionFilled /></el-icon>
+        >
+          <QuestionFilled />
+        </el-icon>
       </el-tooltip>
       <el-button-group size="small" style="margin-right: 6px">
         <el-button @click="emit('switch-mode')">关键词</el-button>
