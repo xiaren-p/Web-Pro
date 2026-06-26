@@ -1326,4 +1326,9 @@ function formatValue(val: any): string {
   margin: 0;
   -webkit-appearance: none;
 }
+
+/* 排序图标缩小 */
+:deep(.caret-wrapper) {
+  transform: scale(0.7);
+}
 </style>
