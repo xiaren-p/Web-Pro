@@ -128,9 +128,6 @@
           <template #default="{ row }">
             <div class="keyword-cell">
               <span class="msku-text msku-text--dark">{{ row.keyword_text || "-" }}</span>
-              <span class="match-badge" :class="`match-${row.match_type}`">
-                {{ row.match_type_label || row.match_type || "-" }}
-              </span>
             </div>
           </template>
         </el-table-column>
