@@ -322,10 +322,7 @@ function confirmAdd() {
   height: 76px;
   padding: 16px 20px 16px 24px;
   overflow: hidden;
-  background: var(--surface-base);
-  border: 1px solid var(--border-base);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-card);
 }
 
 .metric-card::before {
