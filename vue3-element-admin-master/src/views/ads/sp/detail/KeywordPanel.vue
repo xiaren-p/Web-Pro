@@ -12,6 +12,7 @@
         range-separator=" - "
         value-format="YYYY-MM-DD"
         style="width: 218px"
+        :shortcuts="DATE_SHORTCUTS"
         unlink-panels
       />
       <el-select
@@ -386,6 +387,7 @@ import {
 import { ElMessage, ElMessageBox } from "element-plus";
 
 import { getKeywords, batchAdjustKeywordState, batchAdjustKeywordBid } from "@/api/ads";
+import { DATE_SHORTCUTS } from "@/utils/ads-date-shortcuts";
 import BatchBidAdjustDialog from "@/components/BatchBidAdjustDialog/index.vue";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import { getDefaultDateRange, DATE_RANGE_KEY } from "@/utils/date";

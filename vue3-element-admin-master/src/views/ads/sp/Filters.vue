@@ -28,6 +28,7 @@
         end-placeholder="结束"
         range-separator="-"
         value-format="YYYY-MM-DD"
+        :shortcuts="DATE_SHORTCUTS"
         unlink-panels
       />
       <FsSelect
@@ -244,6 +245,7 @@ import { ref, watch, computed } from "vue";
 import type { PropType } from "vue";
 import { Filter, Search, Brush } from "@element-plus/icons-vue";
 import FsSelect from "@/components/FsSelect.vue";
+import { DATE_SHORTCUTS } from "@/utils/ads-date-shortcuts";
 
 const props = defineProps({
   filters: { type: Object as () => any, required: true },

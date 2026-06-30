@@ -12,6 +12,7 @@
         range-separator=" - "
         value-format="YYYY-MM-DD"
         style="width: 218px"
+        :shortcuts="DATE_SHORTCUTS"
         unlink-panels
       />
       <el-select
@@ -276,6 +277,7 @@ import { Operation, VideoPause, CircleClose } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 
 import { getAutoNegativeTargeting } from "@/api/ads";
+import { DATE_SHORTCUTS } from "@/utils/ads-date-shortcuts";
 
 const props = defineProps<{
   campaignId: string;

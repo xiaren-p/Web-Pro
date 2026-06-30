@@ -12,6 +12,7 @@
         range-separator=" - "
         value-format="YYYY-MM-DD"
         style="width: 218px"
+        :shortcuts="DATE_SHORTCUTS"
         unlink-panels
       />
       <el-select
@@ -234,6 +235,7 @@ import { CopyDocument, Filter, Operation, VideoPause, CircleClose } from "@eleme
 import { ElMessage } from "element-plus";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import { getAdGroups } from "@/api/ads";
+import { DATE_SHORTCUTS } from "@/utils/ads-date-shortcuts";
 import { getDefaultDateRange, DATE_RANGE_KEY } from "@/utils/date";
 
 defineOptions({ name: "AdGroupsPanel" });

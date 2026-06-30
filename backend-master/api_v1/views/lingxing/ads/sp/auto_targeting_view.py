@@ -455,6 +455,24 @@ class AutoTargetingViewSet(viewsets.ViewSet):
 
         currency_icon = self._resolve_currency_icon(int(profile_id))
 
+        # 主题：父广告活动基础信息（单次点查）
+        campaign_name = ""
+        campaign_state = ""
+        campaign_portfolio_name = ""
+        try:
+            c_obj = LxSpCampaign.objects.get(
+                campaign_id=campaign_id, profile_id=profile_id
+            )
+            campaign_name = c_obj.name or ""
+            campaign_state = c_obj.state or ""
+            if c_obj.portfolio_id:
+                pf = LxAdsPortfolio.objects.filter(
+                    portfolio_id=c_obj.portfolio_id, profile_id=profile_id
+                ).first()
+                campaign_portfolio_name = pf.name or str(c_obj.portfolio_id) if pf else ""
+        except LxSpCampaign.DoesNotExist:
+            pass
+
         target_ids = [str(it.target_id) for it in items]
         metrics_map, summary = self._build_target_metrics(
             target_ids, int(campaign_id), int(profile_id),
@@ -495,6 +513,9 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             _ss = resolve_service_status(item.serving_status)
             row["service_status_label"] = _ss["label"]
             row["service_status_type"] = _ss["type"]
+            row["campaign_name"] = campaign_name
+            row["campaign_state"] = campaign_state
+            row["portfolio_name"] = campaign_portfolio_name
             ag_info = adgroup_map.get(str(item.ad_group_id), {})
             row["adgroup_name"] = ag_info.get("name", str(item.ad_group_id))
             row["adgroup_state"] = ag_info.get("state", "")

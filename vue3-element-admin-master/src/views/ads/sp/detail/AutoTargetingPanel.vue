@@ -12,6 +12,7 @@
         range-separator=" - "
         value-format="YYYY-MM-DD"
         style="width: 218px"
+        :shortcuts="DATE_SHORTCUTS"
         unlink-panels
       />
       <el-select
@@ -376,6 +377,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import BatchBidAdjustDialog from "@/components/BatchBidAdjustDialog/index.vue";
 import { getAutoTargeting, batchAdjustTargetState, batchAdjustTargetBid } from "@/api/ads";
+import { DATE_SHORTCUTS } from "@/utils/ads-date-shortcuts";
 
 defineOptions({ name: "AutoTargetingPanel" });
 
