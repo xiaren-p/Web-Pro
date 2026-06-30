@@ -11,6 +11,7 @@
         range-separator=" - "
         value-format="YYYY-MM-DD"
         style="width: 218px"
+        :shortcuts="DATE_SHORTCUTS"
         unlink-panels
       />
       <el-select
@@ -22,6 +23,7 @@
       >
         <el-option label="已启用" value="enabled" />
         <el-option label="已暂停" value="paused" />
+        <el-option label="已归档" value="archived" />
       </el-select>
 
       <el-button type="primary" size="small" @click="onSearch">查询</el-button>
@@ -103,28 +105,18 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="商品投放" width="180" fixed="left" align="left" sortable>
+        <el-table-column label="商品投放" min-width="280" fixed="left" align="left" sortable>
           <template #default="{ row }">
             <span v-if="row._isSummary" class="summary-label">汇总</span>
-            <span v-else class="msku-text msku-text--dark">
-              {{ formatTargetingExpr(row.expression) }}
-            </span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="广告组" min-width="220" fixed="left" align="left" sortable>
-          <template #default="{ row }">
-            <template v-if="row._isSummary">---</template>
-            <template v-else>
-              <div class="adgroup-name-cell">
-                <el-icon v-if="row.adgroup_state === 'paused'" class="state-warn" :size="14">
-                  <VideoPause />
-                </el-icon>
-                <span :class="{ 'text-muted': row.adgroup_state === 'paused' }">
-                  {{ row.adgroup_name || "-" }}
-                </span>
+            <div v-else class="targeting-expr-cell">
+              <img v-if="row.expression_img" :src="row.expression_img" class="targeting-img" />
+              <div class="targeting-info">
+                <span class="targeting-type-label">{{ formatTargetingExpr(row.expression) }}</span>
+                <small v-if="row.expression_asin" class="targeting-asin">
+                  {{ row.expression_asin }}
+                </small>
               </div>
-            </template>
+            </div>
           </template>
         </el-table-column>
 
@@ -203,6 +195,37 @@
                 </el-tooltip>
               </div>
             </template>
+            <template v-else-if="col.prop === 'campaign_name'">
+              <template v-if="row._isSummary">---</template>
+              <div v-else class="msku-cell">
+                <span
+                  class="campaign-state-icon"
+                  :class="`state-${row.campaign_state || 'unknown'}`"
+                >
+                  <template v-if="row.campaign_state === 'enabled'">
+                    <span class="dot-circle" />
+                  </template>
+                  <template v-else-if="row.campaign_state === 'paused'">
+                    <el-icon><VideoPause /></el-icon>
+                  </template>
+                  <template v-else-if="row.campaign_state === 'archived'">
+                    <el-icon><CircleClose /></el-icon>
+                  </template>
+                </span>
+                <span class="msku-text">{{ row.campaign_name || "-" }}</span>
+              </div>
+            </template>
+            <template v-else-if="col.prop === 'adgroup_name'">
+              <template v-if="row._isSummary">---</template>
+              <div v-else class="msku-cell">
+                <el-icon v-if="row.adgroup_state === 'paused'" class="state-warn" :size="14">
+                  <VideoPause />
+                </el-icon>
+                <span class="msku-text" :class="{ 'text-muted': row.adgroup_state === 'paused' }">
+                  {{ row.adgroup_name || "-" }}
+                </span>
+              </div>
+            </template>
             <template v-else>
               <span>{{ row[col.prop] != null ? row[col.prop] : "---" }}</span>
             </template>
@@ -256,7 +279,8 @@
       <el-pagination
         v-model:current-page="currentPage"
         v-model:page-size="pageSize"
-        layout="prev, pager, next"
+        layout="total, sizes, prev, pager, next"
+        :page-sizes="[25, 50, 100]"
         :total="total"
         small
         @current-change="loadData"
@@ -289,7 +313,13 @@
  */
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import { Operation, VideoPause, ArrowDown, QuestionFilled } from "@element-plus/icons-vue";
+import {
+  Operation,
+  VideoPause,
+  ArrowDown,
+  QuestionFilled,
+  CircleClose,
+} from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import BatchBidAdjustDialog from "@/components/BatchBidAdjustDialog/index.vue";
@@ -299,6 +329,7 @@ import {
   batchAdjustProductTargetBid,
 } from "@/api/ads";
 import { getDefaultDateRange, DATE_RANGE_KEY } from "@/utils/date";
+import { DATE_SHORTCUTS } from "@/utils/ads-date-shortcuts";
 
 defineOptions({ name: "ProductTargetingPanel" });
 
@@ -373,7 +404,7 @@ const defaultColumns = [
   {
     prop: "adgroup_name",
     label: "广告组",
-    visible: false,
+    visible: true,
     category: "设置",
     minWidth: 140,
     sortable: "custom",
@@ -922,5 +953,39 @@ onMounted(() => {
   position: relative;
   top: 0;
   right: 0;
+}
+
+.targeting-expr-cell {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 2px 0;
+
+  .targeting-img {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 4px;
+  }
+
+  .targeting-info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .targeting-type-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .targeting-asin {
+    font-size: 12px;
+    color: var(--color-primary-600);
+  }
 }
 </style>

@@ -50,6 +50,7 @@
             start-placeholder="开始日期"
             end-placeholder="结束日期"
             style="width: 230px"
+            :shortcuts="DATE_SHORTCUTS"
             @change="handleFilterChange"
           />
           <el-select
@@ -180,6 +181,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { bulkDeleteAdQueue, getAdQueue, retryAdQueue } from "@/api/ads/index";
 import { UserAPI } from "@/api/user";
 import { hasPerm } from "@/utils/auth";
+import { DATE_SHORTCUTS } from "@/utils/ads-date-shortcuts";
 
 const props = defineProps<{
   visible: boolean;
