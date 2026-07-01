@@ -36,8 +36,15 @@ backend-master/db.sqlite3-journal
 # 后端用户上传的媒体文件
 backend-master/media/
 
+# Django 数据库迁移文件（服务端单独管理）
+**/migrations/
+!**/migrations/__init__.py
+
 # Node.js 依赖包（前端和 websocket 开发产生的依赖）
 node_modules/
+
+# AI 代理技能与配置（不上传 Git）
+.opencode/
 
 # 前端打包构建产物
 vue3-element-admin-master/dist/
