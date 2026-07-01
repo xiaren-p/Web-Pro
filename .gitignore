@@ -46,6 +46,8 @@ node_modules/
 
 # AI 代理技能与配置（不上传 Git）
 .opencode/
+AGENTS.md
+CLAUDE.md
 
 # 前端打包构建产物
 vue3-element-admin-master/dist/
