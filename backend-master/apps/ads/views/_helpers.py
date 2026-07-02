@@ -1,15 +1,18 @@
 """广告视图共用辅助：枚举标签映射、复合键构造、货币格式化。
 
-仅供 ``apps.system.views.lingxing.ads`` 包内 ViewSet 复用。跨包的业务计算请放入
-``api_v1.services``。
+所有广告 ViewSet 共用此模块。跨包的业务计算请放入 ``apps.ads.sp.services``。
 
 所有枚举值 → 中文 label 的映射统一集中于此文件，前端不做任何映射。
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from django.db.models import Q
+from rest_framework.request import Request
+
+logger = logging.getLogger(__name__)
 
 # ── 枚举值 → 中文 label 映射（统一出口，前端不做映射）──
 
@@ -185,3 +188,47 @@ def _sortable_val(val: Any) -> tuple[int, float | str]:
         return (1, float(str(val).replace("￥", "").replace("$", "").replace(",", "").replace("%", "").strip()))
     except (ValueError, TypeError):
         return (2, str(val).lower())
+
+
+def get_operator_name(request: Request) -> str:
+    """获取当前登录用户的展示名（昵称优先，降级 username）。
+
+    Args:
+        request (Request): DRF 请求对象。
+
+    Returns:
+        str: 用户昵称或用户名；未认证返回 "未知用户"。
+    """
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated:
+        try:
+            profile = getattr(user, "profile", None)
+            if profile and profile.nickname:
+                return profile.nickname
+        except Exception:
+            logger.warning("[get_operator_name] 获取用户昵称失败", exc_info=True)
+        if hasattr(user, "username") and user.username:
+            return user.username
+    return "未知用户"
+
+
+def get_operator_name(request: Request) -> str:
+    """获取当前登录用户的展示名（昵称优先，降级 username）。
+
+    Args:
+        request (Request): DRF 请求对象。
+
+    Returns:
+        str: 用户昵称或用户名；未认证返回 "未知用户"。
+    """
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated:
+        try:
+            profile = getattr(user, "profile", None)
+            if profile and profile.nickname:
+                return profile.nickname
+        except Exception:
+            logger.warning("[get_operator_name] 获取用户昵称失败", exc_info=True)
+        if hasattr(user, "username") and user.username:
+            return user.username
+    return "未知用户"

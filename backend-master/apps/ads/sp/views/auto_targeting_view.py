@@ -56,30 +56,10 @@ from apps.ads.sp.rules.models.sp_bid_adjustment import (
     SpBidAdjustment,
 )
 from apps.ads.sp.rules.models.sp_bid_adjustment import AdjustmentStatusChoices, ExecutionStatusChoices
-
-
-def _get_operator_name(request: Request) -> str:
-    """获取当前登录用户的展示名（昵称优先，降级 username）。"""
-    user = getattr(request, "user", None)
-    if user and user.is_authenticated:
-        try:
-            profile = getattr(user, "profile", None)
-            if profile and profile.nickname:
-                return profile.nickname
-        except Exception:
-            logger.warning("[_get_operator_name] 获取用户昵称失败", exc_info=True)
-        if hasattr(user, "username") and user.username:
-            return user.username
-    return "未知用户"
-
-
-def _is_time_pricing_active(campaign_id: int, profile_id: int) -> bool:
-    """检查指定广告活动是否正在分时生效中。is_time_pricing==YES(1)=正在分时。"""
-    from apps.ads.sp.timing.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
-    return AdTimePricingHit.objects.filter(
-        campaign_id=campaign_id, profile_id=profile_id,
-        is_time_pricing=TimePricingHitStatus.YES,
-    ).exists()
+from apps.ads.views._helpers import get_operator_name
+from apps.ads.sp.selectors.currency_icon_selector import resolve_currency_icon
+from apps.ads.sp.selectors.bid_adjustment_selector import build_bid_latest_adjustment_map, build_bid_lines
+from apps.ads.sp.selectors.time_pricing_selector import is_time_pricing_active, build_time_pricing_bid_map
 
 
 # 主题：自动投放定位组 type → 中文标签映射
@@ -117,26 +97,6 @@ class AutoTargetingViewSet(viewsets.ViewSet):
     """AutoTargetingViewSet 视图集。"""
     permission_classes = [IsAuthenticated]
     """SP 自动投放定向条款列表及指标聚合视图。"""
-
-    def _resolve_currency_icon(self, profile_id: int) -> str:
-        """根据 profile_id 查询货币符号（一步查表）。
-
-        查询链路：LxAdsProfile.currency_code → LxExchangeRate.code → icon。
-        取最新月份的汇率记录。
-
-        Args:
-            profile_id (int): 店铺 Profile ID。
-
-        Returns:
-            str: 货币符号，查询失败返回 "$"。
-        """
-        profile = LxAdsProfile.objects.filter(profile_id=profile_id).first()
-        if not profile or not profile.currency_code:
-            return "?"
-        rate = LxExchangeRate.objects.filter(
-            code=profile.currency_code
-        ).order_by("-date").first()
-        return rate.icon if rate and rate.icon else "?"
 
     @action(detail=False, methods=["post"], url_path="list")
     def list_auto_targeting(self, request: Request) -> Response:
@@ -189,7 +149,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
         # 主题：货币符号（LxAdsProfile → LxExchangeRate，一步查表）
-        currency_icon = self._resolve_currency_icon(profile_id)
+        currency_icon = resolve_currency_icon(profile_id)
 
         # 主题：父广告活动基础信息（单次点查）
         campaign_name = ""
@@ -283,15 +243,15 @@ class AutoTargetingViewSet(viewsets.ViewSet):
 
          # 主题：最近修改信息（拆分为状态变更和竞价变更两路）
         target_ids = [str(it.target_id) for it in items if it.target_id]
-        state_adj_map = _build_bid_latest_adjustment_map(
+        state_adj_map = build_bid_latest_adjustment_map(
             target_ids, "target_id", profile_id,
             types={BidExecutionTypeChoices.BID_PAUSE, BidExecutionTypeChoices.BID_ENABLE},
         )
-        bid_adj_map = _build_bid_latest_adjustment_map(
+        bid_adj_map = build_bid_latest_adjustment_map(
             target_ids, "target_id", profile_id,
             types={BidExecutionTypeChoices.MANUAL_ADJUSTMENT, BidExecutionTypeChoices.BID_ADJUSTMENT},
         )
-        tp_adj_map = _build_bid_latest_adjustment_map(
+        tp_adj_map = build_bid_latest_adjustment_map(
             target_ids, "target_id", profile_id,
             types={BidExecutionTypeChoices.TIME_PRICING_START, BidExecutionTypeChoices.TIME_PRICING_CALLBACK},
         )
@@ -302,7 +262,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             row["latest_time_pricing_adjustment"] = tp_adj_map.get(tid, {"has_recent": False, "lines": []})
 
         # 主题：分时竞价展示
-        tp_bid_map = _build_time_pricing_bid_map(
+        tp_bid_map = build_time_pricing_bid_map(
             target_ids, "target_id", campaign_id, profile_id, currency_icon,
         )
         for row in res_list:
@@ -463,7 +423,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
 
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
-        currency_icon = self._resolve_currency_icon(int(profile_id))
+        currency_icon = resolve_currency_icon(int(profile_id))
 
         # 主题：父广告活动基础信息（单次点查）
         campaign_name = ""
@@ -536,15 +496,15 @@ class AutoTargetingViewSet(viewsets.ViewSet):
 
          # 主题：最近修改信息（product targeting - 拆分为状态和竞价两路）
         target_ids = [str(it.target_id) for it in items if it.target_id]
-        state_adj_map = _build_bid_latest_adjustment_map(
+        state_adj_map = build_bid_latest_adjustment_map(
             target_ids, "target_id", profile_id,
             types={BidExecutionTypeChoices.BID_PAUSE, BidExecutionTypeChoices.BID_ENABLE},
         )
-        bid_adj_map = _build_bid_latest_adjustment_map(
+        bid_adj_map = build_bid_latest_adjustment_map(
             target_ids, "target_id", profile_id,
             types={BidExecutionTypeChoices.MANUAL_ADJUSTMENT, BidExecutionTypeChoices.BID_ADJUSTMENT},
         )
-        tp_adj_map = _build_bid_latest_adjustment_map(
+        tp_adj_map = build_bid_latest_adjustment_map(
             target_ids, "target_id", profile_id,
             types={BidExecutionTypeChoices.TIME_PRICING_START, BidExecutionTypeChoices.TIME_PRICING_CALLBACK},
         )
@@ -555,7 +515,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             row["latest_time_pricing_adjustment"] = tp_adj_map.get(tid, {"has_recent": False, "lines": []})
 
         # 主题：分时竞价展示
-        tp_bid_map = _build_time_pricing_bid_map(
+        tp_bid_map = build_time_pricing_bid_map(
             target_ids, "target_id", int(campaign_id), int(profile_id), currency_icon,
         )
         for row in res_list:
@@ -604,7 +564,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             return drf_ok({}, msg="未找到对应的投放条款")
 
         bid_before = tgt.bid
-        is_tp = _is_time_pricing_active(cid_int, pid_int)
+        is_tp = is_time_pricing_active(cid_int, pid_int)
         SpBidAdjustment.objects.create(
             target_id=tid_int,
             campaign_id=cid_int,
@@ -616,7 +576,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             execution_status=ExecutionStatusChoices.SUCCESS if is_tp else AdjustmentStatusChoices.PENDING,
             adjustment_time=timezone.now(),
             msg="手动修改，分时生效中，已直接应用" if is_tp else "",
-            operator=_get_operator_name(request),
+            operator=get_operator_name(request),
         )
         LxSpTarget.objects.filter(target_id=tid_int, profile_id=pid_int).update(bid=bid_after)
 
@@ -662,7 +622,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             adjustment_status=AdjustmentStatusChoices.PENDING,
             execution_status=ExecutionStatusChoices.PENDING,
             adjustment_time=timezone.now(),
-            operator=_get_operator_name(request),
+            operator=get_operator_name(request),
         )
         LxSpTarget.objects.filter(target_id=tid_int, profile_id=pid_int).update(state=state)
 
@@ -713,7 +673,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             BidExecutionTypeChoices.BID_ENABLE if state == "enabled"
             else BidExecutionTypeChoices.BID_PAUSE
         )
-        operator = _get_operator_name(request)
+        operator = get_operator_name(request)
 
         existing_map = {
             t.target_id: t.state
@@ -785,8 +745,8 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             return drf_ok({"success_count": 0, "failed_count": 0},
                           msg="ID 参数必须为整数")
 
-        is_tp = _is_time_pricing_active(cid_int, pid_int)
-        operator = _get_operator_name(request)
+        is_tp = is_time_pricing_active(cid_int, pid_int)
+        operator = get_operator_name(request)
 
         item_ids = [int(it["id"]) for it in items if it.get("id")]
         existing_map: dict[int, LxSpTarget] = {}
@@ -853,188 +813,3 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             "failed_count": len(errors),
             "errors": errors or None,
         })
-
-
-def _build_bid_latest_adjustment_map(
-    entity_ids: list[str],
-    entity_field: str,
-    profile_id: int,
-    types: set | None = None,
-) -> dict[str, dict[str, Any]]:
-    """构建投放实体最近修改星标信息（性能优化版：MAX(id) 子查询取每实体最新记录）。"""
-    from datetime import timedelta
-    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-
-    from django.db.models import Max
-    from apps.ads.sp.rules.models.lx_ad_rule import LxAdRule
-    from apps.ads.sp.rules.models.sp_bid_adjustment import SpBidAdjustment, ExecutionTypeChoices as BidExecType
-    from apps.common.utils.timezone_utils import country_to_timezone
-
-    if not entity_ids:
-        return {}
-    int_ids = [int(x) for x in entity_ids if x]
-    if not int_ids:
-        return {}
-    threshold = timezone.now() - timedelta(days=7)
-    filter_kwargs: dict[str, Any] = {
-        f"{entity_field}__in": int_ids, "created_at__gte": threshold,
-    }
-    if types:
-        filter_kwargs["execution_type__in"] = list(types)
-    base_qs = SpBidAdjustment.objects.filter(
-        **filter_kwargs,
-    ).only("id", entity_field, "execution_type", "auto_rule_id", "operator", "bid_before", "bid_after", "created_at")
-
-    latest_ids = base_qs.values(entity_field).annotate(max_id=Max("id")).values_list("max_id", flat=True)
-    records = list(SpBidAdjustment.objects.filter(id__in=list(latest_ids)).only(
-        "id", entity_field, "execution_type", "auto_rule_id", "operator", "bid_before", "bid_after", "created_at",
-    ))
-    if not records:
-        return {}
-    rule_ids = {r.auto_rule_id for r in records if r.auto_rule_id}
-    rule_map: dict[int, Any] = {}
-    if rule_ids:
-        for rule in LxAdRule.objects.filter(id__in=rule_ids).only("id", "name", "condition_sets"):
-            rule_map[rule.id] = rule
-    tz_name, country_name = "", ""
-    prof = LxAdsProfile.objects.filter(profile_id=profile_id).only("country_code", "sid").first()
-    if prof:
-        tz_name = country_to_timezone(prof.country_code or "")
-        from apps.sales.models.lx_shops import LxShops
-        country_name = LxShops.objects.filter(sid=prof.sid).values_list("country", flat=True).first() or (prof.country_code or "")
-    result: dict[str, dict[str, Any]] = {}
-    for rec in records:
-        eid = getattr(rec, entity_field, None) or rec.keyword_id or rec.target_id
-        if eid is not None:
-            lines = _build_bid_lines(rec, rule_map, country_name, tz_name)
-            result[str(eid)] = {"has_recent": True, "lines": lines}
-    return result
-
-
-def _build_bid_lines(rec: Any, rule_map: dict[int, Any], country_name: str, tz_name: str) -> list[str]:
-    """构建定位组最近一次竞价调整的可读说明行。
-
-根据记录来源（规则/人工）生成首行说明，转换时区格式化时间，
-并按规则条件组追加明细。
-
-Args:
-    rec: 竞价调整记录。
-    rule_map (dict): 规则 ID → 规则对象映射。
-    country_name (str): 国家名称。
-    tz_name (str): 时区名称。
-
-Returns:
-    list[str]: 可读说明行列表。
-"""
-    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-    from apps.ads.sp.rules.models.sp_bid_adjustment import ExecutionTypeChoices as BidExecType
-    is_rule = bool(rec.auto_rule_id)
-    rule = rule_map.get(rec.auto_rule_id) if is_rule else None
-    rule_name = getattr(rule, "name", "") if rule else "未知规则"
-    operator = rec.operator or "未知用户"
-    etype = rec.execution_type
-    line1 = f"最近一次修改通过「{rule_name}」规则修改" if is_rule else f"最近一次修改由{operator}完成"
-    local_str = country_name + "时间: 未知"
-    if rec.created_at:
-        try:
-            tz = ZoneInfo(tz_name) if tz_name else None
-            local_dt = rec.created_at.astimezone(tz) if tz else rec.created_at
-            local_str = f"{country_name or '当地'}时间: {local_dt.strftime('%Y-%m-%d %H:%M')}"
-        except Exception:
-            logger.warning("[_build_bid_lines] ZoneInfo 时区转换失败，降级为 UTC 时间格式", exc_info=True)
-            try:
-                local_str = f"{country_name or '当地'}时间: {rec.created_at.strftime('%Y-%m-%d %H:%M')}"
-            except Exception:
-                logger.warning("[_build_bid_lines] UTC 时间格式化失败", exc_info=True)
-    lines = [line1, local_str]
-    if is_rule and rule:
-        try:
-            cs = rule.condition_sets
-            if isinstance(cs, list) and cs:
-                fl = {"cost":"花费","sales":"广告销售额","same_sales":"直接销售额","orders":"广告订单","same_orders":"直接订单","units":"广告销量","clicks":"点击","impressions":"曝光量","ctr":"CTR","cpc":"CPC","cpa":"CPA","acos":"ACoS","roas":"ROAS","cvr":"CVR","spend_rate":"花费占比","sales_rate":"销售额占比","is_ratio":"IS"}
-                ol = {">":">","<":"<",">=":"≥","<=":"≤","==":"=","!=":"≠"}
-                group_parts = []
-                for cg in cs:
-                    if not isinstance(cg, dict): continue
-                    days = cg.get("days", "?")
-                    conds = cg.get("conditions") or []
-                    if not isinstance(conds, list) or not conds: continue
-                    cond_strs = []
-                    for c in conds:
-                        if not isinstance(c, dict): continue
-                        m = str(c.get("metric") or c.get("field") or "")
-                        o = str(c.get("operator", ">"))
-                        v = c.get("value", "")
-                        nm = fl.get(m.lower(), m or "未知")
-                        osym = ol.get(o, o)
-                        seg = f"{nm} {osym} {v}"
-                        if bool(c.get("isRange", False)):
-                            o2 = str(c.get("operator2", "<")); v2 = c.get("value2", "")
-                            seg += f" 且 {ol.get(o2, o2)} {v2}"
-                        cond_strs.append(seg)
-                    if cond_strs:
-                        group_parts.append(f"近{days}天: {', '.join(cond_strs)}")
-                if group_parts:
-                    lines.append(f"详细内容: {'；'.join(group_parts)}")
-        except Exception:
-            logger.warning("[_build_bid_lines] 规则条件解析失败", exc_info=True)
-    if etype == BidExecType.BID_PAUSE: lines.append("执行操作: 竞价暂停")
-    elif etype == BidExecType.BID_ENABLE: lines.append("执行操作: 竞价启用")
-    elif etype in (BidExecType.BID_ADJUSTMENT, BidExecType.MANUAL_ADJUSTMENT):
-        bf = float(rec.bid_before) if rec.bid_before is not None else 0
-        af = float(rec.bid_after) if rec.bid_after is not None else 0
-        lines.append(f"执行操作: 竞价 {bf:.2f} → {af:.2f}")
-    elif etype == BidExecType.TIME_PRICING_START: lines.append("执行操作: 分时开始")
-    elif etype == BidExecType.TIME_PRICING_CALLBACK: lines.append("执行操作: 分时回调")
-    return lines
-
-
-def _build_time_pricing_bid_map(
-    entity_ids: list[str],
-    entity_field: str,
-    campaign_id: int,
-    profile_id: int,
-    currency_icon: str,
-) -> dict[str, str]:
-    """构建分时竞价展示映射：分时生效中时显示最近一次 TIME_PRICING_START 的 bid_after，否则 "-"。"""
-    from apps.ads.sp.timing.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
-
-    if not AdTimePricingHit.objects.filter(
-        campaign_id=campaign_id, profile_id=profile_id,
-        is_time_pricing=TimePricingHitStatus.YES,
-    ).exists():
-        return {k: "-" for k in entity_ids}
-
-    from django.db.models import Max
-    from apps.ads.sp.rules.models.sp_bid_adjustment import SpBidAdjustment, ExecutionTypeChoices as BidExecType
-
-    int_ids = [int(x) for x in entity_ids if x]
-    if not int_ids:
-        return {}
-
-    latest = (
-        SpBidAdjustment.objects
-        .filter(
-            **{f"{entity_field}__in": int_ids},
-            execution_type=BidExecType.TIME_PRICING_START,
-            campaign_id=campaign_id,
-            profile_id=profile_id,
-        )
-        .values(entity_field)
-        .annotate(max_id=Max("id"))
-    )
-    id_map = {row[entity_field]: row["max_id"] for row in latest if row["max_id"]}
-    if not id_map:
-        return {k: "-" for k in entity_ids}
-
-    records = SpBidAdjustment.objects.filter(id__in=list(id_map.values())).only(entity_field, "bid_after")
-    rec_map = {getattr(r, entity_field): r for r in records if getattr(r, entity_field)}
-
-    result: dict[str, str] = {}
-    for eid in entity_ids:
-        rec = rec_map.get(int(eid))
-        if rec and rec.bid_after is not None:
-            result[eid] = f"{currency_icon}{float(rec.bid_after):.2f}"
-        else:
-            result[eid] = "-"
-    return result

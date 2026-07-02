@@ -17,12 +17,16 @@ from typing import Any
 from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.sp.selectors.currency_icon_selector import resolve_currency_icon
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.sp.selectors.currency_icon_selector import resolve_currency_icon
 from rest_framework.request import Request
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.sp.selectors.currency_icon_selector import resolve_currency_icon
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.sp.selectors.currency_icon_selector import resolve_currency_icon
 
 from apps.ads.models.lx_ads_portfolio import LxAdsPortfolio
 from apps.ads.models.lx_ads_profile import LxAdsProfile
@@ -145,7 +149,7 @@ class AdViewSet(viewsets.ViewSet):
         total, items, p_num, p_size = paginate_queryset(request, qs)
 
         # 主题：货币符号（LxAdsProfile.currency_code → LxExchangeRate.code，一步查表）
-        currency_icon = self._resolve_currency_icon(profile_id)
+        currency_icon = resolve_currency_icon(profile_id)
 
         # 主题：父广告活动基础信息（单次点查）
         campaign_name = ""

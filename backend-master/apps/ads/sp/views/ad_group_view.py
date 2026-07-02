@@ -17,12 +17,16 @@ from typing import Any
 from django.db.models import Count, Sum
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.sp.selectors.currency_icon_selector import resolve_currency_icon
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.sp.selectors.currency_icon_selector import resolve_currency_icon
 from rest_framework.request import Request
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.sp.selectors.currency_icon_selector import resolve_currency_icon
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.sp.selectors.currency_icon_selector import resolve_currency_icon
 
 from apps.ads.models.lx_ads_portfolio import LxAdsPortfolio
 from apps.ads.models.lx_ads_profile import LxAdsProfile
@@ -150,7 +154,7 @@ class AdGroupViewSet(viewsets.ViewSet):
             pass
 
         # 主题：货币符号（LxAdsProfile.currency_code → LxExchangeRate.code，一步查表）
-        currency_icon = self._resolve_currency_icon(profile_id_int)
+        currency_icon = resolve_currency_icon(profile_id_int)
 
         # 主题：商品广告数量统计（通过 LxSpAd 按 campaign_id + ad_group_id 分组统计）
         item_ad_group_ids = [item.ad_group_id for item in items if item.ad_group_id]

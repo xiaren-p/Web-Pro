@@ -12,12 +12,16 @@ from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.views._helpers import get_operator_name
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.views._helpers import get_operator_name
 from rest_framework.request import Request
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.views._helpers import get_operator_name
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.views._helpers import get_operator_name
 
 from apps.ads.models.lx_ads_portfolio import LxAdsPortfolio
 from apps.ads.models.lx_ads_profile import LxAdsProfile
@@ -253,7 +257,7 @@ def _flat_parse_label(raw_label: str) -> list[str]:
     return [t.strip() for t in s.split(",") if t.strip()]
 
 
-def _get_operator_name(request: Request) -> str:
+def get_operator_name(request: Request) -> str:
     """获取当前登录用户的展示名（昵称优先，降级 username）。
 
     用于手动调整操作时写入 SpCampaignAdjustment.operator 字段，
@@ -984,7 +988,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             adjustment_status=AdjustmentStatusChoices.PENDING,
             execution_status=ExecutionStatusChoices.PENDING,
             adjustment_time=timezone.now(),
-            operator=_get_operator_name(request),
+            operator=get_operator_name(request),
         )
 
         # 同步更新本地实体表预算
@@ -1053,7 +1057,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
             adjustment_status=AdjustmentStatusChoices.PENDING,
             execution_status=ExecutionStatusChoices.PENDING,
             adjustment_time=timezone.now(),
-            operator=_get_operator_name(request),
+            operator=get_operator_name(request),
         )
 
         # 同步更新本地实体表状态
@@ -1085,7 +1089,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if not items or not isinstance(items, list):
             return drf_ok({"success_count": 0, "failed_count": 0, "errors": []}, msg="items 不能为空")
 
-        operator = _get_operator_name(request)
+        operator = get_operator_name(request)
         records: list[SpCampaignAdjustment] = []
         update_pairs: list[tuple[int, int, str]] = []
         errors: list[dict[str, Any]] = []
@@ -1161,7 +1165,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if not items or not isinstance(items, list):
             return drf_ok({"success_count": 0, "failed_count": 0, "errors": []}, msg="items 不能为空")
 
-        operator = _get_operator_name(request)
+        operator = get_operator_name(request)
         records: list[SpCampaignAdjustment] = []
         update_list: list[LxSpCampaign] = []
         errors: list[dict[str, Any]] = []
