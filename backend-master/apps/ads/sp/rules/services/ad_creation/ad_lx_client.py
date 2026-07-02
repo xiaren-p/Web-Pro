@@ -15,8 +15,8 @@ import json
 import logging
 from typing import Any
 
-from api_v2.models.api_request_log import ApiRequestLog, HttpMethod, ParamType
-from api_v2.services.qinglong_env_service import get_cached_env
+from apps.common.models.api_request_log import ApiRequestLog, HttpMethod, ParamType
+from apps.common.services.qinglong_env_service import get_cached_env
 
 logger = logging.getLogger(__name__)
 

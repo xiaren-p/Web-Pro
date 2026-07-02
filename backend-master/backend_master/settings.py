@@ -142,7 +142,6 @@ CELERY_TASK_ROUTES = {
     # 广告活动参考数据缓存刷新（定时预热，280s 一轮，保证页面缓存永不过期）
     'apps.ads.sp.tasks.listing_cache_refresh_task.refresh_listing_caches': {'queue': 'celery'},
     # ── parallel_queue（concurrency=4）：可并行的批量任务 ────────────────────
-    'api_v2.tasks.ai_chat_task.run_ai_chat_task':                         {'queue': 'parallel_queue'},
     'apps.ai.tasks.chat_task.run_ai_chat_task':                            {'queue': 'parallel_queue'},
     # ── single_thread_queue（concurrency=1）：须顺序执行的任务 ───────────────
     'apps.ads.sp.rules.tasks.ad_campaign_submit_task.submit_pending_campaigns_task': {'queue': 'single_thread_queue'},
@@ -232,7 +231,6 @@ INSTALLED_APPS = [
     'django_celery_beat',     # Celery 定时任务
     'oauth2_provider',        # OIDC Provider（django-oauth-toolkit）
     'api_v1',              # 业务接口 v1
-    'api_v2',              # 任务调度 v2（工作流执行引擎）
     'apps.common',         # 基础服务域
     'apps.ai',             # AI 助手域（对话/分组/应用）
     'apps.crawler',        # 爬虫管理域

@@ -14,7 +14,7 @@ from typing import Any
 
 import requests
 
-from api_v2.models.listing_tag_modify_queue import (
+from apps.sales.listing.models.listing_tag_modify_queue import (
     ListingTagModifyQueue,
     ModifyActionChoices,
 )

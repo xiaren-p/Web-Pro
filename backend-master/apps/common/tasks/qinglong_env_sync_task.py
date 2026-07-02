@@ -2,7 +2,7 @@
 
 Celery Beat 配置（已在 settings.py 中注册）：
     'qinglong-env-sync': {
-        'task': 'api_v2.tasks.qinglong_env_sync_task.sync_qinglong_env_task',
+        'task': 'apps.common.tasks.qinglong_env_sync_task.sync_qinglong_env_task',
         'schedule': 600.0,   # 每 10 分钟执行一次
     }
 
@@ -15,14 +15,14 @@ import logging
 
 from celery import shared_task
 
-from api_v2.services.qinglong_env_service import refresh_all
+from apps.common.services.qinglong_env_service import refresh_all
 
 logger = logging.getLogger(__name__)
 
 
 @shared_task(
     bind=True,
-    name="api_v2.tasks.qinglong_env_sync_task.sync_qinglong_env_task",
+    name="apps.common.tasks.qinglong_env_sync_task.sync_qinglong_env_task",
     max_retries=0,
     soft_time_limit=60,
     time_limit=90,

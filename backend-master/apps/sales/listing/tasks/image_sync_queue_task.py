@@ -8,7 +8,7 @@ import logging
 
 from celery import shared_task
 
-from api_v2.services.image_sync_service import execute_image_sync
+from apps.sales.listing.services.image_sync_service import execute_image_sync
 from apps.common.utils.task_execution_lock import TaskExecutionLock
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ LOCK_TTL = 960
 
 @shared_task(
     bind=True,
-    name="api_v2.tasks.image_sync_queue_task.run_image_sync_queue_task",
+    name="apps.sales.listing.tasks.image_sync_queue_task.run_image_sync_queue_task",
     max_retries=0,
     soft_time_limit=840,
     time_limit=900,

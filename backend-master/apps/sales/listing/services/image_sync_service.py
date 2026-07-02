@@ -22,8 +22,8 @@ from api_v1.models import ImageSyncQueue, ImageUpload
 from api_v1.models.file.image_sync_queue import ImageSyncStatus
 from api_v1.models.file.image_upload import ImageUploadStatus
 from apps.nc.services.nc_api_client import NcApiClient
-from api_v2.services.nc_sku_path_search import search_nc_sku_paths
-from api_v2.services.qinglong_env_service import get_cached_env
+from apps.nc.utils.nc_sku_path_search import search_nc_sku_paths
+from apps.common.services.qinglong_env_service import get_cached_env
 
 logger = logging.getLogger(__name__)
 

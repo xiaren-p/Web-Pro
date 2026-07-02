@@ -17,7 +17,7 @@ from typing import Any
 import requests
 
 from apps.ads.sp.rules.models.ad_upload_queue import AdUploadQueue
-from api_v2.models.api_request_log import ParamType
+from apps.common.models.api_request_log import ParamType
 from apps.ads.sp.rules.services.ad_creation.ad_lx_client import (
     LX_ADS_API_URL,
     build_lx_headers,

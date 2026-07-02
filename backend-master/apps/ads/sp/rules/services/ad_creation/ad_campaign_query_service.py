@@ -13,7 +13,7 @@ from typing import Any
 import requests
 
 from apps.ads.sp.rules.services.ad_creation.ad_lx_client import build_lx_headers, write_request_log
-from api_v2.models.api_request_log import ParamType
+from apps.common.models.api_request_log import ParamType
 
 logger = logging.getLogger(__name__)
 

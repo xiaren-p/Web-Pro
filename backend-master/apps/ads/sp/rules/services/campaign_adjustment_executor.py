@@ -24,7 +24,7 @@ from apps.ads.sp.rules.models.sp_campaign_adjustment import (
     SpCampaignAdjustment,
 )
 from apps.ads.sp.rules.models.sp_bid_adjustment import AdjustmentStatusChoices, ExecutionStatusChoices
-from api_v2.services.qinglong_env_service import get_cached_env, refresh_with_task_trigger
+from apps.common.services.qinglong_env_service import get_cached_env, refresh_with_task_trigger
 
 logger = logging.getLogger(__name__)
 

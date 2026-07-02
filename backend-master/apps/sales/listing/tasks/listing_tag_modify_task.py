@@ -20,7 +20,7 @@ LOCK_TTL = 960
 
 @shared_task(
     bind=True,
-    name="api_v2.tasks.listing_tag_modify_task.run_listing_tag_modify_task",
+    name="apps.sales.listing.tasks.listing_tag_modify_task.run_listing_tag_modify_task",
     max_retries=0,
     soft_time_limit=840,
     time_limit=900,

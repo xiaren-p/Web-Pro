@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 @shared_task(
     bind=True,
-    name="api_v2.tasks.listing_cache_refresh_task.refresh_listing_caches",
+    name="apps.ads.sp.tasks.listing_cache_refresh_task.refresh_listing_caches",
     max_retries=0,
     soft_time_limit=30,
     time_limit=60,

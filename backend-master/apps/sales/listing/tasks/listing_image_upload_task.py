@@ -5,14 +5,14 @@ import logging
 from celery import shared_task
 from django.utils import timezone
 
-from api_v2.models.workflow_execution import ExecutionStatus, WorkflowExecution
+from apps.ai.models.workflow_execution import ExecutionStatus, WorkflowExecution
 
 logger = logging.getLogger(__name__)
 
 
 @shared_task(
     bind=True,
-    name='api_v2.tasks.listing_image_upload_task.upload_listing_images_task',
+    name='apps.sales.listing.tasks.listing_image_upload_task.upload_listing_images_task',
     max_retries=0,
     soft_time_limit=840,
     time_limit=900,
