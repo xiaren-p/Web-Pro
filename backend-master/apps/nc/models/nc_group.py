@@ -45,7 +45,7 @@ class NcGroup(TimeStampedModel):
     )
 
     dept = models.ForeignKey(
-        "Department",
+        "system.Department",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

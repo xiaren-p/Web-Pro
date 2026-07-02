@@ -84,7 +84,7 @@ class UserProfile(TimeStampedModel):
     )
 
     extra_nc_groups = models.ManyToManyField(
-        "NcGroup",
+        "nc.NcGroup",
         blank=True,
         related_name="extra_users",
         verbose_name="额外 NC 群组",
