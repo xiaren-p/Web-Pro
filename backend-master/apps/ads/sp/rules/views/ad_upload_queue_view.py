@@ -19,7 +19,7 @@ from rest_framework.response import Response
 
 from apps.system.auth.bearer_token_auth import BearerTokenAuthentication
 from apps.ads.sp.rules.models.ad_upload_queue import AdParseStatus, AdUploadQueue
-from apps.system.permissions.v2_access import IsV2Accessible
+from apps.system.permissions.api_access import IsApiAccessible
 from apps.ads.sp.rules.serializers.ad_upload_queue_serializer import (
     AdBulkDeleteSerializer,
     AdUploadQueueSerializer,
@@ -29,7 +29,7 @@ from apps.ads.sp.rules.services.ad_upload_queue_service import bulk_delete_queue
 logger = logging.getLogger(__name__)
 
 _AUTH = [BearerTokenAuthentication]
-_PERM = [IsV2Accessible]
+_PERM = [IsApiAccessible]
 
 # 竞价参数字段名与默认值映射
 _BIDDING_FIELDS: dict[str, float] = {

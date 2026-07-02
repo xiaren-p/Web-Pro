@@ -1,4 +1,4 @@
-"""分时调价域 — api_v2 路由。"""
+"""分时调价域 — 路由。"""
 
 from django.urls import path
 

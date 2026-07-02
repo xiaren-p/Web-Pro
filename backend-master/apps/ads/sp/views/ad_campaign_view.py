@@ -279,7 +279,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
     手动调整（adjust_budget / adjust_state）仅写入 SpCampaignAdjustment 调整记录表
     并同步更新 LxSpCampaign 实体表，不触发 Celery 任务；实际推送到亚马逊由
-    专门的触发处调用 api_v2 的 ads/campaign-adjustment/run/ 接口完成。
+    专门的触发处调用 api/v1/ads/campaign-adjustment/run/ 接口完成。
     """
 
     def _serialize(self, obj: LxSpCampaign) -> dict[str, Any]:
@@ -927,7 +927,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         """手动调整广告活动预算：写 SpCampaignAdjustment 记录 + 更新 LxSpCampaign.daily_budget。
 
         仅写入调整记录表与本地实体表，不触发 Celery 任务；实际推送到亚马逊由
-        专门的触发处调用 api_v2 的 ads/campaign-adjustment/run/ 接口完成。
+        专门的触发处调用 api/v1/ads/campaign-adjustment/run/ 接口完成。
 
         Args:
             request (Request): DRF 请求对象，body 需含：
@@ -999,7 +999,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         state=enabled 写 CAMPAIGN_ENABLE 类型，state=paused 写 CAMPAIGN_PAUSE 类型（复用）。
         仅写入调整记录表与本地实体表，不触发 Celery 任务；实际推送到亚马逊由
-        专门的触发处调用 api_v2 的 ads/campaign-adjustment/run/ 接口完成。
+        专门的触发处调用 api/v1/ads/campaign-adjustment/run/ 接口完成。
 
         Args:
             request (Request): DRF 请求对象，body 需含：

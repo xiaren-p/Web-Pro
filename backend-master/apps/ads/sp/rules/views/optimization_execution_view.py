@@ -10,7 +10,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.system.auth import BearerTokenAuthentication
-from apps.system.permissions.v2_access import IsV2Accessible
+from apps.system.permissions.api_access import IsApiAccessible
 from apps.ads.sp.rules.tasks.optimization_execution_task import (
     GLOBAL_LOCK_KEY,
     build_lock_key,
@@ -21,7 +21,7 @@ from apps.common.utils.task_execution_lock import BUSY_RESPONSE, is_task_running
 logger = logging.getLogger(__name__)
 
 _AUTH = [BearerTokenAuthentication, OAuth2Authentication]
-_PERM = [IsV2Accessible]
+_PERM = [IsApiAccessible]
 
 # 合法维度列表
 _VALID_DIMENSIONS = {

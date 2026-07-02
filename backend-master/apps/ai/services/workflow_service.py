@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # 工作流类型 → Celery 注册 Task Name 的映射
 # 使用字符串延迟导入，避免模块顶层产生循环依赖
 _TASK_NAME_MAP: dict[str, str] = {
-    WorkflowType.LISTING_IMAGE_UPLOAD: 'api_v2.tasks.listing_image_upload_task.upload_listing_images_task',
+    WorkflowType.LISTING_IMAGE_UPLOAD: 'apps.sales.listing.tasks.listing_image_upload_task.upload_listing_images_task',
 }
 
 

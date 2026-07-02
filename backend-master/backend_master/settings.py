@@ -419,14 +419,14 @@ REST_FRAMEWORK = {
 # OAuth2 / OIDC Provider 配置（django-oauth-toolkit）
 # /o/token/ 端点同时支持：
 #   - OIDC Authorization Code Flow（前端 SSO 登录）
-#   - Client Credentials Grant（api_v2 外部应用调用）
+#   - Client Credentials Grant（外部应用调用）
 OAUTH2_PROVIDER = {
     # 全局可用 Scope 字典
     'SCOPES': {
         'openid':  'OpenID Connect 身份标识',
         'profile': '用户个人资料',
         'email':   '用户邮箱',
-        'api_v2':  '工作流任务接口访问权限（仅限 api_v2）',
+        'api_access':  'API 接口访问权限（外部应用调用）',
     },
     'DEFAULT_SCOPES': ['openid'],
     # Token 有效期
@@ -529,7 +529,7 @@ OAUTH2_PROVIDER = {
         'email': '邮符1地址',
         'phone': '手机号',
         'groups': 'Nextcloud 群组成员关系',
-        'api_v2': 'API v2 接口访问权限（Client Credentials 外部调用）',
+        'api_access': 'API 接口访问权限（Client Credentials 外部调用）',
     },
     'DEFAULT_SCOPES': ['openid', 'profile', 'email'],
     # 请求 scope 验证：请求的 scope 必须是 SCOPES 的子集

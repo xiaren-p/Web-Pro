@@ -28,7 +28,7 @@ from rest_framework.response import Response
 
 from apps.system.auth.bearer_token_auth import BearerTokenAuthentication
 from apps.ai.models.message import AiMessage, MessageStatus, MessageType
-from apps.system.permissions.v2_access import IsV2Accessible
+from apps.system.permissions.api_access import IsApiAccessible
 from apps.ai.utils.redis_channel import (
     EVENT_DONE,
     EVENT_PLAN,
@@ -92,7 +92,7 @@ class _SSEEventStreamRenderer(BaseRenderer):
 
 @api_view(['GET'])
 @authentication_classes([BearerTokenAuthentication, OAuth2Authentication])
-@permission_classes([IsAuthenticated, IsV2Accessible])
+@permission_classes([IsAuthenticated, IsApiAccessible])
 @renderer_classes([_SSEEventStreamRenderer])
 def subscribe_message(request: Request, public_id):
     """订阅指定 AI 消息的 SSE 实时流。

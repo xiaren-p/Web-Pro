@@ -22,7 +22,7 @@ from rest_framework.response import Response
 
 from apps.system.auth.bearer_token_auth import BearerTokenAuthentication
 from apps.ai.models.workflow_execution import WorkflowExecution
-from apps.system.permissions.v2_access import IsV2Accessible
+from apps.system.permissions.api_access import IsApiAccessible
 from apps.ai.serializers.task_serializer import (
     WorkflowExecutionSerializer,
     WorkflowStartSerializer,
@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 _AccessToken = get_access_token_model()
 
 # 统一鉴权配置：普通用户 Bearer Token + OAuth2 Client Credentials 双路鉴权
-_V2_AUTH = [BearerTokenAuthentication, OAuth2Authentication]
-_V2_PERM = [IsV2Accessible]
+_API_AUTH = [BearerTokenAuthentication, OAuth2Authentication]
+_API_PERM = [IsApiAccessible]
 
 
 def _resolve_actor_user(request: Request) -> Optional[User]:
@@ -51,7 +51,7 @@ def _resolve_actor_user(request: Request) -> Optional[User]:
 
     Returns:
         Optional[User]: 解析出的 Django User；无法解析时返回 None
-            （正常情况下 IsV2Accessible 已前置拦截，此处不应为 None）。
+            （正常情况下 IsApiAccessible 已前置拦截，此处不应为 None）。
     """
     if request.user and request.user.is_authenticated:
         return request.user
@@ -68,8 +68,8 @@ def _resolve_actor_user(request: Request) -> Optional[User]:
 
 
 @api_view(['POST'])
-@authentication_classes(_V2_AUTH)
-@permission_classes(_V2_PERM)
+@authentication_classes(_API_AUTH)
+@permission_classes(_API_PERM)
 def start_workflow(request: Request) -> Response:
     """启动异步任务。
 
@@ -120,8 +120,8 @@ def start_workflow(request: Request) -> Response:
 
 
 @api_view(['GET'])
-@authentication_classes(_V2_AUTH)
-@permission_classes(_V2_PERM)
+@authentication_classes(_API_AUTH)
+@permission_classes(_API_PERM)
 def get_workflow_status(request: Request, execution_id: int) -> Response:
     """查询任务执行状态（同步 Celery 实时状态后返回）。
 
@@ -149,8 +149,8 @@ def get_workflow_status(request: Request, execution_id: int) -> Response:
 
 
 @api_view(['POST'])
-@authentication_classes(_V2_AUTH)
-@permission_classes(_V2_PERM)
+@authentication_classes(_API_AUTH)
+@permission_classes(_API_PERM)
 def cancel_workflow(request: Request, execution_id: int) -> Response:
     """取消正在执行的任务。
 

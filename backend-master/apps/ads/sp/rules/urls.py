@@ -1,4 +1,4 @@
-"""广告规则域 — api_v2 路由。"""
+"""广告规则域 — 路由。"""
 
 from django.urls import path
 

@@ -16,7 +16,7 @@ class ListingTagModifyQueue(models.Model):
     """Listing 商品标签修改队列。
 
     前端每次 upsert_labels 时，计算新旧 global_tags 差异并写入此表，
-    供 api_v2 异步任务消费以追加/移除标签到外部系统。
+    供异步任务消费以追加/移除标签到外部系统。
     """
 
     action = models.CharField(

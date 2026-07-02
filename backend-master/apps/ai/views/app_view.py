@@ -13,14 +13,14 @@ from rest_framework.response import Response
 
 from apps.system.auth.bearer_token_auth import BearerTokenAuthentication
 from apps.ai.models.dify_app import DifyApp
-from apps.system.permissions.v2_access import IsV2Accessible
+from apps.system.permissions.api_access import IsApiAccessible
 from apps.ai.serializers.chat_serializer import DifyAppSerializer
 
 logger = logging.getLogger(__name__)
 
 
 _AUTH = [BearerTokenAuthentication, OAuth2Authentication]
-_PERM = [IsV2Accessible]
+_PERM = [IsApiAccessible]
 
 
 @api_view(['GET'])

@@ -469,7 +469,7 @@ class SalesProductListingViewSet(ViewSet):
         id 为主键（LxListingData.id），用于精确匹配单条记录。
 
         写入 LxListingData.global_tags 后，自动计算新旧差异并写入
-        ListingTagModifyQueue 队列，供 api_v2 异步任务消费。
+        ListingTagModifyQueue 队列，供异步任务消费。
         """
         data = request.data
         if isinstance(data, dict):

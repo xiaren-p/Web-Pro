@@ -6,10 +6,10 @@
   3. 调度第一步（创建广告活动）、第二步（创建广告组）、第三步（创建广告投放），按结果写入最终状态。
 
 HTTP 请求细节、请求体构造、响应解析分别由以下模块负责：
-  - api_v2.services.ad_lx_client           — 底层共享客户端工具
-  - api_v2.services.ad_campaign_service    — 广告活动（Step 1）
-  - api_v2.services.ad_group_service       — 广告组（Step 2）
-  - api_v2.services.ad_product_ad_service  — 广告投放（Step 3）
+  - apps.ads.sp.rules.services.ad_lx_client           — 底层共享客户端工具
+  - apps.ads.sp.rules.services.ad_campaign_service    — 广告活动（Step 1）
+  - apps.ads.sp.rules.services.ad_group_service       — 广告组（Step 2）
+  - apps.ads.sp.rules.services.ad_product_ad_service  — 广告投放（Step 3）
 """
 
 from __future__ import annotations

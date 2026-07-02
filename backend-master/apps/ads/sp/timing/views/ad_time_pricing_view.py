@@ -15,7 +15,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.system.auth import BearerTokenAuthentication
-from apps.system.permissions.v2_access import IsV2Accessible
+from apps.system.permissions.api_access import IsApiAccessible
 from apps.ads.sp.timing.tasks.ad_time_pricing_task import (
     LOCK_KEY as AD_TIME_PRICING_LOCK_KEY,
     run_ad_time_pricing_task,
@@ -29,7 +29,7 @@ from apps.common.utils.task_execution_lock import BUSY_RESPONSE, is_task_running
 logger = logging.getLogger(__name__)
 
 _AUTH = [BearerTokenAuthentication, OAuth2Authentication]
-_PERM = [IsV2Accessible]
+_PERM = [IsApiAccessible]
 
 
 @api_view(["POST"])

@@ -17,7 +17,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.system.auth.bearer_token_auth import BearerTokenAuthentication
-from apps.system.permissions.v2_access import IsV2Accessible
+from apps.system.permissions.api_access import IsApiAccessible
 from apps.ads.sp.rules.services.ad_creation.ad_campaign_submit_service import process_pending_campaigns
 from apps.ads.sp.rules.tasks.ad_campaign_submit_task import LOCK_KEY, LOCK_TTL
 from apps.common.utils.task_execution_lock import is_task_running
@@ -25,7 +25,7 @@ from apps.common.utils.task_execution_lock import is_task_running
 logger = logging.getLogger(__name__)
 
 _AUTH = [BearerTokenAuthentication, OAuth2Authentication]
-_PERM = [IsV2Accessible]
+_PERM = [IsApiAccessible]
 
 
 @api_view(["POST"])
