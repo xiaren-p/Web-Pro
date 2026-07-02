@@ -135,6 +135,7 @@ class MonthlyLossOrder(TimeStampedModel):
     )
 
     class Meta:
+        db_table = "api_v1_monthlylossorder"
         verbose_name = "月度亏损订单统计"
         verbose_name_plural = "月度亏损订单统计"
         ordering = ("-month", "-id")

@@ -46,6 +46,7 @@ class NcFileAccessRule(TimeStampedModel):
     )
 
     class Meta:
+        db_table = "api_v1_ncfileaccessrule"
         verbose_name = "NC 文件访问规则"
         verbose_name_plural = "NC 文件访问规则"
         unique_together = ("user", "nc_path")

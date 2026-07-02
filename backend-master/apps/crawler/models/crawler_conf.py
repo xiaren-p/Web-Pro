@@ -39,6 +39,7 @@ class CrawlerConf(TimeStampedModel):
     )
 
     class Meta:
+        db_table = "api_v1_crawlerconf"
         verbose_name = "数据采集节点"
         verbose_name_plural = "数据采集节点"
         ordering = ("order_num", "id")

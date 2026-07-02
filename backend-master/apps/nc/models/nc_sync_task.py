@@ -78,6 +78,7 @@ class NcSyncTask(TimeStampedModel):
     )
 
     class Meta:
+        db_table = "api_v1_ncsynctask"
         verbose_name = "NC 同步任务"
         verbose_name_plural = "NC 同步任务"
         ordering = ("-created_at",)

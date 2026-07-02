@@ -33,6 +33,7 @@ class CrawlerSellerAccount(TimeStampedModel):
     )
 
     class Meta:
+        db_table = "api_v1_crawlerselleraccount"
         verbose_name = "卖家精灵账号"
         verbose_name_plural = "卖家精灵账号"
         ordering = ("order_num", "id")

@@ -33,6 +33,7 @@ class NoticeRead(TimeStampedModel):
     )
 
     class Meta:
+        db_table = "api_v1_noticeread"
         verbose_name = "公告已读"
         verbose_name_plural = "公告已读"
         unique_together = (("user", "notice"),)

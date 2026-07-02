@@ -39,6 +39,7 @@ class CrawlerCategory(TimeStampedModel):
     )
 
     class Meta:
+        db_table = "api_v1_crawlercategory"
         verbose_name = "爬取类目"
         verbose_name_plural = "爬取类目"
         ordering = ("-created_at", "id")

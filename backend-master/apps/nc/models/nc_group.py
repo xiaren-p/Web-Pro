@@ -62,6 +62,7 @@ class NcGroup(TimeStampedModel):
     )
 
     class Meta:
+        db_table = "api_v1_ncgroup"
         verbose_name = "NC 群组"
         verbose_name_plural = "NC 群组"
         ordering = ("id",)

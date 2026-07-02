@@ -63,6 +63,7 @@ class CrawlerLog(TimeStampedModel):
     )
 
     class Meta:
+        db_table = "api_v1_crawlerlog"
         verbose_name = "爬虫日志"
         verbose_name_plural = "爬虫日志"
         ordering = ("-id",)

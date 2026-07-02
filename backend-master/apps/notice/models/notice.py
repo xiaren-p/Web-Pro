@@ -90,6 +90,7 @@ class Notice(TimeStampedModel):
     )
 
     class Meta:
+        db_table = "api_v1_notice"
         verbose_name = "通知公告"
         verbose_name_plural = "通知公告"
 
