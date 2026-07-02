@@ -4,7 +4,7 @@
 """
 from django.db import models
 
-from apps.lingxing.product.lx_local_product import LxLocalProduct
+from apps.product.models.lx_local_product import LxLocalProduct
 
 
 class PrimaryFlag(models.IntegerChoices):

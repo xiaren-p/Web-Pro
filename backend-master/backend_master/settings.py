@@ -239,7 +239,7 @@ INSTALLED_APPS = [
     'apps.finance',        # 财务管理域
     'apps.ads',            # 广告管理域
     'apps.system',         # 系统管理域
-    'apps.lingxing',      # 领星数据域
+    'apps.product',      # 领星数据域
 ]
 
 MIDDLEWARE = [
