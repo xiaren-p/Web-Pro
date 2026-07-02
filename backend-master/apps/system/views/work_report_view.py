@@ -12,7 +12,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.contrib.auth.models import User
 
-from apps.system.models import WorkReport, Department
+from apps.common.models import WorkReport
+from apps.system.models import Department
 from apps.system.models.user_profile import AdminLevel
 from apps.system.serializers import WorkReportSerializer
 from django.utils import timezone

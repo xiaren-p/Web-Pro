@@ -80,7 +80,7 @@ PRESET_COLORS: dict[str, str] = {
 def make_preset_png(username: str, preset_id: str) -> bytes:
     """返回与前端 @dicebear/thumbs 完全一致的预设头像 PNG bytes。
 
-    静态文件存放于 api_v1/static/api_v1/preset_avatars/preset_XX.png，
+    静态文件存放于 apps/system/static/preset_avatars/preset_XX.png，
     由 dicebear 公开 API 按相同 seed 与 backgroundColor 离线预生成，
     视觉上与前端渲染完全一致。读取优先级：
       1. Django staticfiles.finders.find()  → 开发环境直接命中 app 静态目录

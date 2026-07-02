@@ -21,7 +21,8 @@ from apps.sales.listing.services.image_sync_queue_service import (
     upsert_sync_task,
 )
 from apps.common.utils.responses import drf_ok, drf_error
-from apps.system.models import ImageUpload, ImageSyncQueue
+from apps.common.models import ImageUpload
+from apps.sales.listing.models import ImageSyncQueue
 
 class ImageUploadViewSet(viewsets.ModelViewSet):
     queryset = ImageUpload.objects.all()

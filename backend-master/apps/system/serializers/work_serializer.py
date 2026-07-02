@@ -1,6 +1,6 @@
 """工作汇报序列化器。"""
 from rest_framework import serializers
-from apps.system.models import WorkReport
+from apps.common.models import WorkReport
 
 
 class WorkReportSerializer(serializers.ModelSerializer):

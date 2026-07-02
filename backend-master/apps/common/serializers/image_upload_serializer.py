@@ -1,6 +1,6 @@
 """图片上传记录序列化器。"""
 from rest_framework import serializers
-from apps.system.models import ImageUpload
+from apps.common.models import ImageUpload
 
 
 class ImageUploadSerializer(serializers.ModelSerializer):

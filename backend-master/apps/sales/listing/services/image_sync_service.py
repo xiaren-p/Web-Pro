@@ -18,7 +18,8 @@ import requests
 from django.utils import timezone
 from PIL import Image
 
-from apps.system.models import ImageSyncQueue, ImageUpload
+from apps.sales.listing.models import ImageSyncQueue
+from apps.common.models import ImageUpload
 from apps.sales.listing.models.image_sync_queue import ImageSyncStatus
 from apps.common.models.image_upload import ImageUploadStatus
 from apps.nc.services.nc_api_client import NcApiClient

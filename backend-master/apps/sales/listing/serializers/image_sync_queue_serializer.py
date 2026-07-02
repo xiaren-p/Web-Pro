@@ -5,7 +5,7 @@
 """
 from rest_framework import serializers
 
-from apps.system.models import ImageSyncQueue
+from apps.sales.listing.models import ImageSyncQueue
 
 
 class ImageSyncQueueSerializer(serializers.ModelSerializer):

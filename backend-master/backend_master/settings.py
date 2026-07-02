@@ -230,7 +230,6 @@ INSTALLED_APPS = [
     'django_celery_results',  # Celery 任务结果存储
     'django_celery_beat',     # Celery 定时任务
     'oauth2_provider',        # OIDC Provider（django-oauth-toolkit）
-    'api_v1',              # 业务接口 v1
     'apps.common',         # 基础服务域
     'apps.ai',             # AI 助手域（对话/分组/应用）
     'apps.crawler',        # 爬虫管理域
