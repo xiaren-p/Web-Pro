@@ -174,24 +174,8 @@ urlpatterns = [
     path('menus/<str:id>/form', views.MenuViewSet.as_view({'get': 'form'}), name='menu-form'),
     path('menus/<str:id>', views.MenuViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='menu-update-delete'),
 
-    # 数据采集节点（开放接口，无需认证）
-    path('crawler/conf', views.CrawlerConfViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='crawler-conf-list'),
-    path('crawler/conf/<str:id>/form', views.CrawlerConfViewSet.as_view({'get': 'form'}), name='crawler-conf-form'),
-    path('crawler/conf/<str:ids>', views.CrawlerConfViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='crawler-conf-update-delete'),
-    # 卖家精灵账号配置（开放接口，无需认证）
-    path('crawler/seller', views.CrawlerSellerViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='crawler-seller-list'),
-    path('crawler/seller/<str:id>/form', views.CrawlerSellerViewSet.as_view({'get': 'form'}), name='crawler-seller-form'),
-    path('crawler/seller/<str:ids>', views.CrawlerSellerViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='crawler-seller-update-delete'),
-    # 爬虫日志（开放接口）：分页查询与写入
-    path('crawler/logs/page', views.CrawlerLogViewSet.as_view({'get': 'page'}), name='crawler-logs-page'),
-    path('crawler/logs', views.CrawlerLogViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='crawler-logs-list-create'),
-
-    # 爬取类目（分页公开，写入需认证）
-    path('crawler/category/page', views.CrawlerCategoryViewSet.as_view({'get': 'page'}), name='crawler-category-page'),
-    path('crawler/category/sites', views.CrawlerCategoryViewSet.as_view({'get': 'sites'}), name='crawler-category-sites'),
-    path('crawler/category', views.CrawlerCategoryViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='crawler-category-list'),
-    path('crawler/category/<str:id>/form', views.CrawlerCategoryViewSet.as_view({'get': 'form'}), name='crawler-category-form'),
-    path('crawler/category/<str:ids>', views.CrawlerCategoryViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='crawler-category-update-delete'),
+    # 爬虫管理（apps.crawler）
+    path('crawler/', include('apps.crawler.urls')),
 
 
     # 日志

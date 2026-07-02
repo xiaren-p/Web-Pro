@@ -235,6 +235,9 @@ INSTALLED_APPS = [
     'api_v2',              # 任务调度 v2（工作流执行引擎）
     'apps.common',         # 基础服务域（天气）
     'apps.ai',             # AI 助手域（对话/分组/应用）
+    'apps.crawler',        # 爬虫管理域
+    'apps.notice',         # 通知公告域
+    'apps.nc',             # Nextcloud 集成域
 ]
 
 MIDDLEWARE = [

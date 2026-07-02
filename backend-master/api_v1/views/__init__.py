@@ -8,14 +8,8 @@ from api_v1.views.system import (
     ConfigViewSet,
     PositionViewSet,
 )
-from api_v1.views.nc import NcFolderTreeViewSet
-from api_v1.views.notice import NoticeViewSet
 from api_v1.views.codegen import CodegenViewSet
 from api_v1.views.crawler import (
-    CrawlerConfViewSet,
-    CrawlerSellerViewSet,
-    CrawlerLogViewSet,
-    CrawlerCategoryViewSet,
 )
 from api_v1.views.shop_options_view import ShopOptionsViewSet
 from api_v1.views.lingxing.sales.listing import ImageUploadViewSet, SalesProductListingViewSet, ListingTagViewSet
