@@ -143,6 +143,7 @@ CELERY_TASK_ROUTES = {
     'api_v2.tasks.listing_cache_refresh_task.refresh_listing_caches': {'queue': 'celery'},
     # ── parallel_queue（concurrency=4）：可并行的批量任务 ────────────────────
     'api_v2.tasks.ai_chat_task.run_ai_chat_task':                         {'queue': 'parallel_queue'},
+    'apps.ai.tasks.chat_task.run_ai_chat_task':                            {'queue': 'parallel_queue'},
     # ── single_thread_queue（concurrency=1）：须顺序执行的任务 ───────────────
     'api_v2.tasks.ad_campaign_submit_task.submit_pending_campaigns_task': {'queue': 'single_thread_queue'},
     'api_v2.tasks.listing_image_upload_task.upload_listing_images_task':  {'queue': 'single_thread_queue'},
@@ -232,6 +233,8 @@ INSTALLED_APPS = [
     'oauth2_provider',        # OIDC Provider（django-oauth-toolkit）
     'api_v1',              # 业务接口 v1
     'api_v2',              # 任务调度 v2（工作流执行引擎）
+    'apps.common',         # 基础服务域（天气）
+    'apps.ai',             # AI 助手域（对话/分组/应用）
 ]
 
 MIDDLEWARE = [

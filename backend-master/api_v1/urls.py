@@ -5,7 +5,7 @@ api_v1 路由表
 保持路径、方法与前端完全一致。
 """
 
-from django.urls import path, re_path
+from django.urls import path, re_path, include
 from django.views.decorators.csrf import csrf_exempt
 from api_v1 import views
 
@@ -248,7 +248,9 @@ urlpatterns = [
     path('work-report', views.WorkReportViewSet.as_view({'get': 'list', }), name='work-report-list'),
     path('work-report/<str:pk>', views.WorkReportViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='work-report-detail'),
 
-    path('weather/live', views.WeatherViewSet.as_view({'get': 'live'}), name='weather-live'),
+    path('common/', include('apps.common.urls')),
+    path('ai/', include('apps.ai.urls')),
+
     path('', views.root_index, name='api-root'),
 ]
 

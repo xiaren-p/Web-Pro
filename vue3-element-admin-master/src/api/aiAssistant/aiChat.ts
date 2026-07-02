@@ -1,12 +1,10 @@
 /**
  * AI 助手对话 API 模块。
  *
- * 仅做请求封装，不做业务加工：
- *   - 普通 REST 接口走 requestV2 实例（baseURL 自动拼 /api/v2）
- *   - SSE 订阅由 useAiChatStream 直接 fetch 调用，避免 axios timeout 干扰流式
+ * 普通 REST 接口走 request 实例（baseURL /dev-api → /api/v1）。
+ * SSE 订阅由 useAiChatStream 直接 fetch 调用，避免 axios timeout 干扰流式。
  */
-
-import { requestV2 } from "@/utils/request";
+import request from "@/utils/request";
 import type {
   AiApp,
   AiConversation,
@@ -28,25 +26,20 @@ import type {
 export function startChat(payload: {
   query: string;
   conversation_id?: string | null;
-  /** Dify 应用 code（前端切换器选择的值），新建会话时按此切换 agent */
   app_code?: string | null;
   inputs?: Record<string, unknown>;
 }): Promise<ChatStartResponse> {
-  return requestV2.post("/ai/chat/", payload);
+  return request({ method: "post", url: "/ai/chat/", data: payload });
 }
 
-/**
- * 拉取后台维护的全部启用 Dify 应用（用于前端"应用切换器"渲染下拉列表）。
- */
+/** 拉取后台维护的全部启用 Dify 应用。 */
 export function listAiApps(): Promise<{ items: AiApp[] }> {
-  return requestV2.get("/ai/apps/");
+  return request({ method: "get", url: "/ai/apps/" });
 }
 
-/**
- * 拉取当前用户的会话列表（最近活跃倒序）。
- */
+/** 拉取当前用户的会话列表（最近活跃倒序）。 */
 export function listConversations(): Promise<{ items: AiConversation[] }> {
-  return requestV2.get("/ai/conversations/");
+  return request({ method: "get", url: "/ai/conversations/" });
 }
 
 /**
@@ -55,7 +48,7 @@ export function listConversations(): Promise<{ items: AiConversation[] }> {
  * @param conversationId - 会话 UUID
  */
 export function listMessages(conversationId: string): Promise<{ items: AiMessage[] }> {
-  return requestV2.get(`/ai/conversations/${conversationId}/messages/`);
+  return request({ method: "get", url: `/ai/conversations/${conversationId}/messages/` });
 }
 
 /**
@@ -64,7 +57,7 @@ export function listMessages(conversationId: string): Promise<{ items: AiMessage
  * @param conversationId - 会话 UUID
  */
 export function deleteConversation(conversationId: string): Promise<{ success: boolean }> {
-  return requestV2.delete(`/ai/conversations/${conversationId}/`);
+  return request({ method: "delete", url: `/ai/conversations/${conversationId}/` });
 }
 
 /**
@@ -77,16 +70,16 @@ export function renameConversation(
   conversationId: string,
   title: string
 ): Promise<{ success: boolean; title: string }> {
-  return requestV2.patch(`/ai/conversations/${conversationId}/rename/`, { title });
+  return request({ method: "patch", url: `/ai/conversations/${conversationId}/rename/`, data: { title } });
 }
 
 /**
- * 取消正在生成的 AI 消息。后端会向 Celery 发取消信号并广播 done 事件。
+ * 取消正在生成的 AI 消息。
  *
  * @param messageId - 消息 UUID
  */
 export function cancelMessage(messageId: string): Promise<{ success: boolean }> {
-  return requestV2.post(`/ai/messages/${messageId}/cancel/`);
+  return request({ method: "post", url: `/ai/messages/${messageId}/cancel/` });
 }
 
 /**
@@ -99,7 +92,7 @@ export function pinConversation(
   conversationId: string,
   pinned: boolean
 ): Promise<{ success: boolean; pinned: boolean }> {
-  return requestV2.patch(`/ai/conversations/${conversationId}/pin/`, { pinned });
+  return request({ method: "patch", url: `/ai/conversations/${conversationId}/pin/`, data: { pinned } });
 }
 
 /**
@@ -112,7 +105,7 @@ export function moveConversationToGroup(
   conversationId: string,
   groupId: string | null
 ): Promise<{ success: boolean }> {
-  return requestV2.post(`/ai/conversations/${conversationId}/move/`, { group_id: groupId });
+  return request({ method: "post", url: `/ai/conversations/${conversationId}/move/`, data: { group_id: groupId } });
 }
 
 /**
@@ -125,18 +118,14 @@ export function searchConversations(
   keyword: string,
   limit: number = 30
 ): Promise<{ items: AiSearchHit[] }> {
-  return requestV2.get("/ai/conversations/search/", {
-    params: { q: keyword, limit },
-  });
+  return request({ method: "get", url: "/ai/conversations/search/", params: { q: keyword, limit } });
 }
 
 /* ── 分组管理 ──────────────────────────────────────────── */
 
-/**
- * 获取当前用户的全部分组。
- */
+/** 获取当前用户的全部分组。 */
 export function listGroups(): Promise<{ items: AiConversationGroup[] }> {
-  return requestV2.get("/ai/groups/");
+  return request({ method: "get", url: "/ai/groups/" });
 }
 
 /**
@@ -145,7 +134,7 @@ export function listGroups(): Promise<{ items: AiConversationGroup[] }> {
  * @param name - 分组名称（≤ 80 字，用户内唯一）
  */
 export function createGroup(name: string): Promise<AiConversationGroup> {
-  return requestV2.post("/ai/groups/create/", { name });
+  return request({ method: "post", url: "/ai/groups/create/", data: { name } });
 }
 
 /**
@@ -155,7 +144,7 @@ export function createGroup(name: string): Promise<AiConversationGroup> {
  * @param name - 新名称
  */
 export function renameGroup(groupId: string, name: string): Promise<AiConversationGroup> {
-  return requestV2.patch(`/ai/groups/${groupId}/rename/`, { name });
+  return request({ method: "patch", url: `/ai/groups/${groupId}/rename/`, data: { name } });
 }
 
 /**
@@ -164,7 +153,7 @@ export function renameGroup(groupId: string, name: string): Promise<AiConversati
  * @param groupId - 分组 UUID
  */
 export function deleteGroup(groupId: string): Promise<{ success: boolean }> {
-  return requestV2.delete(`/ai/groups/${groupId}/`);
+  return request({ method: "delete", url: `/ai/groups/${groupId}/` });
 }
 
 /**
@@ -173,5 +162,5 @@ export function deleteGroup(groupId: string): Promise<{ success: boolean }> {
  * @param orderedIds - 期望从上到下的分组 UUID 数组
  */
 export function reorderGroups(orderedIds: string[]): Promise<{ success: boolean }> {
-  return requestV2.post("/ai/groups/reorder/", { ordered_ids: orderedIds });
+  return request({ method: "post", url: "/ai/groups/reorder/", data: { ordered_ids: orderedIds } });
 }

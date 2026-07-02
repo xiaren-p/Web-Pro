@@ -11,7 +11,6 @@ from api_v2.tasks.listing_tag_sync_task import run_listing_tag_sync_task
 from api_v2.tasks.optimization_strategy_task import run_optimization_strategy_task
 from api_v2.tasks.optimization_execution_task import run_optimization_execution_task
 from api_v2.tasks.qinglong_env_sync_task import sync_qinglong_env_task
-from api_v2.tasks.ai_chat_task import run_ai_chat_task
 from api_v2.tasks.image_sync_queue_task import run_image_sync_queue_task
 from api_v2.tasks.listing_cache_refresh_task import refresh_listing_caches
 
@@ -27,7 +26,6 @@ __all__ = [
     'run_optimization_execution_task',
     'run_listing_tag_sync_task',
     'run_listing_tag_modify_task',
-    'run_ai_chat_task',
     'run_image_sync_queue_task',
     'refresh_listing_caches',
 ]

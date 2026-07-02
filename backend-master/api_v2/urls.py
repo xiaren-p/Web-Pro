@@ -1,6 +1,6 @@
 """api_v2 路由分发。"""
 
-from django.urls import path
+from django.urls import path, include
 
 from api_v2.views.ad_campaign_submit_view import submit_pending_campaigns
 from api_v2.views.ad_time_pricing_view import trigger_time_pricing
@@ -21,26 +21,6 @@ from api_v2.views.app_view import (
 from api_v2.views.optimization_strategy_view import trigger_optimization_strategy
 from api_v2.views.optimization_execution_view import trigger_optimization_execution
 from api_v2.views.task_view import cancel_workflow, get_workflow_status, start_workflow
-from api_v2.views.ai_chat_view import (
-    cancel_message,
-    delete_conversation,
-    list_conversations,
-    list_messages,
-    pin_conversation,
-    rename_conversation,
-    search_conversations,
-    start_chat,
-)
-from api_v2.views.ai_group_view import (
-    create_group,
-    delete_group,
-    list_groups,
-    move_conversation_to_group,
-    rename_group,
-    reorder_groups,
-)
-from api_v2.views.ai_app_view import list_apps as list_ai_apps
-from api_v2.views.ai_stream_view import subscribe_message
 
 app_name = 'api_v2'
 
@@ -77,25 +57,4 @@ urlpatterns = [
 
     # SP广告优化策略执行
     path('ads/optimization-strategy/execute/', trigger_optimization_execution, name='ads_optimization_strategy_execute'),
-
-    # AI 助手对话接口（Plan Mode）
-    # 路径参数统一使用 UUID 形式 public_id，禁止暴露内部整数主键
-    path('ai/chat/', start_chat, name='ai_chat_start'),
-    path('ai/stream/<uuid:public_id>/', subscribe_message, name='ai_stream_subscribe'),
-    path('ai/conversations/', list_conversations, name='ai_conversations_list'),
-    path('ai/conversations/search/', search_conversations, name='ai_conversations_search'),
-    path('ai/conversations/<uuid:public_id>/', delete_conversation, name='ai_conversations_delete'),
-    path('ai/conversations/<uuid:public_id>/rename/', rename_conversation, name='ai_conversations_rename'),
-    path('ai/conversations/<uuid:public_id>/pin/', pin_conversation, name='ai_conversations_pin'),
-    path('ai/conversations/<uuid:public_id>/messages/', list_messages, name='ai_conversations_messages'),
-    path('ai/conversations/<uuid:public_id>/move/', move_conversation_to_group, name='ai_conversations_move'),
-    path('ai/messages/<uuid:public_id>/cancel/', cancel_message, name='ai_message_cancel'),
-    # 分组管理
-    path('ai/groups/', list_groups, name='ai_groups_list'),
-    path('ai/groups/create/', create_group, name='ai_groups_create'),
-    path('ai/groups/reorder/', reorder_groups, name='ai_groups_reorder'),
-    path('ai/groups/<uuid:public_id>/', delete_group, name='ai_groups_delete'),
-    path('ai/groups/<uuid:public_id>/rename/', rename_group, name='ai_groups_rename'),
-    # Dify 应用列表（前端切换器使用）
-    path('ai/apps/', list_ai_apps, name='ai_apps_list'),
 ]

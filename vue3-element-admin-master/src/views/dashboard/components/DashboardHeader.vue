@@ -90,7 +90,7 @@
 <script setup lang="ts">
 import { useUserStore } from "@/store/modules/user-store";
 import { resolveAvatarSrc } from "@/utils/avatarPresets";
-import { WeatherAPI } from "@/api/weather";
+import { getWeatherLive } from "@/api/weather";
 import { Folder, Document, VideoCamera } from "@element-plus/icons-vue";
 
 const userStore = useUserStore();
@@ -120,7 +120,7 @@ const weatherText = ref("正在获取天气...");
 
 const fetchWeather = async () => {
   try {
-    const w = await WeatherAPI.getLive();
+    const w = await getWeatherLive();
     if (w && w.weather) {
       weatherText.value = `${w.city} ${w.weather}，气温${w.temperature}℃，${w.winddirection}风${w.windpower}级`;
     }

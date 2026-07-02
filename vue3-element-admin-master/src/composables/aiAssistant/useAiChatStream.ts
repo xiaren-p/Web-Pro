@@ -18,16 +18,16 @@ import type { PlanProposal } from "@/types/aiAssistant/planSchema";
  * 构造 SSE 订阅完整 URL。
  *
  * 与 src/utils/request.ts 中 requestV2 的 baseURL 推导逻辑保持一致：
- *   - 生产环境（VITE_APP_API_ORIGIN 非空）：``https://api.hanlis.cn/api/v2/ai/stream/<id>/``
- *   - 开发环境（VITE_APP_API_ORIGIN 为空）：``/dev-api/api/v2/ai/stream/<id>/``，由 Vite 代理转发
+ *   - 生产环境（VITE_APP_API_ORIGIN 非空）：``https://api.hanlis.cn/api/v1/ai/stream/<id>/``
+ *   - 开发环境（VITE_APP_API_ORIGIN 为空）：``/dev-api/ai/stream/<id>/``，由 Vite 代理转发
  *
  * @param messageId - 要订阅的 AI 消息 ID
  * @returns SSE 端点完整 URL
  */
 function buildStreamUrl(messageId: string): string {
   const origin = import.meta.env.VITE_APP_API_ORIGIN;
-  const v2Base = origin ? `${origin}/api/v2` : `${import.meta.env.VITE_APP_BASE_API}/api/v2`;
-  return `${v2Base}/ai/stream/${messageId}/`;
+  const base = origin ? `${origin}/api/v1` : import.meta.env.VITE_APP_BASE_API;
+  return `${base}/ai/stream/${messageId}/`;
 }
 
 /**
