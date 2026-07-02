@@ -21,6 +21,7 @@ from apps.system.serializers import DeptSerializer
 from apps.common.utils.responses import drf_error, drf_ok
 from apps.system.utils.dept_scope import get_caller_dept_ids
 from apps.system.services.dept_write_service import create_dept, update_dept, delete_depts
+from apps.system.selectors.dept_tree_selector import build_dept_tree
 
 
 class DeptViewSet(viewsets.ViewSet):
@@ -46,44 +47,6 @@ class DeptViewSet(viewsets.ViewSet):
             required = ["sys:dept:delete"]
         setattr(self, "required_perms", required)
         return super().get_permissions()
-
-    def _build_tree(self, nodes: list[Department]) -> list[dict[str, Any]]:
-        """构建部门树形结构（带循环检测保护）。"""
-        by_parent: dict[int, list[Department]] = {}
-        for d in nodes:
-            pid = d.parent_id or 0
-            by_parent.setdefault(pid, []).append(d)
-
-        def build(pid: int | None = None, path: set[int] | None = None) -> list[dict[str, Any]]:
-            """递归构建部门子树节点列表。
-
-Args:
-    pid (int | None): 父部门 ID，None 表示从根层级开始。
-    path (set[int] | None): 已访问部门 ID 集合，用于循环引用检测。
-
-Returns:
-    list[dict[str, Any]]: 部门树节点列表（含 children）。
-"""
-            if path is None:
-                path = set()
-            res: list[dict[str, Any]] = []
-            for d in by_parent.get(pid or 0, []):
-                if d.id in path:
-                    continue
-                new_path = set(path)
-                new_path.add(d.id)
-                res.append({
-                    "id": d.id,
-                    "parentId": d.parent_id,
-                    "name": d.name,
-                    "code": getattr(d, "code", ""),
-                    "status": 1 if d.status else 0,
-                    "sort": d.order_num,
-                    "children": build(d.id, new_path),
-                })
-            return res
-
-        return build(None)
 
     @action(detail=False, methods=["get", "post"], url_path="")
     def list_or_create(self, request: Request) -> Any:
@@ -111,7 +74,7 @@ Returns:
             # 无过滤条件时返回树结构；有过滤时返回平铺列表（保留搜索结果可读性）
             if has_filter:
                 return drf_ok(DeptSerializer(nodes, many=True).data)
-            return drf_ok(self._build_tree(nodes))
+            return drf_ok(build_dept_tree(nodes))
 
         dept = create_dept(
             name=request.data.get("name"),
@@ -127,7 +90,7 @@ Returns:
         """部门树形结构。"""
         try:
             qs = Department.objects.all().order_by("order_num", "id")
-            return drf_ok(self._build_tree(list(qs)))
+            return drf_ok(build_dept_tree(list(qs)))
         except Exception:
             return drf_error("服务器内部错误", status=500)
 

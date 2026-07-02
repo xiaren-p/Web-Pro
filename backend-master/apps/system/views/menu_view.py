@@ -12,6 +12,7 @@ from rest_framework.request import Request
 from apps.system.models import Menu
 from apps.system.permissions import MenuPermRequired
 from apps.common.utils.responses import drf_error, drf_ok
+from apps.system.selectors.menu_route_selector import build_routes
 
 
 class MenuViewSet(viewsets.ViewSet):
@@ -87,59 +88,6 @@ Returns:
             "status": 1 if m.status else 0,
         }
 
-    @staticmethod
-    def _build_routes(nodes: list[Menu]) -> list[dict[str, Any]]:
-        """根据菜单节点列表构建动态路由树。"""
-        # 仅目录/菜单生成路由，按钮(3)跳过
-        by_parent: dict[int, list[Menu]] = {}
-        for m in nodes:
-            if m.type == 3:
-                continue
-            pid = m.parent_id or 0
-            by_parent.setdefault(pid, []).append(m)
-
-        def build(pid: int | None = None) -> list[dict[str, Any]]:
-            """递归构建动态路由树。
-
-Args:
-    pid (int | None): 父菜单 ID，None 表示从根层级开始。
-
-Returns:
-    list[dict[str, Any]]: 节点列表（含 children）。
-"""
-            result = []
-            for m in by_parent.get(pid or 0, []):
-                route: dict[str, Any] = {
-                    "name": (m.route_name or f"Menu{m.id}"),
-                    "path": m.path or (
-                        f"/m{m.id}" if m.parent_id is None else m.path or f"m{m.id}"
-                    ),
-                    "component": m.component if m.component else (
-                        "Layout" if m.type == 1 else ""
-                    ),
-                    "meta": {
-                        "title": m.name,
-                        "icon": m.icon or None,
-                        "hidden": False if m.visible else True,
-                    },
-                }
-                # 外链型：转换绝对 URL 为内部占位路径 + meta.link
-                if m.type == 4:
-                    original_path = m.path or ""
-                    if re.match(r"^https?://", original_path):
-                        internal_path = f"/ext-{m.id}"
-                        route["path"] = internal_path
-                        route["component"] = "external/redirect"
-                        route["meta"]["link"] = original_path
-                    route["meta"]["external"] = True
-                children = build(m.id)
-                if children:
-                    route["children"] = children
-                result.append(route)
-            return result
-
-        return build(None)
-
     @action(detail=False, methods=["get"], url_path="routes")
     def routes(self, request: Request) -> Any:
         """根据当前登录用户角色，返回其可见的动态路由树。"""
@@ -158,7 +106,7 @@ Returns:
         level = profile.admin_level if profile else AdminLevel.MEMBER
 
         if user.is_superuser or level == AdminLevel.COMPANY_ADMIN:
-            return drf_ok(self._build_routes(all_active))
+            return drf_ok(build_routes(all_active))
 
         # 岗位关联菜单
         if not profile or not profile.position_id:
@@ -179,7 +127,7 @@ Returns:
                 p = p.parent
         nodes = [by_id[i] for i in selected if i in by_id]
         nodes.sort(key=lambda x: (x.order_num, x.id))
-        return drf_ok(self._build_routes(nodes))
+        return drf_ok(build_routes(nodes))
 
     @action(detail=False, methods=["get", "post"], url_path="")
     def list_or_create(self, request: Request) -> Any:
