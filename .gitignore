@@ -40,7 +40,6 @@ backend-master/media/
 # Django 数据库迁移文件（服务端单独管理）
 **/migrations/
 !**/migrations/__init__.py
-!apps/**/migrations/0*.py
 
 # Node.js 依赖包（前端和 websocket 开发产生的依赖）
 node_modules/
