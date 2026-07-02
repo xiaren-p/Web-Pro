@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.db import models
 
 from apps.system.models._base import TimeStampedModel
-from apps.system.models.file_folder import FileFolder
+from apps.common.models.file_folder import FileFolder
 
 
 class FileAsset(TimeStampedModel):

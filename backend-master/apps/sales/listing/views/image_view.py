@@ -13,9 +13,9 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 # cross-domain: ImageUpload (kept in api_v1)
-from apps.system.serializers.image_upload_serializer import ImageUploadSerializer
-from apps.system.serializers.image_sync_queue_serializer import ImageSyncQueueSerializer
-from apps.system.services.image_sync_queue_service import (
+from apps.common.serializers.image_upload_serializer import ImageUploadSerializer
+from apps.sales.listing.serializers.image_sync_queue_serializer import ImageSyncQueueSerializer
+from apps.sales.listing.services.image_sync_queue_service import (
     batch_upsert_sync_tasks,
     get_queue_queryset,
     upsert_sync_task,

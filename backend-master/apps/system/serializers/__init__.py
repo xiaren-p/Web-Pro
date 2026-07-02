@@ -10,8 +10,8 @@ from apps.system.serializers.mobile_code_send_serializer import MobileCodeSendSe
 from apps.system.serializers.mobile_bind_serializer import MobileBindSerializer
 from apps.system.serializers.email_code_send_serializer import EmailCodeSendSerializer
 from apps.system.serializers.email_bind_serializer import EmailBindSerializer
-from apps.system.serializers.image_upload_serializer import ImageUploadSerializer
-from apps.system.serializers.image_sync_queue_serializer import ImageSyncQueueSerializer
+from apps.common.serializers.image_upload_serializer import ImageUploadSerializer
+from apps.sales.listing.serializers.image_sync_queue_serializer import ImageSyncQueueSerializer
 from apps.system.serializers.work_serializer import WorkReportSerializer
 from apps.system.serializers.app_serializer import AppCreateSerializer, AppCreatedSerializer, AppListItemSerializer, SecretRotatedSerializer
 

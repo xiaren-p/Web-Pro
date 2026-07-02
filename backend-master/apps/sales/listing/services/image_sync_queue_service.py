@@ -9,8 +9,8 @@ from django.db.models import QuerySet
 from django.utils import timezone
 
 from apps.system.models import ImageSyncQueue, ImageUpload
-from apps.system.models.image_sync_queue import ImageSyncStatus
-from apps.system.models.image_upload import ImageUploadStatus
+from apps.sales.listing.models.image_sync_queue import ImageSyncStatus
+from apps.common.models.image_upload import ImageUploadStatus
 
 logger = logging.getLogger(__name__)
 

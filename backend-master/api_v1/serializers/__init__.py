@@ -21,8 +21,8 @@ from apps.system.serializers.email_code_send_serializer import EmailCodeSendSeri
 from apps.system.serializers.email_bind_serializer import EmailBindSerializer
 
 # file 板块
-from apps.system.serializers.image_upload_serializer import ImageUploadSerializer
-from apps.system.serializers.image_sync_queue_serializer import ImageSyncQueueSerializer
+from apps.common.serializers.image_upload_serializer import ImageUploadSerializer
+from apps.sales.listing.serializers.image_sync_queue_serializer import ImageSyncQueueSerializer
 
 # work 板块
 from apps.system.serializers.work_serializer import WorkReportSerializer

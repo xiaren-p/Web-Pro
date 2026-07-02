@@ -19,8 +19,8 @@ from django.utils import timezone
 from PIL import Image
 
 from apps.system.models import ImageSyncQueue, ImageUpload
-from apps.system.models.image_sync_queue import ImageSyncStatus
-from apps.system.models.image_upload import ImageUploadStatus
+from apps.sales.listing.models.image_sync_queue import ImageSyncStatus
+from apps.common.models.image_upload import ImageUploadStatus
 from apps.nc.services.nc_api_client import NcApiClient
 from apps.nc.utils.nc_sku_path_search import search_nc_sku_paths
 from apps.common.services.qinglong_env_service import get_cached_env

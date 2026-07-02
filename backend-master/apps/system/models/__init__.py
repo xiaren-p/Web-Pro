@@ -8,12 +8,12 @@ from apps.system.models.menu import Menu, MenuType
 from apps.system.models.oper_log import OperLog
 from apps.system.models.position import Position
 from apps.system.models.user_profile import UserProfile, AdminLevel, Gender
-from apps.system.models.file_folder import FileFolder
-from apps.system.models.file_asset import FileAsset
-from apps.system.models.file_chunk import FileChunk
-from apps.system.models.image_upload import ImageUpload, ImageUploadStatus
-from apps.system.models.image_sync_queue import ImageSyncQueue, ImageSyncStatus
-from apps.system.models.work import WorkReport, ReportType
+from apps.common.models.file_folder import FileFolder
+from apps.common.models.file_asset import FileAsset
+from apps.common.models.file_chunk import FileChunk
+from apps.common.models.image_upload import ImageUpload, ImageUploadStatus
+from apps.sales.listing.models.image_sync_queue import ImageSyncQueue, ImageSyncStatus
+from apps.common.models.work import WorkReport, ReportType
 
 __all__ = [
     "TimeStampedModel",

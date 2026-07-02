@@ -2,7 +2,7 @@
 from django.db import models
 
 from apps.system.models._base import TimeStampedModel
-from apps.system.models.file_asset import FileAsset
+from apps.common.models.file_asset import FileAsset
 
 
 class FileChunk(TimeStampedModel):

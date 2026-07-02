@@ -8,12 +8,12 @@ from apps.system.models.menu import Menu
 from apps.system.models.department import Department
 from apps.system.models.position import Position
 from apps.system.models.oper_log import OperLog
-from apps.system.models.file_folder import FileFolder
-from apps.system.models.file_asset import FileAsset
-from apps.system.models.file_chunk import FileChunk
-from apps.system.models.image_upload import ImageUpload
-from apps.system.models.image_sync_queue import ImageSyncQueue, ImageSyncStatus
-from apps.system.models.work import WorkReport
+from apps.common.models.file_folder import FileFolder
+from apps.common.models.file_asset import FileAsset
+from apps.common.models.file_chunk import FileChunk
+from apps.common.models.image_upload import ImageUpload
+from apps.sales.listing.models.image_sync_queue import ImageSyncQueue, ImageSyncStatus
+from apps.common.models.work import WorkReport
 from apps.lingxing.product.lx_local_product import LxLocalProduct
 from apps.lingxing.product.lx_product_tag import LxProductTag
 from apps.lingxing.product.lx_supplier_quote import LxSupplierQuote
