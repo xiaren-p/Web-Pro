@@ -3,9 +3,9 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
-from apps.ads.models.lx_ad_rule import LxAdRule
-from apps.ads.models.lx_ad_rule_group import LxAdRuleGroup
-from apps.ads.serializers.rule_strategy_serializer import (
+from apps.ads.sp.models.lx_ad_rule import LxAdRule
+from apps.ads.sp.models.lx_ad_rule_group import LxAdRuleGroup
+from apps.ads.sp.serializers.rule_strategy_serializer import (
     LxAdRuleSerializer,
     LxAdRuleGroupSerializer,
 )

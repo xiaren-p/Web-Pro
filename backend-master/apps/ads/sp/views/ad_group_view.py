@@ -20,7 +20,7 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from apps.ads.models import (
+from apps.ads.sp.models import (
     LxAdsPortfolio,
     LxAdsProfile,    LxSpAdGroup,
     LxSpAdGroupReport,
@@ -32,7 +32,7 @@ from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.sales.listing.models.lx_product_info import LxProductInfo
 from apps.ads.sp.models.lx_sp_ad import LxSpAd
-from apps.ads.services.ads_metrics_service import (
+from apps.ads.sp.services.ads_metrics_service import (
     _build_summary_row,
     _compute_metrics_row,
     empty_adgroup_metrics,

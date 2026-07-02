@@ -25,7 +25,7 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from apps.ads.models import (
+from apps.ads.sp.models import (
     LxAdsPortfolio,
     LxAdsProfile,    LxSpAdGroup,
     LxSpCampaign,
@@ -37,7 +37,7 @@ from apps.sales.models.lx_shops import LxShops
 from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.sales.listing.models.lx_product_info import LxProductInfo
-from apps.ads.services.ads_metrics_service import (
+from apps.ads.sp.services.ads_metrics_service import (
     _build_summary_row,
     _compute_metrics_row,
     empty_adgroup_metrics,
@@ -46,11 +46,11 @@ from api_v1.utils.ad_status import resolve_service_status
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_ok
 from apps.ads.views._helpers import KEYWORD_MATCH_TYPE_LABEL, _sortable_val
-from apps.ads.models.sp_bid_adjustment import (
+from apps.ads.sp.models.sp_bid_adjustment import (
     ExecutionTypeChoices as BidExecutionTypeChoices,
     SpBidAdjustment,
 )
-from apps.ads.models.sp_bid_adjustment import AdjustmentStatusChoices, ExecutionStatusChoices
+from apps.ads.sp.models.sp_bid_adjustment import AdjustmentStatusChoices, ExecutionStatusChoices
 
 
 def _get_operator_name(request: Request) -> str:
@@ -73,7 +73,7 @@ def _is_time_pricing_active(campaign_id: int, profile_id: int) -> bool:
 
     is_time_pricing == 1(YES) 表示正在分时；0(NO) 表示分时结束。
     """
-    from apps.ads.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
+    from apps.ads.sp.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
 
     return AdTimePricingHit.objects.filter(
         campaign_id=campaign_id,
@@ -706,8 +706,8 @@ def _build_bid_latest_adjustment_map(
 
     from django.db.models import Max
     from apps.ads.sp.models.lx_ads_profile import LxAdsProfile
-    from apps.ads.models.lx_ad_rule import LxAdRule
-    from apps.ads.models.sp_bid_adjustment import SpBidAdjustment, ExecutionTypeChoices as BidExecType
+    from apps.ads.sp.models.lx_ad_rule import LxAdRule
+    from apps.ads.sp.models.sp_bid_adjustment import SpBidAdjustment, ExecutionTypeChoices as BidExecType
     from api_v2.utils.timezone_utils import country_to_timezone
 
     if not entity_ids:
@@ -769,7 +769,7 @@ def _build_bid_lines(
     """按 execution_type 构建多行展示文案。"""
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-    from apps.ads.models.sp_bid_adjustment import ExecutionTypeChoices as BidExecType
+    from apps.ads.sp.models.sp_bid_adjustment import ExecutionTypeChoices as BidExecType
 
     is_rule = bool(rec.auto_rule_id)
     rule = rule_map.get(rec.auto_rule_id) if is_rule else None
@@ -872,7 +872,7 @@ def _build_time_pricing_bid_map(
     Returns:
         dict[str, str]: 实体 ID → 展示字符串（如 "$0.50" 或 "-"）。
     """
-    from apps.ads.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
+    from apps.ads.sp.models.ad_time_pricing_hit import AdTimePricingHit, TimePricingHitStatus
 
     # 未分时直接返回全 -
     if not AdTimePricingHit.objects.filter(
@@ -882,7 +882,7 @@ def _build_time_pricing_bid_map(
         return {k: "-" for k in entity_ids}
 
     from django.db.models import Max
-    from apps.ads.models.sp_bid_adjustment import SpBidAdjustment, ExecutionTypeChoices as BidExecType
+    from apps.ads.sp.models.sp_bid_adjustment import SpBidAdjustment, ExecutionTypeChoices as BidExecType
 
     int_ids = [int(x) for x in entity_ids if x]
     if not int_ids:

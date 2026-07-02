@@ -24,7 +24,7 @@ from apps.sales.models.lx_exchange_rate import LxExchangeRate
 from apps.sales.models.lx_shops import LxShops
 from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
-from apps.ads.serializers.ads import LxSpCampaignSerializer
+from apps.ads.sp.serializers.campaign_serializer import LxSpCampaignSerializer
 from api_v1.utils.ad_status import resolve_service_status
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_ok
@@ -36,8 +36,8 @@ from apps.ads.views._helpers import (
     fmt_money,
     parse_exchange_rate,
 )
-from apps.ads.models.sp_bid_adjustment import AdjustmentStatusChoices, ExecutionStatusChoices
-from apps.ads.models.sp_campaign_adjustment import (
+from apps.ads.sp.models.sp_bid_adjustment import AdjustmentStatusChoices, ExecutionStatusChoices
+from apps.ads.sp.models.sp_campaign_adjustment import (
     CampaignExecutionTypeChoices,
     SpCampaignAdjustment,
 )
@@ -1296,7 +1296,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
         from apps.ads.sp.models.lx_ads_profile import LxAdsProfile
-        from apps.ads.models.sp_campaign_adjustment import SpCampaignAdjustment
+        from apps.ads.sp.models.sp_campaign_adjustment import SpCampaignAdjustment
         from api_v2.utils.timezone_utils import country_to_timezone
 
         # 空页直接返回
@@ -1342,7 +1342,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         }
         rule_map: dict[int, Any] = {}
         if rule_ids:
-            from apps.ads.models.lx_ad_rule import LxAdRule
+            from apps.ads.sp.models.lx_ad_rule import LxAdRule
             for rule in LxAdRule.objects.filter(id__in=rule_ids).only(
                 "id", "name", "condition_sets", "budget_action", "other_action"
             ):
@@ -1432,7 +1432,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         Returns:
             list[str]: 多行文案，前端按 \\n 拼接展示。
         """
-        from apps.ads.models.sp_campaign_adjustment import CampaignExecutionTypeChoices
+        from apps.ads.sp.models.sp_campaign_adjustment import CampaignExecutionTypeChoices
 
         is_rule = bool(rec.auto_rule_id)
         rule = rule_map.get(rec.auto_rule_id) if is_rule else None

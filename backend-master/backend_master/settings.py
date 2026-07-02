@@ -145,14 +145,14 @@ CELERY_TASK_ROUTES = {
     'api_v2.tasks.ai_chat_task.run_ai_chat_task':                         {'queue': 'parallel_queue'},
     'apps.ai.tasks.chat_task.run_ai_chat_task':                            {'queue': 'parallel_queue'},
     # ── single_thread_queue（concurrency=1）：须顺序执行的任务 ───────────────
-    'apps.ads.tasks.ad_campaign_submit_task.submit_pending_campaigns_task': {'queue': 'single_thread_queue'},
+    'apps.ads.sp.tasks.ad_campaign_submit_task.submit_pending_campaigns_task': {'queue': 'single_thread_queue'},
     'api_v2.tasks.listing_image_upload_task.upload_listing_images_task':  {'queue': 'single_thread_queue'},
-    'apps.ads.tasks.ad_time_pricing_task.run_ad_time_pricing_task':         {'queue': 'single_thread_queue'},
-    'apps.ads.tasks.time_pricing_task.run_time_pricing_task':                       {'queue': 'single_thread_queue'},
-    'apps.ads.tasks.bid_adjustment_task.run_bid_adjustment_task':                   {'queue': 'single_thread_queue'},
-    'apps.ads.tasks.campaign_adjustment_task.run_campaign_adjustment_task':         {'queue': 'single_thread_queue'},
-    'apps.ads.tasks.optimization_strategy_task.run_optimization_strategy_task':       {'queue': 'single_thread_queue'},
-    'apps.ads.tasks.optimization_execution_task.run_optimization_execution_task':     {'queue': 'single_thread_queue'},
+    'apps.ads.sp.tasks.ad_time_pricing_task.run_ad_time_pricing_task':         {'queue': 'single_thread_queue'},
+    'apps.ads.sp.tasks.time_pricing_task.run_time_pricing_task':                       {'queue': 'single_thread_queue'},
+    'apps.ads.sp.tasks.bid_adjustment_task.run_bid_adjustment_task':                   {'queue': 'single_thread_queue'},
+    'apps.ads.sp.tasks.campaign_adjustment_task.run_campaign_adjustment_task':         {'queue': 'single_thread_queue'},
+    'apps.ads.sp.tasks.optimization_strategy_task.run_optimization_strategy_task':       {'queue': 'single_thread_queue'},
+    'apps.ads.sp.tasks.optimization_execution_task.run_optimization_execution_task':     {'queue': 'single_thread_queue'},
     'api_v2.tasks.listing_tag_sync_task.run_listing_tag_sync_task':                  {'queue': 'single_thread_queue'},
     'api_v2.tasks.listing_tag_modify_task.run_listing_tag_modify_task':                {'queue': 'single_thread_queue'},
     'api_v2.tasks.image_sync_queue_task.run_image_sync_queue_task':                    {'queue': 'single_thread_queue'},
@@ -233,7 +233,7 @@ INSTALLED_APPS = [
     'oauth2_provider',        # OIDC Provider（django-oauth-toolkit）
     'api_v1',              # 业务接口 v1
     'api_v2',              # 任务调度 v2（工作流执行引擎）
-    'apps.common',         # 基础服务域（天气）
+    'apps.common',         # 基础服务域
     'apps.ai',             # AI 助手域（对话/分组/应用）
     'apps.crawler',        # 爬虫管理域
     'apps.notice',         # 通知公告域

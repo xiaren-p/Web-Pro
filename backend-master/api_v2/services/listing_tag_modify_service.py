@@ -18,7 +18,7 @@ from api_v2.models.listing_tag_modify_queue import (
     ListingTagModifyQueue,
     ModifyActionChoices,
 )
-from apps.ads.models.lx_api_err import LxApiErr
+from apps.ads.sp.models.lx_api_err import LxApiErr
 from api_v2.services.qinglong_env_service import get_cached_env, refresh_with_task_trigger
 
 logger = logging.getLogger(__name__)

@@ -5,10 +5,10 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
 from apps.ads.sp.models.lx_ads_profile import LxAdsProfile
-from apps.ads.models.lx_time_pricing_strategy import LxTimePricingStrategy
+from apps.ads.sp.models.lx_time_pricing_strategy import LxTimePricingStrategy
 from apps.sales.models.lx_user import LxUser
 from apps.sales.listing.models.lx_product_info import LxProductInfo
-from apps.ads.serializers.ads_time_pricing_strategy_serializer import LxTimePricingStrategySerializer
+from apps.ads.sp.serializers.ads_time_pricing_strategy_serializer import LxTimePricingStrategySerializer
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_error, drf_ok
 
