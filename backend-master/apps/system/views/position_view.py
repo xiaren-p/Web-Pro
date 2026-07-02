@@ -18,6 +18,7 @@ from apps.system.serializers.position_serializer import (
     PositionWriteSerializer,
 )
 from apps.system.utils.dept_scope import get_caller_dept_ids
+from apps.system.selectors.position_list_selector import get_position_page_qs, get_position_options_qs
 from apps.common.utils.pagination import paginate_queryset
 from apps.common.utils.responses import drf_error, drf_ok
 
@@ -56,65 +57,19 @@ class PositionViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="page")
     def page(self, request):
-        """分页查询岗位列表。
-
-        权限范围：
-            - 公司管理员/超管：全量岗位。
-            - 部门管理员：仅返回本部门（及子部门）的岗位。
-            - 普通成员：无数据（返回空列表）。
-
-        Query Params:
-            keywords (str): 模糊匹配岗位名称或编码。
-            status (int): 1=启用，0=禁用。
-        """
-        user = request.user
-        dept_ids = get_caller_dept_ids(user)
-
-        qs = Position.objects.all().order_by("order_num", "id")
-
-        if dept_ids is None:
-            # 公司管理员/超管：全量不过滤
-            pass
-        elif dept_ids:
-            # DEPT_ADMIN：仅返回属于自身及子部门的岗位
-            qs = qs.filter(dept_id__in=dept_ids)
-        else:
-            # 普通成员无权限
-            qs = qs.none()
-        kw = request.query_params.get("keywords")
-        if kw:
-            qs = qs.filter(Q(name__icontains=kw) | Q(code__icontains=kw))
-        status = request.query_params.get("status")
-        if status is not None:
-            try:
-                qs = qs.filter(status=bool(int(status)))
-            except (ValueError, TypeError):
-                pass
+        """分页查询岗位列表（按 admin_level 过滤部门范围）。"""
+        qs = get_position_page_qs(
+            request.user,
+            keywords=request.query_params.get("keywords"),
+            status_val=request.query_params.get("status"),
+        )
         total, items, _, _ = paginate_queryset(request, qs)
-        data = PositionSerializer(items, many=True).data
-        return drf_ok({"total": total, "list": data})
+        return drf_ok({"total": total, "list": PositionSerializer(items, many=True).data})
 
     @action(detail=False, methods=["get"], url_path="options")
     def options(self, request):
-        """获取岗位下拉选项（轻量，仅返回 id/name）。
-
-        内置岗位（is_builtin=True，如系统管理员）不出现在选项中，
-        防止被手动分配给任意用户。
-        部门管理员仅可看到本部门（及子部门）的岗位，避免跨部门分配。
-        """
-        dept_ids = get_caller_dept_ids(request.user)
-
-        qs = Position.objects.filter(status=True, is_builtin=False).order_by("order_num", "id")
-
-        if dept_ids is None:
-            # 公司管理员/超管：全量不过滤
-            pass
-        elif dept_ids:
-            # DEPT_ADMIN：仅返回属于自身及子部门的岗位
-            qs = qs.filter(dept_id__in=dept_ids)
-        else:
-            qs = qs.none()
-
+        """获取岗位下拉选项（排除内置岗位，按部门过滤）。"""
+        qs = get_position_options_qs(request.user)
         return drf_ok([{"label": p.name, "value": p.id} for p in qs])
 
     @action(detail=False, methods=["get"], url_path=r"(?P<position_id>[^/]+)/form")
