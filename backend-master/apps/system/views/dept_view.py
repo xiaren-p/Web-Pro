@@ -1,4 +1,8 @@
-"""部门管理 ViewSet。"""
+"""部门管理 ViewSet。
+
+模块说明：部门 CRUD + 树形结构 + 下拉选项。
+写操作委托至 :mod:`apps.system.services.dept_write_service`。
+"""
 from __future__ import annotations
 
 import logging
@@ -16,7 +20,7 @@ from apps.system.permissions import MenuPermRequired
 from apps.system.serializers import DeptSerializer
 from apps.common.utils.responses import drf_error, drf_ok
 from apps.system.utils.dept_scope import get_caller_dept_ids
-from apps.nc.services.nc_sync_service import NcSyncService
+from apps.system.services.dept_write_service import create_dept, update_dept, delete_depts
 
 
 class DeptViewSet(viewsets.ViewSet):
@@ -109,20 +113,13 @@ Returns:
                 return drf_ok(DeptSerializer(nodes, many=True).data)
             return drf_ok(self._build_tree(nodes))
 
-        payload = request.data.copy()
-        name = payload.get("name")
-        parent_id = payload.get("parentId")
-        sort = payload.get("sort", 0)
-        status = payload.get("status", 1)
-        code = payload.get("code", "")
-        dept = Department.objects.create(
-            name=name or "",
-            parent=Department.objects.filter(pk=parent_id).first() if parent_id else None,
-            order_num=int(sort or 0),
-            code=code or "",
-            status=bool(int(status)) if isinstance(status, (str, int)) else bool(status),
+        dept = create_dept(
+            name=request.data.get("name"),
+            parent_id=request.data.get("parentId"),
+            sort=request.data.get("sort", 0),
+            status=request.data.get("status", 1),
+            code=request.data.get("code", ""),
         )
-        NcSyncService.on_dept_created(dept)
         return drf_ok({"id": dept.id}, status=201)
 
     @action(detail=False, methods=["get"], url_path="tree")
@@ -163,51 +160,10 @@ Returns:
         """PUT: 更新部门（带循环引用检查）；DELETE: 批量删除（逗号分隔 ID）。"""
         if request.method.lower() == "put":
             first_id = ids.split(",")[0]
-            try:
-                d = Department.objects.get(pk=first_id)
-            except Department.DoesNotExist:
-                return drf_error("未找到部门", status=404)
-            payload = request.data.copy()
-            d.name = payload.get("name", d.name)
-            parent_id = payload.get("parentId")
-            # 校验：禁止将上级设置为自身或其子孙，避免循环
-            if parent_id:
-                try:
-                    pid_int = int(parent_id)
-                except Exception:
-                    pid_int = None
-                if pid_int and pid_int == d.id:
-                    return drf_error("上级部门不能为自身", status=400)
-                new_parent = Department.objects.filter(pk=parent_id).first()
-                cur = new_parent
-                while cur is not None:
-                    if cur.id == d.id:
-                        return drf_error("上级部门不能为其子孙节点", status=400)
-                    cur = cur.parent
-                d.parent = new_parent
-            else:
-                d.parent = None
-            if "sort" in payload:
-                d.order_num = int(payload.get("sort") or 0)
-            if "code" in payload:
-                d.code = payload.get("code") or ""
-            if "status" in payload:
-                s = payload.get("status")
-                d.status = bool(int(s)) if isinstance(s, (str, int)) else bool(s)
-            d.save()
-            NcSyncService.on_dept_updated(d)
-            return drf_ok({"id": d.id})
+            dept, err = update_dept(first_id, request.data)
+            if err:
+                return drf_error(err[0], status=err[1])
+            return drf_ok({"id": dept.id})
 
-        id_list = [i for i in ids.split(",") if i]
-        # 先入队 NC 群组删除（本地 NcGroup 镜像也会被同步删除），再删除部门记录
-        for dept_id in id_list:
-            try:
-                NcSyncService.on_dept_deleted(int(dept_id))
-            except Exception as exc:
-                # NC 同步失败不阻断部门删除主流程，但记录日志便于排查
-                logger.warning(
-                    "[DeptViewSet][delete] dept_id=%s NC 同步入队失败（部门仍会删除）: %s",
-                    dept_id, exc, exc_info=True,
-                )
-        Department.objects.filter(id__in=id_list).delete()
+        delete_depts(ids)
         return drf_ok(status=204)
