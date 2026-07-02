@@ -956,7 +956,14 @@ def _get_caller_dept_ids(user) -> set[int] | None:
         dept_ids: set[int] = set()
 
         def _collect(did: int) -> None:
-            """_collect 内部辅助方法。"""
+            """递归收集部门及其所有子部门 ID。
+
+Args:
+    did (int): 起始部门 ID。
+
+Returns:
+    None: 结果累积到外层 dept_ids 集合。
+"""
             if did in dept_ids:
                 return
             dept_ids.add(did)

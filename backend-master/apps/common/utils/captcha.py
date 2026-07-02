@@ -14,7 +14,19 @@ except Exception:
 
 
 def generate_captcha(width: int = 120, height: int = 40, length: int = 4, expire: int = 300):
-    """generate_captcha。"""
+    """生成图形验证码并存入缓存。
+
+无 PIL 环境下回退为透明 1x1 PNG。
+
+Args:
+    width (int): 图片宽度，默认 120。
+    height (int): 图片高度，默认 40。
+    length (int): 验证码字符数，默认 4。
+    expire (int): 缓存过期秒数，默认 300。
+
+Returns:
+    tuple[str, str, str]: (缓存 key, base64 图片 data URI, 验证码明文)。
+"""
     text = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
     key = uuid.uuid4().hex
     cache.set(f"captcha:{key}", text, timeout=expire)
@@ -86,7 +98,16 @@ def validate_captcha(key: str, code: str) -> bool:
         unicodedata = None
 
     def _norm(s: str) -> str:
-        """_norm 内部辅助方法。"""
+        """归一化验证码字符串以便比对。
+
+执行 NFKC 全角转半角、去除首尾空白并转小写。
+
+Args:
+    s (str): 原始字符串。
+
+Returns:
+    str: 归一化后的字符串；None 返回空串。
+"""
         if s is None:
             return ''
         s2 = str(s)

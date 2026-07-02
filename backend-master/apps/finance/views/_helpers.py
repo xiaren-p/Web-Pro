@@ -23,12 +23,22 @@ from apps.finance.models.monthly_loss_order_first20 import MonthlyLossOrderFirst
 
 
 def parse_months(r):
-    """parse_months。"""
+    """将月份范围字符串展开为连续月份列表。
+
+    支持形如 ``"202501-202503"`` 的范围输入，返回 ``["2025-01", "2025-02", "2025-03"]``。
+    若输入不含 ``-`` 或解析失败则返回空列表。
+
+    Args:
+        r (str): 月份范围字符串，格式 ``YYYYMM-YYYYMM``。
+
+    Returns:
+        list[str]: 连续月份列表，格式 ``YYYY-MM``；解析失败返回 ``[]``。
+    """
     try:
         if isinstance(r, str) and '-' in r:
             a, b = r.split('-', 1)
             def to_ym(x):
-                """to_ym。"""
+                """将 ``YYYYMM`` 字符串转换为 ``(year, month)`` 元组。"""
                 y = int(x[:4]); m = int(x[4:6]); return y, m
             ys, ms = to_ym(a); ye, me = to_ym(b)
             months = []
@@ -45,7 +55,17 @@ def parse_months(r):
 
 
 def parse_store_param(store_param):
-    """parse_store_param。"""
+    """解析店铺筛选参数，统一返回店铺 ID 列表。
+
+    支持多种输入类型：JSON 字符串 ``"[1,2,3]"``、逗号分隔字符串 ``"1,2,3"``、
+    列表/元组 ``[1, 2, 3]``。空值返回空列表。
+
+    Args:
+        store_param (str | list | tuple | set | None): 原始店铺参数。
+
+    Returns:
+        list[str]: 去空后的店铺 ID 字符串列表。
+    """
     stores = []
     if not store_param:
         return stores
@@ -69,7 +89,14 @@ def parse_store_param(store_param):
 
 
 def _safe_float(x):
-    """_safe_float 内部辅助方法。"""
+    """安全转换为浮点数，无法转换时返回 ``None``。
+
+    Args:
+        x: 任意输入值（str / int / float / None）。
+
+    Returns:
+        float | None: 转换后的浮点数；空值或异常返回 ``None``。
+    """
     try:
         if x is None or (isinstance(x, str) and str(x).strip() == ''):
             return None
@@ -82,7 +109,14 @@ def _safe_float(x):
 
 
 def _safe_int(x):
-    """_safe_int 内部辅助方法。"""
+    """安全转换为整数，无法转换时返回 ``None``。
+
+    Args:
+        x: 任意输入值（str / int / float / None）。
+
+    Returns:
+        int | None: 转换后的整数；空值或异常返回 ``None``。
+    """
     try:
         if x is None or (isinstance(x, str) and str(x).strip() == ''):
             return None
@@ -95,7 +129,15 @@ def _safe_int(x):
 
 
 def _agg_sum(a, b):
-    """_agg_sum 内部辅助方法。"""
+    """聚合求和，``None`` 视为缺失值。
+
+    Args:
+        a: 第一个值（可为 ``None``）。
+        b: 第二个值（可为 ``None``）。
+
+    Returns:
+        两个值之和；若两者均为 ``None`` 则返回 ``None``。
+    """
     if a is None and b is None:
         return None
     if a is None:
@@ -106,7 +148,17 @@ def _agg_sum(a, b):
 
 
 def _agg_int_sum(a, b):
-    """_agg_int_sum 内部辅助方法。"""
+    """聚合求和并转为整数。
+
+    先调用 :func:`_agg_sum` 求和，再将结果转为 ``int``。
+
+    Args:
+        a: 第一个值（可为 ``None``）。
+        b: 第二个值（可为 ``None``）。
+
+    Returns:
+        int | None: 求和后的整数值；两者均 ``None`` 或转换失败返回 ``None``。
+    """
     s = _agg_sum(a, b)
     if s is None:
         return None
@@ -120,7 +172,14 @@ def _agg_int_sum(a, b):
 
 
 def norm_month(x):
-    """norm_month。"""
+    """将 ``YYYYMM`` 格式标准化为 ``YYYY-MM``。
+
+    Args:
+        x (str | None): 月份字符串，如 ``"202501"`` 或 ``"2025-01"``。
+
+    Returns:
+        str | None: 标准化后的 ``YYYY-MM`` 字符串；输入为 ``None`` 或异常返回 ``None``。
+    """
     try:
         if x is None:
             return None
@@ -136,7 +195,16 @@ RATIO_FIELDS = {'gross_margin', 'net_gross_margin', 'return_rate', 'refund_amoun
 
 
 def format_ratio_value(v):
-    """format_ratio_value。"""
+    """将比率值格式化为百分比字符串。
+
+    若值在 ``[-1, 1]`` 范围内视为小数比例，自动乘以 100。
+
+    Args:
+        v: 比率值（float / str / None）。
+
+    Returns:
+        str: 格式化后的百分比字符串，如 ``"23.45%"``；空值返回 ``""``。
+    """
     if v is None or v == '':
         return ''
     try:
@@ -149,14 +217,31 @@ def format_ratio_value(v):
 
 
 def determine_month_color(month_vals):
-    """determine_month_color。"""
+    """根据月度指标判定 Excel 单元格颜色。
+
+    判定规则（均要求毛利润 < 0）：
+    - 退货率 > 15% 且 广告费率 > 10% → 红色 ``FFFF0000``
+    - 退货率 > 15% 且 广告费率 ≤ 10% → 绿色 ``FF00AA00``
+    - 退货率 ≤ 15% 且 广告费率 > 10% → 黄色 ``FFFFFF00``
+    - 其余 → 无颜色（``None``）
+
+    Args:
+        month_vals (dict): 月度指标字典，需包含 ``gross_profit``、
+            ``refund_amount_rate``、``spend_rate`` 键。
+
+    Returns:
+        str | None: ARGB 颜色字符串（如 ``"FFFF0000"``）；不匹配规则返回 ``None``。
+    """
     try:
         gp = month_vals.get('gross_profit')
         refund = month_vals.get('refund_amount_rate')
         ad_rate = month_vals.get('spend_rate')
 
         def _norm_pct(v):
-            """_norm_pct 内部辅助方法。"""
+            """将百分比值标准化为 0-100 范围。
+
+            若值在 ``[-1, 1]`` 内视为小数比例，乘以 100。
+            """
             try:
                 if v is None:
                     return None
@@ -189,7 +274,20 @@ def determine_month_color(month_vals):
 
 # 模块级辅助函数：缓存与响应处理（从 download 中抽取，便于复用和单元测试）
 def build_cache_key(owner_q, time_range, stores, months, batch_size):
-    """build_cache_key。"""
+    """根据查询参数构建 SHA256 缓存键。
+
+    将所有影响导出结果的参数序列化为 JSON 并取 SHA256，确保相同查询参数命中同一缓存。
+
+    Args:
+        owner_q (str): 负责人筛选条件。
+        time_range (str): 时间范围。
+        stores (list): 店铺 ID 列表。
+        months (list): 月份列表。
+        batch_size (int): 批量大小。
+
+    Returns:
+        str | None: ``monthly_loss_xlsx_`` 前缀的 SHA256 缓存键；异常返回 ``None``。
+    """
     try:
         cache_input = {
             'owner': owner_q,
@@ -205,7 +303,17 @@ def build_cache_key(owner_q, time_range, stores, months, batch_size):
 
 
 def is_refresh_requested(payload) -> bool:
-    """is_refresh_requested。"""
+    """检查请求是否要求强制刷新缓存。
+
+    检查 ``payload`` 中 ``refresh``、``refresh_cache``、``force_refresh`` 三个键，
+    任一为真值或 ``"true"`` / ``"1"`` 等字符串即返回 ``True``。
+
+    Args:
+        payload (dict): 请求体解析后的字典。
+
+    Returns:
+        bool: 是否要求强制刷新。
+    """
     try:
         for rf_key in ('refresh', 'refresh_cache', 'force_refresh'):
             v = payload.get(rf_key)
@@ -220,7 +328,17 @@ def is_refresh_requested(payload) -> bool:
 
 
 def try_get_cached_file_response(cache_key, months):
-    """try_get_cached_file_response。"""
+    """尝试从缓存获取已生成的 xlsx 文件响应。
+
+    支持三种缓存存储格式：内存 bytes、磁盘路径、原始 bytes。
+
+    Args:
+        cache_key (str): 由 :func:`build_cache_key` 生成的缓存键。
+        months (list[str]): 月份列表，用于生成文件名。
+
+    Returns:
+        FileResponse | None: 命中缓存则返回文件下载响应；未命中返回 ``None``。
+    """
     try:
         if not cache_key:
             return None
@@ -261,7 +379,14 @@ def try_get_cached_file_response(cache_key, months):
 
 
 def remove_cache_and_disk(cache_key):
-    """remove_cache_and_disk。"""
+    """清除缓存键对应的内存缓存和磁盘临时文件。
+
+    同时清理 Django cache 中的条目和 ``MEDIA_ROOT/export_cache/`` 目录下的
+    对应 ``.xlsx`` 文件。
+
+    Args:
+        cache_key (str): 由 :func:`build_cache_key` 生成的缓存键。
+    """
     try:
         if not cache_key:
             return
@@ -300,7 +425,19 @@ def remove_cache_and_disk(cache_key):
 
 
 def cache_data_bytes_with_fallback(cache_key, data_bytes, filename):
-    """cache_data_bytes_with_fallback。"""
+    """缓存 xlsx 二进制数据，内存缓存失败时回退到磁盘。
+
+    优先尝试写入 Django cache（永不过期）；若 cache 后端拒绝大值，
+    回退写入 ``MEDIA_ROOT/export_cache/{cache_key}.xlsx`` 并将路径存入 cache。
+
+    Args:
+        cache_key (str): 缓存键。
+        data_bytes (bytes): xlsx 文件二进制内容。
+        filename (str): 原始文件名。
+
+    Returns:
+        bool: 缓存成功返回 ``True``，完全失败返回 ``False``。
+    """
     try:
         if not cache_key or data_bytes is None:
             return False
@@ -333,7 +470,18 @@ def cache_data_bytes_with_fallback(cache_key, data_bytes, filename):
 
 
 def stream_tempfile_response(tmp_name, filename, delay=30):
-    """stream_tempfile_response。"""
+    """将临时文件作为 HTTP 文件下载响应流式返回。
+
+    响应发送后启动守护线程，延迟 ``delay`` 秒后删除临时文件。
+
+    Args:
+        tmp_name (str): 临时文件路径。
+        filename (str): 下载文件名。
+        delay (int): 文件清理延迟秒数，默认 30 秒。
+
+    Returns:
+        FileResponse | None: 文件下载响应；文件打开失败返回 ``None``。
+    """
     try:
         from django.http import FileResponse
         f = open(tmp_name, 'rb')
@@ -341,7 +489,10 @@ def stream_tempfile_response(tmp_name, filename, delay=30):
         resp['Content-Disposition'] = f'attachment; filename="{filename}"'
 
         def _cleanup_file(path_file, delay_sec=delay):
-            """_cleanup_file 内部辅助方法。"""
+            """延迟删除临时文件。
+
+            等待 ``delay_sec`` 秒后删除指定路径的文件，忽略所有异常。
+            """
             try:
                 time.sleep(delay_sec)
                 try:

@@ -9,7 +9,17 @@ class MobileCodeSendSerializer(serializers.Serializer):
     mobile = serializers.CharField(max_length=20)
 
     def validate_mobile(self, value: str) -> str:
-        """validate_mobile。"""
+        """校验手机号格式是否合法。
+
+Args:
+    value (str): 待校验手机号。
+
+Returns:
+    str: 校验通过的手机号。
+
+Raises:
+    serializers.ValidationError: 手机号格式不正确时抛出。
+"""
         if not MOBILE_REGEX.match(value):
             raise serializers.ValidationError("手机号格式不正确")
         return value

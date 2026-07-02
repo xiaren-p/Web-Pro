@@ -118,7 +118,15 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
         return drf_ok(serializer.data)
 
     def delete_ids(self, request, pk=None):
-        """delete_ids。"""
+        """按逗号分隔的 ID 列表批量删除图片上传记录。
+
+Args:
+    request: DRF Request 对象。
+    pk (str): 逗号分隔的 ID 字符串。
+
+Returns:
+    Response: 空数据成功响应。
+"""
         id_list = pk.split(',')
         self.queryset.filter(id__in=id_list).delete()
         return drf_ok()
@@ -139,7 +147,16 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def import_csv(self, request):
-        """import_csv。"""
+        """通过 CSV 文件批量导入图片组记录。
+
+支持中英文表头，按 imageGroup 做 upsert 并自动提交同步队列。
+
+Args:
+    request: DRF Request 对象，需包含 file 字段。
+
+Returns:
+    Response: 导入统计。
+"""
         file = request.FILES.get('file')
         if not file:
             return drf_error("请上传文件")

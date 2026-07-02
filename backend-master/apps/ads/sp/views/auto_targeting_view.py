@@ -912,7 +912,20 @@ def _build_bid_latest_adjustment_map(
 
 
 def _build_bid_lines(rec: Any, rule_map: dict[int, Any], country_name: str, tz_name: str) -> list[str]:
-    """_build_bid_lines 内部辅助方法。"""
+    """构建定位组最近一次竞价调整的可读说明行。
+
+根据记录来源（规则/人工）生成首行说明，转换时区格式化时间，
+并按规则条件组追加明细。
+
+Args:
+    rec: 竞价调整记录。
+    rule_map (dict): 规则 ID → 规则对象映射。
+    country_name (str): 国家名称。
+    tz_name (str): 时区名称。
+
+Returns:
+    list[str]: 可读说明行列表。
+"""
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
     from apps.ads.sp.rules.models.sp_bid_adjustment import ExecutionTypeChoices as BidExecType
     is_rule = bool(rec.auto_rule_id)

@@ -20,7 +20,16 @@ class CrawlerLogSerializer(serializers.ModelSerializer):
 
     def validate_level(self, value):
         # 归一化常见同义词到内部统一集合
-        """validate_level。"""
+        """归一化日志级别字段。
+
+将 warning/err 等常见别名映射为内部统一集合。
+
+Args:
+    value (str): 原始日志级别。
+
+Returns:
+    str: 归一化后的日志级别，空值返回 "info"。
+"""
         if not value:
             return "info"
         v = str(value).strip().lower()
@@ -35,7 +44,17 @@ class CrawlerLogSerializer(serializers.ModelSerializer):
         return mapping.get(v, "info")
 
     def validate_elapsed_ms(self, value):
-        """validate_elapsed_ms。"""
+        """校验并转换耗时字段为整数。
+
+Args:
+    value: 原始耗时值。
+
+Returns:
+    int: 耗时毫秒数，空值返回 0。
+
+Raises:
+    serializers.ValidationError: 无法转为整数时抛出。
+"""
         try:
             return int(value or 0)
         except Exception:

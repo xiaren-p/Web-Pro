@@ -45,13 +45,31 @@ class MonthlyLossSerializer(serializers.ModelSerializer):
 
     def to_internal_value(self, data):
         # 入参 JSON key 必须是英文字段名（不再做中文兼容）
-        """to_internal_value。"""
+        """反序列化入参为内部值。
+
+强制要求英文字段名，不再兼容中文 key。
+
+Args:
+    data: 原始输入数据。
+
+Returns:
+    dict: 反序列化后的内部值。
+"""
         if not isinstance(data, dict):
             return super().to_internal_value(data)
         return super().to_internal_value(data)
 
     def to_representation(self, instance):
-        """to_representation。"""
+        """序列化实例为前端输出结构。
+
+输出英文字段名，并补全元数据字段。
+
+Args:
+    instance: MonthlyLossOrder 模型实例。
+
+Returns:
+    dict: 序列化后的输出字典。
+"""
         rep = super().to_representation(instance)
         # 输出英文字段名
         out = {}

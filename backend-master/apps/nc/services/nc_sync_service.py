@@ -619,7 +619,14 @@ class NcSyncService:
         """
         def _run() -> None:
             # 非请求线程必须先关闭旧连接，避免复用已超时的主线程连接导致静默崩溃
-            """_run 内部辅助方法。"""
+            """后台线程执行体：运行指定 NcSyncTask 并管理 DB 连接生命周期。
+
+关闭旧连接后逐条执行任务，异常记录日志，
+最终释放线程独占连接。
+
+Returns:
+    None: 结果通过任务表回写。
+"""
             from django.db import close_old_connections, connection
             close_old_connections()
             try:

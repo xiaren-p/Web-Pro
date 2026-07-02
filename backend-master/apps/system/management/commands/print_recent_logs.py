@@ -7,7 +7,11 @@ class Command(BaseCommand):
     help = "Print recent operation logs with elapsed time"
 
     def add_arguments(self, parser):
-        """add_arguments。"""
+        """注册命令行参数。
+
+Args:
+    parser: Django 命令行参数解析器。
+"""
         parser.add_argument('--limit', type=int, default=100, help='Number of rows to print')
 
     def handle(self, *args, **options):

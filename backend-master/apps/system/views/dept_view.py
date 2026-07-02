@@ -51,7 +51,15 @@ class DeptViewSet(viewsets.ViewSet):
             by_parent.setdefault(pid, []).append(d)
 
         def build(pid: int | None = None, path: set[int] | None = None) -> list[dict[str, Any]]:
-            """build。"""
+            """递归构建部门子树节点列表。
+
+Args:
+    pid (int | None): 父部门 ID，None 表示从根层级开始。
+    path (set[int] | None): 已访问部门 ID 集合，用于循环引用检测。
+
+Returns:
+    list[dict[str, Any]]: 部门树节点列表（含 children）。
+"""
             if path is None:
                 path = set()
             res: list[dict[str, Any]] = []

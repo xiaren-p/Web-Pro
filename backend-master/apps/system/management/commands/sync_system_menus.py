@@ -256,7 +256,14 @@ class Command(BaseCommand):
         admin_position, _ = Position.objects.get_or_create(code="admin", defaults={"name": "管理员", "status": True})
 
         def collect_ids(node):
-            """collect_ids。"""
+            """递归收集菜单节点及其所有子菜单 ID。
+
+Args:
+    node (Menu): 起始菜单节点。
+
+Returns:
+    list[int]: 该节点及所有子孙菜单 ID 列表。
+"""
             ids = [node.id]
             for ch in Menu.objects.filter(parent=node):
                 ids.extend(collect_ids(ch))

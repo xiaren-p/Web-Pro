@@ -23,7 +23,11 @@ class Command(BaseCommand):
     help = "Purge legacy file module menus (and optionally logs) after module decommission"
 
     def add_arguments(self, parser):
-        """add_arguments。"""
+        """注册命令行参数。
+
+Args:
+    parser: Django 命令行参数解析器。
+"""
         parser.add_argument(
             "--with-logs",
             action="store_true",
@@ -43,7 +47,14 @@ class Command(BaseCommand):
         # Include any buttons under those roots even if they themselves do not match the Q above (defensive)
         target_ids = set()
         def collect(menu):
-            """collect。"""
+            """递归收集菜单及其所有子菜单 ID。
+
+Args:
+    menu (Menu): 起始菜单节点。
+
+Returns:
+    None: 结果累积到外层 target_ids 集合。
+"""
             if menu.id in target_ids:
                 return
             target_ids.add(menu.id)

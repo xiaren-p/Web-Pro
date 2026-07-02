@@ -134,7 +134,14 @@ class CrawlerCategoryViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="sites")
     def sites(self, request):
-        """sites。"""
+        """返回去重后的爬取站点列表。
+
+Args:
+    request: DRF Request 对象。
+
+Returns:
+    Response: 站点名称列表响应。
+"""
         try:
             qs = CrawlerCategory.objects.all().order_by("site").values_list("site", flat=True).distinct()
             sites = [s for s in list(qs) if s]

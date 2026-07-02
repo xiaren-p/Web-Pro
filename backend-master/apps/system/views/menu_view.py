@@ -52,7 +52,14 @@ class MenuViewSet(viewsets.ViewSet):
 
         def compute_route_name() -> str:
             # routeName 仅对"菜单"类型生效（type=2）。目录/按钮/外链不显示路由名称。
-            """compute_route_name。"""
+            """计算菜单的路由名称。
+
+仅对菜单类型（type=2）生效；优先取 route_name，
+其次用 component 末段首字母大写，兜底返回 ``Menu{id}``。
+
+Returns:
+    str: 路由名称。
+"""
             if m.type != 2:
                 return ""
             try:
@@ -92,7 +99,14 @@ class MenuViewSet(viewsets.ViewSet):
             by_parent.setdefault(pid, []).append(m)
 
         def build(pid: int | None = None) -> list[dict[str, Any]]:
-            """build。"""
+            """递归构建动态路由树。
+
+Args:
+    pid (int | None): 父菜单 ID，None 表示从根层级开始。
+
+Returns:
+    list[dict[str, Any]]: 节点列表（含 children）。
+"""
             result = []
             for m in by_parent.get(pid or 0, []):
                 route: dict[str, Any] = {
@@ -226,7 +240,14 @@ class MenuViewSet(viewsets.ViewSet):
         nodes = [self._serialize(m) for m in qs]
 
         def build(pid: int | None = None) -> list[dict[str, Any]]:
-            """build。"""
+            """递归构建菜单树形结构。
+
+Args:
+    pid (int | None): 父菜单 ID，None 表示从根层级开始。
+
+Returns:
+    list[dict[str, Any]]: 节点列表（含 children）。
+"""
             res = []
             for node in nodes:
                 if is_search:
@@ -330,7 +351,14 @@ class MenuViewSet(viewsets.ViewSet):
             qs = Menu.objects.all().order_by("order_num", "id")
 
         def build(pid: int | None = None) -> list[dict[str, Any]]:
-            """build。"""
+            """递归构建菜单下拉选项树。
+
+Args:
+    pid (int | None): 父菜单 ID，None 表示从根层级开始。
+
+Returns:
+    list[dict[str, Any]]: 节点列表（含 children）。
+"""
             res = []
             for m in qs:
                 if m.parent_id == pid:

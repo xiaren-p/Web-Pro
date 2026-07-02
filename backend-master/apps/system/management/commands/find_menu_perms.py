@@ -7,7 +7,11 @@ class Command(BaseCommand):
     help = "Find menus by permission token substring"
 
     def add_arguments(self, parser):
-        """add_arguments。"""
+        """注册命令行参数。
+
+Args:
+    parser: Django 命令行参数解析器。
+"""
         parser.add_argument('token', nargs='?', default='notice')
 
     def handle(self, *args, **options):

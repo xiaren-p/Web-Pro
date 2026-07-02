@@ -327,7 +327,18 @@ class StatisticsViewSet(viewsets.ViewSet):
             sort_order = (payload.get('sort_order') or 'asc').lower()
 
             def match_owners(item: dict, owners_list) -> bool:
-                """match_owners。"""
+                """判断数据项的负责人是否匹配给定列表。
+
+从 price_list 提取 principal_uids（兼容单值/列表/分隔字符串），
+无命中时回退到扁平化结构的 owner/principal_names。
+
+Args:
+    item (dict): 单条数据项。
+    owners_list: 待匹配的负责人列表。
+
+Returns:
+    bool: 命中返回 True；owners_list 为空也返回 True。
+"""
                 if not owners_list:
                     return True
                 principals = []
@@ -381,7 +392,18 @@ class StatisticsViewSet(viewsets.ViewSet):
                 return False
 
             def match_msku(item: dict, msku_list) -> bool:
-                """match_msku。"""
+                """判断数据项的 MSKU 是否匹配给定列表。
+
+从 price_list/local_infos 提取候选 MSKU，
+无命中时回退到扁平化结构的 msku 字段。
+
+Args:
+    item (dict): 单条数据项。
+    msku_list: 待匹配的 MSKU 列表。
+
+Returns:
+    bool: 命中返回 True；msku_list 为空也返回 True。
+"""
                 if not msku_list:
                     return True
                 # 从 price_list/local_infos 中提取可能的 MSKU 值进行匹配
@@ -412,7 +434,15 @@ class StatisticsViewSet(viewsets.ViewSet):
                 return False
 
             def match_sids(item: dict, sids_list) -> bool:
-                """match_sids。"""
+                """判断数据项的店铺 ID 是否匹配给定列表。
+
+Args:
+    item (dict): 单条数据项。
+    sids_list: 待匹配的店铺 ID 列表。
+
+Returns:
+    bool: 命中返回 True；sids_list 为空也返回 True。
+"""
                 if not sids_list:
                     return True
                 item_sids = item.get('sids') or []
@@ -460,7 +490,14 @@ class StatisticsViewSet(viewsets.ViewSet):
                         # 为了保证 None 值始终排在末尾，按不同排序方向构造 key
                         if str(sort_order) == 'desc':
                             def sort_key(it):
-                                """sort_key。"""
+                                """降序排序键，None 值排末尾。
+
+Args:
+    it (dict): 单条数据项。
+
+Returns:
+    tuple[int, float]: 有效值返回 (0, -数值)，None 返回 (1, 0)。
+"""
                                 v = it.get(sort_by)
                                 n = self.parse_number(v)
                                 if n is None:
@@ -468,7 +505,14 @@ class StatisticsViewSet(viewsets.ViewSet):
                                 return (0, -n)
                         else:
                             def sort_key(it):
-                                """sort_key。"""
+                                """升序排序键，None 值排末尾。
+
+Args:
+    it (dict): 单条数据项。
+
+Returns:
+    tuple[int, float]: 有效值返回 (0, 数值)，None 返回 (1, 0)。
+"""
                                 v = it.get(sort_by)
                                 n = self.parse_number(v)
                                 if n is None:

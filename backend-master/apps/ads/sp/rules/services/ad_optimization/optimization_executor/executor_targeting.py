@@ -70,33 +70,83 @@ _EXPR_TYPE_LABEL: dict[str, str] = {
 def _check_time_pricing_link(
     rule: dict[str, Any], campaign_id: int, profile_id: int,
 ) -> bool:
-    """_check_time_pricing_link 内部辅助方法。"""
+    """_check_time_pricing_link（定位组维度包装）。
+
+委托共享函数执行，附加本维度日志标签。
+
+Args:
+    *args: 透传给共享函数的位置参数。
+    **kwargs: 透传给共享函数的关键字参数。
+
+Returns:
+    透传共享函数的返回值。
+"""
     return _shared_check_time_pricing_link(
         rule, campaign_id, profile_id, "[executor_targeting]",
     )
 
 
 def _check_all_condition_sets(*args: Any, **kwargs: Any) -> tuple[bool, str]:
-    """_check_all_condition_sets 内部辅助方法。"""
+    """_check_all_condition_sets（定位组维度包装）。
+
+委托共享函数执行，附加本维度日志标签。
+
+Args:
+    *args: 透传给共享函数的位置参数。
+    **kwargs: 透传给共享函数的关键字参数。
+
+Returns:
+    透传共享函数的返回值。
+"""
     return check_all_condition_sets(*args, **kwargs)
 
 
 def _calc_adjusted_bid(*args: Any, **kwargs: Any) -> float | None:
-    """_calc_adjusted_bid 内部辅助方法。"""
+    """_calc_adjusted_bid（定位组维度包装）。
+
+委托共享函数执行，附加本维度日志标签。
+
+Args:
+    *args: 透传给共享函数的位置参数。
+    **kwargs: 透传给共享函数的关键字参数。
+
+Returns:
+    透传共享函数的返回值。
+"""
     return calc_adjusted_bid(*args, **kwargs)
 
 
 def _get_last_adjustment_time(
     target_id: int, campaign_id: int, profile_id: int,
 ) -> datetime | None:
-    """_get_last_adjustment_time 内部辅助方法。"""
+    """_get_last_adjustment_time（定位组维度包装）。
+
+委托共享函数执行，附加本维度日志标签。
+
+Args:
+    *args: 透传给共享函数的位置参数。
+    **kwargs: 透传给共享函数的关键字参数。
+
+Returns:
+    透传共享函数的返回值。
+"""
     return _shared_get_last_adjustment_time(
         "target", target_id, campaign_id, profile_id,
     )
 
 
 def _is_execution_cycle_ok(*args: Any, **kwargs: Any) -> tuple[bool, str]:
-    """_is_execution_cycle_ok 内部辅助方法。"""
+    """_is_execution_cycle_ok（定位组维度包装）。
+
+委托共享函数执行，附加本维度日志标签。
+
+Args:
+    *args: 透传给共享函数的位置参数。
+    **kwargs: 透传给共享函数的关键字参数。
+
+Returns:
+    透传共享函数的返回值。
+"""
     return _shared_is_execution_cycle_ok(*args, **kwargs)
 
 

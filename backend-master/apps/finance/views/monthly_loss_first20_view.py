@@ -54,7 +54,16 @@ class MonthlyLossFirst20ViewSet(viewsets.ViewSet):
             owner_q = request.query_params.get('owner')
             # 接受 YYYYMM 或 YYYY-MM 格式输入；匹配数据库中可能为 'YYYYMM' 或 'YYYY-MM' 的值
             def _month_variants(m):
-                """_month_variants 内部辅助方法。"""
+                """生成月份字符串的等价格式变体。
+
+支持 YYYYMM 与 YYYY-MM 互转。
+
+Args:
+    m: 原始月份字符串。
+
+Returns:
+    list[str]: 月份变体列表；空输入返回空列表。
+"""
                 if not m:
                     return []
                 s = str(m).strip()
@@ -120,7 +129,16 @@ class MonthlyLossFirst20ViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["post"], url_path="download")
     def download(self, request):
         # 导出对比：本月前20天数据 vs 上个月整月数据
-        """download。"""
+        """导出本月前 20 天与上月整月数据对比为 xlsx 文件。
+
+仅支持单月对比；支持 owner/store 过滤与缓存复用。
+
+Args:
+    request: DRF Request 对象。
+
+Returns:
+    Response: xlsx 文件流响应；失败时返回错误响应。
+"""
         try:
             if getattr(request, 'method', '').upper() == 'GET':
                 payload = request.query_params or {}
@@ -169,7 +187,14 @@ class MonthlyLossFirst20ViewSet(viewsets.ViewSet):
             # 过滤条件
             stores = parse_store_param(payload.get('store') or payload.get('stores'))
             def make_variant_set(m):
-                """make_variant_set。"""
+                """生成本月与其去横杠变体的集合。
+
+Args:
+    m (str): 月份字符串。
+
+Returns:
+    set[str]: 月份及其去横杠格式组成的集合。
+"""
                 return {m, m.replace('-', '')}
 
             qs_cur = MonthlyLossOrderFirst20.objects.filter(month__in=list(make_variant_set(cur_month)))
@@ -197,7 +222,15 @@ class MonthlyLossFirst20ViewSet(viewsets.ViewSet):
             rows_prev = list(qs_prev.values('msku','asin','parent_asin','store_country','product_name_sku','owner','month','sales','gross_profit','gross_margin','net_gross_margin','return_rate','refund_amount_rate','total_stock_fee','spend','spend_rate'))
 
             def aggregate_rows(rows, months_list):
-                """aggregate_rows。"""
+                """用 pandas 按产品与月份聚合行数据为字典。
+
+Args:
+    rows (list[dict]): 原始数据行。
+    months_list (list[str]): 月份列表。
+
+Returns:
+    dict: 聚合后的数据字典。
+"""
                 try:
                     df = pd.DataFrame(rows)
                     if df.empty:
@@ -431,7 +464,12 @@ class MonthlyLossFirst20ViewSet(viewsets.ViewSet):
             resp = FileResponse(f, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             resp['Content-Disposition'] = f'attachment; filename="{filename}"'
             def _cleanup(path_file, delay=30):
-                """_cleanup 内部辅助方法。"""
+                """延迟删除临时文件的后台清理函数。
+
+Args:
+    path_file (str): 临时文件路径。
+    delay (int): 删除前等待秒数，默认 30。
+"""
                 try:
                     time.sleep(delay)
                     try:

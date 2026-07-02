@@ -161,7 +161,14 @@ class UserViewSet(viewsets.ViewSet):
             try:
                 target_ids = set()
                 def collect(did):
-                    """collect。"""
+                    """递归收集部门及其所有子部门 ID 到外层集合。
+
+Args:
+    did (int): 起始部门 ID。
+
+Returns:
+    None: 结果累积到外层 target_ids 集合。
+"""
                     if did in target_ids:
                         return
                     target_ids.add(did)
@@ -740,7 +747,14 @@ class UserViewSet(viewsets.ViewSet):
     @staticmethod
     def generic_get(request):
         # 兼容 GET /users -> 返回全部列表（前端主要使用 /users/page）
-        """generic_get。"""
+        """兼容 GET /users 直接返回全部用户列表。
+
+Args:
+    request: DRF Request 对象。
+
+Returns:
+    Response: 全部用户序列化数据响应。
+"""
         users = User.objects.all().select_related("profile", "profile__dept", "profile__position").order_by("id")
         return drf_ok([UserSerializer(u).data for u in users])
 

@@ -257,7 +257,14 @@ def execute_campaign_adjustment() -> dict[str, Any]:
 
 
 def _execute() -> dict[str, Any]:
-    """_execute 内部辅助方法。"""
+    """执行广告活动调整核心逻辑。
+
+读取 PENDING 记录按 profile 分组，请求 API 并回写状态。
+四种类型（规则预算调整/手动预算调整/暂停/启用）统一执行。
+
+Returns:
+    dict[str, Any]: 执行统计。
+"""
     records = list(SpCampaignAdjustment.objects.filter(
         adjustment_status=AdjustmentStatusChoices.PENDING,
         created_at__gte=timezone.now() - timezone.timedelta(hours=2),

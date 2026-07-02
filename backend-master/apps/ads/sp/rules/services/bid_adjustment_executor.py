@@ -254,7 +254,14 @@ def execute_bid_adjustment() -> dict[str, Any]:
 
 
 def _execute() -> dict[str, Any]:
-    """_execute 内部辅助方法。"""
+    """执行竞价调整与暂停核心逻辑。
+
+读取 PENDING 记录按 profile 分组，分关键词/定位组请求 API
+并回写状态。BID_ADJUSTMENT 与 BID_PAUSE 在同一请求中执行。
+
+Returns:
+    dict[str, Any]: 执行统计。
+"""
     records = list(SpBidAdjustment.objects.filter(
         adjustment_status=AdjustmentStatusChoices.PENDING,
         created_at__gte=timezone.now() - timezone.timedelta(hours=2),
