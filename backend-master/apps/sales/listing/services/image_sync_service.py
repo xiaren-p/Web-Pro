@@ -18,9 +18,9 @@ import requests
 from django.utils import timezone
 from PIL import Image
 
-from api_v1.models import ImageSyncQueue, ImageUpload
-from api_v1.models.file.image_sync_queue import ImageSyncStatus
-from api_v1.models.file.image_upload import ImageUploadStatus
+from apps.system.models import ImageSyncQueue, ImageUpload
+from apps.system.models.image_sync_queue import ImageSyncStatus
+from apps.system.models.image_upload import ImageUploadStatus
 from apps.nc.services.nc_api_client import NcApiClient
 from apps.nc.utils.nc_sku_path_search import search_nc_sku_paths
 from apps.common.services.qinglong_env_service import get_cached_env
@@ -640,7 +640,7 @@ def _process_sync_item(
         return {"sku": sku, "success": False, "msg": msg}
 
     # 2. 内部搜索 listing（在售 + 停售，排除已删除）
-    from api_v1.models import LxListingData, LxShops
+    from apps.system.models import LxListingData, LxShops
     records = list(LxListingData.objects.filter(
         seller_sku=sku, is_delete=0,
     ))

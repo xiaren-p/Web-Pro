@@ -9,8 +9,8 @@ from apps.ads.sp.timing.models.lx_time_pricing_strategy import LxTimePricingStra
 from apps.sales.models.lx_user import LxUser
 from apps.sales.listing.models.lx_product_info import LxProductInfo
 from apps.ads.sp.timing.serializers.ads_time_pricing_strategy_serializer import LxTimePricingStrategySerializer
-from api_v1.utils.pagination import paginate_queryset
-from api_v1.utils.responses import drf_error, drf_ok
+from apps.common.utils.pagination import paginate_queryset
+from apps.common.utils.responses import drf_error, drf_ok
 
 
 def _flatten_json_values(raw_values):

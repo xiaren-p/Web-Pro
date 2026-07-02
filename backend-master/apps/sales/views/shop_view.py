@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
 # cross-domain: LxShops (kept in api_v1), LxUser
-from api_v1.utils.responses import drf_ok
+from apps.common.utils.responses import drf_ok
 
 
 class ShopOptionsViewSet(viewsets.ViewSet):

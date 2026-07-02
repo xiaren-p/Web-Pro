@@ -560,7 +560,7 @@ def bulk_delete_queue(ids: list[int], user: User | None) -> int:
     Returns:
         int: 实际删除的记录数。
     """
-    from api_v1.models.system.user_profile import AdminLevel
+    from apps.system.models.user_profile import AdminLevel
 
     is_company_admin = bool(
         getattr(getattr(user, "profile", None), "admin_level", None) == AdminLevel.COMPANY_ADMIN

@@ -14,8 +14,8 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from api_v1.utils.responses import drf_ok, drf_error
-from api_v1.utils.pagination import paginate_queryset
+from apps.common.utils.responses import drf_ok, drf_error
+from apps.common.utils.pagination import paginate_queryset
 from apps.finance.models.monthly_loss_order import MonthlyLossOrder
 from apps.finance.models.monthly_loss_order_first20 import MonthlyLossOrderFirst20:
     try:

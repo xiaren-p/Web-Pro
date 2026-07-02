@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
 
-from api_v1.models._base import TimeStampedModel
+from apps.system.models._base import TimeStampedModel
 from apps.notice.models.notice import Notice
 
 

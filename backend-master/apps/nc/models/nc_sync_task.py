@@ -1,7 +1,7 @@
 """Nextcloud 同步任务队列模型（nc_sync_task）。"""
 from django.db import models
 
-from api_v1.models._base import TimeStampedModel
+from apps.system.models._base import TimeStampedModel
 
 
 class SyncOperation(models.TextChoices):

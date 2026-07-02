@@ -43,9 +43,9 @@ from apps.ads.sp.services.ads_metrics_service import (
     _compute_metrics_row,
     empty_adgroup_metrics,
 )
-from api_v1.utils.ad_status import resolve_service_status
-from api_v1.utils.pagination import paginate_queryset
-from api_v1.utils.responses import drf_ok
+from apps.ads.utils.ad_status import resolve_service_status
+from apps.common.utils.pagination import paginate_queryset
+from apps.common.utils.responses import drf_ok
 from apps.ads.views._helpers import KEYWORD_MATCH_TYPE_LABEL, _sortable_val
 from apps.ads.sp.rules.models.sp_bid_adjustment import (
     ExecutionTypeChoices as BidExecutionTypeChoices,

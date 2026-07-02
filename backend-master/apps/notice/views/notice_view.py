@@ -17,12 +17,12 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.request import Request
 
-from api_v1.models.system.dict_item import DictItem
+from apps.system.models.dict_item import DictItem
 from apps.notice.models import Notice, NoticeRead, NoticeTarget
-from api_v1.permissions import MenuPermRequired
+from apps.system.permissions import MenuPermRequired
 from apps.notice.serializers import NoticeBriefSerializer, NoticeDetailSerializer
-from api_v1.utils.pagination import paginate_queryset
-from api_v1.utils.responses import drf_error, drf_ok
+from apps.common.utils.pagination import paginate_queryset
+from apps.common.utils.responses import drf_error, drf_ok
 
 
 class NoticeViewSet(viewsets.ViewSet):
@@ -97,7 +97,7 @@ class NoticeViewSet(viewsets.ViewSet):
         支持 ``isRead=0`` 仅查询当前用户未读公告。
         """
         user = getattr(request, "user", None)
-        from api_v1.models.system.user_profile import AdminLevel
+        from apps.system.models.user_profile import AdminLevel
         try:
             profile = getattr(user, "profile", None)
             is_admin_role = (

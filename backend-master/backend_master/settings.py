@@ -138,7 +138,7 @@ CELERY_TASK_ROUTES = {
     'apps.common.tasks.qinglong_env_sync_task.sync_qinglong_env_task': {'queue': 'celery'},
     'apps.nc.tasks.nc_sync_tasks.process_pending_nc_tasks':        {'queue': 'celery'},
     'apps.nc.tasks.nc_sync_tasks.retry_failed_nc_tasks':           {'queue': 'celery'},
-    'api_v1.tasks.maintenance_tasks.cleanup_orphan_uploads':      {'queue': 'celery'},
+    'apps.system.tasks.maintenance_tasks.cleanup_orphan_uploads':      {'queue': 'celery'},
     # 广告活动参考数据缓存刷新（定时预热，280s 一轮，保证页面缓存永不过期）
     'apps.ads.sp.tasks.listing_cache_refresh_task.refresh_listing_caches': {'queue': 'celery'},
     # ── parallel_queue（concurrency=4）：可并行的批量任务 ────────────────────
@@ -175,7 +175,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     # 运维维护：每天凌晨 03:00 (Asia/Shanghai) 清理孤儿上传文件
     'cleanup-orphan-uploads': {
-        'task': 'api_v1.tasks.maintenance_tasks.cleanup_orphan_uploads',
+        'task': 'apps.system.tasks.maintenance_tasks.cleanup_orphan_uploads',
         'schedule': crontab(hour=3, minute=0),
         'kwargs': {'days': 30},
     },
@@ -240,6 +240,7 @@ INSTALLED_APPS = [
     'apps.finance',        # 财务管理域
     'apps.ads',            # 广告管理域
     'apps.system',         # 系统管理域
+    'apps.lingxing',      # 领星数据域
 ]
 
 MIDDLEWARE = [
@@ -403,7 +404,7 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.MultiPartParser',
     ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'api_v1.auth.BearerTokenAuthentication',
+        'apps.system.auth.BearerTokenAuthentication',
         # SessionAuthentication 已移除：本项目 API 鉴权完全走 Bearer Token，
         # Django Session 仅用于 OIDC SSO（走 Django 模板视图，不经过 DRF）。
         # 保留 SessionAuthentication 会导致 Bearer 过期而 sessionid cookie 仍有效时，
@@ -412,7 +413,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
-    'EXCEPTION_HANDLER': 'api_v1.utils.responses.custom_exception_handler',
+    'EXCEPTION_HANDLER': 'apps.system.utils.responses.custom_exception_handler',
 }
 
 # OAuth2 / OIDC Provider 配置（django-oauth-toolkit）
@@ -534,7 +535,7 @@ OAUTH2_PROVIDER = {
     # 请求 scope 验证：请求的 scope 必须是 SCOPES 的子集
     'REQUEST_APPROVAL_PROMPT': 'auto',
     # 自定义验证器（添加 NC 业务声明）
-    'OAUTH2_VALIDATOR_CLASS': 'api_v1.services.oidc.oidc_validator.CustomOAuth2Validator',
+    'OAUTH2_VALIDATOR_CLASS': 'apps.system.services.oidc_validator.CustomOAuth2Validator',
     # 支持的授权类型
     'ALLOWED_GRANT_TYPES': [
         'authorization_code',

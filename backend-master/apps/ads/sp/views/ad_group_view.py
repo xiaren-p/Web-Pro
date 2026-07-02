@@ -4,7 +4,7 @@
 返回带指标的广告组列表、汇总行以及分页信息。
 
 指标聚合逻辑内联于视图，
-复用 :mod:`api_v1.services.ads_metrics_service` 中的纯计算函数。
+复用 :mod:`apps.system.services.ads_metrics_service` 中的纯计算函数。
 """
 from __future__ import annotations
 
@@ -38,9 +38,9 @@ from apps.ads.sp.services.ads_metrics_service import (
     _compute_metrics_row,
     empty_adgroup_metrics,
 )
-from api_v1.utils.ad_status import resolve_service_status
-from api_v1.utils.pagination import paginate_queryset
-from api_v1.utils.responses import drf_ok
+from apps.ads.utils.ad_status import resolve_service_status
+from apps.common.utils.pagination import paginate_queryset
+from apps.common.utils.responses import drf_ok
 from apps.ads.views._helpers import _sortable_val
 
 

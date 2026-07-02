@@ -7,44 +7,31 @@ api_v1 序列化器包
 """
 
 # system 板块
-from api_v1.serializers.system.position_serializer import PositionSerializer, PositionWriteSerializer, PositionOptionSerializer
-from api_v1.serializers.system.dept_serializer import DeptSerializer
-from api_v1.serializers.system.menu_serializer import MenuSerializer
-from api_v1.serializers.system.oper_log_serializer import OperLogSerializer
-from api_v1.serializers.system.user_serializer import UserSerializer
-from api_v1.serializers.system.dict_type_serializer import DictTypeSerializer
-from api_v1.serializers.system.dict_item_serializer import DictItemSerializer
-from api_v1.serializers.system.config_serializer import ConfigSerializer
-from api_v1.serializers.system.mobile_code_send_serializer import MobileCodeSendSerializer
-from api_v1.serializers.system.mobile_bind_serializer import MobileBindSerializer
-from api_v1.serializers.system.email_code_send_serializer import EmailCodeSendSerializer
-from api_v1.serializers.system.email_bind_serializer import EmailBindSerializer
-
-# notice 板块
-from api_v1.serializers.notice.notice_brief_serializer import NoticeBriefSerializer
-from api_v1.serializers.notice.notice_detail_serializer import NoticeDetailSerializer
-from api_v1.serializers.notice.notice_serializer import NoticeSerializer
-
-# crawler 板块
-from api_v1.serializers.crawler.crawler_log_serializer import CrawlerLogSerializer
-from api_v1.serializers.crawler.crawler_conf_serializer import CrawlerConfSerializer
-from api_v1.serializers.crawler.crawler_seller_serializer import CrawlerSellerSerializer
-from api_v1.serializers.crawler.crawler_category_serializer import CrawlerCategorySerializer
+from apps.system.serializers.position_serializer import PositionSerializer, PositionWriteSerializer, PositionOptionSerializer
+from apps.system.serializers.dept_serializer import DeptSerializer
+from apps.system.serializers.menu_serializer import MenuSerializer
+from apps.system.serializers.oper_log_serializer import OperLogSerializer
+from apps.system.serializers.user_serializer import UserSerializer
+from apps.system.serializers.dict_type_serializer import DictTypeSerializer
+from apps.system.serializers.dict_item_serializer import DictItemSerializer
+from apps.system.serializers.config_serializer import ConfigSerializer
+from apps.system.serializers.mobile_code_send_serializer import MobileCodeSendSerializer
+from apps.system.serializers.mobile_bind_serializer import MobileBindSerializer
+from apps.system.serializers.email_code_send_serializer import EmailCodeSendSerializer
+from apps.system.serializers.email_bind_serializer import EmailBindSerializer
 
 # file 板块
-from api_v1.serializers.file import ImageUploadSerializer
-from api_v1.serializers.image_sync_queue import ImageSyncQueueSerializer
-
-# finance 板块
-from api_v1.serializers.finance.monthly_loss_serializer import MonthlyLossSerializer
-from api_v1.serializers.finance.monthly_loss_first20_serializer import MonthlyLossFirst20Serializer
+from apps.system.serializers.image_upload_serializer import ImageUploadSerializer
+from apps.system.serializers.image_sync_queue_serializer import ImageSyncQueueSerializer
 
 # work 板块
-from api_v1.serializers.work import WorkReportSerializer
+from apps.system.serializers.work_serializer import WorkReportSerializer
 
-# ads 板块
-from api_v1.serializers.lingxing.ads_time_pricing_strategy_serializer import LxTimePricingStrategySerializer
-from api_v1.serializers.lingxing.rule_strategy_serializer import LxAdRuleSerializer, LxAdRuleGroupSerializer
+# migrated to apps/*
+# notice -> apps.notice.serializers
+# crawler -> apps.crawler.serializers
+# finance -> apps.finance.serializers
+# ads -> apps.ads.sp.timing.serializers / apps.ads.sp.rules.serializers
 
 __all__ = [
     "PositionSerializer", "PositionWriteSerializer", "PositionOptionSerializer",
@@ -52,14 +39,8 @@ __all__ = [
     "OperLogSerializer", "UserSerializer", "DictTypeSerializer", "DictItemSerializer",
     "ConfigSerializer", "MobileCodeSendSerializer", "MobileBindSerializer",
     "EmailCodeSendSerializer", "EmailBindSerializer",
-    "NoticeBriefSerializer", "NoticeDetailSerializer", "NoticeSerializer",
-    "CrawlerLogSerializer", "CrawlerConfSerializer", "CrawlerSellerSerializer",
-    "CrawlerCategorySerializer",
     "ImageUploadSerializer",
     "ImageSyncQueueSerializer",
-    "MonthlyLossSerializer", "MonthlyLossFirst20Serializer",
     "WorkReportSerializer",
-    "LxTimePricingStrategySerializer",
-    "LxAdRuleSerializer", "LxAdRuleGroupSerializer",
 ]
 

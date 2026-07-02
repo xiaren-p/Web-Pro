@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from api_v1.auth import BearerTokenAuthentication
+from apps.system.auth import BearerTokenAuthentication
 from apps.system.permissions.v2_access import IsV2Accessible
 from apps.ads.sp.rules.tasks.optimization_execution_task import (
     GLOBAL_LOCK_KEY,

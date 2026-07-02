@@ -10,8 +10,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from apps.crawler.models import CrawlerCategory
 from apps.crawler.serializers import CrawlerCategorySerializer
-from api_v1.utils.pagination import paginate_queryset
-from api_v1.utils.responses import drf_error, drf_ok
+from apps.common.utils.pagination import paginate_queryset
+from apps.common.utils.responses import drf_error, drf_ok
 
 
 class CrawlerCategoryViewSet(viewsets.ViewSet):

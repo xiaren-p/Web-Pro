@@ -1,7 +1,7 @@
 """Nextcloud 群组镜像模型（nc_group）。"""
 from django.db import models
 
-from api_v1.models._base import TimeStampedModel
+from apps.system.models._base import TimeStampedModel
 
 
 class NcGroupType(models.TextChoices):

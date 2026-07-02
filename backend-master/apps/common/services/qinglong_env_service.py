@@ -53,7 +53,7 @@ def _get_config_value(key: str) -> str:
         str: 参数明文值，读取失败时返回空字符串。
     """
     try:
-        from api_v1.models.system.config import Config
+        from apps.system.models.config import Config
         cfg = Config.objects.filter(key=key, status=True).first()
         if cfg is None:
             return ""

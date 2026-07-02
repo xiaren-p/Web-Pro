@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 # cross-domain: LxListing (kept in api_v1)Tag
-from api_v1.utils.responses import drf_error, drf_ok
+from apps.common.utils.responses import drf_error, drf_ok
 
 
 class ListingTagViewSet(ViewSet):

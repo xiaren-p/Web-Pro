@@ -26,7 +26,7 @@ from rest_framework.renderers import BaseRenderer
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from api_v1.auth.bearer_token_auth import BearerTokenAuthentication
+from apps.system.auth.bearer_token_auth import BearerTokenAuthentication
 from apps.ai.models.message import AiMessage, MessageStatus, MessageType
 from apps.system.permissions.v2_access import IsV2Accessible
 from apps.ai.utils.redis_channel import (

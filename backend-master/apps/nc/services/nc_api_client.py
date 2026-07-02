@@ -63,7 +63,7 @@ class NcApiClient:
         Returns:
             NcApiClient: 已完成初始化的客户端实例。
         """
-        from api_v1.models.system.config import Config
+        from apps.system.models.config import Config
         server_url = cls._read_config("NC_BASE_URL")
         admin_user = cls._read_config("NC_ADMIN_USER")
         admin_password = cls._read_config_plaintext("NC_ADMIN_APP_PWD")
@@ -99,7 +99,7 @@ class NcApiClient:
         Raises:
             RuntimeError: 配置项不存在或值为空时抛出。
         """
-        from api_v1.models.system.config import Config
+        from apps.system.models.config import Config
         obj = Config.objects.filter(key=key).first()
         if not obj or not obj.value:
             raise RuntimeError(f"[NcApiClient] Config 表中缺少必要配置项: {key}")
@@ -118,7 +118,7 @@ class NcApiClient:
         Raises:
             RuntimeError: 配置项不存在或解密失败时抛出。
         """
-        from api_v1.models.system.config import Config
+        from apps.system.models.config import Config
         obj = Config.objects.filter(key=key).first()
         if not obj:
             raise RuntimeError(f"[NcApiClient] Config 表中缺少必要配置项: {key}")

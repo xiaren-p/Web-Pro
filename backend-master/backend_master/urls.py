@@ -22,7 +22,7 @@ from django.conf.urls.static import static
 from django.urls import re_path
 from django.views.static import serve
 
-from api_v1.views.oidc.oidc_login_view import oidc_login_view
+from apps.system.views.oidc_login_view import oidc_login_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),

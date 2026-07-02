@@ -1,7 +1,7 @@
 """OrderProfit 缓存模型。"""
 from django.db import models
 
-from api_v1.models._base import TimeStampedModel
+from apps.system.models._base import TimeStampedModel
 
 
 class OrderProfitCache(TimeStampedModel):

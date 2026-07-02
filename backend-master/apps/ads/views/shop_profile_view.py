@@ -14,8 +14,8 @@ from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.sales.listing.models.lx_product_info import LxProductInfo
 from apps.sales.models.lx_shops import LxShops
-from api_v1.utils.ad_status import _LABEL_MAP as SERVICE_STATUS_LABEL
-from api_v1.utils.responses import drf_ok
+from apps.ads.utils.ad_status import _LABEL_MAP as SERVICE_STATUS_LABEL
+from apps.common.utils.responses import drf_ok
 from apps.ads.views._helpers import (
     BIDDING_STRATEGY_LABEL,
     CAMPAIGN_TYPE_SHORT,

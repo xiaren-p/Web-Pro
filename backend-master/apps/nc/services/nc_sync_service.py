@@ -26,8 +26,8 @@ from django.utils import timezone
 from apps.nc.models.nc_file_access_rule import NcFileAccessRule
 from apps.nc.models.nc_group import NcGroup, NcGroupType
 from apps.nc.models.nc_sync_task import NcSyncTask, SyncOperation, SyncStatus
-from api_v1.models.system.department import Department
-from api_v1.models.system.user_profile import AdminLevel
+from apps.system.models.department import Department
+from apps.system.models.user_profile import AdminLevel
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -801,8 +801,8 @@ class NcSyncService:
             )
             # 将 NC 密码加密后保存到 UserProfile，供后续用户级 NC 操作（如头像同步）使用
             try:
-                from api_v1.models.system.user_profile import UserProfile  # noqa: PLC0415
-                from api_v1.utils.fernet_crypto import encrypt_value  # noqa: PLC0415
+                from apps.system.models.user_profile import UserProfile  # noqa: PLC0415
+                from apps.common.utils.fernet_crypto import encrypt_value  # noqa: PLC0415
                 updated = (
                     UserProfile.objects
                     .filter(user__username=p["username"])

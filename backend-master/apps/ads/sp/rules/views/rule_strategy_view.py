@@ -9,8 +9,8 @@ from apps.ads.sp.rules.serializers.rule_strategy_serializer import (
     LxAdRuleSerializer,
     LxAdRuleGroupSerializer,
 )
-from api_v1.utils.pagination import paginate_queryset
-from api_v1.utils.responses import drf_error, drf_ok
+from apps.common.utils.pagination import paginate_queryset
+from apps.common.utils.responses import drf_error, drf_ok
 
 
 class RuleStrategyViewSet(viewsets.ViewSet):

@@ -2,7 +2,7 @@
 from django.conf import settings
 from django.db import models
 
-from api_v1.models._base import TimeStampedModel
+from apps.system.models._base import TimeStampedModel
 
 
 class NcFileAccessRule(TimeStampedModel):

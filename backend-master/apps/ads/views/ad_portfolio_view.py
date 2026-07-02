@@ -7,7 +7,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.ads.models.lx_ads_portfolio import LxAdsPortfolio
-from api_v1.utils.responses import drf_ok
+from apps.common.utils.responses import drf_ok
 
 
 class AdPortfolioViewSet(viewsets.ViewSet):

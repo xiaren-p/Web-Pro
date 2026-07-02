@@ -11,7 +11,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from api_v1.auth.bearer_token_auth import BearerTokenAuthentication
+from apps.system.auth.bearer_token_auth import BearerTokenAuthentication
 from apps.ai.models.dify_app import DifyApp
 from apps.system.permissions.v2_access import IsV2Accessible
 from apps.ai.serializers.chat_serializer import DifyAppSerializer

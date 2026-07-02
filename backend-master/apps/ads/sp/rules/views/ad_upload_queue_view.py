@@ -17,7 +17,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from api_v1.auth.bearer_token_auth import BearerTokenAuthentication
+from apps.system.auth.bearer_token_auth import BearerTokenAuthentication
 from apps.ads.sp.rules.models.ad_upload_queue import AdParseStatus, AdUploadQueue
 from apps.system.permissions.v2_access import IsV2Accessible
 from apps.ads.sp.rules.serializers.ad_upload_queue_serializer import (
@@ -160,7 +160,7 @@ def list_ad_queue(request: Request) -> Response:
         Response: {"total": N, "page": N, "page_size": N, "list": [...]}
     """
     # 超管或公司管理员可通过 user_id 参数查看其他用户的队列；其余用户强制过滤为自己
-    from api_v1.models.system.user_profile import AdminLevel  # noqa: PLC0415
+    from apps.system.models.user_profile import AdminLevel  # noqa: PLC0415
     _profile = getattr(request.user, "profile", None)
     _admin_level = getattr(_profile, "admin_level", None) if _profile else None
     can_view_all: bool = bool(
@@ -274,7 +274,7 @@ def retry_ad_queue(request: Request) -> Response:
     # FAILED 和 ANOMALY 均可重试；不清除已落库的 campaign_id / ad_group_id 等 ID，
     # 由 _submit_single 按"跳过已完成步骤"逻辑从断点续跑。
     # 权限与列表页保持一致：超管/公司管理员可操作所有记录，其余用户仅可操作自己记录。
-    from api_v1.models.system.user_profile import AdminLevel  # noqa: PLC0415
+    from apps.system.models.user_profile import AdminLevel  # noqa: PLC0415
 
     profile = getattr(request.user, "profile", None)
     admin_level = getattr(profile, "admin_level", None) if profile else None

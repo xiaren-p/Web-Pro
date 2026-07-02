@@ -13,14 +13,15 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 # cross-domain: ImageUpload (kept in api_v1)
-from api_v1.serializers.file import ImageUploadSerializer
-from api_v1.serializers.image_sync_queue import ImageSyncQueueSerializer
-from apps.sales.listing.services.image_sync_queue_service import (
+from apps.system.serializers.image_upload_serializer import ImageUploadSerializer
+from apps.system.serializers.image_sync_queue_serializer import ImageSyncQueueSerializer
+from apps.system.services.image_sync_queue_service import (
     batch_upsert_sync_tasks,
     get_queue_queryset,
     upsert_sync_task,
 )
-from api_v1.utils.responses import drf_ok, drf_error
+from apps.common.utils.responses import drf_ok, drf_error
+from apps.system.models import ImageUpload, ImageSyncQueue
 
 class ImageUploadViewSet(viewsets.ModelViewSet):
     queryset = ImageUpload.objects.all()

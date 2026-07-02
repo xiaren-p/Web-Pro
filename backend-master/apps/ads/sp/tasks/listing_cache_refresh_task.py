@@ -24,7 +24,7 @@ def refresh_listing_caches(self) -> dict:
     Returns:
         dict: 执行摘要。
     """
-    from api_v1.views.lingxing.ads.sp.ad_campaign_view import (
+    from apps.system.views.lingxing.ads.sp.ad_campaign_view import (
         _get_profile_map,
         _get_rate_map,
         _get_sid_country_map,

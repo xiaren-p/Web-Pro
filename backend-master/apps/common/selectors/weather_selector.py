@@ -1,10 +1,10 @@
 """天气配置查询。
 
-从系统配置表（api_v1.models.Config）读取高德 API 相关参数，
+从系统配置表（apps.system.models.Config）读取高德 API 相关参数，
 读不到时返回预设的兜底默认值。
 """
 
-from api_v1.models import Config
+from apps.system.models import Config
 
 _AMAP_KEY = "AMAP_KEY"
 _AMAP_CITY = "AMAP_CITY"

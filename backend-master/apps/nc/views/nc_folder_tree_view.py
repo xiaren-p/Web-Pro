@@ -18,13 +18,13 @@ from rest_framework.request import Request
 from apps.nc.models.nc_file_access_rule import NcFileAccessRule
 from apps.nc.models.nc_group import NcGroup, NcGroupType
 from apps.nc.models.nc_sync_task import NcSyncTask
-from api_v1.models.system.department import Department
-from api_v1.models.system.user_profile import AdminLevel, UserProfile
-from api_v1.permissions import MenuPermRequired
+from apps.system.models.department import Department
+from apps.system.models.user_profile import AdminLevel, UserProfile
+from apps.system.permissions import MenuPermRequired
 from apps.nc.serializers.nc_file_rule_serializer import NcFileRuleReadSerializer
 from apps.nc.services.nc_api_client import NcApiClient
 from apps.nc.services.nc_sync_service import NcSyncService
-from api_v1.utils.responses import drf_error, drf_ok
+from apps.common.utils.responses import drf_error, drf_ok
 
 User = get_user_model()
 logger = logging.getLogger(__name__)

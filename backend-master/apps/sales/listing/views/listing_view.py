@@ -24,7 +24,7 @@ from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_meta import LxListingMeta
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.sales.listing.models.lx_order_profit import LxOrderProfit
-from api_v1.utils.responses import drf_error, drf_ok
+from apps.common.utils.responses import drf_error, drf_ok
 from apps.sales.listing.models.listing_tag_modify_queue import (
     ListingTagModifyQueue,
     ModifyActionChoices,

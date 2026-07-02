@@ -25,9 +25,9 @@ from apps.sales.models.lx_shops import LxShops
 from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.ads.sp.rules.serializers.campaign_serializer import LxSpCampaignSerializer
-from api_v1.utils.ad_status import resolve_service_status
-from api_v1.utils.pagination import paginate_queryset
-from api_v1.utils.responses import drf_ok
+from apps.ads.utils.ad_status import resolve_service_status
+from apps.common.utils.pagination import paginate_queryset
+from apps.common.utils.responses import drf_ok
 from apps.ads.views._helpers import (
     BIDDING_STRATEGY_LABEL,
     CAMPAIGN_TYPE_SHORT,
