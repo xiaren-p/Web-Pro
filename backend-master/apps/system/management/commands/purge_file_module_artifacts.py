@@ -19,9 +19,11 @@ from apps.system.models import Menu, Position, OperLog
 
 
 class Command(BaseCommand):
+    """自定义管理命令。"""
     help = "Purge legacy file module menus (and optionally logs) after module decommission"
 
     def add_arguments(self, parser):
+        """add_arguments。"""
         parser.add_argument(
             "--with-logs",
             action="store_true",
@@ -30,6 +32,7 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        """命令处理入口。"""
         with_logs = options.get("with_logs")
         # 1. Locate candidate menus (self + descendants) to delete
         roots = list(
@@ -40,6 +43,7 @@ class Command(BaseCommand):
         # Include any buttons under those roots even if they themselves do not match the Q above (defensive)
         target_ids = set()
         def collect(menu):
+            """collect。"""
             if menu.id in target_ids:
                 return
             target_ids.add(menu.id)

@@ -56,6 +56,7 @@ class BizError(Exception):
     """业务层可抛出的异常，最终会被 `custom_exception_handler` 转换为统一响应。"""
 
     def __init__(self, msg: str, code: str = PARAM_ERROR_CODE, status: int = 400, data=None):
+        """初始化实例。"""
         super().__init__(msg)
         self.msg = msg
         self.code = code

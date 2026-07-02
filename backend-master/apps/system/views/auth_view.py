@@ -86,6 +86,7 @@ class AuthViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
+        """返回当前 action 所需的权限类列表。"""
         action = getattr(self, 'action', None)
         # 允许匿名访问的动作：登录、图形验证码、刷新 token（刷新 token 使用 refreshToken 字段）
         if action in ("login", "captcha", "refresh_token"):
@@ -138,6 +139,7 @@ class AuthViewSet(viewsets.ViewSet):
     @csrf_exempt
     @action(detail=False, methods=["post"], url_path="refresh-token")
     def refresh_token(self, request):  # pragma: no cover
+        """刷新访问令牌。"""
         token = request.query_params.get('refreshToken') or (request.data or {}).get('refreshToken')
         if not token:
             return drf_error("缺少 refreshToken", status=400)
@@ -162,6 +164,7 @@ class AuthViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["delete", "get", "post"], url_path="logout")
     def logout(self, request):  # pragma: no cover
         # 撤销 JWT access token
+        """用户登出。"""
         try:
             from rest_framework.authentication import get_authorization_header
             parts = get_authorization_header(request).split()
@@ -181,6 +184,7 @@ class AuthViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path="captcha")
     def captcha(self, request):  # pragma: no cover
         # 生成图形验证码（若 PIL 不可用，回退为透明 1x1 PNG）
+        """生成验证码。"""
         try:
             key, img_b64, _text = generate_captcha()
         except Exception as e:

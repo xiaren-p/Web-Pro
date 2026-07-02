@@ -20,6 +20,7 @@ class MenuViewSet(viewsets.ViewSet):
     permission_classes = [MenuPermRequired]
 
     def get_permissions(self):
+        """返回当前 action 所需的权限类列表。"""
         action_name = getattr(self, "action", None)
         method = (
             getattr(self.request, "method", "").upper()
@@ -51,6 +52,7 @@ class MenuViewSet(viewsets.ViewSet):
 
         def compute_route_name() -> str:
             # routeName 仅对"菜单"类型生效（type=2）。目录/按钮/外链不显示路由名称。
+            """compute_route_name。"""
             if m.type != 2:
                 return ""
             try:
@@ -90,6 +92,7 @@ class MenuViewSet(viewsets.ViewSet):
             by_parent.setdefault(pid, []).append(m)
 
         def build(pid: int | None = None) -> list[dict[str, Any]]:
+            """build。"""
             result = []
             for m in by_parent.get(pid or 0, []):
                 route: dict[str, Any] = {
@@ -223,6 +226,7 @@ class MenuViewSet(viewsets.ViewSet):
         nodes = [self._serialize(m) for m in qs]
 
         def build(pid: int | None = None) -> list[dict[str, Any]]:
+            """build。"""
             res = []
             for node in nodes:
                 if is_search:
@@ -326,6 +330,7 @@ class MenuViewSet(viewsets.ViewSet):
             qs = Menu.objects.all().order_by("order_num", "id")
 
         def build(pid: int | None = None) -> list[dict[str, Any]]:
+            """build。"""
             res = []
             for m in qs:
                 if m.parent_id == pid:

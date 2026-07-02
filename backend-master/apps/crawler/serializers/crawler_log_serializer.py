@@ -20,6 +20,7 @@ class CrawlerLogSerializer(serializers.ModelSerializer):
 
     def validate_level(self, value):
         # 归一化常见同义词到内部统一集合
+        """validate_level。"""
         if not value:
             return "info"
         v = str(value).strip().lower()
@@ -34,6 +35,7 @@ class CrawlerLogSerializer(serializers.ModelSerializer):
         return mapping.get(v, "info")
 
     def validate_elapsed_ms(self, value):
+        """validate_elapsed_ms。"""
         try:
             return int(value or 0)
         except Exception:

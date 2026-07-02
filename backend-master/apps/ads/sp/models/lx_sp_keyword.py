@@ -88,4 +88,5 @@ class LxSpKeyword(models.Model):
         unique_together = (("keyword_id", "profile_id"),)
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxSpKeyword<{self.keyword_id}> {self.keyword_text}"

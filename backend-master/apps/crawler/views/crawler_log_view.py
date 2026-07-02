@@ -23,10 +23,12 @@ class CrawlerLogViewSet(viewsets.ViewSet):
 
     def get_permissions(self):
         # 对所有动作均开放（AllowAny）
+        """返回当前 action 所需的权限类列表。"""
         return [AllowAny()]
 
     @action(detail=False, methods=["get"], url_path="page")
     def page(self, request):
+        """分页列表查询。"""
         try:
             qs = CrawlerLog.objects.all().order_by("-id")
             # 关键字仅匹配日志内容（content）
@@ -54,6 +56,7 @@ class CrawlerLogViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path="")
     def list_or_create(self, request):
         # GET 列表（非分页）
+        """分页列表查询。"""
         if request.method.lower() == "get":
             qs = CrawlerLog.objects.all().order_by("-id")
             raw = CrawlerLogSerializer(qs, many=True).data

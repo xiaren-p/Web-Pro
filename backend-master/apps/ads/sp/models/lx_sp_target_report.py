@@ -108,4 +108,5 @@ class LxSpTargetReport(models.Model):
         ]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxSpTargetReport<tg={self.target_id}, {self.report_date}>"

@@ -57,6 +57,7 @@ class Config(TimeStampedModel):
         verbose_name_plural = "系统参数"
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return self.key
 
     def get_plaintext_value(self) -> str:

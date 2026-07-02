@@ -14,10 +14,12 @@ from django.contrib.auth.models import User
 from apps.system.models import Position, Menu, Department, UserProfile
 
 class Command(BaseCommand):
+    """自定义管理命令。"""
     help = 'Initialize demo data (positions, menus, department, admin user)'
 
     def handle(self, *args, **options):
         # Position
+        """命令处理入口。"""
         admin_position, _ = Position.objects.get_or_create(code='admin', defaults={'name': '管理员', 'status': True})
 
         # Menus

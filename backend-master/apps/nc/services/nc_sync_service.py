@@ -619,6 +619,7 @@ class NcSyncService:
         """
         def _run() -> None:
             # 非请求线程必须先关闭旧连接，避免复用已超时的主线程连接导致静默崩溃
+            """_run 内部辅助方法。"""
             from django.db import close_old_connections, connection
             close_old_connections()
             try:

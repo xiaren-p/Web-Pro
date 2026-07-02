@@ -124,4 +124,5 @@ class LxSpCampaign(models.Model):
         unique_together = (("campaign_id", "profile_id"),)
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxSpCampaign<{self.campaign_id}> {self.name}"

@@ -92,6 +92,7 @@ class LxListingTag(models.Model):
         ]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxListingTag<{self.global_tag_id}> {self.tag_name}"
 
     def save(self, *args, **kwargs):

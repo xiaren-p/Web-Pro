@@ -39,6 +39,7 @@ def _get_target_users(user) -> "User.objects":
         dept_ids: set[int] = set()
 
         def _collect(did: int) -> None:
+            """_collect 内部辅助方法。"""
             if did in dept_ids:
                 return
             dept_ids.add(did)

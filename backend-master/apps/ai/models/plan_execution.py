@@ -89,4 +89,5 @@ class AiPlanExecution(models.Model):
         ordering = ['-created_at']
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"AiPlanExecution<{self.pk} {self.plan_id} {self.status}>"

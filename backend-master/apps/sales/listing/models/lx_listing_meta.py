@@ -49,4 +49,5 @@ class LxListingMeta(models.Model):
         ordering = ["-updated_at"]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxListingMeta<listing_data={self.listing_data_id}>"

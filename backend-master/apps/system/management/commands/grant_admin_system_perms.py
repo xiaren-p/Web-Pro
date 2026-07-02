@@ -15,11 +15,13 @@ from apps.system.models import Position, Menu, UserProfile
 
 
 class Command(BaseCommand):
+    """自定义管理命令。"""
     help = "Grant all system management permissions to admin position and user"
 
     @transaction.atomic
     def handle(self, *args, **options):
         # 确保 admin 岗位存在
+        """命令处理入口。"""
         admin_position, _ = Position.objects.get_or_create(code='admin', defaults={'name': '管理员', 'status': True})
 
         # 查找系统管理菜单

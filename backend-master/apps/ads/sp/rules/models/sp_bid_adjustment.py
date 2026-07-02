@@ -173,5 +173,6 @@ class SpBidAdjustment(models.Model):
         ]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         item = f"target={self.target_id}" if self.target_id else f"keyword={self.keyword_id}"
         return f"SpBidAdjustment<{item}, campaign={self.campaign_id}>"

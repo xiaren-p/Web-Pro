@@ -405,4 +405,5 @@ class LxListingData(models.Model):
         unique_together = (("seller_sku", "sid"),)
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxListingData<{self.seller_sku}> sid={self.sid}"

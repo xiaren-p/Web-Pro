@@ -118,5 +118,6 @@ class FileAsset(TimeStampedModel):
         ]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return self.name
 

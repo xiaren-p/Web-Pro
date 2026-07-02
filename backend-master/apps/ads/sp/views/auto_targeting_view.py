@@ -114,6 +114,7 @@ def _resolve_targeting_label(expression: list[dict[str, Any]] | None) -> str:
 
 
 class AutoTargetingViewSet(viewsets.ViewSet):
+    """AutoTargetingViewSet 视图集。"""
     permission_classes = [IsAuthenticated]
     """SP 自动投放定向条款列表及指标聚合视图。"""
 
@@ -911,6 +912,7 @@ def _build_bid_latest_adjustment_map(
 
 
 def _build_bid_lines(rec: Any, rule_map: dict[int, Any], country_name: str, tz_name: str) -> list[str]:
+    """_build_bid_lines 内部辅助方法。"""
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
     from apps.ads.sp.rules.models.sp_bid_adjustment import ExecutionTypeChoices as BidExecType
     is_rule = bool(rec.auto_rule_id)

@@ -17,6 +17,7 @@ from apps.common.utils.responses import drf_error, drf_ok
 
 
 class ListingTagViewSet(ViewSet):
+    """ListingTagViewSet 视图集。"""
     permission_classes = [IsAuthenticated]
     """Listing 标签管理视图。"""
 

@@ -294,5 +294,6 @@ class LxAdRule(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         status_label = "启用" if self.status == AdRuleStatus.ACTIVE else "暂停"
         return f"LxAdRule<{self.id}> {self.name}（{status_label}）"

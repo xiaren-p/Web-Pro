@@ -254,6 +254,7 @@ def execute_bid_adjustment() -> dict[str, Any]:
 
 
 def _execute() -> dict[str, Any]:
+    """_execute 内部辅助方法。"""
     records = list(SpBidAdjustment.objects.filter(
         adjustment_status=AdjustmentStatusChoices.PENDING,
         created_at__gte=timezone.now() - timezone.timedelta(hours=2),

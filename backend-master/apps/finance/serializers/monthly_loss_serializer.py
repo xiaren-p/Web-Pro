@@ -24,27 +24,34 @@ class MonthlyLossSerializer(serializers.ModelSerializer):
             return ""
 
     def get_gross_margin_display(self, obj) -> str:
+        """获取 gross_margin_display。"""
         return self._fmt_percent(obj.gross_margin)
 
     def get_net_gross_margin_display(self, obj) -> str:
+        """获取 net_gross_margin_display。"""
         return self._fmt_percent(obj.net_gross_margin)
 
     def get_return_rate_display(self, obj) -> str:
+        """获取 return_rate_display。"""
         return self._fmt_percent(obj.return_rate)
 
     def get_refund_amount_rate_display(self, obj) -> str:
+        """获取 refund_amount_rate_display。"""
         return self._fmt_percent(obj.refund_amount_rate)
 
     def get_spend_rate_display(self, obj) -> str:
+        """获取 spend_rate_display。"""
         return self._fmt_percent(obj.spend_rate)
 
     def to_internal_value(self, data):
         # 入参 JSON key 必须是英文字段名（不再做中文兼容）
+        """to_internal_value。"""
         if not isinstance(data, dict):
             return super().to_internal_value(data)
         return super().to_internal_value(data)
 
     def to_representation(self, instance):
+        """to_representation。"""
         rep = super().to_representation(instance)
         # 输出英文字段名
         out = {}

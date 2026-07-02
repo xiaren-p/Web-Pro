@@ -80,4 +80,5 @@ class ApiRequestLog(models.Model):
         ordering = ["-requested_at"]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"ApiRequestLog<{self.pk}> [{self.method}] {self.url}"

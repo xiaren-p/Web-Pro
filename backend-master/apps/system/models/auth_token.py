@@ -52,6 +52,7 @@ class AuthToken(TimeStampedModel):
         ]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"AuthToken<user={self.user_id}>"
 
     def is_access_valid(self) -> bool:

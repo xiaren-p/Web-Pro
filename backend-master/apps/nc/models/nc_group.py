@@ -69,4 +69,5 @@ class NcGroup(TimeStampedModel):
         unique_together = (("dept", "group_type"),)
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"{self.name}({self.code})"

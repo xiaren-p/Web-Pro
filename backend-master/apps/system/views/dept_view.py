@@ -25,6 +25,7 @@ class DeptViewSet(viewsets.ViewSet):
     permission_classes = [MenuPermRequired]
 
     def get_permissions(self):
+        """返回当前 action 所需的权限类列表。"""
         action_name = getattr(self, "action", None)
         method = (
             getattr(self.request, "method", "").upper()
@@ -50,6 +51,7 @@ class DeptViewSet(viewsets.ViewSet):
             by_parent.setdefault(pid, []).append(d)
 
         def build(pid: int | None = None, path: set[int] | None = None) -> list[dict[str, Any]]:
+            """build。"""
             if path is None:
                 path = set()
             res: list[dict[str, Any]] = []

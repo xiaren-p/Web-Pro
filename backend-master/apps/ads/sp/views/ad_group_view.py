@@ -49,6 +49,7 @@ from apps.ads.views._helpers import _sortable_val
 
 
 class AdGroupViewSet(viewsets.ViewSet):
+    """AdGroupViewSet 视图集。"""
     permission_classes = [IsAuthenticated]
     """SP 广告组列表及指标聚合视图。"""
 

@@ -1434,4 +1434,5 @@ class LxProfitReportMsku(models.Model):
         )
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxProfitReportMsku<{self.msku}> {self.report_date_month} sid={self.sid}"

@@ -25,11 +25,13 @@ from apps.common.models import ImageUpload
 from apps.sales.listing.models import ImageSyncQueue
 
 class ImageUploadViewSet(viewsets.ModelViewSet):
+    """ImageUploadViewSet 视图集。"""
     queryset = ImageUpload.objects.all()
     serializer_class = ImageUploadSerializer
     permission_classes = [AllowAny]
 
     def get_queryset(self):
+        """返回当前视图的查询集。"""
         qs = super().get_queryset()
         image_group = self.request.query_params.get('imageGroup')
         status = self.request.query_params.get('status')
@@ -57,12 +59,14 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
         return drf_ok({'list': serializer.data, 'total': total})
 
     def form(self, request, pk=None):
+        """获取表单详情。"""
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return drf_ok(serializer.data)
 
     def create(self, request, *args, **kwargs):
         # 检查图片组是否已存在
+        """创建资源。"""
         image_group = request.data.get('imageGroup')
         if image_group:
             existing = ImageUpload.objects.filter(image_group=image_group).first()
@@ -83,6 +87,7 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
         return drf_ok(serializer.data)
 
     def update(self, request, *args, **kwargs):
+        """更新或删除资源。"""
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         
@@ -113,6 +118,7 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
         return drf_ok(serializer.data)
 
     def delete_ids(self, request, pk=None):
+        """delete_ids。"""
         id_list = pk.split(',')
         self.queryset.filter(id__in=id_list).delete()
         return drf_ok()
@@ -133,6 +139,7 @@ class ImageUploadViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def import_csv(self, request):
+        """import_csv。"""
         file = request.FILES.get('file')
         if not file:
             return drf_error("请上传文件")

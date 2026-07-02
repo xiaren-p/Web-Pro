@@ -79,6 +79,7 @@ _ENUM_LABEL_REGISTRY: dict[str, dict[str, str]] = {
 
 
 class ShopProfileViewSet(viewsets.ViewSet):
+    """ShopProfileViewSet 视图集。"""
     permission_classes = [IsAuthenticated]
     """店铺配置下拉数据视图。"""
 

@@ -19,9 +19,11 @@ from apps.system.models import Department, UserProfile, DictType, DictItem, Menu
 
 
 class Command(BaseCommand):
+    """自定义管理命令。"""
     help = "Audit orphaned foreign keys/m2m references and print a summary report"
 
     def handle(self, *args, **options):
+        """命令处理入口。"""
         problems = []
 
         # 1) UserProfile.dept

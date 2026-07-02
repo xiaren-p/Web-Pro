@@ -18,6 +18,7 @@ class CrawlerCategoryViewSet(viewsets.ViewSet):
     """爬取类目的分页与 CRUD。"""
 
     def get_permissions(self):
+        """返回当前 action 所需的权限类列表。"""
         method = getattr(self.request, "method", "").upper() if hasattr(self, "request") else ""
         if method == "GET":
             return [AllowAny()]
@@ -25,6 +26,7 @@ class CrawlerCategoryViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="page")
     def page(self, request):
+        """分页列表查询。"""
         qs = CrawlerCategory.objects.all().order_by("-created_at", "id")
         kw = request.query_params.get("keywords") or request.query_params.get("keyword")
         if kw:
@@ -48,6 +50,7 @@ class CrawlerCategoryViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get", "post"], url_path="")
     def list_or_create(self, request):
+        """分页列表查询。"""
         if request.method.lower() == "get":
             qs = CrawlerCategory.objects.all().order_by("-created_at", "id")
             total, items, _, _ = paginate_queryset(request, qs)
@@ -77,6 +80,7 @@ class CrawlerCategoryViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path=r"(?P<id>[^/]+)/form")
     def form(self, request, id: str):
+        """获取表单详情。"""
         try:
             obj = CrawlerCategory.objects.get(pk=id)
         except CrawlerCategory.DoesNotExist:
@@ -85,6 +89,7 @@ class CrawlerCategoryViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["put", "delete"], url_path=r"(?P<ids>[^/]+)")
     def update_or_delete(self, request, ids: str):
+        """更新或删除资源。"""
         if request.method.lower() == "put":
             first_id = ids.split(",")[0]
             try:
@@ -129,6 +134,7 @@ class CrawlerCategoryViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="sites")
     def sites(self, request):
+        """sites。"""
         try:
             qs = CrawlerCategory.objects.all().order_by("site").values_list("site", flat=True).distinct()
             sites = [s for s in list(qs) if s]

@@ -75,5 +75,6 @@ class WeatherServiceError(RuntimeError):
     """
 
     def __init__(self, message: str, code: str = "WEATHER_ERROR"):
+        """初始化实例。"""
         super().__init__(message)
         self.code = code

@@ -279,6 +279,7 @@ def _get_operator_name(request: Request) -> str:
 
 
 class AdCampaignViewSet(viewsets.ViewSet):
+    """AdCampaignViewSet 视图集。"""
     permission_classes = [IsAuthenticated]
     """SP 广告活动基础数据视图，提供查询与手动预算/状态调整。
 

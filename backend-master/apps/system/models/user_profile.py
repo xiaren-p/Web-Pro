@@ -106,6 +106,7 @@ class UserProfile(TimeStampedModel):
         verbose_name_plural = "用户扩展"
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"UserProfile<{self.user_id}:{self.user.username}>"
 
     # ------------------------------------------------------------------ #

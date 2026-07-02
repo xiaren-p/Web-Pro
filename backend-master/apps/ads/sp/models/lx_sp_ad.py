@@ -71,4 +71,5 @@ class LxSpAd(models.Model):
         unique_together = (("ad_id", "profile_id"),)
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxSpAd<{self.ad_id}> {self.sku}"

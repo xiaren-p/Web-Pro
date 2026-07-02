@@ -72,5 +72,6 @@ class WorkReport(TimeStampedModel):
         ordering = ("-report_date", "-created_at")
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"{self.user.username} {self.report_date} {self.type}"
 

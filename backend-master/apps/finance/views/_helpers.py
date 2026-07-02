@@ -23,10 +23,12 @@ from apps.finance.models.monthly_loss_order_first20 import MonthlyLossOrderFirst
 
 
 def parse_months(r):
+    """parse_months。"""
     try:
         if isinstance(r, str) and '-' in r:
             a, b = r.split('-', 1)
             def to_ym(x):
+                """to_ym。"""
                 y = int(x[:4]); m = int(x[4:6]); return y, m
             ys, ms = to_ym(a); ye, me = to_ym(b)
             months = []
@@ -43,6 +45,7 @@ def parse_months(r):
 
 
 def parse_store_param(store_param):
+    """parse_store_param。"""
     stores = []
     if not store_param:
         return stores
@@ -66,6 +69,7 @@ def parse_store_param(store_param):
 
 
 def _safe_float(x):
+    """_safe_float 内部辅助方法。"""
     try:
         if x is None or (isinstance(x, str) and str(x).strip() == ''):
             return None
@@ -78,6 +82,7 @@ def _safe_float(x):
 
 
 def _safe_int(x):
+    """_safe_int 内部辅助方法。"""
     try:
         if x is None or (isinstance(x, str) and str(x).strip() == ''):
             return None
@@ -90,6 +95,7 @@ def _safe_int(x):
 
 
 def _agg_sum(a, b):
+    """_agg_sum 内部辅助方法。"""
     if a is None and b is None:
         return None
     if a is None:
@@ -100,6 +106,7 @@ def _agg_sum(a, b):
 
 
 def _agg_int_sum(a, b):
+    """_agg_int_sum 内部辅助方法。"""
     s = _agg_sum(a, b)
     if s is None:
         return None
@@ -113,6 +120,7 @@ def _agg_int_sum(a, b):
 
 
 def norm_month(x):
+    """norm_month。"""
     try:
         if x is None:
             return None
@@ -128,6 +136,7 @@ RATIO_FIELDS = {'gross_margin', 'net_gross_margin', 'return_rate', 'refund_amoun
 
 
 def format_ratio_value(v):
+    """format_ratio_value。"""
     if v is None or v == '':
         return ''
     try:
@@ -140,12 +149,14 @@ def format_ratio_value(v):
 
 
 def determine_month_color(month_vals):
+    """determine_month_color。"""
     try:
         gp = month_vals.get('gross_profit')
         refund = month_vals.get('refund_amount_rate')
         ad_rate = month_vals.get('spend_rate')
 
         def _norm_pct(v):
+            """_norm_pct 内部辅助方法。"""
             try:
                 if v is None:
                     return None
@@ -178,6 +189,7 @@ def determine_month_color(month_vals):
 
 # 模块级辅助函数：缓存与响应处理（从 download 中抽取，便于复用和单元测试）
 def build_cache_key(owner_q, time_range, stores, months, batch_size):
+    """build_cache_key。"""
     try:
         cache_input = {
             'owner': owner_q,
@@ -193,6 +205,7 @@ def build_cache_key(owner_q, time_range, stores, months, batch_size):
 
 
 def is_refresh_requested(payload) -> bool:
+    """is_refresh_requested。"""
     try:
         for rf_key in ('refresh', 'refresh_cache', 'force_refresh'):
             v = payload.get(rf_key)
@@ -207,6 +220,7 @@ def is_refresh_requested(payload) -> bool:
 
 
 def try_get_cached_file_response(cache_key, months):
+    """try_get_cached_file_response。"""
     try:
         if not cache_key:
             return None
@@ -247,6 +261,7 @@ def try_get_cached_file_response(cache_key, months):
 
 
 def remove_cache_and_disk(cache_key):
+    """remove_cache_and_disk。"""
     try:
         if not cache_key:
             return
@@ -285,6 +300,7 @@ def remove_cache_and_disk(cache_key):
 
 
 def cache_data_bytes_with_fallback(cache_key, data_bytes, filename):
+    """cache_data_bytes_with_fallback。"""
     try:
         if not cache_key or data_bytes is None:
             return False
@@ -317,6 +333,7 @@ def cache_data_bytes_with_fallback(cache_key, data_bytes, filename):
 
 
 def stream_tempfile_response(tmp_name, filename, delay=30):
+    """stream_tempfile_response。"""
     try:
         from django.http import FileResponse
         f = open(tmp_name, 'rb')
@@ -324,6 +341,7 @@ def stream_tempfile_response(tmp_name, filename, delay=30):
         resp['Content-Disposition'] = f'attachment; filename="{filename}"'
 
         def _cleanup_file(path_file, delay_sec=delay):
+            """_cleanup_file 内部辅助方法。"""
             try:
                 time.sleep(delay_sec)
                 try:

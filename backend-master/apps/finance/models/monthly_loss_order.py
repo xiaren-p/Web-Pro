@@ -141,5 +141,6 @@ class MonthlyLossOrder(TimeStampedModel):
         ordering = ("-month", "-id")
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"{self.msku} {self.asin} {self.month}"
 

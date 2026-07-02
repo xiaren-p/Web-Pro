@@ -21,6 +21,7 @@ class CrawlerSellerViewSet(viewsets.ViewSet):
     """
 
     def get_permissions(self):
+        """返回当前 action 所需的权限类列表。"""
         method = getattr(self.request, "method", "").upper() if hasattr(self, "request") else ""
         if method == "GET":
             return [AllowAny()]
@@ -28,6 +29,7 @@ class CrawlerSellerViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get", "post"], url_path="")
     def list_or_create(self, request):
+        """分页列表查询。"""
         if request.method.lower() == "get":
             qs = CrawlerSellerAccount.objects.all().order_by("order_num", "id")
             kw = request.query_params.get("keywords") or request.query_params.get("keyword")
@@ -57,6 +59,7 @@ class CrawlerSellerViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path=r"(?P<id>[^/]+)/form")
     def form(self, request, id: str):
+        """获取表单详情。"""
         try:
             obj = CrawlerSellerAccount.objects.get(pk=id)
         except Exception:
@@ -65,6 +68,7 @@ class CrawlerSellerViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["put", "delete"], url_path=r"(?P<ids>[^/]+)")
     def update_or_delete(self, request, ids: str):
+        """更新或删除资源。"""
         if request.method.lower() == "put":
             first_id = ids.split(",")[0]
             try:

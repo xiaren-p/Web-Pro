@@ -956,6 +956,7 @@ def _get_caller_dept_ids(user) -> set[int] | None:
         dept_ids: set[int] = set()
 
         def _collect(did: int) -> None:
+            """_collect 内部辅助方法。"""
             if did in dept_ids:
                 return
             dept_ids.add(did)

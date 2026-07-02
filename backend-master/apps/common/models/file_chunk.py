@@ -52,5 +52,6 @@ class FileChunk(TimeStampedModel):
         ]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"{self.asset_id}:{self.num}"
 

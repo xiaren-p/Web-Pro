@@ -80,6 +80,7 @@ def _refresh_tags_from_registry(data_list: list[dict[str, Any]]) -> None:
 
 
 class SalesProductListingViewSet(ViewSet):
+    """SalesProductListingViewSet 视图集。"""
     permission_classes = [IsAuthenticated]
     """销售-商品 Listing 视图。"""
 

@@ -11,6 +11,7 @@ class DictItemSerializer(serializers.ModelSerializer):
     tagType = serializers.CharField(source="tag_type", required=False, allow_blank=True)
 
     def get_status(self, obj) -> int:
+        """获取 status。"""
         return 1 if obj.status else 0
 
     def get_status_text(self, obj) -> str:

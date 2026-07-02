@@ -96,5 +96,6 @@ class Notice(TimeStampedModel):
         verbose_name_plural = "通知公告"
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return self.title
 

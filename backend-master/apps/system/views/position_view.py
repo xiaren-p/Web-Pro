@@ -46,6 +46,7 @@ def _is_company_admin(request) -> bool:
 
 
 class PositionViewSet(viewsets.ViewSet):
+    """PositionViewSet 视图集。"""
     permission_classes = [IsAuthenticated]
     """岗位管理接口
 

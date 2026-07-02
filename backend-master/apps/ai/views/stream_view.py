@@ -87,6 +87,7 @@ class _SSEEventStreamRenderer(BaseRenderer):
 
     def render(self, data, accepted_media_type=None, renderer_context=None):
         # 视图直接返回 StreamingHttpResponse，不经此处；保留空实现以满足 BaseRenderer 接口
+        """渲染 SSE 流响应。"""
         return data if isinstance(data, (bytes, str)) else b''
 
 

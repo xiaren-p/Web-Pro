@@ -23,6 +23,7 @@ class StatisticsViewSet(viewsets.ViewSet):
     """统计类接口（包括 lossmaking orders 查询）"""
 
     def get_permissions(self):
+        """返回当前 action 所需的权限类列表。"""
         method = getattr(self.request, 'method', '').upper() if hasattr(self, 'request') else ''
         if method in ('GET', 'POST'):
             return [AllowAny()]
@@ -326,6 +327,7 @@ class StatisticsViewSet(viewsets.ViewSet):
             sort_order = (payload.get('sort_order') or 'asc').lower()
 
             def match_owners(item: dict, owners_list) -> bool:
+                """match_owners。"""
                 if not owners_list:
                     return True
                 principals = []
@@ -379,6 +381,7 @@ class StatisticsViewSet(viewsets.ViewSet):
                 return False
 
             def match_msku(item: dict, msku_list) -> bool:
+                """match_msku。"""
                 if not msku_list:
                     return True
                 # 从 price_list/local_infos 中提取可能的 MSKU 值进行匹配
@@ -409,6 +412,7 @@ class StatisticsViewSet(viewsets.ViewSet):
                 return False
 
             def match_sids(item: dict, sids_list) -> bool:
+                """match_sids。"""
                 if not sids_list:
                     return True
                 item_sids = item.get('sids') or []
@@ -456,6 +460,7 @@ class StatisticsViewSet(viewsets.ViewSet):
                         # 为了保证 None 值始终排在末尾，按不同排序方向构造 key
                         if str(sort_order) == 'desc':
                             def sort_key(it):
+                                """sort_key。"""
                                 v = it.get(sort_by)
                                 n = self.parse_number(v)
                                 if n is None:
@@ -463,6 +468,7 @@ class StatisticsViewSet(viewsets.ViewSet):
                                 return (0, -n)
                         else:
                             def sort_key(it):
+                                """sort_key。"""
                                 v = it.get(sort_by)
                                 n = self.parse_number(v)
                                 if n is None:

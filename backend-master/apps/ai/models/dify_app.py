@@ -161,6 +161,7 @@ class DifyApp(models.Model):
         ordering = ['sort_order', 'id']
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f'DifyApp<{self.pk} {self.code} {self.name}>'
 
     # ── 加密 / 解密辅助 ──────────────────────────────────────────

@@ -173,5 +173,6 @@ class LxTimePricingStrategy(models.Model):
         ordering = ["weight", "-created_at"]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         status_label = "开启" if self.status == StrategyStatus.ACTIVE else "暂停"
         return f"LxTimePricingStrategy<{self.id}> {self.name}（{status_label}）"

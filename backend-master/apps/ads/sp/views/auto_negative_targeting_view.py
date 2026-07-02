@@ -46,6 +46,7 @@ from apps.ads.views._helpers import NEGATIVE_TYPE_LABEL
 
 
 class AutoNegativeTargetingViewSet(viewsets.ViewSet):
+    """AutoNegativeTargetingViewSet 视图集。"""
     permission_classes = [IsAuthenticated]
     """SP 否定定向（否定商品）列表及指标聚合视图。"""
 

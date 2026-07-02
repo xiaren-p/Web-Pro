@@ -80,6 +80,7 @@ class AiConversationSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_is_pinned(self, obj: AiConversation) -> bool:
+        """获取 is_pinned。"""
         return obj.pinned_at is not None
 
 
@@ -112,12 +113,15 @@ class AiMessageSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_role_label(self, obj: AiMessage) -> str:
+        """获取 role_label。"""
         return MessageRole(obj.role).label
 
     def get_status_label(self, obj: AiMessage) -> str:
+        """获取 status_label。"""
         return MessageStatus(obj.status).label
 
     def get_message_type_label(self, obj: AiMessage) -> str:
+        """获取 message_type_label。"""
         return MessageType(obj.message_type).label
 
 

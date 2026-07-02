@@ -53,4 +53,5 @@ class NcFileAccessRule(TimeStampedModel):
         ordering = ("user_id", "nc_path")
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"{self.user.username} → {self.nc_path} [{self.permission_bits}]"

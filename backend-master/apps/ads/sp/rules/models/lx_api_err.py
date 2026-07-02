@@ -65,4 +65,5 @@ class LxApiErr(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxApiErr<{self.task} {self.url}>"

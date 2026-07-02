@@ -101,5 +101,6 @@ class LxOrderProfit(models.Model):
         ordering = ["-report_date"]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxOrderProfit<listing={self.listing_id}, date={self.report_date}>"
 

@@ -103,4 +103,5 @@ class WorkflowExecution(models.Model):
         ]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"WorkflowExecution<{self.pk}>"

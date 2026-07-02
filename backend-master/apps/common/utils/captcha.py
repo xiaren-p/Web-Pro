@@ -14,6 +14,7 @@ except Exception:
 
 
 def generate_captcha(width: int = 120, height: int = 40, length: int = 4, expire: int = 300):
+    """generate_captcha。"""
     text = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
     key = uuid.uuid4().hex
     cache.set(f"captcha:{key}", text, timeout=expire)
@@ -85,6 +86,7 @@ def validate_captcha(key: str, code: str) -> bool:
         unicodedata = None
 
     def _norm(s: str) -> str:
+        """_norm 内部辅助方法。"""
         if s is None:
             return ''
         s2 = str(s)

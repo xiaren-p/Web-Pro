@@ -15,6 +15,7 @@ from apps.common.utils.responses import drf_ok
 
 
 class AdPortfolioViewSet(viewsets.ViewSet):
+    """AdPortfolioViewSet 视图集。"""
     permission_classes = [IsAuthenticated]
     """广告组合数据视图。"""
 

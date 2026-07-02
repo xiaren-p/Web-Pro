@@ -55,6 +55,7 @@ def _dept_subtree(root_id: int) -> set[int]:
 
 
 class UserViewSet(viewsets.ViewSet):
+    """UserViewSet 视图集。"""
     permission_classes = [IsAuthenticated]
     """用户相关接口
 
@@ -145,6 +146,7 @@ class UserViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path="page")
     def page(self, request):
         # 支持 pageNum/pageSize/keywords/status/deptId
+        """分页列表查询。"""
         qs = User.objects.all().select_related("profile", "profile__dept", "profile__position").order_by("id")
         kw = request.query_params.get("keywords")
         if kw:
@@ -159,6 +161,7 @@ class UserViewSet(viewsets.ViewSet):
             try:
                 target_ids = set()
                 def collect(did):
+                    """collect。"""
                     if did in target_ids:
                         return
                     target_ids.add(did)
@@ -208,6 +211,7 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path=r"(?P<user_id>[^/]+)/form")
     def form(self, request, user_id: str):
+        """获取表单详情。"""
         try:
             user = User.objects.get(pk=user_id)
         except User.DoesNotExist:
@@ -216,6 +220,7 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="")
     def create(self, request):
+        """创建资源。"""
         payload = request.data.copy()
         username = payload.get("username")
         password = payload.get("password") or "123456"
@@ -304,6 +309,7 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["put"], url_path=r"(?P<id>[^/]+)")
     def update(self, request, id: str):
+        """更新或删除资源。"""
         try:
             user = User.objects.get(pk=id)
         except User.DoesNotExist:
@@ -407,6 +413,7 @@ class UserViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["delete"], url_path=r"(?P<id>[^/]+)")
     def delete(self, request, id: str):
         # 支持单个或逗号分隔的批量删除
+        """删除资源。"""
         try:
             if isinstance(id, str) and "," in id:
                 ids = [s.strip() for s in id.split(",") if s.strip()]
@@ -440,6 +447,7 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["put"], url_path=r"(?P<id>[^/]+)/password/reset")
     def reset_password(self, request, id: str):
+        """密码重置/修改。"""
         try:
             user = User.objects.get(pk=id)
         except User.DoesNotExist:
@@ -451,6 +459,7 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="profile")
     def profile_get(self, request):
+        """用户个人资料获取/更新。"""
         user = request.user
         if not user.is_authenticated:
             return drf_error("未登录", status=401)
@@ -481,6 +490,7 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["put"], url_path="profile")
     def profile_put(self, request):
+        """用户个人资料获取/更新。"""
         user = request.user
         if not user.is_authenticated:
             return drf_error("未登录", status=401)
@@ -542,6 +552,7 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["put"], url_path="password")
     def change_password(self, request):
+        """密码重置/修改。"""
         user = request.user
         if not user.is_authenticated:
             return drf_error("未登录", status=401)
@@ -721,6 +732,7 @@ class UserViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="options")
     def options(self, request):
+        """获取下拉选项。"""
         users = User.objects.filter(is_active=True).order_by("id")
         data = [{"label": u.username, "value": u.id} for u in users]
         return drf_ok(data)
@@ -728,6 +740,7 @@ class UserViewSet(viewsets.ViewSet):
     @staticmethod
     def generic_get(request):
         # 兼容 GET /users -> 返回全部列表（前端主要使用 /users/page）
+        """generic_get。"""
         users = User.objects.all().select_related("profile", "profile__dept", "profile__position").order_by("id")
         return drf_ok([UserSerializer(u).data for u in users])
 

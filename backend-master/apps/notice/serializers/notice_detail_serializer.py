@@ -10,6 +10,7 @@ class NoticeDetailSerializer(NoticeBriefSerializer):
     targetUserIds = serializers.SerializerMethodField()
 
     def get_targetUserIds(self, obj: Notice):
+        """获取 targetUserIds。"""
         return list(obj.targets.values_list("user_id", flat=True))
 
     class Meta(NoticeBriefSerializer.Meta):

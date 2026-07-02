@@ -31,6 +31,7 @@ class ConfigViewSet(viewsets.ViewSet):
     permission_classes = [MenuPermRequired]
 
     def get_permissions(self):
+        """返回当前 action 所需的权限类列表。"""
         action_name = getattr(self, "action", None)
         method = (
             getattr(self.request, "method", "").upper()

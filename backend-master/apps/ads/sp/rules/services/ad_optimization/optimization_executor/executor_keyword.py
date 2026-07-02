@@ -61,34 +61,40 @@ COMPARISON_TARGET_KEYWORD = "keyword"
 
 # ── 本地包装：适配旧调用方签名 ──
 def _build_metrics_dict(*args: Any, **kwargs: Any) -> dict[str, float]:
+    """_build_metrics_dict 内部辅助方法。"""
     return build_metrics_dict(*args, **kwargs)
 
 
 def _check_time_pricing_link(
     rule: dict[str, Any], campaign_id: int, profile_id: int,
 ) -> bool:
+    """_check_time_pricing_link 内部辅助方法。"""
     return _shared_check_time_pricing_link(
         rule, campaign_id, profile_id, "[executor_keyword]",
     )
 
 
 def _check_all_condition_sets(*args: Any, **kwargs: Any) -> tuple[bool, str]:
+    """_check_all_condition_sets 内部辅助方法。"""
     return check_all_condition_sets(*args, **kwargs)
 
 
 def _calc_adjusted_bid(*args: Any, **kwargs: Any) -> float | None:
+    """_calc_adjusted_bid 内部辅助方法。"""
     return calc_adjusted_bid(*args, **kwargs)
 
 
 def _get_last_adjustment_time(
     keyword_id: int, campaign_id: int, profile_id: int,
 ) -> datetime | None:
+    """_get_last_adjustment_time 内部辅助方法。"""
     return _shared_get_last_adjustment_time(
         "keyword", keyword_id, campaign_id, profile_id,
     )
 
 
 def _is_execution_cycle_ok(*args: Any, **kwargs: Any) -> tuple[bool, str]:
+    """_is_execution_cycle_ok 内部辅助方法。"""
     return _shared_is_execution_cycle_ok(*args, **kwargs)
 
 

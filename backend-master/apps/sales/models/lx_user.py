@@ -112,4 +112,5 @@ class LxUser(models.Model):
         ordering = ["uid"]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxUser<{self.uid} - {self.realname or self.username}>"

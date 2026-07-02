@@ -231,4 +231,5 @@ class LxLocalProduct(models.Model):
         ordering = ["-id"]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxLocalProduct<{self.sku}> {self.product_name}"

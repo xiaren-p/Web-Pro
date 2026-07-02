@@ -71,4 +71,5 @@ class LxAdsProfile(models.Model):
         ordering = ["profile_id"]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxAdsProfile<{self.profile_id}> {self.name}"

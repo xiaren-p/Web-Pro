@@ -122,11 +122,13 @@ CRAWLER_BUTTON_DEFS = {
 
 
 class Command(BaseCommand):
+    """自定义管理命令。"""
     help = "Sync system management menu tree (init/update) and bind to admin role"
 
     @transaction.atomic
     def handle(self, *args, **options):
         # Create/update parent
+        """命令处理入口。"""
         parent, created = Menu.objects.get_or_create(name=SYSTEM_PARENT_DEF["name"], defaults=SYSTEM_PARENT_DEF)
         if not created:
             for k, v in SYSTEM_PARENT_DEF.items():
@@ -254,6 +256,7 @@ class Command(BaseCommand):
         admin_position, _ = Position.objects.get_or_create(code="admin", defaults={"name": "管理员", "status": True})
 
         def collect_ids(node):
+            """collect_ids。"""
             ids = [node.id]
             for ch in Menu.objects.filter(parent=node):
                 ids.extend(collect_ids(ch))

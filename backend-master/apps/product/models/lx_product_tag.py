@@ -52,4 +52,5 @@ class LxProductTag(models.Model):
         ordering = ["-id"]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxProductTag<{self.global_tag_id}> {self.tag_name}"

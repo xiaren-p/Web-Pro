@@ -52,4 +52,5 @@ class LxProductCustomField(models.Model):
         ordering = ["-id"]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxProductCustomField<{self.field_id}> {self.field_name}"

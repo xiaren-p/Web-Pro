@@ -173,4 +173,5 @@ class AdTimePricingHit(models.Model):
         ]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"AdTimePricingHit<campaign={self.campaign_id}, profile={self.profile_id}>"

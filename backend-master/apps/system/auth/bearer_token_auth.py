@@ -14,6 +14,7 @@ class BearerTokenAuthentication(BaseAuthentication):
     keyword = b"Bearer"
 
     def authenticate(self, request) -> Optional[Tuple[User, AuthToken]]:
+        """认证请求。"""
         auth = get_authorization_header(request).split()
         if not auth or auth[0].lower() != self.keyword.lower():
             return None

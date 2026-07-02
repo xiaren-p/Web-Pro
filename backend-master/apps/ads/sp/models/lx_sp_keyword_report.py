@@ -108,4 +108,5 @@ class LxSpKeywordReport(models.Model):
         ]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"LxSpKeywordReport<kw={self.keyword_id}, {self.report_date}>"

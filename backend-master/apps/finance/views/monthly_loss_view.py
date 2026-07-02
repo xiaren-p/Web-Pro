@@ -39,6 +39,7 @@ class MonthlyLossViewSet(viewsets.ViewSet):
     """Monthly loss orders (CRUD + filter by month/owner, owner optional). Parameters and JSON responses use English keys only."""
 
     def get_permissions(self):
+        """返回当前 action 所需的权限类列表。"""
         method = getattr(self.request, 'method', '').upper() if hasattr(self, 'request') else ''
         if method == 'GET':
             return [AllowAny()]
@@ -46,12 +47,14 @@ class MonthlyLossViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get", "post"], url_path="")
     def list_or_create(self, request):
+        """分页列表查询。"""
         if request.method.lower() == 'get':
             qs = MonthlyLossOrder.objects.all().order_by('-month', '-id')
             month_q = request.query_params.get('month')
             owner_q = request.query_params.get('owner')
             # 接受 YYYYMM 或 YYYY-MM 格式输入；匹配数据库中可能为 'YYYYMM' 或 'YYYY-MM' 的值
             def _month_variants(m):
+                """_month_variants 内部辅助方法。"""
                 if not m:
                     return []
                 s = str(m).strip()
@@ -88,6 +91,7 @@ class MonthlyLossViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path=r"(?P<id>[^/]+)/form")
     def form(self, request, id: str):
+        """获取表单详情。"""
         try:
             obj = MonthlyLossOrder.objects.get(pk=id)
         except MonthlyLossOrder.DoesNotExist:
@@ -96,6 +100,7 @@ class MonthlyLossViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["put", "delete"], url_path=r"(?P<ids>[^/]+)")
     def update_or_delete(self, request, ids: str):
+        """更新或删除资源。"""
         if request.method.lower() == 'put':
             first_id = ids.split(',')[0]
             try:
@@ -115,6 +120,7 @@ class MonthlyLossViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get", "post"], url_path="download")
     def download(self, request):
         # 更简洁的单线程导出：按产品键分块遍历并写入行
+        """download。"""
         try:
             if getattr(request, 'method', '').upper() == 'GET':
                 payload = request.query_params or {}
@@ -184,6 +190,7 @@ class MonthlyLossViewSet(viewsets.ViewSet):
             # 将 product keys 列表化，避免 MySQL 嵌套游标导致的冲突
             product_keys = list(qs.values_list('msku','asin','parent_asin','store_country').distinct())
             def chunked_iter(seq, size=500):
+                """chunked_iter。"""
                 batch = []
                 for d in seq:
                     msku, asin, parent_asin, store_country = d
@@ -343,6 +350,7 @@ class MonthlyLossViewSet(viewsets.ViewSet):
                 }
                 _border_cache = {}
                 def get_border(l_key='default', r_key='default', t_key='default', b_key='default'):
+                    """获取 border。"""
                     key = (l_key, r_key, t_key, b_key)
                     if key in _border_cache:
                         return _border_cache[key]
@@ -520,6 +528,7 @@ class MonthlyLossViewSet(viewsets.ViewSet):
                 resp = FileResponse(f, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
                 resp['Content-Disposition'] = f'attachment; filename="{filename}"'
                 def _cleanup_file(path_file, delay=30):
+                    """_cleanup_file 内部辅助方法。"""
                     try:
                         time.sleep(delay)
                         try:

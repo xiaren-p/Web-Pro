@@ -22,6 +22,7 @@ class MenuPermRequired(BasePermission):
     message = "无权限"
 
     def has_permission(self, request: Request, view) -> bool:
+        """检查请求是否具有所需权限。"""
         required = getattr(view, "required_perms", None)
         if not required:
             return True  # 未声明权限需求，默认放行

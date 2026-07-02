@@ -10,6 +10,7 @@ class MobileBindSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=10)
 
     def validate_mobile(self, value: str) -> str:
+        """validate_mobile。"""
         if not MOBILE_REGEX.match(value):
             raise serializers.ValidationError("手机号格式不正确")
         return value

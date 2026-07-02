@@ -15,15 +15,19 @@ class NoticeBriefSerializer(serializers.ModelSerializer):
 
     def get_publishStatus(self, obj: Notice):
         # 0=未发布, 1=已发布, -1=已撤回
+        """获取 publishStatus。"""
         return 1 if obj.status == "published" else (-1 if obj.status == "revoked" else 0)
 
     def get_publisherName(self, obj: Notice):
+        """获取 publisherName。"""
         return getattr(obj.creator, "username", "")
 
     def get_publishTime(self, obj: Notice):
+        """获取 publishTime。"""
         return obj.publish_time.strftime("%Y-%m-%d %H:%M:%S") if obj.publish_time else None
 
     def get_revokeTime(self, obj: Notice):
+        """获取 revokeTime。"""
         return obj.revoke_time.strftime("%Y-%m-%d %H:%M:%S") if obj.revoke_time else None
 
     class Meta:

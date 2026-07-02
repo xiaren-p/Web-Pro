@@ -87,4 +87,5 @@ class NcSyncTask(TimeStampedModel):
         ]
 
     def __str__(self) -> str:
+        """返回模型的字符串表示。"""
         return f"NcSyncTask<{self.operation}>[{self.status}]"
