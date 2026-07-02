@@ -8,7 +8,7 @@ import logging
 from celery import shared_task
 
 from apps.ads.sp.rules.services.bid_adjustment_executor import execute_bid_adjustment
-from api_v2.utils.task_execution_lock import TaskExecutionLock
+from apps.common.utils.task_execution_lock import TaskExecutionLock
 
 logger = logging.getLogger(__name__)
 

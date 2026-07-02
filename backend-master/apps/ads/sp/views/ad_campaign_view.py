@@ -1297,7 +1297,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         from apps.ads.models.lx_ads_profile import LxAdsProfile
         from apps.ads.sp.rules.models.sp_campaign_adjustment import SpCampaignAdjustment
-        from api_v2.utils.timezone_utils import country_to_timezone
+        from apps.common.utils.timezone_utils import country_to_timezone
 
         # 空页直接返回
         if not items:

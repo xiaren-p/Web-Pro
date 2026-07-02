@@ -25,7 +25,7 @@ from rest_framework.response import Response
 from api_v1.auth.bearer_token_auth import BearerTokenAuthentication
 from apps.ai.models.conversation import AiConversation
 from apps.ai.models.message import AiMessage, MessageStatus
-from api_v2.permissions.workflow_permission import IsV2Accessible
+from apps.system.permissions.v2_access import IsV2Accessible
 from apps.ai.serializers.chat_serializer import (
     AiChatRequestSerializer,
     AiConversationSerializer,
@@ -340,7 +340,7 @@ def cancel_message(request: Request, public_id) -> Response:
     AiMessage.objects.filter(pk=message.pk).update(status=MessageStatus.CANCELLED)
 
     # 向订阅端广播 done 让 SSE 流自然收尾（Pub/Sub 频道仍按内部整数 pk 寻址）
-    from api_v2.utils.ai_redis_channel import EVENT_DONE, get_redis_client, publish_event
+    from apps.ai.utils.redis_channel import EVENT_DONE, get_redis_client, publish_event
     try:
         publish_event(get_redis_client(), message.id, EVENT_DONE, {'cancelled': True})
     except Exception as exc:

@@ -12,13 +12,13 @@
 
 典型用法：
     # 1. 视图层
-    from api_v2.utils.task_execution_lock import is_task_running, BUSY_RESPONSE
+    from apps.common.utils.task_execution_lock import is_task_running, BUSY_RESPONSE
     if is_task_running('bid_adjustment_lock'):
         return Response(BUSY_RESPONSE('竞价调整任务正在执行中'), status=409)
     task = run_bid_adjustment_task.delay()
 
     # 2. 任务体
-    from api_v2.utils.task_execution_lock import TaskExecutionLock
+    from apps.common.utils.task_execution_lock import TaskExecutionLock
     @shared_task(...)
     def run_bid_adjustment_task(self):
         with TaskExecutionLock('bid_adjustment_lock', ttl=960) as acquired:

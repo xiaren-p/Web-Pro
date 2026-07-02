@@ -7,7 +7,7 @@ import logging
 from celery import shared_task
 
 from apps.ads.sp.timing.services.time_pricing_service import execute_time_pricing
-from api_v2.utils.task_execution_lock import TaskExecutionLock
+from apps.common.utils.task_execution_lock import TaskExecutionLock
 
 logger = logging.getLogger(__name__)
 

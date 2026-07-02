@@ -862,7 +862,7 @@ def _build_bid_latest_adjustment_map(
     from django.db.models import Max
     from apps.ads.sp.rules.models.lx_ad_rule import LxAdRule
     from apps.ads.sp.rules.models.sp_bid_adjustment import SpBidAdjustment, ExecutionTypeChoices as BidExecType
-    from api_v2.utils.timezone_utils import country_to_timezone
+    from apps.common.utils.timezone_utils import country_to_timezone
 
     if not entity_ids:
         return {}

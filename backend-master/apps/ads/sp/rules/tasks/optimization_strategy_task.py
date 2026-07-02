@@ -13,7 +13,7 @@ from celery import shared_task
 from apps.ads.sp.rules.services.ad_optimization.optimization_strategy_service import (
     process_optimization_strategies,
 )
-from api_v2.utils.task_execution_lock import TaskExecutionLock
+from apps.common.utils.task_execution_lock import TaskExecutionLock
 
 logger = logging.getLogger(__name__)
 

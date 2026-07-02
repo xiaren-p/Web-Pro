@@ -11,9 +11,9 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from api_v1.auth import BearerTokenAuthentication
-from api_v2.permissions.workflow_permission import IsV2Accessible
+from apps.system.permissions.v2_access import IsV2Accessible
 from apps.ads.sp.rules.tasks.campaign_adjustment_task import LOCK_KEY, run_campaign_adjustment_task
-from api_v2.utils.task_execution_lock import BUSY_RESPONSE, is_task_running
+from apps.common.utils.task_execution_lock import BUSY_RESPONSE, is_task_running
 
 logger = logging.getLogger(__name__)
 

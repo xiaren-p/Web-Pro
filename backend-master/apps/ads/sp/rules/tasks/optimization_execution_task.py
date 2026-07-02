@@ -15,7 +15,7 @@ from apps.ads.sp.rules.services.ad_optimization.execution_service import (
     execute_all_dimensions,
     execute_single_dimension,
 )
-from api_v2.utils.task_execution_lock import TaskExecutionLock
+from apps.common.utils.task_execution_lock import TaskExecutionLock
 
 logger = logging.getLogger(__name__)
 

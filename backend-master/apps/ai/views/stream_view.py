@@ -28,8 +28,8 @@ from rest_framework.response import Response
 
 from api_v1.auth.bearer_token_auth import BearerTokenAuthentication
 from apps.ai.models.message import AiMessage, MessageStatus, MessageType
-from api_v2.permissions.workflow_permission import IsV2Accessible
-from api_v2.utils.ai_redis_channel import (
+from apps.system.permissions.v2_access import IsV2Accessible
+from apps.ai.utils.redis_channel import (
     EVENT_DONE,
     EVENT_PLAN,
     EVENT_TOKEN,

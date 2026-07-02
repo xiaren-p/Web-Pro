@@ -27,7 +27,7 @@ from apps.ads.sp.timing.services.time_pricing_shared import (
     filter_segments_for_today,
     get_utc_now,
 )
-from api_v2.utils.timezone_utils import country_to_timezone, get_fixed_utc_offset
+from apps.common.utils.timezone_utils import country_to_timezone, get_fixed_utc_offset
 
 logger = logging.getLogger(__name__)
 

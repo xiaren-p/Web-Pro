@@ -8,7 +8,7 @@ import logging
 from celery import shared_task
 
 from apps.sales.listing.services.listing_tag_modify_service import execute_listing_tag_modify
-from api_v2.utils.task_execution_lock import TaskExecutionLock
+from apps.common.utils.task_execution_lock import TaskExecutionLock
 
 logger = logging.getLogger(__name__)
 

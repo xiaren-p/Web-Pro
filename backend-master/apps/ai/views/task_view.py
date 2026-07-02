@@ -22,7 +22,7 @@ from rest_framework.response import Response
 
 from api_v1.auth.bearer_token_auth import BearerTokenAuthentication
 from apps.ai.models.workflow_execution import WorkflowExecution
-from api_v2.permissions.workflow_permission import IsV2Accessible
+from apps.system.permissions.v2_access import IsV2Accessible
 from apps.ai.serializers.task_serializer import (
     WorkflowExecutionSerializer,
     WorkflowStartSerializer,

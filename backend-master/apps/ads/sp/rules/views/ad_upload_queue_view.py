@@ -19,7 +19,7 @@ from rest_framework.response import Response
 
 from api_v1.auth.bearer_token_auth import BearerTokenAuthentication
 from apps.ads.sp.rules.models.ad_upload_queue import AdParseStatus, AdUploadQueue
-from api_v2.permissions.workflow_permission import IsV2Accessible
+from apps.system.permissions.v2_access import IsV2Accessible
 from apps.ads.sp.rules.serializers.ad_upload_queue_serializer import (
     AdBulkDeleteSerializer,
     AdUploadQueueSerializer,

@@ -63,7 +63,7 @@ from apps.ads.sp.timing.services.time_pricing_shared import (
     get_utc_now,
     get_rules_for_segments,
 )
-from api_v2.utils.timezone_utils import get_fixed_utc_offset
+from apps.common.utils.timezone_utils import get_fixed_utc_offset
 
 logger = logging.getLogger(__name__)
 

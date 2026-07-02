@@ -9,7 +9,7 @@ from apps.ai.models.conversation import AiConversation
 from apps.ai.models.message import AiMessage, MessageStatus, MessageType
 from apps.ai.services.dify_client import DifyClient
 from apps.ai.services.plan_translator import PlanTranslator
-from api_v2.utils.ai_redis_channel import (
+from apps.ai.utils.redis_channel import (
     EVENT_DONE,
     EVENT_ERROR,
     EVENT_MESSAGE_META,

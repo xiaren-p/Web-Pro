@@ -1,3 +1,1 @@
-from api_v2.permissions.workflow_permission import IsV2Accessible
-
-__all__ = ['IsV2Accessible']
+from apps.system.permissions.v2_access import IsV2Accessible
