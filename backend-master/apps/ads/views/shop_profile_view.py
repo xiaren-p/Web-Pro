@@ -75,6 +75,7 @@ _ENUM_LABEL_REGISTRY: dict[str, dict[str, str]] = {
 
 
 class ShopProfileViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """店铺配置下拉数据视图。"""
 
     @action(detail=False, methods=["post"], url_path="options")

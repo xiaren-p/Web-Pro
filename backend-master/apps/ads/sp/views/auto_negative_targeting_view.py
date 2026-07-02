@@ -42,6 +42,7 @@ from apps.ads.views._helpers import NEGATIVE_TYPE_LABEL
 
 
 class AutoNegativeTargetingViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """SP 否定定向（否定商品）列表及指标聚合视图。"""
 
     def _resolve_currency_icon(self, profile_id: int) -> str:

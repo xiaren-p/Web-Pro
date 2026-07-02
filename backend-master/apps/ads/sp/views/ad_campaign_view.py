@@ -275,6 +275,7 @@ def _get_operator_name(request: Request) -> str:
 
 
 class AdCampaignViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """SP 广告活动基础数据视图，提供查询与手动预算/状态调整。
 
     手动调整（adjust_budget / adjust_state）仅写入 SpCampaignAdjustment 调整记录表

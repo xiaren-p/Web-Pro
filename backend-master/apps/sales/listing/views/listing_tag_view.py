@@ -8,11 +8,12 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
-# cross-domain: LxListing (kept in api_v1)Tag
+from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.common.utils.responses import drf_error, drf_ok
 
 
 class ListingTagViewSet(ViewSet):
+    permission_classes = [IsAuthenticated]
     """Listing 标签管理视图。"""
 
     def list(self, request: Request) -> Response:

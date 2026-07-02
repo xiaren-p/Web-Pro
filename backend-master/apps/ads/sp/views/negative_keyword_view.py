@@ -41,6 +41,7 @@ from apps.ads.views._helpers import NEGATIVE_MATCH_TYPE_LABEL
 
 
 class NegativeKeywordViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """SP 否定关键词列表及指标聚合视图。"""
 
     def _resolve_currency_icon(self, profile_id: int) -> str:

@@ -11,6 +11,7 @@ from apps.common.utils.responses import drf_ok
 
 
 class AdPortfolioViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """广告组合数据视图。"""
 
     @action(detail=False, methods=["post"], url_path="options")

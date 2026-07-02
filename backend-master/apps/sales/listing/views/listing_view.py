@@ -76,6 +76,7 @@ def _refresh_tags_from_registry(data_list: list[dict[str, Any]]) -> None:
 
 
 class SalesProductListingViewSet(ViewSet):
+    permission_classes = [IsAuthenticated]
     """销售-商品 Listing 视图。"""
 
     @action(detail=False, methods=["get"], url_path="page")

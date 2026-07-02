@@ -76,12 +76,6 @@ class LxProfitReportMsku(models.Model):
         verbose_name="记录 ID",
     )
 
-    report_date_month = models.CharField(
-        max_length=20,
-        default="",
-        verbose_name="按月时间",
-    )
-
     posted_date_locale = models.CharField(
         max_length=20,
         default="",

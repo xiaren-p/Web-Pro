@@ -43,6 +43,7 @@ from apps.ads.views._helpers import _sortable_val
 
 
 class AdViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """SP 广告投放列表及指标聚合视图。"""
 
     def _resolve_currency_icon(self, profile_id: int) -> str:

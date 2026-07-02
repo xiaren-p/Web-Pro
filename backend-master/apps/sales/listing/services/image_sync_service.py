@@ -641,7 +641,8 @@ def _process_sync_item(
         return {"sku": sku, "success": False, "msg": msg}
 
     # 2. 内部搜索 listing（在售 + 停售，排除已删除）
-    from apps.system.models import LxListingData, LxShops
+    from apps.sales.listing.models.lx_listing_data import LxListingData
+    from apps.sales.models.lx_shops import LxShops
     records = list(LxListingData.objects.filter(
         seller_sku=sku, is_delete=0,
     ))

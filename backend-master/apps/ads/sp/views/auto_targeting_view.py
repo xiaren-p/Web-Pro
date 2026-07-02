@@ -110,6 +110,7 @@ def _resolve_targeting_label(expression: list[dict[str, Any]] | None) -> str:
 
 
 class AutoTargetingViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """SP 自动投放定向条款列表及指标聚合视图。"""
 
     def _resolve_currency_icon(self, profile_id: int) -> str:

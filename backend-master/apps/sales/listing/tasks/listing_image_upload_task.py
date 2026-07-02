@@ -53,7 +53,7 @@ def upload_listing_images_task(self, execution_id: int, listing_id: int, image_i
         )
 
         # TODO(实现): 调用 Listing 图片上传 Service
-        # from api_v2.services.listing_image_upload_service import ListingImageUploadService
+        # from apps.sales.listing.services.listing_image_upload_service import ListingImageUploadService
         # result = ListingImageUploadService().upload(listing_id, image_ids)
         result: dict = {
             'listing_id': listing_id,

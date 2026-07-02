@@ -422,5 +422,5 @@ class MonthlyLossFirst20ViewSet(viewsets.ViewSet):
             return drf_error('download failed', status=500, data={'msg': str(e), 'trace': tb})
 
 
-__all__ = ["StatisticsViewSet", "MonthlyLossViewSet", "MonthlyLossFirst20ViewSet"]
+__all__ = ["MonthlyLossFirst20ViewSet"]
 

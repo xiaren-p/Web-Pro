@@ -9,6 +9,7 @@
 from rest_framework import viewsets, permissions, filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
+from apps.common.utils.responses import drf_ok
 from rest_framework.decorators import action
 from django.contrib.auth.models import User
 
@@ -164,4 +165,4 @@ class WorkReportViewSet(viewsets.ModelViewSet):
                 "avatar": getattr(getattr(u, "profile", None), "avatar", ""),
                 "department": dept_obj.name if dept_obj else "",
             })
-        return Response(data)
+        return drf_ok(data)

@@ -17,7 +17,10 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from apps.common.utils.responses import drf_ok, drf_error
 from apps.common.utils.pagination import paginate_queryset
 from apps.finance.models.monthly_loss_order import MonthlyLossOrder
-from apps.finance.models.monthly_loss_order_first20 import MonthlyLossOrderFirst20:
+from apps.finance.models.monthly_loss_order_first20 import MonthlyLossOrderFirst20
+
+
+def parse_months(r):
     try:
         if isinstance(r, str) and '-' in r:
             a, b = r.split('-', 1)

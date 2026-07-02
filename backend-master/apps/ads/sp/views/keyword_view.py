@@ -84,6 +84,7 @@ def _is_time_pricing_active(campaign_id: int, profile_id: int) -> bool:
 
 
 class KeywordViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """SP 手动广告关键词列表及指标聚合视图。支持手动调整竞价与启停状态。"""
 
     def _resolve_currency_icon(self, profile_id: int) -> str:

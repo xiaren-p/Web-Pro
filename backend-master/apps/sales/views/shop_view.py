@@ -3,7 +3,8 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
-# cross-domain: LxShops (kept in api_v1), LxUser
+from apps.sales.models.lx_shops import LxShops
+from apps.sales.models.lx_user import LxUser
 from apps.common.utils.responses import drf_ok
 
 
