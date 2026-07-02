@@ -21,7 +21,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from api_v1.auth.bearer_token_auth import BearerTokenAuthentication
-from api_v2.serializers.app_serializer import (
+from apps.system.serializers.app_serializer import (
     AppCreateSerializer,
     AppCreatedSerializer,
     AppListItemSerializer,

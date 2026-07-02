@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from api_v2.models.workflow_execution import WorkflowExecution, WorkflowType
+from apps.ai.models.workflow_execution import WorkflowExecution, WorkflowType
 
 
 class WorkflowStartSerializer(serializers.Serializer):

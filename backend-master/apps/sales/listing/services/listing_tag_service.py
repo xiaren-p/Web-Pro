@@ -13,7 +13,7 @@ from typing import Any
 import requests
 
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
-from apps.ads.sp.models.lx_api_err import LxApiErr
+from apps.ads.sp.rules.models.lx_api_err import LxApiErr
 from api_v2.services.qinglong_env_service import get_cached_env, refresh_with_task_trigger
 
 logger = logging.getLogger(__name__)

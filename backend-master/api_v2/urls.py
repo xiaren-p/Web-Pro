@@ -1,29 +1,19 @@
-"""api_v2 路由分发。"""
+"""api_v2 路由分发 — 全部已迁移到 apps/ 域。"""
 
 from django.urls import path, include
-
-from api_v2.views.app_view import (
-    create_app,
-    delete_app,
-    list_apps,
-    rotate_secret,
-)
-from api_v2.views.task_view import cancel_workflow, get_workflow_status, start_workflow
 
 app_name = 'api_v2'
 
 urlpatterns = [
-    # 工作流任务接口
-    path('workflow/', start_workflow, name='workflow_start'),
-    path('workflow/<int:execution_id>/', get_workflow_status, name='workflow_status'),
-    path('workflow/<int:execution_id>/cancel/', cancel_workflow, name='workflow_cancel'),
+    # 系统管理（apps/system）
+    path('', include('apps.system.urls')),
 
-    # 开发者应用管理接口（仅对登录用户开放）
-    path('developer/apps/', list_apps, name='developer_apps_list'),
-    path('developer/apps/create/', create_app, name='developer_apps_create'),
-    path('developer/apps/<int:app_id>/', delete_app, name='developer_apps_delete'),
-    path('developer/apps/<int:app_id>/rotate-secret/', rotate_secret, name='developer_apps_rotate'),
+    # AI 工作流（apps/ai）
+    path('', include('apps.ai.urls')),
 
-    # 广告域（apps.ads v2 路由）
+    # 广告分时调价（apps/ads/sp/timing）
+    path('', include('apps.ads.sp.timing.v2_urls')),
+
+    # 广告规则（apps/ads/sp/rules）
     path('', include('apps.ads.sp.rules.v2_urls')),
 ]

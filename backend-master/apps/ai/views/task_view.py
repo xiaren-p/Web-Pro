@@ -21,13 +21,13 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from api_v1.auth.bearer_token_auth import BearerTokenAuthentication
-from api_v2.models.workflow_execution import WorkflowExecution
+from apps.ai.models.workflow_execution import WorkflowExecution
 from api_v2.permissions.workflow_permission import IsV2Accessible
-from api_v2.serializers.task_serializer import (
+from apps.ai.serializers.task_serializer import (
     WorkflowExecutionSerializer,
     WorkflowStartSerializer,
 )
-from api_v2.services.workflow_service import WorkflowService
+from apps.ai.services.workflow_service import WorkflowService
 
 logger = logging.getLogger(__name__)
 

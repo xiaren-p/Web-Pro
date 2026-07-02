@@ -10,7 +10,7 @@ from typing import Optional
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from api_v2.models.workflow_execution import ExecutionStatus, WorkflowExecution, WorkflowType
+from apps.ai.models.workflow_execution import ExecutionStatus, WorkflowExecution, WorkflowType
 
 logger = logging.getLogger(__name__)
 

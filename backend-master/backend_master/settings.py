@@ -135,33 +135,33 @@ CELERY_TASK_DEFAULT_QUEUE = 'celery'
 # 集中路由表：所有任务的队列归属在此声明，不在装饰器里写 queue=
 CELERY_TASK_ROUTES = {
     # ── celery（默认队列）：轻量 / 定时 / 低频任务 ───────────────────────────
-    'api_v2.tasks.qinglong_env_sync_task.sync_qinglong_env_task': {'queue': 'celery'},
+    'apps.common.tasks.qinglong_env_sync_task.sync_qinglong_env_task': {'queue': 'celery'},
     'apps.nc.tasks.nc_sync_tasks.process_pending_nc_tasks':        {'queue': 'celery'},
     'apps.nc.tasks.nc_sync_tasks.retry_failed_nc_tasks':           {'queue': 'celery'},
     'api_v1.tasks.maintenance_tasks.cleanup_orphan_uploads':      {'queue': 'celery'},
     # 广告活动参考数据缓存刷新（定时预热，280s 一轮，保证页面缓存永不过期）
-    'api_v2.tasks.listing_cache_refresh_task.refresh_listing_caches': {'queue': 'celery'},
+    'apps.ads.sp.tasks.listing_cache_refresh_task.refresh_listing_caches': {'queue': 'celery'},
     # ── parallel_queue（concurrency=4）：可并行的批量任务 ────────────────────
     'api_v2.tasks.ai_chat_task.run_ai_chat_task':                         {'queue': 'parallel_queue'},
     'apps.ai.tasks.chat_task.run_ai_chat_task':                            {'queue': 'parallel_queue'},
     # ── single_thread_queue（concurrency=1）：须顺序执行的任务 ───────────────
     'apps.ads.sp.rules.tasks.ad_campaign_submit_task.submit_pending_campaigns_task': {'queue': 'single_thread_queue'},
-    'api_v2.tasks.listing_image_upload_task.upload_listing_images_task':  {'queue': 'single_thread_queue'},
+    'apps.sales.listing.tasks.listing_image_upload_task.upload_listing_images_task':  {'queue': 'single_thread_queue'},
     'apps.ads.sp.timing.tasks.ad_time_pricing_task.run_ad_time_pricing_task':         {'queue': 'single_thread_queue'},
     'apps.ads.sp.timing.tasks.time_pricing_task.run_time_pricing_task':                       {'queue': 'single_thread_queue'},
     'apps.ads.sp.rules.tasks.bid_adjustment_task.run_bid_adjustment_task':                   {'queue': 'single_thread_queue'},
     'apps.ads.sp.rules.tasks.campaign_adjustment_task.run_campaign_adjustment_task':         {'queue': 'single_thread_queue'},
     'apps.ads.sp.rules.tasks.optimization_strategy_task.run_optimization_strategy_task':       {'queue': 'single_thread_queue'},
     'apps.ads.sp.rules.tasks.optimization_execution_task.run_optimization_execution_task':     {'queue': 'single_thread_queue'},
-    'api_v2.tasks.listing_tag_sync_task.run_listing_tag_sync_task':                  {'queue': 'single_thread_queue'},
-    'api_v2.tasks.listing_tag_modify_task.run_listing_tag_modify_task':                {'queue': 'single_thread_queue'},
-    'api_v2.tasks.image_sync_queue_task.run_image_sync_queue_task':                    {'queue': 'single_thread_queue'},
+    'apps.sales.listing.tasks.listing_tag_sync_task.run_listing_tag_sync_task':                  {'queue': 'single_thread_queue'},
+    'apps.sales.listing.tasks.listing_tag_modify_task.run_listing_tag_modify_task':                {'queue': 'single_thread_queue'},
+    'apps.sales.listing.tasks.image_sync_queue_task.run_image_sync_queue_task':                    {'queue': 'single_thread_queue'},
 }
 
 CELERY_BEAT_SCHEDULE = {
     # 青龙环境变量同步：每 10 分钟拉取 LX_ERP_HEADERS / LX_ADS_HEADERS / MIDDLE_API_HEADERS 写入缓存
     'qinglong-env-sync': {
-        'task': 'api_v2.tasks.qinglong_env_sync_task.sync_qinglong_env_task',
+        'task': 'apps.common.tasks.qinglong_env_sync_task.sync_qinglong_env_task',
         'schedule': 600.0,
     },
     # NC 同步：每 30 秒处理一次 PENDING 队列
@@ -183,28 +183,28 @@ CELERY_BEAT_SCHEDULE = {
     # Listing 标签同步：每 5 秒处理创建中 / 删除中的标签（Redis 锁保证同时仅一个实例执行）
     # options.expires=4：队列里超过 4 秒未被消费的任务自动丢弃，防止任务跑慢时 Beat 持续堆积
     'listing-tag-sync': {
-        'task': 'api_v2.tasks.listing_tag_sync_task.run_listing_tag_sync_task',
+        'task': 'apps.sales.listing.tasks.listing_tag_sync_task.run_listing_tag_sync_task',
         'schedule': 5.0,
         'options': {'expires': 4},
     },
     # Listing 商品标签修改同步：每 5 秒处理新增 / 移除绑定（Redis 锁保证同时仅一个实例执行）
     # options.expires=4：理由同上
     'listing-tag-modify': {
-        'task': 'api_v2.tasks.listing_tag_modify_task.run_listing_tag_modify_task',
+        'task': 'apps.sales.listing.tasks.listing_tag_modify_task.run_listing_tag_modify_task',
         'schedule': 5.0,
         'options': {'expires': 4},
     },
     # 图片同步队列监控：每 30 秒扫描 PENDING 记录，从 NC 下载图片并调领星 API 更新 listing
     # options.expires=25：队列中超过 25 秒未被消费的任务自动丢弃，防止 Beat 堆积
     'image-sync-queue': {
-        'task': 'api_v2.tasks.image_sync_queue_task.run_image_sync_queue_task',
+        'task': 'apps.sales.listing.tasks.image_sync_queue_task.run_image_sync_queue_task',
         'schedule': 30.0,
         'options': {'expires': 25},
     },
     # 广告活动参考数据缓存刷新：每 280 秒预热一次 Redis，保证页面缓存永不过期
     # schedule=280 比缓存 TTL（300s）略短，确保不会出现真空期
     'listing-cache-refresh': {
-        'task': 'api_v2.tasks.listing_cache_refresh_task.refresh_listing_caches',
+        'task': 'apps.ads.sp.tasks.listing_cache_refresh_task.refresh_listing_caches',
         'schedule': 280.0,
     },
 }
@@ -241,6 +241,7 @@ INSTALLED_APPS = [
     'apps.sales',          # 销售管理域
     'apps.finance',        # 财务管理域
     'apps.ads',            # 广告管理域
+    'apps.system',         # 系统管理域
 ]
 
 MIDDLEWARE = [
