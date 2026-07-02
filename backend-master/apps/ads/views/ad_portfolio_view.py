@@ -6,7 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from apps.ads.sp.models.lx_ads_portfolio import LxAdsPortfolio
+from apps.ads.models.lx_ads_portfolio import LxAdsPortfolio
 from api_v1.utils.responses import drf_ok
 
 

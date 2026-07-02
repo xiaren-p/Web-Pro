@@ -25,5 +25,5 @@ urlpatterns = [
     path('developer/apps/<int:app_id>/rotate-secret/', rotate_secret, name='developer_apps_rotate'),
 
     # 广告域（apps.ads v2 路由）
-    path('', include('apps.ads.sp.v2_urls')),
+    path('', include('apps.ads.sp.rules.v2_urls')),
 ]

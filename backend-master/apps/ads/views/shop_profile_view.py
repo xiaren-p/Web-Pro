@@ -8,7 +8,7 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from apps.ads.sp.models.lx_ads_profile import LxAdsProfile
+from apps.ads.models.lx_ads_profile import LxAdsProfile
 from apps.ads.sp.models.lx_sp_campaign import LxSpCampaign
 from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
