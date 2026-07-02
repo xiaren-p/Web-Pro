@@ -58,6 +58,7 @@ class ImageUpload(TimeStampedModel):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "sys_image_upload"
         verbose_name = "图片上传记录"
         verbose_name_plural = "图片上传记录"

@@ -86,6 +86,7 @@ class LxSpTarget(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_sp_target"
         verbose_name = "SP 商品定位"
         verbose_name_plural = "SP 商品定位列表"

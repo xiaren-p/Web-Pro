@@ -55,6 +55,7 @@ def _dept_subtree(root_id: int) -> set[int]:
 
 
 class UserViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """用户相关接口
 
     路由前缀：/users
@@ -144,7 +145,7 @@ class UserViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path="page")
     def page(self, request):
         # 支持 pageNum/pageSize/keywords/status/deptId
-        qs = User.objects.all().order_by("id")
+        qs = User.objects.all().select_related("profile", "profile__dept", "profile__position").order_by("id")
         kw = request.query_params.get("keywords")
         if kw:
             # 使用 Q 组合 OR，避免 QuerySet union 在分页 count/slice 时报错
@@ -727,7 +728,7 @@ class UserViewSet(viewsets.ViewSet):
     @staticmethod
     def generic_get(request):
         # 兼容 GET /users -> 返回全部列表（前端主要使用 /users/page）
-        users = User.objects.all().order_by("id")
+        users = User.objects.all().select_related("profile", "profile__dept", "profile__position").order_by("id")
         return drf_ok([UserSerializer(u).data for u in users])
 
 

@@ -100,6 +100,7 @@ class UserProfile(TimeStampedModel):
     )
 
     class Meta:
+        ordering = ["user__username"]
         db_table = 'api_v1_userprofile'
         verbose_name = "用户扩展"
         verbose_name_plural = "用户扩展"

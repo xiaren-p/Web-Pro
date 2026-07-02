@@ -34,7 +34,7 @@ def _get_target_users(user) -> "User.objects":
     level = profile.admin_level if profile else AdminLevel.MEMBER
 
     if user.is_superuser or level == AdminLevel.COMPANY_ADMIN:
-        return User.objects.filter(is_active=True)
+        return User.objects.filter(is_active=True).select_related("profile__dept")
     elif level == AdminLevel.DEPT_ADMIN and profile and profile.dept_id:
         dept_ids: set[int] = set()
 
@@ -46,7 +46,7 @@ def _get_target_users(user) -> "User.objects":
                 _collect(cid)
 
         _collect(profile.dept_id)
-        return User.objects.filter(profile__dept_id__in=list(dept_ids), is_active=True)
+        return User.objects.filter(profile__dept_id__in=list(dept_ids), is_active=True).select_related("profile__dept")
     else:
         return User.objects.filter(id=user.id)
 
@@ -119,7 +119,7 @@ class WorkReportViewSet(viewsets.ModelViewSet):
         submitted_count = submitted_qs.values("user").distinct().count()
         missing_count = total_count - submitted_count
 
-        return Response({
+        return drf_ok({
             "total": total_count,
             "submitted": submitted_count,
             "missing": missing_count,

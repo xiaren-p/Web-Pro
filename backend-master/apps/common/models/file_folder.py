@@ -53,6 +53,7 @@ class FileFolder(TimeStampedModel):
     )
 
     class Meta:
+        ordering = ["name"]
         db_table = 'api_v1_filefolder'
         verbose_name = "文件夹"
         verbose_name_plural = "文件夹"

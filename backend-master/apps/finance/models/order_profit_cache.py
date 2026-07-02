@@ -31,6 +31,7 @@ class OrderProfitCache(TimeStampedModel):
     )
 
     class Meta:
+        ordering = ["key"]
         db_table = "api_v1_orderprofitcache"
         verbose_name = "OrderProfit 缓存"
         verbose_name_plural = "OrderProfit 缓存"

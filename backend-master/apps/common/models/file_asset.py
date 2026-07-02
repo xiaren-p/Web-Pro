@@ -108,6 +108,7 @@ class FileAsset(TimeStampedModel):
     )
 
     class Meta:
+        ordering = ["-created_at"]
         db_table = 'api_v1_fileasset'
         verbose_name = "文件"
         verbose_name_plural = "文件"

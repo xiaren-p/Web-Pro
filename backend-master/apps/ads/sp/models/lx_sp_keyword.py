@@ -80,6 +80,7 @@ class LxSpKeyword(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_sp_keyword"
         verbose_name = "SP 关键词"
         verbose_name_plural = "SP 关键词列表"

@@ -42,6 +42,7 @@ class AuthToken(TimeStampedModel):
     )
 
     class Meta:
+        ordering = ["-created_at"]
         db_table = 'api_v1_authtoken'
         verbose_name = "认证令牌"
         verbose_name_plural = "认证令牌"
@@ -49,6 +50,9 @@ class AuthToken(TimeStampedModel):
             models.Index(fields=["access_token"]),
             models.Index(fields=["refresh_token"]),
         ]
+
+    def __str__(self) -> str:
+        return f"AuthToken<user={self.user_id}>"
 
     def is_access_valid(self) -> bool:
         """访问令牌是否仍在有效期且未被吊销。"""

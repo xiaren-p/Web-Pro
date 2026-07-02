@@ -1,4 +1,5 @@
 import traceback
+import threading
 from typing import List, Optional
 import json
 import re
@@ -6,6 +7,7 @@ import hashlib
 from datetime import timedelta
 from django.utils import timezone
 from django.conf import settings
+from django.core.cache import cache
 import io
 import os
 import time

@@ -75,6 +75,7 @@ class SpAdOptimizationStrategy(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "sp_ad_optimization_strategy"
         verbose_name = "SP 广告优化策略"
         verbose_name_plural = verbose_name

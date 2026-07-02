@@ -162,6 +162,7 @@ class LxListingInfo(models.Model):
     )
 
     class Meta:
+        ordering = ["id"]
         managed = False
         db_table = "lx_listing_info"
         verbose_name = "Listing 基础表"

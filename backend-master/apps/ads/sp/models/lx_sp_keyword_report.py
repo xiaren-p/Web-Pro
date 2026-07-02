@@ -94,6 +94,7 @@ class LxSpKeywordReport(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_sp_keyword_report"
         verbose_name = "SP 关键词报表"
         verbose_name_plural = verbose_name

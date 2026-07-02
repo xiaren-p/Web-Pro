@@ -127,7 +127,7 @@ class MenuViewSet(viewsets.ViewSet):
     def routes(self, request: Request) -> Any:
         """根据当前登录用户角色，返回其可见的动态路由树。"""
         user = getattr(request, "user", None)
-        all_active = list(Menu.objects.filter(status=True).order_by("order_num", "id"))
+        all_active = list(Menu.objects.filter(status=True).select_related("parent").order_by("order_num", "id"))
         if not user or not getattr(user, "is_authenticated", False):
             return drf_error("未登录", status=401)
 

@@ -64,6 +64,7 @@ class LxAdsProfile(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_ads_profile"
         verbose_name = "广告账号"
         verbose_name_plural = "广告账号列表"

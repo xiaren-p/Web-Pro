@@ -24,6 +24,7 @@ class DictType(TimeStampedModel):
     )
 
     class Meta:
+        ordering = ["code"]
         db_table = 'api_v1_dicttype'
         verbose_name = "字典类型"
         verbose_name_plural = "字典类型"

@@ -1424,6 +1424,7 @@ class LxProfitReportMsku(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_profit_report_msku"
         verbose_name = "利润报表-MSKU"
         verbose_name_plural = "利润报表-MSKU 列表"

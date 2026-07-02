@@ -1,5 +1,5 @@
 """月度前 20 天亏损订单序列化器。"""
-# cross-domain: MonthlyLoss (kept in api_v1)OrderFirst20
+from apps.finance.models.monthly_loss_order_first20 import MonthlyLossOrderFirst20
 from apps.finance.serializers.monthly_loss_serializer import MonthlyLossSerializer
 
 

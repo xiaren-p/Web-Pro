@@ -224,6 +224,7 @@ class LxLocalProduct(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_local_product"
         verbose_name = "本地产品"
         verbose_name_plural = "本地产品列表"

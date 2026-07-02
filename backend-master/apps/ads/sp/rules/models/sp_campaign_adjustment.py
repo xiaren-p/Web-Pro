@@ -101,6 +101,7 @@ class SpCampaignAdjustment(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "sp_campaign_adjustment"
         verbose_name = "广告活动调整记录"
         verbose_name_plural = verbose_name

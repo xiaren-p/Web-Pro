@@ -58,6 +58,7 @@ class LxApiErr(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_api_err"
         verbose_name = "领星API调用错误日志"
         verbose_name_plural = verbose_name

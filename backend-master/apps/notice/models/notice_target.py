@@ -24,6 +24,7 @@ class NoticeTarget(TimeStampedModel):
     )
 
     class Meta:
+        ordering = ["-id"]
         db_table = "api_v1_noticetarget"
         verbose_name = "通知目标"
         verbose_name_plural = "通知目标"

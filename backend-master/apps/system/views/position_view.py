@@ -8,6 +8,7 @@ import logging
 from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 
 from apps.system.models.position import Position
 from apps.system.models.menu import Menu
@@ -45,6 +46,7 @@ def _is_company_admin(request) -> bool:
 
 
 class PositionViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """岗位管理接口
 
     路由前缀：/positions

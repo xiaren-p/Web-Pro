@@ -45,6 +45,7 @@ class LxProductCustomField(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_product_custom_field"
         verbose_name = "产品自定义字段"
         verbose_name_plural = "产品自定义字段列表"

@@ -4,9 +4,13 @@ from __future__ import annotations
 from typing import Any
 
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ViewSet
+from rest_framework.permissions import IsAuthenticated
 
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.common.utils.responses import drf_error, drf_ok
@@ -77,13 +81,7 @@ class ListingTagViewSet(ViewSet):
                 "updateTime": item.updated_at.strftime("%Y-%m-%d %H:%M:%S") if item.updated_at else "",
             })
 
-        return Response({
-            "code": 0,
-            "message": "success",
-            "error_details": [],
-            "total": total,
-            "data": data_list,
-        })
+        return drf_ok({"total": total, "data": data_list})
 
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """获取单个标签详情。"""
@@ -94,11 +92,7 @@ class ListingTagViewSet(ViewSet):
         except (ValueError, LxListingTag.DoesNotExist):
             return drf_error(msg="标签不存在")
 
-        return Response({
-            "code": 0,
-            "message": "success",
-            "error_details": [],
-            "data": {
+        return drf_ok(data={
                 "id": item.id,
                 "globalTagId": item.global_tag_id or "",
                 "tagName": item.tag_name or "",
@@ -109,8 +103,7 @@ class ListingTagViewSet(ViewSet):
                 "status": item.status or "creating",
                 "createTime": item.created_at.strftime("%Y-%m-%d %H:%M:%S") if item.created_at else "",
                 "updateTime": item.updated_at.strftime("%Y-%m-%d %H:%M:%S") if item.updated_at else "",
-            },
-        })
+            })
 
     def create(self, request: Request) -> Response:
         """新增标签。"""

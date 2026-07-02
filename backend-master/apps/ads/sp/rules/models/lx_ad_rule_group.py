@@ -54,6 +54,7 @@ class LxAdRuleGroup(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_ad_rule_group"
         verbose_name = "规则组"
         verbose_name_plural = verbose_name

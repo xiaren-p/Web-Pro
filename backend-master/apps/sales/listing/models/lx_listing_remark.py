@@ -33,6 +33,8 @@ class LxListingRemark(models.Model):
     )
 
     class Meta:
+        ordering = ["id"]
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_listing_remark"
         verbose_name = "Listing备注"
         verbose_name_plural = "Listing备注"

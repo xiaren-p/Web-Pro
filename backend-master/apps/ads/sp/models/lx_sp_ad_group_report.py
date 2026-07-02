@@ -78,6 +78,7 @@ class LxSpAdGroupReport(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_sp_ad_group_report"
         verbose_name = "SP 广告组报表"
         verbose_name_plural = verbose_name

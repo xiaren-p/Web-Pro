@@ -14,9 +14,13 @@ from typing import Any
 from django.db.models import IntegerField, Q
 from django.db.models.functions import Cast
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ViewSet
+from rest_framework.permissions import IsAuthenticated
 
 from apps.sales.models.lx_shops import LxShops
 from apps.sales.models.lx_exchange_rate import LxExchangeRate
@@ -453,13 +457,7 @@ class SalesProductListingViewSet(ViewSet):
         # 全局标签交叉引用：用 LxListingTag 中权威数据（最新 tagName / color）覆盖快照值
         _refresh_tags_from_registry(data_list)
 
-        return Response({
-            "code": 0,
-            "message": "success",
-            "error_details": [],
-            "total": total,
-            "data": data_list,
-        })
+        return drf_ok({"total": total, "data": data_list})
 
     @action(detail=False, methods=["post"], url_path="labels/upsert")
     def upsert_labels(self, request: Request) -> Response:

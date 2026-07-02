@@ -51,6 +51,7 @@ class Config(TimeStampedModel):
     )
 
     class Meta:
+        ordering = ["key"]
         db_table = 'api_v1_config'
         verbose_name = "系统参数"
         verbose_name_plural = "系统参数"

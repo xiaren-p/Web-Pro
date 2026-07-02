@@ -397,6 +397,7 @@ class LxListingData(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_listing_data"
         verbose_name = "Listing 完整数据快照"
         verbose_name_plural = "Listing 完整数据快照列表"

@@ -1,6 +1,6 @@
 """月度亏损订单序列化器。"""
 from rest_framework import serializers
-# cross-domain: MonthlyLoss (kept in api_v1)Order
+from apps.finance.models.monthly_loss_order import MonthlyLossOrder
 
 
 class MonthlyLossSerializer(serializers.ModelSerializer):

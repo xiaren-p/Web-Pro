@@ -19,6 +19,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+from apps.common.utils.responses import drf_ok, drf_error
 
 from apps.system.auth.bearer_token_auth import BearerTokenAuthentication
 from apps.system.serializers.app_serializer import (
@@ -55,7 +56,7 @@ def list_apps(request: Request) -> Response:
         authorization_grant_type=Application.GRANT_CLIENT_CREDENTIALS,
     ).order_by('-created')
 
-    return Response({'results': AppListItemSerializer(apps, many=True).data})
+    return drf_ok({'results': AppListItemSerializer(apps, many=True).data})
 
 
 @api_view(['POST'])
@@ -93,7 +94,7 @@ def create_app(request: Request) -> Response:
         application.client_id,
     )
 
-    return Response(AppCreatedSerializer(application).data, status=status.HTTP_201_CREATED)
+    return drf_ok(AppCreatedSerializer(application).data)
 
 
 @api_view(['DELETE'])
@@ -116,7 +117,7 @@ def delete_app(request: Request, app_id: int) -> Response:
             authorization_grant_type=Application.GRANT_CLIENT_CREDENTIALS,
         )
     except Application.DoesNotExist:
-        return Response({'detail': '应用不存在'}, status=status.HTTP_404_NOT_FOUND)
+        return drf_error('应用不存在', status=404)
 
     client_id = application.client_id
     application.delete()  # DOT 级联删除关联 AccessToken
@@ -157,7 +158,7 @@ def rotate_secret(request: Request, app_id: int) -> Response:
             authorization_grant_type=Application.GRANT_CLIENT_CREDENTIALS,
         )
     except Application.DoesNotExist:
-        return Response({'detail': '应用不存在'}, status=status.HTTP_404_NOT_FOUND)
+        return drf_error('应用不存在', status=404)
 
     # 撤销所有当前有效的 AccessToken，防止旧 Secret 泄露后仍被使用
     revoked_count, _ = AccessToken.objects.filter(application=application).delete()
@@ -180,4 +181,4 @@ def rotate_secret(request: Request, app_id: int) -> Response:
         'client_secret': new_secret,
         'rotated_at': rotated_at,
     })
-    return Response(serializer.data)
+    return drf_ok(serializer.data)

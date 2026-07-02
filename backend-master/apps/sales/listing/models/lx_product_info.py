@@ -78,6 +78,7 @@ class LxProductInfo(models.Model):
     )
 
     class Meta:
+        ordering = ["asin"]
         managed = False
         db_table = "lx_product_info"
         verbose_name = "产品基础表"

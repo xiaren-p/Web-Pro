@@ -25,16 +25,16 @@ class CodegenViewSet(viewsets.ViewSet):
             if connection.vendor == 'sqlite':
                 sql = "SELECT name, type FROM sqlite_master WHERE type='table'"
                 if table_name:
-                    sql += f" AND name LIKE '%%{table_name}%%'"
-                cursor.execute(sql)
+                    sql += " AND name LIKE %s"
+                    cursor.execute(sql, [f'%{table_name}%'])
                 rows = cursor.fetchall()
                 data = [{"tableName": r[0], "tableComment": r[0], "createTime": ""} for r in rows]
             else:
                 # MySQL
                 sql = "SELECT table_name, table_comment, create_time FROM information_schema.tables WHERE table_schema = DATABASE()"
                 if table_name:
-                    sql += f" AND table_name LIKE '%%{table_name}%%'"
-                cursor.execute(sql)
+                    sql += " AND table_name LIKE %s"
+                    cursor.execute(sql, [f'%{table_name}%'])
                 rows = cursor.fetchall()
                 data = [{"tableName": r[0], "tableComment": r[1], "createTime": r[2]} for r in rows]
 

@@ -287,6 +287,7 @@ class LxAdRule(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_ad_rule"
         verbose_name = "广告规则"
         verbose_name_plural = verbose_name

@@ -116,6 +116,7 @@ class LxSpCampaign(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_sp_campaign"
         verbose_name = "SP 广告活动"
         verbose_name_plural = "SP 广告活动列表"

@@ -45,6 +45,7 @@ class LxProductTag(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_product_tag"
         verbose_name = "产品标签"
         verbose_name_plural = "产品标签列表"

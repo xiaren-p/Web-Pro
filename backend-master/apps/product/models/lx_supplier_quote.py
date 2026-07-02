@@ -117,6 +117,7 @@ class LxSupplierQuote(models.Model):
     )
 
     class Meta:
+        managed = False  # 外部数据表，Django 不管理 schema
         db_table = "lx_supplier_quote"
         verbose_name = "供应商报价"
         verbose_name_plural = "供应商报价列表"
