@@ -228,227 +228,33 @@ Returns:
     @action(detail=False, methods=["post"], url_path="")
     def create(self, request):
         """创建资源。"""
-        payload = request.data.copy()
-        username = payload.get("username")
-        password = payload.get("password") or "123456"
-        email = payload.get("email") or ""
-        nickname = payload.get("nickname") or ""
-        mobile = payload.get("mobile") or ""
-        # 若未显式传入 avatar，随机分配系统预设头像（格式 'preset:01'~'preset:12'）
-        avatar = payload.get("avatar") or get_random_preset()
-        dept_id = payload.get("deptId")
-        status_num = payload.get("status", 1)
-        gender = payload.get("gender")
-        if not username:
-            return drf_error("用户名不能为空", status=400)
-        if not email:
-            return drf_error("邮箱不能为空", status=400)
-        if User.objects.filter(username=username).exists():
-            return drf_error("用户名已存在", status=400)
-        if User.objects.filter(email=email).exists():
-            return drf_error("邮箱已被使用", status=400)
-        # 写权限检查：部门管理员只能在本部门（含子部门）内创建用户
-        if not request.user.is_superuser and dept_id is not None:
-            _req_p = getattr(request.user, "profile", None)
-            _req_level = _req_p.admin_level if _req_p else AdminLevel.MEMBER
-            if _req_level == AdminLevel.DEPT_ADMIN and _req_p and _req_p.dept_id:
-                try:
-                    if int(dept_id) not in _dept_subtree(_req_p.dept_id):
-                        return drf_error("部门管理员只能在本部门内创建用户", status=403)
-                except (ValueError, TypeError):
-                    pass
-        user = User.objects.create(username=username, email=email, is_active=bool(int(status_num)))
-        user.set_password(password)
-        user.save()
-        position_id = payload.get("positionId")
-        admin_level_val = payload.get("adminLevel", AdminLevel.MEMBER)
-        try:
-            admin_level_val = int(admin_level_val)
-            if admin_level_val not in AdminLevel.values:
-                admin_level_val = AdminLevel.MEMBER
-        except (ValueError, TypeError):
-            admin_level_val = AdminLevel.MEMBER
-        # 权限封顶：请求者无法创建权限高于自身的用户。
-        # AdminLevel 数字越小权限越高：COMPANY_ADMIN=1 > DEPT_ADMIN=2 > MEMBER=3
-        if not request.user.is_superuser:
-            try:
-                _req_profile = getattr(request.user, "profile", None)
-                _req_level = _req_profile.admin_level if _req_profile else AdminLevel.MEMBER
-            except Exception:
-                _req_level = AdminLevel.MEMBER
-            if admin_level_val < _req_level:
-                # 请求创建的级别高于自身，强制降至与自身相同级别
-                admin_level_val = _req_level
-        profile = UserProfile.objects.create(
-            user=user,
-            nickname=nickname,
-            mobile=mobile,
-            avatar=avatar,
-            dept_id=dept_id,
-            admin_level=admin_level_val,
-        )
-        if gender is not None:
-            try:
-                profile.gender = int(gender)
-            except (ValueError, TypeError):
-                pass
-        if position_id:
-            try:
-                pos = Position.objects.get(pk=position_id)
-                if pos.is_builtin:
-                    return drf_error("内置岗位不可手动分配给用户", status=400)
-                profile.position = pos
-            except Position.DoesNotExist:
-                pass
-        profile.save()
-        # extra_nc_groups M2M：仅在前端传 extraGroupIds 时设置（需在 on_user_created 前完成，以便 _enqueue_extra_groups 读到）
-        if "extraGroupIds" in payload:
-            extra_ids = payload.get("extraGroupIds") or []
-            if isinstance(extra_ids, str):
-                extra_ids = [s.strip() for s in extra_ids.split(",") if s.strip()]
-            try:
-                profile.extra_nc_groups.set(extra_ids)
-            except Exception as exc:
-                logger.warning("[UserViewSet][create] 设置 extra_nc_groups 失败: %s", exc)
-        NcSyncService.on_user_created(profile)
-        logger.info("[UserViewSet] [create] user=%s", username)
+        from apps.system.services.user_write_service import create_user
+        user, err = create_user(request, request.data)
+        if err:
+            return drf_error(err[0], status=err[1])
         return drf_ok(UserSerializer(user).data, status=201)
 
     @action(detail=False, methods=["put"], url_path=r"(?P<id>[^/]+)")
     def update(self, request, id: str):
-        """更新或删除资源。"""
-        try:
-            user = User.objects.get(pk=id)
-        except User.DoesNotExist:
-            return drf_error("未找到用户", status=404)
-        # 写权限检查：部门管理员只能编辑本部门（含子部门）的用户
-        if not request.user.is_superuser:
-            _req_p = getattr(request.user, "profile", None)
-            _req_level = _req_p.admin_level if _req_p else AdminLevel.MEMBER
-            if _req_level == AdminLevel.DEPT_ADMIN and _req_p and _req_p.dept_id:
-                _target_p = getattr(user, "profile", None)
-                _target_dept = getattr(_target_p, "dept_id", None)
-                if _target_dept is None or _target_dept not in _dept_subtree(_req_p.dept_id):
-                    return drf_error("无权编辑其他部门的用户", status=403)
-        payload = request.data.copy()
-        # 在任何字段被覆写前捕获旧值，以供 NC 同步差量判定
-        _old_email = user.email
-        _old_is_active = user.is_active
-        user.email = payload.get("email", user.email)
-        # 保留原值为默认，防止前端未传 status 时意外激活被禁用用户
-        new_status = payload.get("status")
-        if new_status is not None:
-            try:
-                user.is_active = bool(int(new_status))
-            except (ValueError, TypeError):
-                pass
-        user.save()
-        profile = getattr(user, "profile", None)
-        if profile:
-            _old_dept_id = profile.dept_id
-            _old_display_name = profile.nickname or user.username
-            _old_extra_codes = set(profile.extra_nc_groups.values_list("code", flat=True))
-            profile.nickname = payload.get("nickname", profile.nickname)
-            profile.mobile = payload.get("mobile", profile.mobile)
-            profile.avatar = payload.get("avatar", profile.avatar)
-            profile.dept_id = payload.get("deptId", profile.dept_id)
-            if payload.get("gender") is not None:
-                try:
-                    profile.gender = int(payload.get("gender"))
-                except (ValueError, TypeError):
-                    pass
-            if "positionId" in payload:
-                # admin 账号的岗位绑定不可修改，跳过
-                if user.username == "admin":
-                    pass
-                else:
-                    pid = payload.get("positionId")
-                    if pid:
-                        try:
-                            pos = Position.objects.get(pk=pid)
-                            if pos.is_builtin:
-                                return drf_error("内置岗位不可手动分配给用户", status=400)
-                            profile.position = pos
-                        except Position.DoesNotExist:
-                            pass
-                    else:
-                        profile.position = None
-            _old_admin_level = profile.admin_level
-            if "adminLevel" in payload:
-                try:
-                    lvl = int(payload.get("adminLevel"))
-                    if lvl in AdminLevel.values:
-                        # 权限封顶：非超级用户不允许将用户级别设置高于自身
-                        if not request.user.is_superuser:
-                            try:
-                                _req_profile = getattr(request.user, "profile", None)
-                                _req_level = _req_profile.admin_level if _req_profile else AdminLevel.MEMBER
-                            except Exception:
-                                _req_level = AdminLevel.MEMBER
-                            if lvl < _req_level:
-                                # 越权设置，拒绝修改并返回 403
-                                return drf_error(
-                                    "无权设置高于自身权限的管理级别",
-                                    status=403,
-                                )
-                        profile.admin_level = lvl
-                except (ValueError, TypeError):
-                    pass
-            profile.save()
-            # extra_nc_groups M2M 更新（仅当前端传 extraGroupIds 时才处理）
-            if "extraGroupIds" in payload:
-                extra_ids = payload.get("extraGroupIds") or []
-                if isinstance(extra_ids, str):
-                    extra_ids = [s.strip() for s in extra_ids.split(",") if s.strip()]
-                try:
-                    profile.extra_nc_groups.set(extra_ids)
-                except Exception as exc:
-                    logger.warning("[UserViewSet][update] 设置 extra_nc_groups 失败: %s", exc)
-            NcSyncService.on_user_updated(
-                profile,
-                old_admin_level=_old_admin_level,
-                old_dept_id=_old_dept_id,
-                old_display_name=_old_display_name,
-                old_email=_old_email,
-                old_extra_group_codes=_old_extra_codes if "extraGroupIds" in payload else None,
-            )
-        if user.is_active != _old_is_active:
-            NcSyncService.on_user_status_changed(profile, enabled=user.is_active)
-        logger.info("[UserViewSet] [update] id=%s", id)
+        """更新用户。"""
+        from apps.system.services.user_write_service import update_user
+        user, err = update_user(request, id, request.data)
+        if err:
+            return drf_error(err[0], status=err[1])
         return drf_ok(UserSerializer(user).data)
 
     @action(detail=False, methods=["delete"], url_path=r"(?P<id>[^/]+)")
     def delete(self, request, id: str):
-        # 支持单个或逗号分隔的批量删除
-        """删除资源。"""
-        try:
-            if isinstance(id, str) and "," in id:
-                ids = [s.strip() for s in id.split(",") if s.strip()]
-            else:
-                ids = [id]
-            users_qs = User.objects.filter(id__in=ids)
-            if not users_qs.exists():
-                return drf_error("未找到用户", status=404)
-            # 写权限检查：部门管理员只能删除本部门（含子部门）的用户
-            if not request.user.is_superuser:
-                _req_p = getattr(request.user, "profile", None)
-                _req_level = _req_p.admin_level if _req_p else AdminLevel.MEMBER
-                if _req_level == AdminLevel.DEPT_ADMIN and _req_p and _req_p.dept_id:
-                    _allowed = _dept_subtree(_req_p.dept_id)
-                    if users_qs.exclude(profile__dept_id__in=list(_allowed)).exists():
-                        return drf_error("无权删除其他部门的用户", status=403)
-            count = users_qs.count()
-            usernames_del = list(users_qs.values_list("username", flat=True))
-            # 先入队 NC disable，再删除 Django 用户（保证 username 在入队时仍有效）
-            for uname in usernames_del:
-                NcSyncService.on_user_deleted(uname)
-            users_qs.delete()
-            logger.info("[UserViewSet] [delete] %s, count=%d", usernames_del, count)
-            return drf_ok({"deletedCount": count})
-        except User.DoesNotExist:
-            return drf_error("未找到用户", status=404)
-        except Exception:
-            return drf_error("服务器内部错误", status=500)
+        """删除用户。"""
+        if isinstance(id, str) and "," in id:
+            ids = [s.strip() for s in id.split(",") if s.strip()]
+        else:
+            ids = [id]
+        from apps.system.services.user_write_service import delete_users
+        _, err = delete_users(request, ids)
+        if err:
+            return drf_error(err[0], status=err[1])
+        return drf_ok({"deletedCount": len(ids)})
 
 
 
