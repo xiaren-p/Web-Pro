@@ -20,6 +20,7 @@ from apps.system.permissions import MenuPermRequired
 from apps.system.serializers import OperLogSerializer
 from apps.common.utils.pagination import paginate_queryset
 from apps.common.utils.responses import drf_ok
+from apps.system.selectors.log_stats_selector import get_visit_trend, get_visit_stats
 
 
 def _parse_browser(ua: str) -> str:
@@ -182,61 +183,10 @@ class LogViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="visit-trend")
     def visit_trend(self, request: Request) -> Any:
-        """最近 7 天访问趋势（PV / UV / IP）。
-
-        日期已格式化为 ``YYYY-MM-DD`` 字符串，可直接喂给 ECharts xAxis。
-        """
-        today = datetime.date.today()
-        start_date = today - datetime.timedelta(days=6)
-        qs = OperLog.objects.filter(created_at__date__gte=start_date)
-        agg = (
-            qs.annotate(d=TruncDate("created_at"))
-            .values("d")
-            .annotate(
-                pv=Count("id"),
-                uv=Count("operator", distinct=True),
-                ip=Count("ip", distinct=True),
-            )
-            .order_by("d")
-        )
-        # 构造完整 7 天序列，缺失日期补 0
-        date_list = [start_date + datetime.timedelta(days=i) for i in range(7)]
-        m = {x["d"]: x for x in agg}
-        # 日期统一在后端格式化为前端可直接消费的字符串
-        dates = [d.strftime("%Y-%m-%d") for d in date_list]
-        pv_list = [m.get(d, {}).get("pv", 0) for d in date_list]
-        uv_list = [m.get(d, {}).get("uv", 0) for d in date_list]
-        ip_list = [m.get(d, {}).get("ip", 0) for d in date_list]
-        return drf_ok({
-            "dates": dates, "pvList": pv_list,
-            "uvList": uv_list, "ipList": ip_list,
-        })
+        """最近 7 天访问趋势（PV / UV / IP）。"""
+        return drf_ok(get_visit_trend())
 
     @action(detail=False, methods=["get"], url_path="visit-stats")
     def visit_stats(self, request: Request) -> Any:
-        """今日 / 累计访问统计与同比增长率（已在后端定型为百分比数值）。"""
-        today = datetime.date.today()
-        yesterday = today - datetime.timedelta(days=1)
-
-        total_pv = OperLog.objects.count()
-        total_uv = OperLog.objects.aggregate(c=Count("operator", distinct=True))["c"] or 0
-
-        qs_today = OperLog.objects.filter(created_at__date=today)
-        qs_yest = OperLog.objects.filter(created_at__date=yesterday)
-        today_pv = qs_today.count()
-        today_uv = qs_today.aggregate(c=Count("operator", distinct=True))["c"] or 0
-        y_pv = qs_yest.count()
-        y_uv = qs_yest.aggregate(c=Count("operator", distinct=True))["c"] or 0
-
-        # 增长率：昨日为 0 时今日有值视为 100%，均为 0 视为 0%
-        pv_growth = ((today_pv - y_pv) / y_pv * 100.0) if y_pv else (100.0 if today_pv > 0 else 0.0)
-        uv_growth = ((today_uv - y_uv) / y_uv * 100.0) if y_uv else (100.0 if today_uv > 0 else 0.0)
-
-        return drf_ok({
-            "todayUvCount": today_uv,
-            "totalUvCount": total_uv,
-            "uvGrowthRate": round(uv_growth, 2),
-            "todayPvCount": today_pv,
-            "totalPvCount": total_pv,
-            "pvGrowthRate": round(pv_growth, 2),
-        })
+        """今日 / 累计访问统计与增长率。"""
+        return drf_ok(get_visit_stats())
