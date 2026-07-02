@@ -136,8 +136,8 @@ CELERY_TASK_DEFAULT_QUEUE = 'celery'
 CELERY_TASK_ROUTES = {
     # ── celery（默认队列）：轻量 / 定时 / 低频任务 ───────────────────────────
     'api_v2.tasks.qinglong_env_sync_task.sync_qinglong_env_task': {'queue': 'celery'},
-    'api_v1.tasks.nc_sync_tasks.process_pending_nc_tasks':        {'queue': 'celery'},
-    'api_v1.tasks.nc_sync_tasks.retry_failed_nc_tasks':           {'queue': 'celery'},
+    'apps.nc.tasks.nc_sync_tasks.process_pending_nc_tasks':        {'queue': 'celery'},
+    'apps.nc.tasks.nc_sync_tasks.retry_failed_nc_tasks':           {'queue': 'celery'},
     'api_v1.tasks.maintenance_tasks.cleanup_orphan_uploads':      {'queue': 'celery'},
     # 广告活动参考数据缓存刷新（定时预热，280s 一轮，保证页面缓存永不过期）
     'api_v2.tasks.listing_cache_refresh_task.refresh_listing_caches': {'queue': 'celery'},
@@ -166,12 +166,12 @@ CELERY_BEAT_SCHEDULE = {
     },
     # NC 同步：每 30 秒处理一次 PENDING 队列
     'nc-process-pending': {
-        'task': 'api_v1.tasks.nc_sync_tasks.process_pending_nc_tasks',
+        'task': 'apps.nc.tasks.nc_sync_tasks.process_pending_nc_tasks',
         'schedule': 30.0,
     },
     # NC 同步：每 5 分钟将可重试的 FAILED 任务重置为 PENDING
     'nc-retry-failed': {
-        'task': 'api_v1.tasks.nc_sync_tasks.retry_failed_nc_tasks',
+        'task': 'apps.nc.tasks.nc_sync_tasks.retry_failed_nc_tasks',
         'schedule': 300.0,
     },
     # 运维维护：每天凌晨 03:00 (Asia/Shanghai) 清理孤儿上传文件

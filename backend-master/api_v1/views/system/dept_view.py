@@ -16,7 +16,7 @@ from api_v1.permissions import MenuPermRequired
 from api_v1.serializers import DeptSerializer
 from api_v1.utils.responses import drf_error, drf_ok
 from api_v1.utils.dept_scope import get_caller_dept_ids
-from api_v1.services.nc.nc_sync_service import NcSyncService
+from apps.nc.services.nc_sync_service import NcSyncService
 
 
 class DeptViewSet(viewsets.ViewSet):

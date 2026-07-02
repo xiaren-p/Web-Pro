@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
 if TYPE_CHECKING:
-    from api_v1.services.nc.nc_api_client import NcApiClient
+    from apps.nc.services.nc_api_client import NcApiClient
 
 logger = logging.getLogger(__name__)
 

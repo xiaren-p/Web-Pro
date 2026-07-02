@@ -26,8 +26,8 @@ from api_v1.utils.responses import drf_ok, drf_error
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.image_validator import validate_image_file, resize_image_to_square
 from api_v1.utils.avatar_presets import get_random_preset, is_local_upload, is_preset, make_preset_png
-from api_v1.services.nc.nc_sync_service import NcSyncService
-from api_v1.services.nc.nc_api_client import NcApiClient
+from apps.nc.services.nc_sync_service import NcSyncService
+from apps.nc.services.nc_api_client import NcApiClient
 
 logger = logging.getLogger(__name__)
 

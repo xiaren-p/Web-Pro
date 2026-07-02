@@ -23,7 +23,7 @@ import string
 from django.core.management.base import BaseCommand
 
 from api_v1.models.system.user_profile import UserProfile
-from api_v1.services.nc.nc_api_client import NcApiClient
+from apps.nc.services.nc_api_client import NcApiClient
 from api_v1.utils.avatar_presets import get_random_preset, is_local_upload, is_preset, make_preset_png
 from api_v1.utils.fernet_crypto import encrypt_value
 

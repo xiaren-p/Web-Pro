@@ -21,7 +21,7 @@ from PIL import Image
 from api_v1.models import ImageSyncQueue, ImageUpload
 from api_v1.models.file.image_sync_queue import ImageSyncStatus
 from api_v1.models.file.image_upload import ImageUploadStatus
-from api_v1.services.nc.nc_api_client import NcApiClient
+from apps.nc.services.nc_api_client import NcApiClient
 from api_v2.services.nc_sku_path_search import search_nc_sku_paths
 from api_v2.services.qinglong_env_service import get_cached_env
 
@@ -86,7 +86,7 @@ def _get_art_dept_nc_info() -> tuple[NcApiClient, str, str] | None:
     Returns:
         tuple: (NcApiClient, admin_user, mount_point)；失败返回 None。
     """
-    from api_v1.models.nc.nc_group import NcGroup, NcGroupType
+    from apps.nc.models.nc_group import NcGroup, NcGroupType
 
     try:
         nc_group = NcGroup.objects.filter(

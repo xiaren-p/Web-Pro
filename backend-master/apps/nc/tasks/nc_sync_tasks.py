@@ -16,8 +16,8 @@ from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
 
-from api_v1.models.nc.nc_sync_task import NcSyncTask, SyncStatus
-from api_v1.services.nc.nc_sync_service import NcSyncService
+from apps.nc.models.nc_sync_task import NcSyncTask, SyncStatus
+from apps.nc.services.nc_sync_service import NcSyncService
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ _REQUEST_INTERVAL = 0.5
 
 
 @shared_task(
-    name="api_v1.tasks.nc_sync_tasks.process_pending_nc_tasks",
+    name="apps.nc.tasks.nc_sync_tasks.process_pending_nc_tasks",
     bind=True,
     max_retries=0,
     soft_time_limit=120,
@@ -73,7 +73,7 @@ def process_pending_nc_tasks(self) -> dict:
 
 
 @shared_task(
-    name="api_v1.tasks.nc_sync_tasks.retry_failed_nc_tasks",
+    name="apps.nc.tasks.nc_sync_tasks.retry_failed_nc_tasks",
     bind=True,
     max_retries=0,
     soft_time_limit=120,

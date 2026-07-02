@@ -16,12 +16,12 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import IntegrityError
 
 from api_v1.models import Department
-from api_v1.models.nc.nc_file_access_rule import NcFileAccessRule
-from api_v1.models.nc.nc_group import NcGroup, NcGroupType
-from api_v1.models.nc.nc_sync_task import NcSyncTask, SyncOperation, SyncStatus
+from apps.nc.models.nc_file_access_rule import NcFileAccessRule
+from apps.nc.models.nc_group import NcGroup, NcGroupType
+from apps.nc.models.nc_sync_task import NcSyncTask, SyncOperation, SyncStatus
 from api_v1.models.system.user_profile import AdminLevel, UserProfile
-from api_v1.services.nc.nc_api_client import NcApiClient
-from api_v1.services.nc.nc_sync_service import NcSyncService
+from apps.nc.services.nc_api_client import NcApiClient
+from apps.nc.services.nc_sync_service import NcSyncService
 
 logger = logging.getLogger(__name__)
 User = get_user_model()

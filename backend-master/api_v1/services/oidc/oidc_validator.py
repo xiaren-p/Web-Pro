@@ -15,7 +15,7 @@ import logging
 
 from oauth2_provider.oauth2_validators import OAuth2Validator
 
-from api_v1.models.nc.nc_group import NcGroup, NcGroupType
+from apps.nc.models.nc_group import NcGroup, NcGroupType
 from api_v1.models.system.user_profile import AdminLevel
 
 logger = logging.getLogger(__name__)
