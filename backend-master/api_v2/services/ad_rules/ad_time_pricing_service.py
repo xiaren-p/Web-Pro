@@ -19,7 +19,7 @@ from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
 from api_v1.models.lingxing.ads.basic.lx_sp_ad import LxSpAd
 from api_v1.models.lingxing.ads.basic.lx_sp_campaign import LxSpCampaign
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStrategy, StrategyStatus
-from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
+from apps.sales.listing.models.lx_product_info import LxProductInfo
 from api_v2.models.ad_time_pricing_hit import AdTimePricingHit, ManualRulesStatus, TimePricingHitStatus
 from api_v2.services.ad_rules.strategy_matcher import match_strategy_against_product
 from api_v2.services.ad_rules.time_pricing_shared import (

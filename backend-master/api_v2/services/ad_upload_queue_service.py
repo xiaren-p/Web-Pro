@@ -20,7 +20,7 @@ import pandas as pd
 from django.contrib.auth.models import User
 from django.db import transaction
 
-from api_v1.models.lingxing.basic.lx_shops import LxShops
+from apps.sales.models.lx_shops import LxShops
 from api_v2.models.ad_upload_queue import AdParseStatus, AdUploadQueue
 
 logger = logging.getLogger(__name__)

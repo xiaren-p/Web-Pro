@@ -12,7 +12,7 @@ from typing import Any
 
 import requests
 
-from api_v1.models.lingxing.sales.listing.lx_listing_tag import LxListingTag
+from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from api_v2.models.lx_api_err import LxApiErr
 from api_v2.services.qinglong_env_service import get_cached_env, refresh_with_task_trigger
 

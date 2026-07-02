@@ -6,8 +6,8 @@ from rest_framework.permissions import IsAuthenticated
 
 from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
 from api_v1.models.lingxing.ads.lx_time_pricing_strategy import LxTimePricingStrategy
-from api_v1.models.lingxing.basic.lx_user import LxUser
-from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
+from apps.sales.models.lx_user import LxUser
+from apps.sales.listing.models.lx_product_info import LxProductInfo
 from api_v1.serializers.lingxing.ads_time_pricing_strategy_serializer import LxTimePricingStrategySerializer
 from api_v1.utils.pagination import paginate_queryset
 from api_v1.utils.responses import drf_error, drf_ok

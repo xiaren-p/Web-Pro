@@ -238,6 +238,8 @@ INSTALLED_APPS = [
     'apps.crawler',        # 爬虫管理域
     'apps.notice',         # 通知公告域
     'apps.nc',             # Nextcloud 集成域
+    'apps.sales',          # 销售管理域
+    'apps.finance',        # 财务管理域
 ]
 
 MIDDLEWARE = [

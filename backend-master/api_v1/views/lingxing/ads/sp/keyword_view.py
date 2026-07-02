@@ -745,7 +745,7 @@ def _build_bid_latest_adjustment_map(
     prof = LxAdsProfile.objects.filter(profile_id=profile_id).only("country_code", "sid").first()
     if prof:
         tz_name = country_to_timezone(prof.country_code or "")
-        from api_v1.models.lingxing.basic.lx_shops import LxShops
+        from apps.sales.models.lx_shops import LxShops
         country_name = LxShops.objects.filter(sid=prof.sid).values_list("country", flat=True).first() or (prof.country_code or "")
 
     result: dict[str, dict[str, Any]] = {}

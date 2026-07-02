@@ -24,7 +24,7 @@ from api_v1.models.lingxing.ads.basic.lx_sp_campaign import LxSpCampaign
 from api_v1.models.lingxing.ads.basic.lx_sp_target import LxSpTarget, SpTargetExpressionType
 from api_v1.models.lingxing.ads.lx_ad_rule import AdRuleStatus, LxAdRule
 from api_v1.models.lingxing.ads.lx_ad_rule_group import LxAdRuleGroup
-from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
+from apps.sales.listing.models.lx_product_info import LxProductInfo
 from api_v2.models.sp_ad_optimization_strategy import (
     ManualRulesStatus,
     SpAdOptimizationStrategy,

@@ -14,7 +14,7 @@ import json
 from typing import Any
 
 from api_v1.models.lingxing.ads.basic.lx_sp_ad import LxSpAd
-from api_v1.models.lingxing.sales.listing.lx_product_info import LxProductInfo
+from apps.sales.listing.models.lx_product_info import LxProductInfo
 
 
 # ============================================================

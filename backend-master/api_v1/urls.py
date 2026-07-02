@@ -157,22 +157,8 @@ urlpatterns = [
     path('shops/options', views.ShopOptionsViewSet.as_view({'get': 'shops'}), name='shops-options'),
     # 负责人下拉（LxUser 模型）
     path('shops/owners', views.ShopOptionsViewSet.as_view({'get': 'owners'}), name='shops-owners'),
-    # 亏损报表（使用 LingXing OpenAPI 获取并筛选毛利润为负的数据）
-    # 迁移为两步缓存模型：先同步/触发刷新 -> 再按 cache key 读取数据
-    path('statistics/lossmakingorders_sync', views.StatisticsViewSet.as_view({'post': 'lossmaking_orders_sync'}), name='statistics-lossmaking-orders-sync'),
-    path('statistics/lossmakingorders_data', views.StatisticsViewSet.as_view({'post': 'lossmaking_orders_data'}), name='statistics-lossmaking-orders-data'),
-    # 月度亏损订单统计（全部中文字段） - CRUD & 查询，查询参数：月份（月份）与负责人（负责人）
-    path('statistics/monthly-loss', views.MonthlyLossViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='statistics-monthly-loss-list-create'),
-    path('statistics/monthly-loss/download', views.MonthlyLossViewSet.as_view({'get': 'download', 'post': 'download'}), name='statistics-monthly-loss-download'),
-    path('statistics/monthly-loss/<str:id>/form', views.MonthlyLossViewSet.as_view({'get': 'form'}), name='statistics-monthly-loss-form'),
-    path('statistics/monthly-loss/<str:ids>', views.MonthlyLossViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='statistics-monthly-loss-update-delete'),
-    # 月度前20天亏损（全部中文字段） - CRUD & 查询
-    path('statistics/monthly-loss-first20', views.MonthlyLossFirst20ViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='statistics-monthly-loss-first20-list-create'),
-    path('statistics/monthly-loss-first20/download', views.MonthlyLossFirst20ViewSet.as_view({'get': 'download', 'post': 'download'}), name='statistics-monthly-loss-first20-download'),
-    path('statistics/monthly-loss-first20/<str:id>/form', views.MonthlyLossFirst20ViewSet.as_view({'get': 'form'}), name='statistics-monthly-loss-first20-form'),
-    path('statistics/monthly-loss-first20/<str:ids>', views.MonthlyLossFirst20ViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='statistics-monthly-loss-first20-update-delete'),
-    path('menus/<str:id>/form', views.MenuViewSet.as_view({'get': 'form'}), name='menu-form'),
-    path('menus/<str:id>', views.MenuViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='menu-update-delete'),
+# 财务统计（apps.finance）
+    path('', include('apps.finance.urls')),
 
     # 爬虫管理（apps.crawler）
     path('crawler/', include('apps.crawler.urls')),
