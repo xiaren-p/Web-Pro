@@ -94,7 +94,7 @@ def get_local_time_by_profile(profile_id: int) -> datetime | None:
         当地 datetime（naive），失败返回 None
     """
     try:
-        from api_v1.models.lingxing.ads.basic.lx_ads_profile import LxAdsProfile
+        from apps.ads.sp.models.lx_ads_profile import LxAdsProfile
 
         cc = LxAdsProfile.objects.filter(profile_id=profile_id).values_list("country_code", flat=True).first()
         if not cc:

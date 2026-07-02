@@ -1,0 +1,9 @@
+from apps.ads.views.shop_profile_view import ShopProfileViewSet
+from apps.ads.views.ad_portfolio_view import AdPortfolioViewSet
+from apps.ads.views.ad_campaign_submit_view import submit_pending_campaigns
+from apps.ads.views.ad_time_pricing_view import trigger_time_pricing
+from apps.ads.views.ad_upload_queue_view import bulk_delete_ad_queue, list_ad_queue, retry_ad_queue, upload_ad_xlsx
+from apps.ads.views.bid_adjustment_view import trigger_bid_adjustment
+from apps.ads.views.campaign_adjustment_view import trigger_campaign_adjustment
+from apps.ads.views.optimization_strategy_view import trigger_optimization_strategy
+from apps.ads.views.optimization_execution_view import trigger_optimization_execution

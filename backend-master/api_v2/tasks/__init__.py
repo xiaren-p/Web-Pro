@@ -1,15 +1,8 @@
 """api_v2 Celery 任务包。"""
 
-from api_v2.tasks.ad_campaign_submit_task import submit_pending_campaigns_task
-from api_v2.tasks.time_pricing_task import run_time_pricing_task
-from api_v2.tasks.ad_time_pricing_task import run_ad_time_pricing_task
-from api_v2.tasks.bid_adjustment_task import run_bid_adjustment_task
-from api_v2.tasks.campaign_adjustment_task import run_campaign_adjustment_task
 from api_v2.tasks.listing_image_upload_task import upload_listing_images_task
 from api_v2.tasks.listing_tag_modify_task import run_listing_tag_modify_task
 from api_v2.tasks.listing_tag_sync_task import run_listing_tag_sync_task
-from api_v2.tasks.optimization_strategy_task import run_optimization_strategy_task
-from api_v2.tasks.optimization_execution_task import run_optimization_execution_task
 from api_v2.tasks.qinglong_env_sync_task import sync_qinglong_env_task
 from api_v2.tasks.image_sync_queue_task import run_image_sync_queue_task
 from api_v2.tasks.listing_cache_refresh_task import refresh_listing_caches
@@ -17,13 +10,6 @@ from api_v2.tasks.listing_cache_refresh_task import refresh_listing_caches
 __all__ = [
     'upload_listing_images_task',
     'sync_qinglong_env_task',
-    'submit_pending_campaigns_task',
-    'run_ad_time_pricing_task',
-    'run_time_pricing_task',
-    'run_bid_adjustment_task',
-    'run_campaign_adjustment_task',
-    'run_optimization_strategy_task',
-    'run_optimization_execution_task',
     'run_listing_tag_sync_task',
     'run_listing_tag_modify_task',
     'run_image_sync_queue_task',

@@ -16,13 +16,7 @@ from api_v1.utils.responses import drf_ok
 def root_index(request):
     return drf_ok({"name": "api_v1"})
 
-from api_v1.views.lingxing.ads import (
-    AdCampaignViewSet, AdPortfolioViewSet, ShopProfileViewSet,
-    AdGroupViewSet, AdViewSet, AutoTargetingViewSet,
-    KeywordViewSet, AutoNegativeTargetingViewSet, NegativeKeywordViewSet,
-    TimePricingStrategyViewSet,
-    RuleStrategyViewSet, RuleStrategyGroupViewSet,
-)
+# ads migrated to apps.ads
 
 from api_v1.views.work_report import WorkReportViewSet
 
