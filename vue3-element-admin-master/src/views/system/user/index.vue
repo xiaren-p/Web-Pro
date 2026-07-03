@@ -67,7 +67,7 @@
                 v-hasPerm="'sys:user:delete'"
                 type="danger"
                 icon="delete"
-                :disabled="selectIds.length === 0"
+                :disabled="selectedIds.length === 0"
                 @click="handleDelete()"
               >
                 删除
@@ -76,7 +76,7 @@
           </div>
 
           <el-table
-            v-loading="loading"
+            v-loading="isLoading"
             :data="pageData"
             border
             stripe
@@ -161,133 +161,45 @@
 </template>
 
 <script setup lang="ts">
-import { UserAPI, type UserPageQuery, type UserPageVO } from "@/api/user";
-import { useUserStore } from "@/store";
-
+/**
+ * 用户管理列表页。
+ *
+ * @description 薄编排层：组合 useUserList composable、DeptTree 侧边栏与 UserFormDrawer。
+ *              搜索/分页/删除/重置密码/权限判断逻辑全部在 composable 中。
+ */
+import { useUserList } from "./composables/useUserList";
 import DeptTree from "./components/DeptTree.vue";
 import UserFormDrawer from "./components/UserFormDrawer.vue";
-
-const userStore = useUserStore();
 
 defineOptions({
   name: "User",
   inheritAttrs: false,
 });
 
-/**
- * 判断当前登录用户是否有权限对目标用户执行写操作（编辑、删除、重置密码）。
- * - COMPANY_ADMIN（1）或未知级别：全权访问。
- * - DEPT_ADMIN（2）：仅允许操作与自身 deptId 相同的用户；后端负责子部门授权。
- * - MEMBER（3）：无写权。
- *
- * @param row - 目标用户行数据。
- * @returns 是否允许对该用户执行写操作。
- */
-function canWriteUser(row: UserPageVO): boolean {
-  const { adminLevel, deptId } = userStore.userInfo;
-  if (!adminLevel || adminLevel === 1) return true;
-  if (adminLevel === 3) return false;
-  return !!deptId && row.deptId === deptId;
-}
-
 const queryFormRef = ref();
 const userFormDrawerRef = ref();
 
-const queryParams = reactive<UserPageQuery>({
-  pageNum: 1,
-  pageSize: 10,
-});
-
-const pageData = ref<UserPageVO[]>();
-const total = ref(0);
-const loading = ref(false);
-const selectIds = ref<string[]>([]);
-
-/** 获取用户列表分页数据。 */
-async function fetchData() {
-  loading.value = true;
-  try {
-    const data = await UserAPI.getPage(queryParams);
-    pageData.value = data.list;
-    total.value = data.total;
-  } finally {
-    loading.value = false;
-  }
-}
-
-/** 查询（重置页码后获取数据）。 */
-function handleQuery() {
-  queryParams.pageNum = 1;
-  fetchData();
-}
+const {
+  isLoading,
+  queryParams,
+  pageData,
+  total,
+  selectedIds,
+  canWriteUser,
+  fetchData,
+  handleQuery,
+  handleSelectionChange,
+  handleResetPassword,
+  handleDelete: deleteAction,
+} = useUserList();
 
 /** 重置查询条件并重新获取数据。 */
 function handleResetQuery() {
-  queryFormRef.value.resetFields();
+  queryFormRef.value?.resetFields();
   queryParams.pageNum = 1;
   queryParams.deptId = undefined;
   queryParams.createTime = undefined;
   fetchData();
-}
-
-/** 表格选中项变化回调。 */
-function handleSelectionChange(selection: UserPageVO[]) {
-  selectIds.value = selection.map((item) => item.id);
-}
-
-/** 重置用户密码。 */
-function handleResetPassword(row: UserPageVO) {
-  ElMessageBox.prompt("请输入用户【" + row.username + "】的新密码", "重置密码", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-  }).then(
-    ({ value }) => {
-      if (!value || value.length < 6) {
-        ElMessage.warning("密码至少需要6位字符，请重新输入");
-        return false;
-      }
-      UserAPI.resetPassword(row.id, value)
-        .then(() => {
-          ElMessage.success("密码重置成功，新密码是：" + value);
-        })
-        .catch(() => {
-          ElMessage.error("重置密码失败，请稍后重试");
-        });
-    },
-    () => {
-      ElMessage.info("已取消重置密码");
-    }
-  );
-}
-
-/**
- * 打开用户编辑弹窗。
- *
- * @param id - 用户ID（新建时为空）。
- */
-function handleOpenDialog(id?: string) {
-  userFormDrawerRef.value.open(id);
-}
-
-/**
- * 检查是否删除当前登录用户。
- *
- * @param singleId - 单个删除的用户ID。
- * @param selectedIds - 批量删除的用户ID数组。
- * @param currentUserInfo - 当前用户信息。
- * @returns 是否包含当前用户。
- */
-function isDeletingCurrentUser(
-  singleId?: number,
-  selectedIds: string[] = [],
-  currentUserInfo?: Record<string, any>
-): boolean {
-  if (!currentUserInfo?.userId) return false;
-  if (singleId && singleId.toString() === currentUserInfo.userId) return true;
-  if (!singleId && selectedIds.length > 0) {
-    return selectedIds.map(String).includes(currentUserInfo.userId);
-  }
-  return false;
 }
 
 /**
@@ -295,37 +207,21 @@ function isDeletingCurrentUser(
  *
  * @param id - 用户ID（不传则使用已选中的ID列表）。
  */
-function handleDelete(id?: number) {
-  const userIds = [id || selectIds.value].join(",");
-  if (!userIds) {
-    ElMessage.warning("请勾选删除项");
-    return;
-  }
+function handleDelete(id?: string) {
+  deleteAction(id, () => {
+    queryFormRef.value?.resetFields();
+    queryParams.deptId = undefined;
+    queryParams.createTime = undefined;
+  });
+}
 
-  const currentUserInfo = userStore.userInfo;
-  if (isDeletingCurrentUser(id, selectIds.value, currentUserInfo)) {
-    ElMessage.error("不能删除当前登录用户");
-    return;
-  }
-
-  ElMessageBox.confirm("确认删除用户?", "警告", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-    type: "warning",
-  }).then(
-    () => {
-      loading.value = true;
-      UserAPI.deleteByIds(userIds)
-        .then(() => {
-          ElMessage.success("删除成功");
-          handleResetQuery();
-        })
-        .finally(() => (loading.value = false));
-    },
-    () => {
-      ElMessage.info("已取消删除");
-    }
-  );
+/**
+ * 打开用户编辑抽屉。
+ *
+ * @param id - 用户ID（不传为新增）。
+ */
+function handleOpenDialog(id?: string) {
+  userFormDrawerRef.value.open(id);
 }
 
 onMounted(() => {
