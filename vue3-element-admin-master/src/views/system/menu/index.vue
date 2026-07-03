@@ -1,5 +1,6 @@
 <template>
   <div class="app-container">
+    <!-- 搜索区域 -->
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item label="关键字" prop="keywords">
@@ -126,23 +127,37 @@
 <script setup lang="ts">
 /**
  * 菜单管理列表页。
+ *
+ * @description 薄编排层：组合 useMenuList composable 与 MenuFormDrawer。
+ *              菜单树查询、行选中、删除逻辑全部在 composable 中。
  */
 import { useMenuList } from "./composables/useMenuList";
 import { MenuTypeEnum } from "@/enums/system/menu-enum";
 import MenuFormDrawer from "./components/MenuFormDrawer.vue";
 
 defineOptions({ name: "SysMenu", inheritAttrs: false });
+
 const queryFormRef = ref();
 const menuFormDrawerRef = ref();
 const { isLoading, queryParams, menuTableData, handleQuery, handleRowClick, handleDelete } =
   useMenuList();
+
+/** 重置查询条件并重新查询。 */
 function handleResetQuery() {
   queryFormRef.value?.resetFields();
   handleQuery();
 }
+
+/**
+ * 打开菜单表单抽屉。
+ *
+ * @param parentId - 父菜单ID（新建子菜单时传入）。
+ * @param menuId - 菜单ID（编辑时传入）。
+ */
 function openDrawer(parentId?: string, menuId?: string) {
   menuFormDrawerRef.value.open(parentId, menuId);
 }
+
 onMounted(() => {
   handleQuery();
 });
