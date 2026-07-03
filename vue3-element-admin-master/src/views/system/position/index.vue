@@ -117,7 +117,7 @@
     <PositionPermDrawer ref="positionPermDrawerRef" @success="handleResetQuery" />
   </div>
 </template>
-
+`r`n`r`n
 <script setup lang="ts">
 /**
  * 岗位管理列表页：展示所有岗位、支持增删改及菜单权限分配。
@@ -190,17 +190,29 @@ function handleSelectionChange(selection: PositionPageVO[]) {
   ids.value = selection.filter((item) => !item.isBuiltin).map((item) => item.id);
 }
 
-/** 打开岗位表单弹窗 */
+/**
+ * 打开岗位表单弹窗。
+ *
+ * @param positionId - 岗位ID（编辑时传入）。
+ */
 function handleOpenDialog(positionId?: string) {
   positionDialogRef.value.open(positionId);
 }
 
-/** 打开岗位权限分配抽屉 */
+/**
+ * 打开岗位权限分配抽屉。
+ *
+ * @param row - 岗位行数据。
+ */
 function handleOpenPermDrawer(row: PositionPageVO) {
   positionPermDrawerRef.value.open(row);
 }
 
-/** 删除岗位 */
+/**
+ * 删除岗位（单个或批量）。
+ *
+ * @param positionId - 单个岗位ID，不传则删除勾选项。
+ */
 function handleDelete(positionId?: string) {
   const positionIds = positionId ? positionId : ids.value.join(",");
   if (!positionIds) {
