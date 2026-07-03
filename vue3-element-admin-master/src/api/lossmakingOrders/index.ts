@@ -66,10 +66,10 @@ export interface LossOrderDataResponse {
 export async function fetchShopOptions(): Promise<ShopOptionRaw[]> {
   try {
     const res = await ShopsAPI.getOptions();
-    return (res || []).map((it: Record<string, unknown>) => ({
+    return (res || []).map((it) => ({
       id: it.id,
       name: it.name,
-      country: it.country,
+      country: (it as Record<string, unknown>).country,
     }));
   } catch (e) {
     console.error("fetchShopOptions error", e);
@@ -81,9 +81,9 @@ export async function fetchShopOptions(): Promise<ShopOptionRaw[]> {
 export async function fetchListingOwnerOptions(): Promise<ListingOwnerOptionRaw[]> {
   try {
     const res = await ShopsAPI.getOwners();
-    return (res || []).map((it: Record<string, unknown>) => ({
+    return (res || []).map((it) => ({
       id: it.id || it.value,
-      name: it.label || it.name || it.realname,
+      name: it.label || it.name || (it as Record<string, unknown>).realname,
     }));
   } catch (e) {
     console.error("fetchListingOwnerOptions error", e);
