@@ -32,12 +32,20 @@ export function startChat(payload: {
   return request({ method: "post", url: "/ai/chat/", data: payload });
 }
 
-/** 拉取后台维护的全部启用 Dify 应用。 */
+/**
+ * 拉取后台维护的全部启用 Dify 应用。
+ *
+ * @returns 应用列表。
+ */
 export function listAiApps(): Promise<{ items: AiApp[] }> {
   return request({ method: "get", url: "/ai/apps/" });
 }
 
-/** 拉取当前用户的会话列表（最近活跃倒序）。 */
+/**
+ * 拉取当前用户的会话列表（最近活跃倒序）。
+ *
+ * @returns 会话列表。
+ */
 export function listConversations(): Promise<{ items: AiConversation[] }> {
   return request({ method: "get", url: "/ai/conversations/" });
 }
@@ -80,7 +88,8 @@ export function renameConversation(
 /**
  * 取消正在生成的 AI 消息。
  *
- * @param messageId - 消息 UUID
+ * @param messageId - 消息 UUID。
+ * @returns 操作结果。
  */
 export function cancelMessage(messageId: string): Promise<{ success: boolean }> {
   return request({ method: "post", url: `/ai/messages/${messageId}/cancel/` });
@@ -139,7 +148,11 @@ export function searchConversations(
 
 /* ── 分组管理 ──────────────────────────────────────────── */
 
-/** 获取当前用户的全部分组。 */
+/**
+ * 获取当前用户的全部分组。
+ *
+ * @returns 分组列表。
+ */
 export function listGroups(): Promise<{ items: AiConversationGroup[] }> {
   return request({ method: "get", url: "/ai/groups/" });
 }
