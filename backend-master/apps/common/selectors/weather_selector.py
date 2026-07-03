@@ -57,7 +57,7 @@ def _config_val(key: str, fallback: str = "") -> str:
     try:
         conf = Config.objects.filter(key=key, status=True).first()
         if conf and conf.value.strip():
-            return conf.value.strip()
+            return conf.get_plaintext_value().strip()
     except Exception:
         pass
     return fallback

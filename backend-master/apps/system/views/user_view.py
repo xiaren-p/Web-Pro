@@ -265,7 +265,7 @@ Returns:
             user = User.objects.get(pk=id)
         except User.DoesNotExist:
             return drf_error("未找到用户", status=404)
-        password = request.query_params.get("password") or "123456"
+        password = request.query_params.get("password") or ""
         user.set_password(password)
         user.save()
         return drf_ok({"message": "password reset"})
