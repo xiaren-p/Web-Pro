@@ -181,7 +181,8 @@ class NoticeViewSet(viewsets.ViewSet):
         n.save()
         return drf_ok({"message": "revoked"})
 
-    @action(detail=False, methods=["get"], url_path=r"(?P<id>[^/]+)/detail")\n    def detail_plain(self, request: Request, id: str) -> Any:
+    @action(detail=False, methods=["get"], url_path=r"(?P<id>[^/]+)/detail")
+    def detail_plain(self, request: Request, id: str) -> Any:
         """公告详情查询（手工 urls 路由，不挂 @action 避免冲突）。"""
         n = Notice.objects.get(pk=id)
         data = NoticeDetailSerializer(n).data

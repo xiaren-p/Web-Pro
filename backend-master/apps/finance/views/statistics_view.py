@@ -20,8 +20,8 @@ from apps.finance.models.monthly_loss_order import MonthlyLossOrder
 from apps.finance.models.monthly_loss_order_first20 import MonthlyLossOrderFirst20
 
 class StatisticsViewSet(viewsets.ViewSet):
+    """统计类接口（亏损订单大盘数据）。"""
     permission_classes = [IsAuthenticated]
-    """统计类接口（包括 lossmaking orders 查询）"""
 
     def get_permissions(self):
         """返回当前 action 所需的权限类列表。"""

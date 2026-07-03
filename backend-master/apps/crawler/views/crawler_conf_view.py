@@ -11,16 +11,8 @@ from apps.common.utils.responses import drf_error, drf_ok
 
 
 class CrawlerConfViewSet(viewsets.ViewSet):
+    """爬虫配置管理接口。"""
     permission_classes = [IsAuthenticated]
-    """数据采集节点配置（对外开放，无需认证）。
-
-    路由：
-    - GET /crawler/conf -> 列表
-    - POST /crawler/conf -> 新增
-    - GET /crawler/conf/<id>/form -> 获取表单数据
-    - PUT /crawler/conf/<ids> -> 更新（多个 id 传入逗号，以第一个为目标）
-    - DELETE /crawler/conf/<ids> -> 删除
-    """
 
     def get_permissions(self):
         """权限策略：GET 开放 AllowAny；写操作需要登录 IsAuthenticated。"""

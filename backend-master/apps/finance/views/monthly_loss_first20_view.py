@@ -36,8 +36,8 @@ from apps.finance.views._helpers import (
 )
 
 class MonthlyLossFirst20ViewSet(viewsets.ViewSet):
+    """月度前20天亏损 (CRUD + 按月/负责人对比导出)。"""
     permission_classes = [IsAuthenticated]
-    """Monthly first-20-days loss (CRUD + filter by month/owner, owner optional). Parameters and JSON responses use English keys only."""
 
     def get_permissions(self):
         """返回当前 action 所需的权限类列表。"""

@@ -15,8 +15,8 @@ from apps.common.utils.responses import drf_error, drf_ok
 
 
 class CrawlerCategoryViewSet(viewsets.ViewSet):
+    """爬虫分类管理接口。"""
     permission_classes = [IsAuthenticated]
-    """爬取类目的分页与 CRUD。"""
 
     def get_permissions(self):
         """返回当前 action 所需的权限类列表。"""

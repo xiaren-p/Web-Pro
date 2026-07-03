@@ -36,7 +36,6 @@ urlpatterns = [
     path('api/v1/', include('apps.ads.sp.timing.urls')),
     path('api/v1/', include('apps.ads.sp.rules.urls')),
     path('api/v1/', include('apps.system.urls')),
-    path('api/v1/', include('apps.ai.urls')),
     # 兼容前端在构建时使用 `/prod-api` 前缀的部署方式：
     # 将 /prod-api/... 映射到相同的 api_v1 路由集合，避免 nginx 配置不一致时 404
     path('prod-api/', include('api_v1.urls')),

@@ -10,16 +10,8 @@ from apps.common.utils.responses import drf_error, drf_ok
 
 
 class CrawlerSellerViewSet(viewsets.ViewSet):
+    """爬虫卖家账号管理接口。"""
     permission_classes = [IsAuthenticated]
-    """卖家精灵账号配置（对外开放，无需认证）。
-
-    路由：
-    - GET /crawler/seller -> 列表
-    - POST /crawler/seller -> 新增
-    - GET /crawler/seller/<id>/form -> 获取表单数据
-    - PUT /crawler/seller/<ids> -> 更新
-    - DELETE /crawler/seller/<ids> -> 删除
-    """
 
     def get_permissions(self):
         """返回当前 action 所需的权限类列表。"""

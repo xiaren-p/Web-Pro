@@ -14,14 +14,8 @@ from apps.common.utils.responses import drf_error, drf_ok
 
 
 class CrawlerLogViewSet(viewsets.ViewSet):
+    """爬虫日志查看与写入接口。"""
     permission_classes = [IsAuthenticated]
-    """爬虫日志（开放式接口）：允许任何人提交与查询日志，用于采集/调试场景。
-
-    - GET  /crawler/logs/page -> 分页查询，支持 keywords（匹配日志内容）、createTime 日期范围
-    - GET  /crawler/logs -> 列表（非分页）
-    - POST /crawler/logs -> 新增日志（接受 module, action/content, result/level, elapsed_ms,
-      operator, ip, user_agent）
-    """
 
     def get_permissions(self):
         # 对所有动作均开放（AllowAny）
