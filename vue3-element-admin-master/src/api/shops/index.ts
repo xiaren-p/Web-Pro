@@ -3,10 +3,12 @@
  */
 import request from "@/utils/request";
 
-/** 下拉选项。 */
+/** 下拉选项（支持 id/name 兼容字段）。 */
 interface OptionItem {
-  value: string;
-  label: string;
+  value?: string;
+  label?: string;
+  id?: string | number;
+  name?: string;
 }
 
 const SHOPS_BASE_URL = "/shops";
