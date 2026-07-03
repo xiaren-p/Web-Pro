@@ -40,49 +40,39 @@
     </el-checkbox>
   </el-checkbox-group>
 </template>
-`r`n`r`n
+
 <script setup lang="ts">
+/**
+ * 字典组件：根据 dictCode 自动加载字典项，渲染为 select / radio / checkbox。
+ */
 import { useDictStore } from "@/store";
 
 const dictStore = useDictStore();
 
-const props = defineProps({
-  code: {
-    type: String,
-    required: true,
-  },
-  modelValue: {
-    type: [String, Number, Array],
-    required: false,
-  },
-  type: {
-    type: String,
-    default: "select",
-    validator: (value: string) => ["select", "radio", "checkbox"].includes(value),
-  },
-  placeholder: {
-    type: String,
-    default: "请选择",
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
-  style: {
-    type: Object,
-    default: () => {
-      return {
-        width: "300px",
-      };
-    },
-  },
+interface Props {
+  code: string;
+  /** v-model 绑定的选中值，支持 string / number / array */
+  modelValue?: string | number | (string | number)[];
+  type?: "select" | "radio" | "checkbox";
+  placeholder?: string;
+  disabled?: boolean;
+  style?: Record<string, string>;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  type: "select",
+  placeholder: "请选择",
+  disabled: false,
+  style: () => ({ width: "300px" }),
 });
 
-const emit = defineEmits(["update:modelValue"]);
+const emit = defineEmits<{
+  (e: "update:modelValue", value: string | number | (string | number)[]): void;
+}>();
 
 const options = ref<Array<{ label: string; value: string | number }>>([]);
 
-const selectedValue = ref<any>(
+const selectedValue = ref<string | number | (string | number)[] | undefined>(
   typeof props.modelValue === "string" || typeof props.modelValue === "number"
     ? props.modelValue
     : Array.isArray(props.modelValue)
@@ -90,7 +80,6 @@ const selectedValue = ref<any>(
       : undefined
 );
 
-// 监听 modelValue 和 options 的变化
 watch(
   [() => props.modelValue, () => options.value],
   ([newValue, newOptions]) => {
@@ -110,12 +99,11 @@ watch(
   { immediate: true }
 );
 
-// 监听 selectedValue 的变化并触发 update:modelValue
-function handleChange(val: any) {
+/** 选中值变化时同步 v-model。 */
+function handleChange(val: string | number | (string | number)[]): void {
   emit("update:modelValue", val);
 }
 
-// 获取字典数据
 onMounted(async () => {
   await dictStore.loadDictItems(props.code);
   options.value = dictStore.getDictItems(props.code);
