@@ -11,6 +11,7 @@ from apps.common.utils.responses import drf_error, drf_ok
 
 
 class CrawlerConfViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """数据采集节点配置（对外开放，无需认证）。
 
     路由：

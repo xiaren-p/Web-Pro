@@ -36,6 +36,7 @@ from apps.finance.views._helpers import (
 )
 
 class MonthlyLossViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """Monthly loss orders (CRUD + filter by month/owner, owner optional). Parameters and JSON responses use English keys only."""
 
     def get_permissions(self):

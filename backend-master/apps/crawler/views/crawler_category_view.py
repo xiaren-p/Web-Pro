@@ -15,6 +15,7 @@ from apps.common.utils.responses import drf_error, drf_ok
 
 
 class CrawlerCategoryViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """爬取类目的分页与 CRUD。"""
 
     def get_permissions(self):

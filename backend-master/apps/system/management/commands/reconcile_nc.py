@@ -124,7 +124,7 @@ class Command(BaseCommand):
         except RuntimeError as exc:
             raise CommandError(f"无法连接 Nextcloud，请检查 Config 配置: {exc}") from exc
 
-        self.stdout.write(self.style.NOTICE(
+        self.stdout.write(self.style.WARNING(
             f"[reconcile_nc] 开始对账 | dry_run={dry_run} | target={target_username or '全部'}"
         ))
 

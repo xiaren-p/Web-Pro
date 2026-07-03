@@ -10,6 +10,7 @@ from apps.common.utils.responses import drf_error, drf_ok
 
 
 class CrawlerSellerViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """卖家精灵账号配置（对外开放，无需认证）。
 
     路由：

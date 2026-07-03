@@ -7,7 +7,8 @@ import datetime
 from django.contrib.auth.models import User
 from django.db.models import Count, Q
 
-from apps.system.models import Department, WorkReport
+from apps.system.models import Department
+from apps.common.models import WorkReport
 from apps.system.models.user_profile import AdminLevel
 
 

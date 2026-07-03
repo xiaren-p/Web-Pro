@@ -12,8 +12,11 @@
 from __future__ import annotations
 
 from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
+from rest_framework.permissions import IsAuthenticated
 
 from apps.system.serializers import (
     EmailBindSerializer,
@@ -25,6 +28,7 @@ from apps.common.utils.responses import drf_ok
 
 
 class ProfileViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """手机号/邮箱的验证码发送与绑定。
 
     绑定操作要求登录，权限沿用全局默认的 ``IsAuthenticated``。

@@ -36,6 +36,7 @@ from apps.finance.views._helpers import (
 )
 
 class MonthlyLossFirst20ViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
     """Monthly first-20-days loss (CRUD + filter by month/owner, owner optional). Parameters and JSON responses use English keys only."""
 
     def get_permissions(self):
@@ -56,14 +57,14 @@ class MonthlyLossFirst20ViewSet(viewsets.ViewSet):
             def _month_variants(m):
                 """生成月份字符串的等价格式变体。
 
-支持 YYYYMM 与 YYYY-MM 互转。
+                支持 YYYYMM 与 YYYY-MM 互转。
 
-Args:
-    m: 原始月份字符串。
+                Args:
+                    m: 原始月份字符串。
 
-Returns:
-    list[str]: 月份变体列表；空输入返回空列表。
-"""
+                Returns:
+                    list[str]: 月份变体列表；空输入返回空列表。
+                """
                 if not m:
                     return []
                 s = str(m).strip()
@@ -131,14 +132,14 @@ Returns:
         # 导出对比：本月前20天数据 vs 上个月整月数据
         """导出本月前 20 天与上月整月数据对比为 xlsx 文件。
 
-仅支持单月对比；支持 owner/store 过滤与缓存复用。
+        仅支持单月对比；支持 owner/store 过滤与缓存复用。
 
-Args:
-    request: DRF Request 对象。
+        Args:
+            request: DRF Request 对象。
 
-Returns:
-    Response: xlsx 文件流响应；失败时返回错误响应。
-"""
+        Returns:
+            Response: xlsx 文件流响应；失败时返回错误响应。
+        """
         try:
             if getattr(request, 'method', '').upper() == 'GET':
                 payload = request.query_params or {}
