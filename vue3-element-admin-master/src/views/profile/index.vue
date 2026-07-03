@@ -8,7 +8,7 @@
     </el-result>
 
     <!-- 加载态 -->
-    <el-skeleton v-else-if="loading" :rows="8" animated />
+    <el-skeleton v-else-if="isLoading" :rows="8" animated />
 
     <!-- 内容态 -->
     <el-row v-else :gutter="20">
@@ -16,7 +16,7 @@
       <el-col :span="8">
         <el-card class="user-card">
           <div class="user-info">
-            <div class="avatar-wrapper" :class="{ 'is-uploading': uploading }">
+            <div class="avatar-wrapper" :class="{ 'is-uploading': isUploading }">
               <el-avatar :src="resolveAvatarSrc(userStore.userInfo.avatar ?? '')" :size="100" />
               <div class="avatar-overlay">
                 <el-tooltip content="上传图片" placement="top" :show-after="400">
@@ -148,10 +148,10 @@
     </el-row>
 
     <!-- 弹窗 -->
-    <el-dialog v-model="dialog.visible" :title="dialog.title" :width="500">
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" :width="500">
       <!-- 账号资料 -->
       <el-form
-        v-if="dialog.type === DialogType.ACCOUNT"
+        v-if="dialogType === DialogType.ACCOUNT"
         ref="userProfileFormRef"
         :model="userProfileForm"
         :label-width="100"
@@ -166,7 +166,7 @@
 
       <!-- 修改密码 -->
       <el-form
-        v-if="dialog.type === DialogType.PASSWORD"
+        v-if="dialogType === DialogType.PASSWORD"
         ref="passwordChangeFormRef"
         :model="passwordChangeForm"
         :rules="passwordChangeRules"
@@ -185,7 +185,7 @@
 
       <!-- 绑定手机 -->
       <el-form
-        v-else-if="dialog.type === DialogType.MOBILE"
+        v-else-if="dialogType === DialogType.MOBILE"
         ref="mobileBindingFormRef"
         :model="mobileUpdateForm"
         :rules="mobileBindingRules"
@@ -198,7 +198,7 @@
 
       <!-- 绑定邮箱 -->
       <el-form
-        v-else-if="dialog.type === DialogType.EMAIL"
+        v-else-if="dialogType === DialogType.EMAIL"
         ref="emailBindingFormRef"
         :model="emailUpdateForm"
         :rules="emailBindingRules"
@@ -232,11 +232,11 @@
           v-for="preset in allPresets"
           :key="preset.id"
           class="preset-item"
-          :class="{ active: userProfile.avatar === preset.id, selecting: selectingPreset }"
+          :class="{ active: userProfile.avatar === preset.id, selecting: isSelectingPreset }"
           @click="handleSelectPreset(preset.id)"
         >
           <el-avatar :src="preset.dataUri" :size="72" />
-          <span v-if="userProfile.avatar === preset.id" class="preset-check">✓</span>
+          <span v-if="userProfile.avatar === preset.id" class="preset-check">OK</span>
         </div>
       </div>
       <template #footer>
@@ -246,219 +246,88 @@
   </div>
 </template>
 
-<script lang="ts" setup>
-import { UserAPI } from "@/api/user";
-import { useUserStoreHook } from "@/store";
-import { Camera, Edit, Male, Female, Picture } from "@element-plus/icons-vue";
-import { ref, reactive, onMounted } from "vue";
+<script setup lang="ts">
+/**
+ * 个人资料页。
+ *
+ * @description 薄编排层：组合 useProfile composable + 头像上传/裁剪 + 预设选择。
+ *              资料加载、表单提交、校验规则全部在 composable 中。
+ */
+import { ref, onMounted } from "vue";
 import { ElLoading, ElMessage } from "element-plus";
+import { Camera, Edit, Male, Female, Picture } from "@element-plus/icons-vue";
+import { UserAPI } from "@/api/user";
 import AvatarCropper from "@/components/AvatarCropper/index.vue";
 import { resolveAvatarSrc, getAllPresets } from "@/utils/avatarPresets";
+import { useProfile, DialogType } from "./composables/useProfile";
 
-// 本地类型定义
-interface UserProfileVO {
-  id?: string;
-  username?: string;
-  nickname?: string;
-  avatar?: string;
-  email?: string;
-  mobile?: string;
-  gender?: number;
-  deptName?: string;
-  positionName?: string;
-  createTime?: string;
-}
-interface PasswordChangeForm {
-  oldPassword?: string;
-  newPassword?: string;
-  confirmPassword?: string;
-}
-interface MobileUpdateForm {
-  mobile?: string;
-}
-interface EmailUpdateForm {
-  email?: string;
-}
-interface UserProfileForm {
-  id?: string;
-  nickname?: string;
-  gender?: number;
-}
+const {
+  userProfile,
+  isLoading,
+  loadError,
+  dialogVisible,
+  dialogTitle,
+  dialogType,
+  userProfileForm,
+  passwordChangeForm,
+  mobileUpdateForm,
+  emailUpdateForm,
+  passwordChangeRules,
+  mobileBindingRules,
+  emailBindingRules,
+  userStore,
+  preloadFromStore,
+  loadUserProfile,
+  handleOpenDialog,
+  handleSubmit,
+} = useProfile();
 
-const userStore = useUserStoreHook();
-const userProfile = ref<UserProfileVO>({});
-const loading = ref(true);
-const loadError = ref<string | null>(null);
-
-// file input 在下方与上传逻辑一起声明
-
-const enum DialogType {
-  ACCOUNT = "account",
-  PASSWORD = "password",
-  MOBILE = "mobile",
-  EMAIL = "email",
+/** 取消弹窗并重置对应表单。 */
+function handleCancel() {
+  dialogVisible.value = false;
+  switch (dialogType.value) {
+    case DialogType.ACCOUNT:
+      userProfileFormRef.value?.resetFields();
+      break;
+    case DialogType.PASSWORD:
+      passwordChangeFormRef.value?.resetFields();
+      break;
+    case DialogType.MOBILE:
+      mobileBindingFormRef.value?.resetFields();
+      break;
+    case DialogType.EMAIL:
+      emailBindingFormRef.value?.resetFields();
+      break;
+  }
 }
 
-const dialog = reactive({
-  visible: false,
-  title: "",
-  type: "" as DialogType, // 修改账号资料,修改密码、绑定手机、绑定邮箱
-});
 const userProfileFormRef = ref();
 const passwordChangeFormRef = ref();
 const mobileBindingFormRef = ref();
 const emailBindingFormRef = ref();
 
-const userProfileForm = reactive<UserProfileForm>({});
-const passwordChangeForm = reactive<PasswordChangeForm>({});
-const mobileUpdateForm = reactive<MobileUpdateForm>({});
-const emailUpdateForm = reactive<EmailUpdateForm>({});
-
-// 修改密码校验规则
-const passwordChangeRules = {
-  oldPassword: [{ required: true, message: "请输入原密码", trigger: "blur" }],
-  newPassword: [{ required: true, message: "请输入新密码", trigger: "blur" }],
-  confirmPassword: [{ required: true, message: "请再次输入新密码", trigger: "blur" }],
-};
-
-// 手机号校验规则
-const mobileBindingRules = {
-  mobile: [
-    { required: true, message: "请输入手机号", trigger: "blur" },
-    {
-      pattern: /^1[3|4|5|6|7|8|9][0-9]\d{8}$/,
-      message: "请输入正确的手机号码",
-      trigger: "blur",
-    },
-  ],
-};
-
-// 邮箱校验规则
-const emailBindingRules = {
-  email: [
-    { required: true, message: "请输入邮箱", trigger: "blur" },
-    {
-      pattern: /\w[-\w.+]*@([A-Za-z0-9][-A-Za-z0-9]+\.)+[A-Za-z]{2,14}/,
-      message: "请输入正确的邮箱地址",
-      trigger: "blur",
-    },
-  ],
-};
-
-/**
- * 打开弹窗
- * @param type 弹窗类型 ACCOUNT: 账号资料 PASSWORD: 修改密码 MOBILE: 绑定手机 EMAIL: 绑定邮箱
- */
-const handleOpenDialog = (type: DialogType) => {
-  dialog.type = type;
-  dialog.visible = true;
-  switch (type) {
-    case DialogType.ACCOUNT:
-      dialog.title = "账号资料";
-      // 初始化表单数据
-      userProfileForm.id = userProfile.value.id;
-      userProfileForm.nickname = userProfile.value.nickname;
-      userProfileForm.gender = userProfile.value.gender;
-      break;
-    case DialogType.PASSWORD:
-      dialog.title = "修改密码";
-      break;
-    case DialogType.MOBILE:
-      dialog.title = "绑定手机";
-      break;
-    case DialogType.EMAIL:
-      dialog.title = "绑定邮箱";
-      break;
-  }
-};
-
-/**
- * 提交表单
- */
-const handleSubmit = async () => {
-  if (dialog.type === DialogType.ACCOUNT) {
-    try {
-      await UserAPI.updateProfile({ ...userProfileForm });
-      ElMessage.success("账号资料修改成功");
-      dialog.visible = false;
-      loadUserProfile();
-    } catch (err: any) {
-      ElMessage.error(err?.message || "更新失败");
-    }
-  } else if (dialog.type === DialogType.PASSWORD) {
-    if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
-      ElMessage.error("两次输入的密码不一致");
-      return;
-    }
-    try {
-      await UserAPI.changePassword(passwordChangeForm);
-      ElMessage.success("密码修改成功");
-      dialog.visible = false;
-    } catch (err: any) {
-      ElMessage.error(err?.message || "修改密码失败");
-    }
-  } else if (dialog.type === DialogType.MOBILE) {
-    try {
-      await UserAPI.updateProfile({ mobile: mobileUpdateForm.mobile });
-      ElMessage.success("手机号修改成功");
-      dialog.visible = false;
-      loadUserProfile();
-    } catch (err: any) {
-      ElMessage.error(err?.message || "修改失败");
-    }
-  } else if (dialog.type === DialogType.EMAIL) {
-    try {
-      await UserAPI.updateProfile({ email: emailUpdateForm.email });
-      ElMessage.success("邮箱修改成功");
-      dialog.visible = false;
-      loadUserProfile();
-    } catch (err: any) {
-      ElMessage.error(err?.message || "修改失败");
-    }
-  }
-};
-
-/**
- * 取消
- */
-const handleCancel = () => {
-  dialog.visible = false;
-  if (dialog.type === DialogType.ACCOUNT) {
-    userProfileFormRef.value?.resetFields();
-  } else if (dialog.type === DialogType.PASSWORD) {
-    passwordChangeFormRef.value?.resetFields();
-  } else if (dialog.type === DialogType.MOBILE) {
-    mobileBindingFormRef.value?.resetFields();
-  } else if (dialog.type === DialogType.EMAIL) {
-    emailBindingFormRef.value?.resetFields();
-  }
-};
+// ====== 头像上传 ======
 
 const fileInput = ref<HTMLInputElement | null>(null);
-const uploading = ref(false);
+const isUploading = ref(false);
 
-// 裁剪弹窗状态
 const cropperVisible = ref(false);
 const cropperSrcUrl = ref("");
-let cropperObjectUrl = ""; // createObjectURL 引用，需主动释放
+let cropperObjectUrl = "";
 
-// 预设头像选择
-const presetDialogVisible = ref(false);
-const allPresets = getAllPresets();
-const selectingPreset = ref(false);
-
-const triggerFileUpload = () => {
-  if (uploading.value) return;
+/** 触发文件选择器。 */
+function triggerFileUpload() {
+  if (isUploading.value) return;
   fileInput.value?.click();
-};
+}
 
 /**
- * 选择文件后打开裁剪弹窗（不直接上传原图）。
- * 前端白名单校验：仅允许 JPG / PNG / WEBP，最大 5MB。
+ * 文件选择后打开裁剪弹窗。
  *
- * @param {Event} e - input[type=file] change 事件。
+ * @description 前端白名单校验：仅允许 JPG / PNG / WEBP，最大 5MB。
+ * @param e - input[type=file] change 事件。
  */
-const handleFileChange = (e: Event) => {
+function handleFileChange(e: Event) {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
@@ -475,24 +344,22 @@ const handleFileChange = (e: Event) => {
     return;
   }
 
-  // 创建 Object URL 传入裁剪弹窗（弹窗关闭后统一释放）
   if (cropperObjectUrl) URL.revokeObjectURL(cropperObjectUrl);
   cropperObjectUrl = URL.createObjectURL(file);
   cropperSrcUrl.value = cropperObjectUrl;
   cropperVisible.value = true;
   input.value = "";
-};
+}
 
 /**
- * 裁剪确认回调：将裁剪后 Blob 上传至服务端。
- * 服务端 upload_avatar 已原子化写 DB，此处无需再调 updateProfile。
+ * 裁剪确认：上传裁剪后 Blob 至服务端。
  *
- * @param {{ blob: Blob; dataUrl: string }} payload - 裁剪结果。
+ * @param payload - 裁剪结果 { blob, dataUrl }。
  */
-const handleCropConfirm = async (payload: { blob: Blob; dataUrl: string }) => {
+async function handleCropConfirm(payload: { blob: Blob; dataUrl: string }) {
   let loadingSvc: { close(): void } | null = null;
   try {
-    uploading.value = true;
+    isUploading.value = true;
     loadingSvc = ElLoading.service({ text: "上传中...", background: "rgba(0,0,0,0.3)" });
     const croppedFile = new File([payload.blob], "avatar.jpg", { type: "image/jpeg" });
     const res = await UserAPI.uploadAvatar(croppedFile);
@@ -505,31 +372,37 @@ const handleCropConfirm = async (payload: { blob: Blob; dataUrl: string }) => {
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : "上传失败");
   } finally {
-    uploading.value = false;
+    isUploading.value = false;
     loadingSvc?.close();
     if (cropperObjectUrl) {
       URL.revokeObjectURL(cropperObjectUrl);
       cropperObjectUrl = "";
     }
   }
-};
+}
 
 /** 裁剪取消：释放 Object URL。 */
-const handleCropCancel = () => {
+function handleCropCancel() {
   if (cropperObjectUrl) {
     URL.revokeObjectURL(cropperObjectUrl);
     cropperObjectUrl = "";
   }
-};
+}
+
+// ====== 预设头像 ======
+
+const presetDialogVisible = ref(false);
+const allPresets = getAllPresets();
+const isSelectingPreset = ref(false);
 
 /**
- * 选择预设头像：直接调 updateProfile，更新 DB 和本地 store。
+ * 选择预设头像并更新数据库和本地 Store。
  *
- * @param {string} presetId - 预设标识符，如 'preset:03'。
+ * @param presetId - 预设标识符，如 'preset:03'。
  */
-const handleSelectPreset = async (presetId: string) => {
-  if (selectingPreset.value) return;
-  selectingPreset.value = true;
+async function handleSelectPreset(presetId: string) {
+  if (isSelectingPreset.value) return;
+  isSelectingPreset.value = true;
   try {
     await UserAPI.updateProfile({ avatar: presetId });
     userProfile.value.avatar = presetId;
@@ -539,43 +412,11 @@ const handleSelectPreset = async (presetId: string) => {
   } catch (err: unknown) {
     ElMessage.error(err instanceof Error ? err.message : "更新失败");
   } finally {
-    selectingPreset.value = false;
+    isSelectingPreset.value = false;
   }
-};
-
-/** 加载用户信息 */
-const preloadFromStore = () => {
-  // 先用已登录的简要信息填充，提升感知速度
-  const basic = userStore.userInfo || ({} as any);
-  if (basic && (basic.username || basic.nickname)) {
-    userProfile.value.username = basic.username;
-    userProfile.value.nickname = basic.nickname;
-    userProfile.value.avatar = basic.avatar;
-  }
-};
-
-const loadUserProfile = async () => {
-  loadError.value = null;
-  loading.value = true;
-  try {
-    const data = await Promise.race([
-      UserAPI.getProfile(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
-    ]);
-    userProfile.value = data as any;
-  } catch (err: any) {
-    if (err?.message === "timeout") {
-      loadError.value = "获取资料超时，请刷新重试";
-    } else {
-      loadError.value = err?.message || "加载失败";
-    }
-  } finally {
-    loading.value = false;
-  }
-};
+}
 
 onMounted(async () => {
-  // 预填用户基本信息，随后拉取完整资料
   preloadFromStore();
   await loadUserProfile();
 });
@@ -744,11 +585,11 @@ onMounted(async () => {
     font-size: 16px;
 
     &.male {
-      color: #409eff;
+      color: var(--el-color-primary);
     }
 
     &.female {
-      color: #f56c6c;
+      color: var(--el-color-danger);
     }
   }
 }
@@ -808,14 +649,13 @@ onMounted(async () => {
       height: 20px;
       font-size: 12px;
       font-weight: 700;
-      color: #fff;
+      color: var(--el-color-white);
       background: var(--el-color-primary);
       border-radius: 50%;
     }
   }
 }
 
-// 响应式适配
 @media (max-width: 768px) {
   .profile-container {
     padding: 10px;
