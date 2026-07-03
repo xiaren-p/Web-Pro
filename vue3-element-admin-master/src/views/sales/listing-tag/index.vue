@@ -136,6 +136,12 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 商品标签管理列表页。
+ *
+ * @description 薄编排层：组合 useListingTag composable 与搜索/编辑子组件。
+ *              所有数据查询、删除、分页逻辑在 composable 中。
+ */
 import { ref } from "vue";
 import { Plus, Delete, List } from "@element-plus/icons-vue";
 import { useListingTag } from "@/views/sales/listing-tag/useListingTag";
