@@ -53,16 +53,20 @@ export interface LossOrderSyncResponse {
 
 /** 数据接口响应结构。 */
 export interface LossOrderDataResponse {
-  list?: any[];
+  list?: Record<string, unknown>[];
   total?: number;
   sync_time?: string | null;
 }
 
-/** 拉取店铺下拉项。 */
+/**
+ * 拉取店铺下拉项。
+ *
+ * @returns 店铺选项数组。
+ */
 export async function fetchShopOptions(): Promise<ShopOptionRaw[]> {
   try {
     const res = await ShopsAPI.getOptions();
-    return (res || []).map((it: any) => ({
+    return (res || []).map((it: Record<string, unknown>) => ({
       id: it.id,
       name: it.name,
       country: it.country,
@@ -77,7 +81,7 @@ export async function fetchShopOptions(): Promise<ShopOptionRaw[]> {
 export async function fetchListingOwnerOptions(): Promise<ListingOwnerOptionRaw[]> {
   try {
     const res = await ShopsAPI.getOwners();
-    return (res || []).map((it: any) => ({
+    return (res || []).map((it: Record<string, unknown>) => ({
       id: it.id || it.value,
       name: it.label || it.name || it.realname,
     }));
