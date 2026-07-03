@@ -1,4 +1,3 @@
-<!-- 字典 -->
 <template>
   <div class="app-container">
     <!-- 搜索区域 -->
@@ -60,164 +59,121 @@
               {{ scope.row.status_text || (scope.row.status === 1 ? "启用" : "禁用") }}
             </el-tag>
           </template>
-        </el-table-column>
-        <el-table-column fixed="right" label="操作" align="center" width="220">
-          <template #default="scope">
-            <el-button
-              type="primary"
-              link
-              size="small"
-              :disabled="scope.row.status !== 1"
-              @click.stop="handleOpenDictData(scope.row)"
-            >
-              <template #icon>
-                <Collection />
-              </template>
-              字典数据
-            </el-button>
 
-            <el-button
-              v-hasPerm="['sys:dict:edit']"
-              type="primary"
-              link
-              size="small"
-              icon="edit"
-              @click.stop="handleEditClick(scope.row.id)"
-            >
-              编辑
-            </el-button>
-            <el-button
-              v-hasPerm="['sys:dict:delete']"
-              type="danger"
-              link
-              size="small"
-              icon="delete"
-              @click.stop="handleDelete(scope.row.id)"
-            >
-              删除
-            </el-button>
-          </template>
+          <script setup lang="ts">
+            import { DictAPI, type DictPageQuery, type DictPageVO } from "@/api/dict";
+            import DictTypeDialog from "./components/DictTypeDialog.vue";
+            import router from "@/router";
+
+            defineOptions({
+              name: "Dict",
+              inheritAttrs: false,
+            });
+
+            const queryFormRef = ref();
+            const dictTypeDialogRef = ref();
+
+            const loading = ref(false);
+            const ids = ref<string[]>([]);
+            const total = ref(0);
+
+            const queryParams = reactive<DictPageQuery>({
+              pageNum: 1,
+              pageSize: 10,
+            });
+
+            const tableData = ref<DictPageVO[]>();
+
+            /** 获取分页数据。 */
+            function fetchData() {
+              loading.value = true;
+              DictAPI.getPage(queryParams)
+                .then((data) => {
+                  tableData.value = data.list;
+                  total.value = data.total;
+                })
+                .finally(() => {
+                  loading.value = false;
+                });
+            }
+
+            /** 查询（重置页码后获取数据）。 */
+            function handleQuery() {
+              queryParams.pageNum = 1;
+              fetchData();
+            }
+
+            /** 重置查询。 */
+            function handleResetQuery() {
+              queryFormRef.value.resetFields();
+              queryParams.pageNum = 1;
+              fetchData();
+            }
+
+            /** 表格行选择回调。 */
+            function handleSelectionChange(selection: DictPageVO[]) {
+              ids.value = selection.map((item) => String(item.id));
+            }
+
+            /** 新增字典。 */
+            function handleAddClick() {
+              dictTypeDialogRef.value.open();
+            }
+
+            /**
+             * 编辑字典。
+             *
+             * @param id - 字典ID。
+             */
+            function handleEditClick(id: string) {
+              dictTypeDialogRef.value.open(id);
+            }
+
+            /**
+             * 删除字典（单个或批量）。
+             *
+             * @param id - 单个字典ID，不传则删除勾选项。
+             */
+            function handleDelete(id?: string) {
+              const dictIds = [id || ids.value].join(",");
+              if (!dictIds) {
+                ElMessage.warning("请勾选删除项");
+                return;
+              }
+              ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
+                confirmButtonText: "确定",
+                cancelButtonText: "取消",
+                type: "warning",
+              }).then(
+                () => {
+                  DictAPI.deleteByIds(dictIds).then(() => {
+                    ElMessage.success("删除成功");
+                    handleResetQuery();
+                  });
+                },
+                () => {
+                  ElMessage.info("已取消删除");
+                }
+              );
+            }
+
+            /** 跳转到字典数据管理页。 */
+            function handleOpenDictData(row: DictPageVO) {
+              router.push({
+                path: "/system/dict-item",
+                query: {
+                  dictCode: row.dictCode,
+                  title: "【" + row.name + "】字典数据",
+                  status: row.status,
+                },
+              });
+            }
+            onMounted(() => {
+              handleQuery();
+            });
+          </script>
         </el-table-column>
       </el-table>
-
-      <pagination
-        v-if="total > 0"
-        v-model:total="total"
-        v-model:page="queryParams.pageNum"
-        v-model:limit="queryParams.pageSize"
-        @pagination="fetchData"
-      />
     </el-card>
-
-    <DictTypeDialog ref="dictTypeDialogRef" @success="handleQuery" />
   </div>
 </template>
-
-<script setup lang="ts">
-import { DictAPI, type DictPageQuery, type DictPageVO } from "@/api/dict";
-import DictTypeDialog from "./components/DictTypeDialog.vue";
-import router from "@/router";
-
-defineOptions({
-  name: "Dict",
-  inherititems: false,
-});
-
-const queryFormRef = ref();
-const dictTypeDialogRef = ref();
-
-const loading = ref(false);
-const ids = ref<number[]>([]);
-const total = ref(0);
-
-const queryParams = reactive<DictPageQuery>({
-  pageNum: 1,
-  pageSize: 10,
-});
-
-const tableData = ref<DictPageVO[]>();
-
-// 获取数据
-function fetchData() {
-  loading.value = true;
-  DictAPI.getPage(queryParams)
-    .then((data) => {
-      tableData.value = data.list;
-      total.value = data.total;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-}
-
-// 查询（重置页码后获取数据）
-function handleQuery() {
-  queryParams.pageNum = 1;
-  fetchData();
-}
-
-// 重置查询
-function handleResetQuery() {
-  queryFormRef.value.resetFields();
-  queryParams.pageNum = 1;
-  fetchData();
-}
-
-// 行选择
-function handleSelectionChange(selection: any) {
-  ids.value = selection.map((item: any) => item.id);
-}
-
-// 新增字典
-function handleAddClick() {
-  dictTypeDialogRef.value.open();
-}
-
-/**
- * 编辑字典
- *
- * @param id 字典ID
- */
-function handleEditClick(id: string) {
-  dictTypeDialogRef.value.open(id);
-}
-
-/**
- * 删除字典
- *
- * @param id 字典ID
- */
-function handleDelete(id?: number) {
-  const attrGroupIds = [id || ids.value].join(",");
-  if (!attrGroupIds) {
-    ElMessage.warning("请勾选删除项");
-    return;
-  }
-  ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-    type: "warning",
-  }).then(
-    () => {
-      DictAPI.deleteByIds(attrGroupIds).then(() => {
-        ElMessage.success("删除成功");
-        handleResetQuery();
-      });
-    },
-    () => {
-      ElMessage.info("已取消删除");
-    }
-  );
-}
-
-// 打开字典项
-function handleOpenDictData(row: DictPageVO) {
-  router.push({
-    path: "/system/dict-item",
-    query: { dictCode: row.dictCode, title: "【" + row.name + "】字典数据", status: row.status },
-  });
-}
-onMounted(() => {
-  handleQuery();
-});
-</script>
