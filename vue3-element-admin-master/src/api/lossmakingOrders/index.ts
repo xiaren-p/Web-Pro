@@ -67,9 +67,9 @@ export async function fetchShopOptions(): Promise<ShopOptionRaw[]> {
   try {
     const res = await ShopsAPI.getOptions();
     return (res || []).map((it) => ({
-      id: it.id,
-      name: it.name,
-      country: (it as Record<string, unknown>).country,
+      id: String(it.id ?? it.value ?? ""),
+      name: String(it.name ?? it.label ?? ""),
+      country: (it as Record<string, unknown>).country as string | undefined,
     }));
   } catch (e) {
     console.error("fetchShopOptions error", e);
@@ -82,8 +82,8 @@ export async function fetchListingOwnerOptions(): Promise<ListingOwnerOptionRaw[
   try {
     const res = await ShopsAPI.getOwners();
     return (res || []).map((it) => ({
-      id: it.id || it.value,
-      name: it.label || it.name || (it as Record<string, unknown>).realname,
+      id: String(it.id ?? it.value ?? ""),
+      name: String(it.label ?? it.name ?? (it as Record<string, unknown>).realname ?? ""),
     }));
   } catch (e) {
     console.error("fetchListingOwnerOptions error", e);
