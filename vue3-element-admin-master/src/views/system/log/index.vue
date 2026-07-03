@@ -1,5 +1,6 @@
 <template>
   <div class="app-container">
+    <!-- 搜索区域 -->
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item prop="keywords" label="关键字">
@@ -60,17 +61,25 @@
 <script setup lang="ts">
 /**
  * 操作日志列表页。
+ *
+ * @description 薄编排层：组合 useLogList composable。
+ *              日志分页查询逻辑全部在 composable 中。
  */
 import { useLogList } from "./composables/useLogList";
+
 defineOptions({ name: "Log", inheritAttrs: false });
+
 const queryFormRef = ref();
 const { isLoading, total, queryParams, pageData, fetchData, handleQuery } = useLogList();
+
+/** 重置查询条件（含时间范围清空）并重新获取数据。 */
 function handleResetQuery() {
   queryFormRef.value?.resetFields();
   queryParams.pageNum = 1;
   queryParams.createTime = undefined;
   fetchData();
 }
+
 onMounted(() => {
   handleQuery();
 });

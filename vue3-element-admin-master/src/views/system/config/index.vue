@@ -1,5 +1,6 @@
 <template>
   <div class="app-container">
+    <!-- 搜索区域 -->
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item label="关键字" prop="keywords">
@@ -97,11 +98,15 @@
 <script setup lang="ts">
 /**
  * 系统配置管理列表页。
+ *
+ * @description 薄编排层：组合 useConfigList composable 与 ConfigDialog。
+ *              配置分页查询、删除、缓存刷新逻辑全部在 composable 中。
  */
 import { useConfigList } from "./composables/useConfigList";
 import ConfigDialog from "./components/ConfigDialog.vue";
 
 defineOptions({ name: "Config", inheritAttrs: false });
+
 const queryFormRef = ref();
 const configDialogRef = ref();
 const {
@@ -115,17 +120,32 @@ const {
   refreshCache,
   handleDelete: deleteAction,
 } = useConfigList();
+
+/** 重置查询条件并重新获取数据。 */
 function handleResetQuery() {
   queryFormRef.value?.resetFields();
   queryParams.pageNum = 1;
   fetchData();
 }
+
+/**
+ * 删除系统配置。
+ *
+ * @param id - 配置ID。
+ */
 function handleDelete(id: string) {
   deleteAction(id, () => queryFormRef.value?.resetFields());
 }
+
+/**
+ * 打开系统配置弹窗。
+ *
+ * @param id - 配置ID（编辑时传入，不传为新增）。
+ */
 function openDialog(id?: string) {
   configDialogRef.value.open(id);
 }
+
 onMounted(() => {
   handleQuery();
 });
