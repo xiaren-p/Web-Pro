@@ -20,7 +20,9 @@ interface PaginatedResponse<T> {
  * @param params - 查询参数。
  * @returns 分页结果。
  */
-export function fetchRuleList(params?: Record<string, unknown>): Promise<PaginatedResponse<AdRule>> {
+export function fetchRuleList(
+  params?: Record<string, unknown>
+): Promise<PaginatedResponse<AdRule>> {
   return request.get("/ads/rule-strategy/rules", { params });
 }
 
@@ -72,7 +74,9 @@ export function deleteRule(id: string | number): Promise<void> {
  * @param params - 查询参数。
  * @returns 分页结果。
  */
-export function fetchGroupList(params?: Record<string, unknown>): Promise<PaginatedResponse<AdRuleGroup>> {
+export function fetchGroupList(
+  params?: Record<string, unknown>
+): Promise<PaginatedResponse<AdRuleGroup>> {
   return request.get("/ads/rule-strategy/groups", { params });
 }
 
@@ -103,7 +107,10 @@ export function createGroup(data: Record<string, unknown>): Promise<AdRuleGroup>
  * @param data - 更新数据。
  * @returns 更新后的规则组。
  */
-export function updateGroup(id: string | number, data: Record<string, unknown>): Promise<AdRuleGroup> {
+export function updateGroup(
+  id: string | number,
+  data: Record<string, unknown>
+): Promise<AdRuleGroup> {
   return request.put(`/ads/rule-strategy/groups/${id}/update`, data);
 }
 
@@ -123,7 +130,10 @@ export function deleteGroup(id: string | number): Promise<void> {
  * @param ruleIds - 规则ID数组。
  * @returns 更新后的规则组。
  */
-export function addRulesToGroup(groupId: string | number, ruleIds: (string | number)[]): Promise<AdRuleGroup> {
+export function addRulesToGroup(
+  groupId: string | number,
+  ruleIds: (string | number)[]
+): Promise<AdRuleGroup> {
   return request.post(`/ads/rule-strategy/groups/${groupId}/add-rules`, { ruleIds });
 }
 
@@ -134,7 +144,10 @@ export function addRulesToGroup(groupId: string | number, ruleIds: (string | num
  * @param ruleId - 规则ID。
  * @returns 更新后的规则组。
  */
-export function removeRuleFromGroup(groupId: string | number, ruleId: string | number): Promise<AdRuleGroup> {
+export function removeRuleFromGroup(
+  groupId: string | number,
+  ruleId: string | number
+): Promise<AdRuleGroup> {
   return request.post(`/ads/rule-strategy/groups/${groupId}/remove-rule`, { ruleId });
 }
 
@@ -145,6 +158,9 @@ export function removeRuleFromGroup(groupId: string | number, ruleId: string | n
  * @param ruleOrder - 规则ID顺序数组。
  * @returns 更新后的规则组。
  */
-export function updateRuleOrder(groupId: string | number, ruleOrder: (string | number)[]): Promise<AdRuleGroup> {
+export function updateRuleOrder(
+  groupId: string | number,
+  ruleOrder: (string | number)[]
+): Promise<AdRuleGroup> {
   return request.put(`/ads/rule-strategy/groups/${groupId}/update`, { ruleOrder });
 }

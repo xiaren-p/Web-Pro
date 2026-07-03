@@ -63,7 +63,9 @@ export const NoticeAPI = {
    */
   getPage(params: Record<string, unknown>) {
     return request<any, PageResult<NoticePageVO[]>>({
-      url: `${NOTICE_BASE_URL}/page`, method: "get", params,
+      url: `${NOTICE_BASE_URL}/page`,
+      method: "get",
+      params,
     });
   },
   /**
@@ -120,7 +122,9 @@ export const NoticeAPI = {
    */
   getMyPage(params: Record<string, unknown>) {
     return request<any, PageResult<NoticePageVO[]>>({
-      url: `${NOTICE_BASE_URL}/my-page`, method: "get", params,
+      url: `${NOTICE_BASE_URL}/my-page`,
+      method: "get",
+      params,
     });
   },
   /** @deprecated 使用 getMyPage 替代。 */
@@ -134,7 +138,12 @@ export const NoticeAPI = {
    * @returns Blob 流。
    */
   exportData(params: Record<string, unknown>) {
-    return request({ url: `${NOTICE_BASE_URL}/export`, method: "get", params, responseType: "blob" });
+    return request({
+      url: `${NOTICE_BASE_URL}/export`,
+      method: "get",
+      params,
+      responseType: "blob",
+    });
   },
   /**
    * 创建通知。

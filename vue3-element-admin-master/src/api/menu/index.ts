@@ -73,8 +73,17 @@ const MENU_BASE_URL = "/menus";
 function mapToBackend(data: MenuForm) {
   const payload: Record<string, unknown> = {};
   const keys: Array<keyof MenuForm> = [
-    "name", "parentId", "type", "routeName", "path", "component",
-    "perms", "icon", "sort", "visible", "status",
+    "name",
+    "parentId",
+    "type",
+    "routeName",
+    "path",
+    "component",
+    "perms",
+    "icon",
+    "sort",
+    "visible",
+    "status",
   ];
   for (const k of keys) {
     if (data[k] !== undefined) payload[k] = data[k];
@@ -117,7 +126,9 @@ export const MenuAPI = {
    */
   getOptions(onlyParent?: boolean) {
     return request<any, MenuOption[]>({
-      url: `${MENU_BASE_URL}/options`, method: "get", params: { onlyParent },
+      url: `${MENU_BASE_URL}/options`,
+      method: "get",
+      params: { onlyParent },
     });
   },
   /**
@@ -128,7 +139,9 @@ export const MenuAPI = {
    */
   getAssignableOptions() {
     return request<any, MenuOption[]>({
-      url: `${MENU_BASE_URL}/options`, method: "get", params: { scope: "assignable" },
+      url: `${MENU_BASE_URL}/options`,
+      method: "get",
+      params: { scope: "assignable" },
     });
   },
   /**

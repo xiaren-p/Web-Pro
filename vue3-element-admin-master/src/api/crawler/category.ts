@@ -40,7 +40,11 @@ export const CategoryAPI = {
    * @returns 分页结果。
    */
   getPage(params: Record<string, unknown>) {
-    return request<any, PageResult<CategoryVO[]>>({ url: `${CATEGORY_BASE_URL}/page`, method: "get", params });
+    return request<any, PageResult<CategoryVO[]>>({
+      url: `${CATEGORY_BASE_URL}/page`,
+      method: "get",
+      params,
+    });
   },
   /**
    * 获取类目编辑表单。
@@ -59,7 +63,8 @@ export const CategoryAPI = {
    */
   getTimes(id: string) {
     return request<any, { list: { index: number; name: string }[]; all: string[] }>({
-      url: `${CATEGORY_BASE_URL}/${id}/times`, method: "get",
+      url: `${CATEGORY_BASE_URL}/${id}/times`,
+      method: "get",
     });
   },
   /**
@@ -70,8 +75,13 @@ export const CategoryAPI = {
    * @returns 文件状态。
    */
   checkFile(id: string, time: string) {
-    return request<any, { exists?: boolean; error_msg?: string; viewUrl?: string; downloadUrl?: string }>({
-      url: `${CATEGORY_BASE_URL}/${id}/file/check`, method: "get", params: { time },
+    return request<
+      any,
+      { exists?: boolean; error_msg?: string; viewUrl?: string; downloadUrl?: string }
+    >({
+      url: `${CATEGORY_BASE_URL}/${id}/file/check`,
+      method: "get",
+      params: { time },
     });
   },
   /**
@@ -83,7 +93,10 @@ export const CategoryAPI = {
    */
   downloadFile(id: string, time: string) {
     return request<any, Blob>({
-      url: `${CATEGORY_BASE_URL}/${id}/file`, method: "get", params: { time }, responseType: "blob",
+      url: `${CATEGORY_BASE_URL}/${id}/file`,
+      method: "get",
+      params: { time },
+      responseType: "blob",
     });
   },
   /**

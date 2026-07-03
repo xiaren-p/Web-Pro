@@ -54,7 +54,11 @@ export const ListingTagAPI = {
    * @returns 分页结果。
    */
   getPage(params: ListingTagQuery) {
-    return request<any, { total: number; data: ListingTagVO[] }>({ url: LISTING_TAG_BASE_URL, method: "get", params });
+    return request<any, { total: number; data: ListingTagVO[] }>({
+      url: LISTING_TAG_BASE_URL,
+      method: "get",
+      params,
+    });
   },
   /**
    * 获取标签详情。
@@ -96,7 +100,11 @@ export const ListingTagAPI = {
    * @param ids - ID数组。
    */
   batchDelete(ids: number[]) {
-    return request<any>({ url: `${LISTING_TAG_BASE_URL}/batch-delete`, method: "post", data: { ids } });
+    return request<any>({
+      url: `${LISTING_TAG_BASE_URL}/batch-delete`,
+      method: "post",
+      data: { ids },
+    });
   },
   /**
    * 更新标签状态。
@@ -105,7 +113,11 @@ export const ListingTagAPI = {
    * @param status - 目标状态。
    */
   updateStatus(id: number, status: string) {
-    return request<any>({ url: `${LISTING_TAG_BASE_URL}/${id}/status`, method: "put", data: { status } });
+    return request<any>({
+      url: `${LISTING_TAG_BASE_URL}/${id}/status`,
+      method: "put",
+      data: { status },
+    });
   },
   /**
    * 获取标签类型下拉选项。

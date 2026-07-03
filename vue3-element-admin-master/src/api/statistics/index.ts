@@ -18,12 +18,15 @@ export const StatisticsAPI = {
    * @deprecated 后端已移除。
    */
   lossmakingOrdersSync(body: Record<string, unknown>) {
-    return request<any, {
-      key: string;
-      sync_time: string | null;
-      needs_refresh: boolean;
-      syncing: boolean;
-    }>({ url: `${STAT_BASE_URL}/lossmakingorders_sync`, method: "post", data: body });
+    return request<
+      any,
+      {
+        key: string;
+        sync_time: string | null;
+        needs_refresh: boolean;
+        syncing: boolean;
+      }
+    >({ url: `${STAT_BASE_URL}/lossmakingorders_sync`, method: "post", data: body });
   },
   /**
    * 根据 cache key 读取已缓存的 pick_fields 数据（分页）。
@@ -33,8 +36,13 @@ export const StatisticsAPI = {
    * @deprecated 后端已移除。
    */
   lossmakingOrdersData(body: Record<string, unknown>) {
-    return request<any, { list: Record<string, unknown>[]; total: number; sync_time: string | null }>({
-      url: `${STAT_BASE_URL}/lossmakingorders_data`, method: "post", data: body,
+    return request<
+      any,
+      { list: Record<string, unknown>[]; total: number; sync_time: string | null }
+    >({
+      url: `${STAT_BASE_URL}/lossmakingorders_data`,
+      method: "post",
+      data: body,
     });
   },
 };

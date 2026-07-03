@@ -2,12 +2,12 @@ import request from "@/utils/request";
 
 /** 广告活动列表分页响应结构 */
 interface AdCampaignsResponse {
-  list: any[];
+  list: Record<string, unknown>[];
   total: number;
   summary?: Record<string, unknown>;
 }
 
-export function getAdCampaigns(data: any): Promise<AdCampaignsResponse> {
+export function getAdCampaigns(data: Record<string, unknown>): Promise<AdCampaignsResponse> {
   return request({
     url: "/ads/campaigns",
     method: "post",
@@ -15,35 +15,44 @@ export function getAdCampaigns(data: any): Promise<AdCampaignsResponse> {
   });
 }
 
-export function getAdOptions(): Promise<any> {
-  return request({
-    url: "/ads/options",
-    method: "post",
-  });
+/** 广告选项响应 */
+interface AdOptionsResponse {
+  countries?: { value: string; label: string }[];
+  profiles?: { value: string; label: string; country?: string }[];
+  bidding_types?: { value: string; label: string }[];
 }
 
-export function getAdSkuOptions(data?: any): Promise<any> {
-  return request({
-    url: "/ads/sku-options",
-    method: "post",
-    data,
-  });
+/** 广告 SKU 选项响应 */
+interface AdSkuOptionsResponse {
+  skus?: Record<string, unknown>[];
 }
 
-export function getAdEnumLabels(data?: any): Promise<any> {
-  return request({
-    url: "/ads/enum-labels",
-    method: "post",
-    data,
-  });
+/** 广告枚举标签响应 */
+interface AdEnumLabelsResponse {
+  labels?: Record<string, unknown>[];
 }
 
-export function getAdPortfolioOptions(data?: any): Promise<any> {
-  return request({
-    url: "/ads/portfolios/options",
-    method: "post",
-    data,
-  });
+/** 广告组合选项响应 */
+interface AdPortfolioOptionsResponse {
+  portfolios?: { value: string; label: string }[];
+}
+
+export function getAdOptions(): Promise<AdOptionsResponse> {
+  return request({ url: "/ads/options", method: "post" });
+}
+
+export function getAdSkuOptions(data?: Record<string, unknown>): Promise<AdSkuOptionsResponse> {
+  return request({ url: "/ads/sku-options", method: "post", data });
+}
+
+export function getAdEnumLabels(data?: Record<string, unknown>): Promise<AdEnumLabelsResponse> {
+  return request({ url: "/ads/enum-labels", method: "post", data });
+}
+
+export function getAdPortfolioOptions(
+  data?: Record<string, unknown>
+): Promise<AdPortfolioOptionsResponse> {
+  return request({ url: "/ads/portfolios/options", method: "post", data });
 }
 
 /** 广告活动详情基础信息响应结构 */
@@ -90,7 +99,7 @@ export interface AdGroupsParams {
 
 /** 广告组列表分页响应结构 */
 export interface AdGroupsResponse {
-  list: any[];
+  list: Record<string, unknown>[];
   total: number;
   summary?: Record<string, unknown>;
   currency_icon?: string;
@@ -130,7 +139,7 @@ export interface AdsParams {
 
 /** 广告投放列表分页响应结构 */
 export interface AdsResponse {
-  list: any[];
+  list: Record<string, unknown>[];
   total: number;
   summary?: Record<string, unknown>;
   currency_icon?: string;
@@ -167,7 +176,7 @@ export interface AutoTargetingParams {
 
 /** 自动投放条款列表分页响应结构 */
 export interface AutoTargetingResponse {
-  list: any[];
+  list: Record<string, unknown>[];
   total: number;
   summary?: Record<string, unknown>;
   currency_icon?: string;
@@ -204,7 +213,7 @@ export interface AutoNegativeTargetingParams {
 
 /** 自动广告否定定向列表分页响应结构 */
 export interface AutoNegativeTargetingResponse {
-  list: any[];
+  list: Record<string, unknown>[];
   total: number;
   summary?: Record<string, unknown>;
   currency_icon?: string;
@@ -243,7 +252,7 @@ export interface NegativeKeywordParams {
 
 /** 否定关键词列表分页响应结构 */
 export interface NegativeKeywordResponse {
-  list: any[];
+  list: Record<string, unknown>[];
   total: number;
   summary?: Record<string, unknown>;
   currency_icon?: string;
@@ -284,7 +293,7 @@ export interface KeywordParams {
 
 /** 关键词列表分页响应结构 */
 export interface KeywordResponse {
-  list: any[];
+  list: Record<string, unknown>[];
   total: number;
   summary?: Record<string, unknown>;
   currency_icon?: string;
@@ -855,7 +864,7 @@ export interface ProductTargetingParams {
 
 /** 产品投放列表分页响应 */
 export interface ProductTargetingResponse {
-  list: any[];
+  list: Record<string, unknown>[];
   total: number;
   summary?: Record<string, unknown>;
   currency_icon?: string;

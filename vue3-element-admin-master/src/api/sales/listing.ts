@@ -15,7 +15,9 @@ export const SalesProductListingAPI = {
    */
   getPage(params: Record<string, unknown>) {
     return request<{ total: number; data: ListingItemVO[] }, any>({
-      url: "/sales/product/listing", method: "get", params,
+      url: "/sales/product/listing",
+      method: "get",
+      params,
     });
   },
   /**
@@ -25,8 +27,16 @@ export const SalesProductListingAPI = {
    */
   upsertLabels(
     data:
-      | { id: number; asin: string; tags: { globalTagId: string; tagName: string; color: string }[] }
-      | { id: number; asin: string; tags: { globalTagId: string; tagName: string; color: string }[] }[]
+      | {
+          id: number;
+          asin: string;
+          tags: { globalTagId: string; tagName: string; color: string }[];
+        }
+      | {
+          id: number;
+          asin: string;
+          tags: { globalTagId: string; tagName: string; color: string }[];
+        }[]
   ) {
     return request<any>({ url: "/sales/product/listing/labels/upsert", method: "post", data });
   },
@@ -36,7 +46,9 @@ export const SalesProductListingAPI = {
    * @param data - 分类数据（单条或数组）。
    */
   upsertAssort(
-    data: { id: number; asin: string; assort: string } | { id: number; asin: string; assort: string }[]
+    data:
+      | { id: number; asin: string; assort: string }
+      | { id: number; asin: string; assort: string }[]
   ) {
     return request<any>({ url: "/sales/product/listing/assort/upsert", method: "post", data });
   },

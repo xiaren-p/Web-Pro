@@ -72,7 +72,11 @@ export const DictAPI = {
    * @returns 分页结果。
    */
   getPage(params: DictPageQuery) {
-    return request<any, PageResult<DictPageVO[]>>({ url: `${DICT_BASE_URL}/page`, method: "get", params });
+    return request<any, PageResult<DictPageVO[]>>({
+      url: `${DICT_BASE_URL}/page`,
+      method: "get",
+      params,
+    });
   },
   /**
    * 获取全部字典类型列表。
@@ -125,7 +129,9 @@ export const DictAPI = {
    */
   getItemPage(dictCode: string, params: DictItemPageQuery) {
     return request<any, PageResult<DictItemPageVO[]>>({
-      url: `${DICT_BASE_URL}/${dictCode}/items/page`, method: "get", params,
+      url: `${DICT_BASE_URL}/${dictCode}/items/page`,
+      method: "get",
+      params,
     });
   },
   /**
@@ -136,7 +142,10 @@ export const DictAPI = {
    * @returns 表单数据。
    */
   getItemForm(dictCode: string, itemId: string) {
-    return request<any, DictItemForm>({ url: `${DICT_BASE_URL}/${dictCode}/items/${itemId}/form`, method: "get" });
+    return request<any, DictItemForm>({
+      url: `${DICT_BASE_URL}/${dictCode}/items/${itemId}/form`,
+      method: "get",
+    });
   },
   /**
    * 创建字典项。
@@ -173,7 +182,10 @@ export const DictAPI = {
    * @returns 选项列表。
    */
   getItemOptions(dictCode: string) {
-    return request<any, DictItemOption[]>({ url: `${DICT_BASE_URL}/${dictCode}/items/options`, method: "get" });
+    return request<any, DictItemOption[]>({
+      url: `${DICT_BASE_URL}/${dictCode}/items/options`,
+      method: "get",
+    });
   },
   /** @deprecated 使用 getItemPage 替代。 */
   getDictItemPage(dictCode: string, params: DictItemPageQuery) {

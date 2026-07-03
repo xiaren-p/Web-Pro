@@ -50,7 +50,9 @@ export const PositionAPI = {
    */
   getPage(params: PositionPageQuery) {
     return request<any, PageResult<PositionPageVO[]>>({
-      url: `${POSITION_BASE_URL}/page`, method: "get", params,
+      url: `${POSITION_BASE_URL}/page`,
+      method: "get",
+      params,
     });
   },
   /**
@@ -102,7 +104,10 @@ export const PositionAPI = {
    * @returns 菜单ID数组。
    */
   getMenuIds(positionId: string) {
-    return request<any, string[]>({ url: `${POSITION_BASE_URL}/${positionId}/menuIds`, method: "get" });
+    return request<any, string[]>({
+      url: `${POSITION_BASE_URL}/${positionId}/menuIds`,
+      method: "get",
+    });
   },
   /**
    * 保存岗位菜单权限。
@@ -112,7 +117,9 @@ export const PositionAPI = {
    */
   saveMenus(positionId: string, menuIds: Array<string | number>) {
     return request({
-      url: `${POSITION_BASE_URL}/${positionId}/menus`, method: "put", data: { menuIds },
+      url: `${POSITION_BASE_URL}/${positionId}/menus`,
+      method: "put",
+      data: { menuIds },
     });
   },
 };

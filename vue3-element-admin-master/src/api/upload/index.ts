@@ -29,7 +29,10 @@ export const UploadAPI = {
     const params: Record<string, string> = {};
     if (thumbs && thumbs.length) params.thumbs = thumbs.join(",");
     return request<any, ImageUploadResult>({
-      url: `${UPLOAD_BASE_URL}/upload-image`, method: "post", data: form, params,
+      url: `${UPLOAD_BASE_URL}/upload-image`,
+      method: "post",
+      data: form,
+      params,
     });
   },
 };

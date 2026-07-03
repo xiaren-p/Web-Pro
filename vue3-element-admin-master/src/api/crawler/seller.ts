@@ -31,7 +31,11 @@ export const SellerAPI = {
    * @returns 账号列表。
    */
   getList(params: Record<string, unknown>) {
-    return request<any, CrawlerSellerVO[]>({ url: `${CRAWLER_SELLER_BASE_URL}`, method: "get", params });
+    return request<any, CrawlerSellerVO[]>({
+      url: `${CRAWLER_SELLER_BASE_URL}`,
+      method: "get",
+      params,
+    });
   },
   /**
    * 获取账号编辑表单。
@@ -40,7 +44,10 @@ export const SellerAPI = {
    * @returns 表单数据。
    */
   getFormData(id: string) {
-    return request<any, CrawlerSellerForm>({ url: `${CRAWLER_SELLER_BASE_URL}/${id}/form`, method: "get" });
+    return request<any, CrawlerSellerForm>({
+      url: `${CRAWLER_SELLER_BASE_URL}/${id}/form`,
+      method: "get",
+    });
   },
   /**
    * 创建账号。

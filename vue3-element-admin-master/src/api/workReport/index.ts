@@ -71,7 +71,9 @@ export interface TeamStatsDetail {
  */
 export function getWorkReportList(params: WorkReportQuery) {
   return request<any, { data: WorkReportVO[]; total: number }>({
-    url: WORK_REPORT_BASE_URL, method: "get", params,
+    url: WORK_REPORT_BASE_URL,
+    method: "get",
+    params,
   });
 }
 
@@ -85,7 +87,9 @@ export function getWorkReportList(params: WorkReportQuery) {
  */
 export function getTeamStats(date?: string, dept_id?: number | string, type?: string) {
   return request<any, TeamStatsVO>({
-    url: `${WORK_REPORT_BASE_URL}/team/stats`, method: "get", params: { date, dept_id, type },
+    url: `${WORK_REPORT_BASE_URL}/team/stats`,
+    method: "get",
+    params: { date, dept_id, type },
   });
 }
 
@@ -99,10 +103,15 @@ export function getTeamStats(date?: string, dept_id?: number | string, type?: st
  * @returns 人员列表。
  */
 export function getTeamStatsDetails(
-  date?: string, dept_id?: number | string, type?: string, status?: string
+  date?: string,
+  dept_id?: number | string,
+  type?: string,
+  status?: string
 ) {
   return request<any, TeamStatsDetail[]>({
-    url: `${WORK_REPORT_BASE_URL}/team/stats/details`, method: "get", params: { date, dept_id, type, status },
+    url: `${WORK_REPORT_BASE_URL}/team/stats/details`,
+    method: "get",
+    params: { date, dept_id, type, status },
   });
 }
 

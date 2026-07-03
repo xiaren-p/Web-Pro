@@ -105,7 +105,11 @@ export const UserAPI = {
    * @returns 分页结果。
    */
   getPage(queryParams: UserPageQuery) {
-    return request<any, PageResult<UserPageVO[]>>({ url: `${USER_BASE_URL}/page`, method: "get", params: queryParams });
+    return request<any, PageResult<UserPageVO[]>>({
+      url: `${USER_BASE_URL}/page`,
+      method: "get",
+      params: queryParams,
+    });
   },
   /**
    * 获取用户编辑表单数据（含部门/岗位信息）。
@@ -140,7 +144,11 @@ export const UserAPI = {
    * @param password - 新密码。
    */
   resetPassword(id: string, password: string) {
-    return request({ url: `${USER_BASE_URL}/${id}/password/reset`, method: "put", params: { password } });
+    return request({
+      url: `${USER_BASE_URL}/${id}/password/reset`,
+      method: "put",
+      params: { password },
+    });
   },
   /**
    * 批量删除用户（逗号分隔ID）。
@@ -223,6 +231,10 @@ export const UserAPI = {
   uploadAvatar(file: File) {
     const form = new FormData();
     form.append("file", file);
-    return request<unknown, { url: string }>({ url: `${USER_BASE_URL}/avatar`, method: "post", data: form });
+    return request<unknown, { url: string }>({
+      url: `${USER_BASE_URL}/avatar`,
+      method: "post",
+      data: form,
+    });
   },
 };
