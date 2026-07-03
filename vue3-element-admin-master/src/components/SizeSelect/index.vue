@@ -18,7 +18,7 @@
     </el-dropdown>
   </el-tooltip>
 </template>
-
+`r`n`r`n
 <script setup lang="ts">
 import { ComponentSize } from "@/enums/settings/layout-enum";
 import { useAppStore } from "@/store/modules/app-store";

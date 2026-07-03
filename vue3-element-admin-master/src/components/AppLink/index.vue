@@ -3,7 +3,7 @@
     <slot />
   </component>
 </template>
-
+`r`n`r`n
 <script setup lang="ts">
 defineOptions({
   name: "AppLink",

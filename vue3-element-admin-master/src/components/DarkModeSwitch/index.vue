@@ -20,6 +20,7 @@
     </template>
   </el-dropdown>
 </template>
+`r`n`r`n
 <script setup lang="ts">
 import { useSettingsStore } from "@/store";
 import { ThemeMode } from "@/enums";

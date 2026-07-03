@@ -38,6 +38,7 @@
     @close="handlePreviewClose"
   />
 </template>
+`r`n`r`n
 <script setup lang="ts">
 import { UploadRawFile, UploadRequestOptions, UploadUserFile } from "element-plus";
 // 文件上传模块已移除：该组件保留 UI，占位提示，不调用后端
@@ -205,4 +206,5 @@ onMounted(() => {
   fileList.value = modelValue.value.map((url) => ({ url }) as UploadUserFile);
 });
 </script>
+
 <style lang="scss" scoped></style>

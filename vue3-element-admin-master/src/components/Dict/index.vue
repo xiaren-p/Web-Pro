@@ -40,7 +40,7 @@
     </el-checkbox>
   </el-checkbox-group>
 </template>
-
+`r`n`r`n
 <script setup lang="ts">
 import { useDictStore } from "@/store";
 

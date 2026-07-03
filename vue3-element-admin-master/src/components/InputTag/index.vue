@@ -25,6 +25,7 @@
     </div>
   </el-scrollbar>
 </template>
+`r`n`r`n
 <script setup lang="ts">
 import type { InputInstance } from "element-plus";
 

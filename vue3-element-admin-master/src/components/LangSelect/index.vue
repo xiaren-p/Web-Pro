@@ -15,7 +15,7 @@
     </template>
   </el-dropdown>
 </template>
-
+`r`n`r`n
 <script setup lang="ts">
 import { useAppStore } from "@/store/modules/app-store";
 import { LanguageEnum } from "@/enums/settings/locale-enum";

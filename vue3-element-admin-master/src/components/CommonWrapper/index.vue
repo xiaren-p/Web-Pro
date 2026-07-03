@@ -3,6 +3,7 @@
     <slot></slot>
   </div>
 </template>
+`r`n`r`n
 <script setup lang="ts">
 defineProps({
   padding: {
@@ -11,6 +12,7 @@ defineProps({
   },
 });
 </script>
+
 <style scoped lang="scss">
 .el {
   cursor: pointer;

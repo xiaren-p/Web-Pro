@@ -27,7 +27,7 @@
     />
   </div>
 </template>
-
+`r`n`r`n
 <script setup lang="ts">
 import "@wangeditor-next/editor/dist/css/style.css";
 import { Toolbar, Editor } from "@wangeditor-next/editor-for-vue";

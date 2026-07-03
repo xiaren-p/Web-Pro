@@ -59,7 +59,7 @@
     </div>
   </div>
 </template>
-
+`r`n`r`n
 <script setup lang="ts">
 /**
  * Plan 提案交互卡片。

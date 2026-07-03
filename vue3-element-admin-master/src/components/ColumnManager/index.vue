@@ -96,7 +96,7 @@
     </template>
   </el-drawer>
 </template>
-
+`r`n`r`n
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
 import Sortable from "sortablejs";

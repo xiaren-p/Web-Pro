@@ -3,7 +3,7 @@
     <div :class="['i-svg:collapse', { hamburger: true, 'is-active': isActive }, hamburgerClass]" />
   </div>
 </template>
-
+`r`n`r`n
 <script setup lang="ts">
 import { useSettingsStore } from "@/store";
 import { ThemeMode, SidebarColor } from "@/enums/settings/theme-enum";

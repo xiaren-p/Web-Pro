@@ -6,7 +6,7 @@
     </slot>
   </el-button>
 </template>
-
+`r`n`r`n
 <script setup lang="ts">
 defineOptions({
   name: "CopyButton",

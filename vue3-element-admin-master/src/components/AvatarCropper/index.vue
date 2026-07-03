@@ -41,7 +41,7 @@
     </template>
   </el-dialog>
 </template>
-
+`r`n`r`n
 <script setup lang="ts">
 /**
  * 头像裁剪弹窗组件。
