@@ -1,4 +1,3 @@
-<!-- 系统配置 -->
 <template>
   <div class="app-container">
     <!-- 搜索区域 -->
@@ -115,7 +114,7 @@ const queryFormRef = ref();
 const configDialogRef = ref();
 
 const loading = ref(false);
-const selectIds = ref<number[]>([]);
+const selectIds = ref<string[]>([]);
 const total = ref(0);
 
 const queryParams = reactive<ConfigPageQuery>({
@@ -124,10 +123,9 @@ const queryParams = reactive<ConfigPageQuery>({
   keywords: "",
 });
 
-// 系统配置表格数据
 const pageData = ref<ConfigPageVO[]>([]);
 
-// 获取数据
+/** Fetch paginated data. */
 function fetchData() {
   loading.value = true;
   ConfigAPI.getPage(queryParams)
@@ -140,37 +138,41 @@ function fetchData() {
     });
 }
 
-// 查询（重置页码后获取数据）
+/** Query (reset page and fetch). */
 function handleQuery() {
   queryParams.pageNum = 1;
   fetchData();
 }
 
-// 重置查询
+/** Reset query. */
 function handleResetQuery() {
   queryFormRef.value.resetFields();
   queryParams.pageNum = 1;
   fetchData();
 }
 
-// 行复选框选中项变化
-function handleSelectionChange(selection: any) {
-  selectIds.value = selection.map((item: any) => item.id);
+/** Selection change handler. */
+function handleSelectionChange(selection: ConfigPageVO[]) {
+  selectIds.value = selection.map((item) => String(item.id));
 }
 
-// 打开系统配置弹窗
+/**
+ * Open config dialog.
+ *
+ * @param id - Config ID (for editing).
+ */
 function handleOpenDialog(id?: string) {
   configDialogRef.value.open(id);
 }
 
-// 刷新缓存(防抖)
+/** Refresh config cache (debounced 1s). */
 const handleRefreshCache = useDebounceFn(() => {
   ConfigAPI.refreshCache().then(() => {
     ElMessage.success("刷新成功");
   });
 }, 1000);
 
-// 删除系统配置
+/** Delete config. */
 function handleDelete(id: string) {
   ElMessageBox.confirm("确认删除该项配置?", "警告", {
     confirmButtonText: "确定",
