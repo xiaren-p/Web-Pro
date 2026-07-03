@@ -1,6 +1,5 @@
 <template>
   <div class="app-container">
-    <!-- 搜索区域 -->
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item label="关键字" prop="keywords">
@@ -11,29 +10,22 @@
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-
         <el-form-item class="search-buttons">
           <el-button type="primary" icon="search" @click="handleQuery">搜索</el-button>
           <el-button icon="refresh" @click="handleResetQuery">重置</el-button>
         </el-form-item>
       </el-form>
     </div>
-
     <el-card shadow="hover" class="data-table">
       <div class="data-table__toolbar">
         <div class="data-table__toolbar--actions">
-          <el-button
-            v-hasPerm="['sys:dict:add']"
-            type="success"
-            icon="plus"
-            @click="handleAddClick()"
-          >
+          <el-button v-hasPerm="['sys:dict:add']" type="success" icon="plus" @click="openDialog()">
             新增
           </el-button>
           <el-button
             v-hasPerm="['sys:dict:delete']"
             type="danger"
-            :disabled="ids.length === 0"
+            :disabled="selectedIds.length === 0"
             icon="delete"
             @click="handleDelete()"
           >
@@ -41,9 +33,8 @@
           </el-button>
         </div>
       </div>
-
       <el-table
-        v-loading="loading"
+        v-loading="isLoading"
         highlight-current-row
         :data="tableData"
         border
@@ -67,21 +58,18 @@
               link
               size="small"
               :disabled="scope.row.status !== 1"
-              @click.stop="handleOpenDictData(scope.row)"
+              @click.stop="openDictData(scope.row)"
             >
-              <template #icon>
-                <Collection />
-              </template>
+              <template #icon><Collection /></template>
               字典数据
             </el-button>
-
             <el-button
               v-hasPerm="['sys:dict:edit']"
               type="primary"
               link
               size="small"
               icon="edit"
-              @click.stop="handleEditClick(scope.row.id)"
+              @click.stop="editDialog(scope.row.id)"
             >
               编辑
             </el-button>
@@ -98,7 +86,6 @@
           </template>
         </el-table-column>
       </el-table>
-
       <pagination
         v-if="total > 0"
         v-model:total="total"
@@ -107,116 +94,55 @@
         @pagination="fetchData"
       />
     </el-card>
-
     <DictTypeDialog ref="dictTypeDialogRef" @success="handleQuery" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { DictAPI, type DictPageQuery, type DictPageVO } from "@/api/dict";
+/**
+ * 字典管理列表页。
+ */
+import { useDictList } from "./composables/useDictList";
+import type { DictPageVO } from "@/api/dict";
 import DictTypeDialog from "./components/DictTypeDialog.vue";
 import router from "@/router";
 
-defineOptions({
-  name: "Dict",
-  inheritAttrs: false,
-});
+defineOptions({ name: "Dict", inheritAttrs: false });
 
 const queryFormRef = ref();
 const dictTypeDialogRef = ref();
+const {
+  isLoading,
+  selectedIds,
+  total,
+  queryParams,
+  tableData,
+  fetchData,
+  handleQuery,
+  handleSelectionChange,
+  handleDelete: deleteAction,
+} = useDictList();
 
-const loading = ref(false);
-const ids = ref<string[]>([]);
-const total = ref(0);
-
-const queryParams = reactive<DictPageQuery>({
-  pageNum: 1,
-  pageSize: 10,
-});
-
-const tableData = ref<DictPageVO[]>();
-
-/** Get paginated data. */
-function fetchData() {
-  loading.value = true;
-  DictAPI.getPage(queryParams)
-    .then((data) => {
-      tableData.value = data.list;
-      total.value = data.total;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-}
-
-/** Query (reset page and fetch). */
-function handleQuery() {
-  queryParams.pageNum = 1;
-  fetchData();
-}
-
-/** Reset query. */
 function handleResetQuery() {
-  queryFormRef.value.resetFields();
+  queryFormRef.value?.resetFields();
   queryParams.pageNum = 1;
   fetchData();
 }
-
-/** Selection change handler. */
-function handleSelectionChange(selection: DictPageVO[]) {
-  ids.value = selection.map((item) => String(item.id));
+function handleDelete(id?: string) {
+  deleteAction(id, () => queryFormRef.value?.resetFields());
 }
-
-/** Open create dialog. */
-function handleAddClick() {
+function openDialog() {
   dictTypeDialogRef.value.open();
 }
-
-/**
- * Edit dict.
- *
- * @param id - Dict ID.
- */
-function handleEditClick(id: string) {
+function editDialog(id: string) {
   dictTypeDialogRef.value.open(id);
 }
-
-/**
- * Delete dict (single or batch).
- *
- * @param id - Single dict ID; if omitted, deletes selected rows.
- */
-function handleDelete(id?: string) {
-  const dictIds = [id || ids.value].join(",");
-  if (!dictIds) {
-    ElMessage.warning("请勾选删除项");
-    return;
-  }
-  ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-    type: "warning",
-  }).then(
-    () => {
-      DictAPI.deleteByIds(dictIds).then(() => {
-        ElMessage.success("删除成功");
-        handleResetQuery();
-      });
-    },
-    () => {
-      ElMessage.info("已取消删除");
-    }
-  );
-}
-
-/** Navigate to dict data management page. */
-function handleOpenDictData(row: DictPageVO) {
+function openDictData(row: DictPageVO) {
   router.push({
     path: "/system/dict-item",
-    query: { dictCode: row.dictCode, title: "【" + row.name + "】字典数据", status: row.status },
+    query: { dictCode: row.dictCode, title: "[" + row.name + "]字典数据", status: row.status },
   });
 }
-
 onMounted(() => {
   handleQuery();
 });

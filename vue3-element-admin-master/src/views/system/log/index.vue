@@ -1,6 +1,5 @@
 <template>
   <div class="app-container">
-    <!-- 搜索区域 -->
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item prop="keywords" label="关键字">
@@ -11,7 +10,6 @@
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-
         <el-form-item prop="createTime" label="操作时间">
           <el-date-picker
             v-model="queryParams.createTime"
@@ -24,17 +22,15 @@
             style="width: 200px"
           />
         </el-form-item>
-
         <el-form-item class="search-buttons">
           <el-button type="primary" icon="search" @click="handleQuery">搜索</el-button>
           <el-button icon="refresh" @click="handleResetQuery">重置</el-button>
         </el-form-item>
       </el-form>
     </div>
-
     <el-card shadow="hover" class="data-table">
       <el-table
-        v-loading="loading"
+        v-loading="isLoading"
         :data="pageData"
         highlight-current-row
         border
@@ -50,7 +46,6 @@
         <el-table-column label="终端系统" prop="os" width="200" show-overflow-tooltip />
         <el-table-column label="执行时间(ms)" prop="executionTime" width="150" />
       </el-table>
-
       <pagination
         v-if="total > 0"
         v-model:total="total"
@@ -63,55 +58,19 @@
 </template>
 
 <script setup lang="ts">
-defineOptions({
-  name: "Log",
-  inheritAttrs: false,
-});
-
-import { LogAPI, type LogPageQuery, type LogPageVO } from "@/api/log";
-
+/**
+ * 操作日志列表页。
+ */
+import { useLogList } from "./composables/useLogList";
+defineOptions({ name: "Log", inheritAttrs: false });
 const queryFormRef = ref();
-
-const loading = ref(false);
-const total = ref(0);
-
-const queryParams = reactive<LogPageQuery>({
-  pageNum: 1,
-  pageSize: 10,
-  keywords: "",
-  createTime: ["", ""],
-});
-
-// 日志表格数据
-const pageData = ref<LogPageVO[]>();
-
-/** 获取数据 */
-function fetchData() {
-  loading.value = true;
-  LogAPI.getPage(queryParams)
-    .then((data) => {
-      pageData.value = data.list;
-      total.value = data.total;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-}
-
-/** 查询（重置页码后获取数据） */
-function handleQuery() {
-  queryParams.pageNum = 1;
-  fetchData();
-}
-
-/** 重置查询 */
+const { isLoading, total, queryParams, pageData, fetchData, handleQuery } = useLogList();
 function handleResetQuery() {
-  queryFormRef.value.resetFields();
+  queryFormRef.value?.resetFields();
   queryParams.pageNum = 1;
   queryParams.createTime = undefined;
   fetchData();
 }
-
 onMounted(() => {
   handleQuery();
 });

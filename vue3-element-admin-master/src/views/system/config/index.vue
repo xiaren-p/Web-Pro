@@ -1,6 +1,5 @@
 <template>
   <div class="app-container">
-    <!-- 搜索区域 -->
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item label="关键字" prop="keywords">
@@ -11,14 +10,12 @@
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-
         <el-form-item class="search-buttons">
           <el-button type="primary" icon="search" @click="handleQuery">搜索</el-button>
           <el-button icon="refresh" @click="handleResetQuery">重置</el-button>
         </el-form-item>
       </el-form>
     </div>
-
     <el-card shadow="hover" class="data-table">
       <div class="data-table__toolbar">
         <div class="data-table__toolbar--actions">
@@ -26,7 +23,7 @@
             v-hasPerm="['sys:config:add']"
             type="success"
             icon="plus"
-            @click="handleOpenDialog()"
+            @click="openDialog()"
           >
             新增
           </el-button>
@@ -34,16 +31,15 @@
             v-hasPerm="['sys:config:refresh']"
             color="#626aef"
             icon="RefreshLeft"
-            @click="handleRefreshCache"
+            @click="refreshCache"
           >
             刷新缓存
           </el-button>
         </div>
       </div>
-
       <el-table
         ref="dataTableRef"
-        v-loading="loading"
+        v-loading="isLoading"
         :data="pageData"
         highlight-current-row
         class="data-table__content"
@@ -69,7 +65,7 @@
               size="small"
               link
               icon="edit"
-              @click="handleOpenDialog(scope.row.id)"
+              @click="openDialog(scope.row.id)"
             >
               编辑
             </el-button>
@@ -86,7 +82,6 @@
           </template>
         </el-table-column>
       </el-table>
-
       <pagination
         v-if="total > 0"
         v-model:total="total"
@@ -95,100 +90,42 @@
         @pagination="fetchData"
       />
     </el-card>
-
     <ConfigDialog ref="configDialogRef" @success="handleResetQuery" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ConfigAPI, type ConfigPageQuery, type ConfigPageVO } from "@/api/config";
-import { useDebounceFn } from "@vueuse/core";
+/**
+ * 系统配置管理列表页。
+ */
+import { useConfigList } from "./composables/useConfigList";
 import ConfigDialog from "./components/ConfigDialog.vue";
 
-defineOptions({
-  name: "Config",
-  inheritAttrs: false,
-});
-
+defineOptions({ name: "Config", inheritAttrs: false });
 const queryFormRef = ref();
 const configDialogRef = ref();
-
-const loading = ref(false);
-const selectIds = ref<string[]>([]);
-const total = ref(0);
-
-const queryParams = reactive<ConfigPageQuery>({
-  pageNum: 1,
-  pageSize: 10,
-  keywords: "",
-});
-
-const pageData = ref<ConfigPageVO[]>([]);
-
-/** Fetch paginated data. */
-function fetchData() {
-  loading.value = true;
-  ConfigAPI.getPage(queryParams)
-    .then((data) => {
-      pageData.value = data.list;
-      total.value = data.total;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-}
-
-/** Query (reset page and fetch). */
-function handleQuery() {
-  queryParams.pageNum = 1;
-  fetchData();
-}
-
-/** Reset query. */
+const {
+  isLoading,
+  total,
+  queryParams,
+  pageData,
+  fetchData,
+  handleQuery,
+  handleSelectionChange,
+  refreshCache,
+  handleDelete: deleteAction,
+} = useConfigList();
 function handleResetQuery() {
-  queryFormRef.value.resetFields();
+  queryFormRef.value?.resetFields();
   queryParams.pageNum = 1;
   fetchData();
 }
-
-/** Selection change handler. */
-function handleSelectionChange(selection: ConfigPageVO[]) {
-  selectIds.value = selection.map((item) => String(item.id));
+function handleDelete(id: string) {
+  deleteAction(id, () => queryFormRef.value?.resetFields());
 }
-
-/**
- * Open config dialog.
- *
- * @param id - Config ID (for editing).
- */
-function handleOpenDialog(id?: string) {
+function openDialog(id?: string) {
   configDialogRef.value.open(id);
 }
-
-/** Refresh config cache (debounced 1s). */
-const handleRefreshCache = useDebounceFn(() => {
-  ConfigAPI.refreshCache().then(() => {
-    ElMessage.success("刷新成功");
-  });
-}, 1000);
-
-/** Delete config. */
-function handleDelete(id: string) {
-  ElMessageBox.confirm("确认删除该项配置?", "警告", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-    type: "warning",
-  }).then(() => {
-    loading.value = true;
-    ConfigAPI.deleteById(id)
-      .then(() => {
-        ElMessage.success("删除成功");
-        handleResetQuery();
-      })
-      .finally(() => (loading.value = false));
-  });
-}
-
 onMounted(() => {
   handleQuery();
 });
