@@ -171,7 +171,8 @@ export function setFolderRule(data: SetRuleForm): Promise<FolderRuleVO> {
 /**
  * 删除指定 NC 权限规则并入队撤销 ACL 同步。
  *
- * @param {number} id NcFileAccessRule 主键
+ * @param {number} id - NcFileAccessRule 主键。
+ * @param {number} groupId - NcGroup ID。
  * @returns {Promise<void>}
  */
 export function deleteFolderRule(id: number, groupId: number): Promise<void> {
