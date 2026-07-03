@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    v-model="visible"
+    v-model="isVisible"
     title="批量修改广告活动预算"
     width="720px"
     :close-on-click-modal="false"
@@ -77,7 +77,7 @@
       </el-table-column>
       <el-table-column label="操作" width="60" align="center" fixed="right">
         <template #default="{ $index }">
-          <el-button type="danger" link size="small" @click="removeRow($index)">×</el-button>
+          <el-button type="danger" link size="small" @click="removeRow($index)">x</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -85,7 +85,7 @@
     <!-- 底部按钮 -->
     <template #footer>
       <el-button @click="onClose">取消</el-button>
-      <el-button type="primary" :loading="confirming" @click="onConfirm">保存</el-button>
+      <el-button type="primary" :loading="isConfirming" @click="onConfirm">保存</el-button>
     </template>
   </el-dialog>
 </template>
@@ -101,7 +101,7 @@ import { ElMessage } from "element-plus";
 
 defineOptions({ name: "BatchBudgetDialog" });
 
-/** 批量调整预算对话框接收的单项数据结构 */
+/** 批量调整预算对话框接收的单项数据结构。 */
 export interface BatchBudgetItem {
   /** 广告活动 ID */
   campaignId: string | number;
@@ -117,15 +117,21 @@ export interface BatchBudgetItem {
   newBudget?: number;
 }
 
+/** 表格行数据（含 newBudget 渲染字段）。 */
+interface BudgetTableRow extends BatchBudgetItem {
+  newBudget: number;
+}
+
+/** 批量设置模式。 */
+type BatchSetMode = "fixed" | "increase" | "decrease" | "multiply";
+
 const props = withDefaults(
   defineProps<{
     modelValue: boolean;
     items: BatchBudgetItem[];
     currencyIcon?: string;
   }>(),
-  {
-    currencyIcon: "$",
-  }
+  { currencyIcon: "$" }
 );
 
 const emit = defineEmits<{
@@ -136,17 +142,17 @@ const emit = defineEmits<{
   ): void;
 }>();
 
-const visible = ref(props.modelValue);
-const tableData = ref<any[]>([]);
-const confirming = ref(false);
+const isVisible = ref(props.modelValue);
+const tableData = ref<BudgetTableRow[]>([]);
+const isConfirming = ref(false);
 
-const batchSetMode = ref<"fixed" | "increase" | "decrease" | "multiply" | null>(null);
+const batchSetMode = ref<BatchSetMode | null>(null);
 const batchSetValue = ref("");
 
 watch(
   () => props.modelValue,
   (val) => {
-    visible.value = val;
+    isVisible.value = val;
     if (val && props.items.length > 0) {
       tableData.value = props.items.map((item) => ({
         ...item,
@@ -156,23 +162,21 @@ watch(
   }
 );
 
-watch(visible, (val) => {
+watch(isVisible, (val) => {
   emit("update:modelValue", val);
 });
 
 /**
  * 处理批量设置命令：切换当前批量模式。
  *
- * @param {string} command - 批量设置模式
+ * @param command - 批量设置模式。
  */
 function handleBatchSetCommand(command: string): void {
-  batchSetMode.value = command as any;
+  batchSetMode.value = command as BatchSetMode;
   batchSetValue.value = "";
 }
 
-/**
- * 应用批量设置到所有行的新预算值。
- */
+/** 应用批量设置到所有行的新预算值。 */
 function applyBatchSet(): void {
   const value = parseFloat(batchSetValue.value);
   if (!value || isNaN(value)) {
@@ -204,10 +208,10 @@ function applyBatchSet(): void {
 /**
  * 验证单个行的预算输入，确保大于 0。
  *
- * @param {any} row - 行数据
+ * @param row - 表格行数据。
  */
-function validateBudget(row: any): void {
-  const val = parseFloat(row.newBudget);
+function validateBudget(row: BudgetTableRow): void {
+  const val = parseFloat(String(row.newBudget));
   if (!val || isNaN(val) || val <= 0) {
     row.newBudget = row.currentBudget;
     ElMessage.warning("预算必须大于 0");
@@ -219,15 +223,13 @@ function validateBudget(row: any): void {
 /**
  * 从表格中移除某一行。
  *
- * @param {number} index - 行索引
+ * @param index - 行索引。
  */
 function removeRow(index: number): void {
   tableData.value.splice(index, 1);
 }
 
-/**
- * 确认批量调整预算，校验后 emit 结果。
- */
+/** 确认批量调整预算，校验后 emit 结果。 */
 function onConfirm(): void {
   if (tableData.value.length === 0) {
     ElMessage.warning("没有要调整的预算项");
@@ -235,30 +237,28 @@ function onConfirm(): void {
   }
 
   for (const row of tableData.value) {
-    const val = parseFloat(row.newBudget);
+    const val = parseFloat(String(row.newBudget));
     if (!val || isNaN(val) || val <= 0) {
       ElMessage.error(`第 ${tableData.value.indexOf(row) + 1} 行的预算无效`);
       return;
     }
   }
 
-  confirming.value = true;
+  isConfirming.value = true;
   const result = tableData.value.map((row) => ({
     campaignId: row.campaignId,
     profileId: row.profileId,
-    budget: Math.round(parseFloat(row.newBudget) * 100) / 100,
+    budget: Math.round(parseFloat(String(row.newBudget)) * 100) / 100,
   }));
 
   emit("confirm", result);
-  confirming.value = false;
-  visible.value = false;
+  isConfirming.value = false;
+  isVisible.value = false;
 }
 
-/**
- * 关闭对话框并重置状态。
- */
+/** 关闭对话框并重置状态。 */
 function onClose(): void {
-  visible.value = false;
+  isVisible.value = false;
   batchSetMode.value = null;
   batchSetValue.value = "";
 }
@@ -280,6 +280,6 @@ function onClose(): void {
 .budget-icon {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary, #64748b);
+  color: var(--text-secondary, var(--el-text-color-secondary));
 }
 </style>
