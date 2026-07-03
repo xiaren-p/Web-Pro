@@ -18,7 +18,29 @@ def get_caller_dept_ids(user) -> set[int] | None:
         return None
     profile = getattr(user, "profile", None)
     if profile is None:
-        return set()
+    return set()
+
+
+def get_dept_subtree(root_id: int) -> set[int]:
+    """返回指定部门及其所有子部门的 ID 集合（广度优先遍历）。
+
+    用于部门管理员权限校验。
+
+    Args:
+        root_id (int): 根部门 ID。
+
+    Returns:
+        set[int]: 包含 root_id 本身及所有层级子部门的 ID 集合。
+    """
+    result: set[int] = {root_id}
+    queue = [root_id]
+    while queue:
+        pid = queue.pop()
+        for cid in Department.objects.filter(parent_id=pid).values_list("id", flat=True):
+            if cid not in result:
+                result.add(cid)
+                queue.append(cid)
+    return result
     level = profile.admin_level
     if level == AdminLevel.COMPANY_ADMIN:
         return None

@@ -26,32 +26,11 @@ from apps.common.utils.responses import drf_ok, drf_error
 from apps.common.utils.pagination import paginate_queryset
 from apps.common.utils.image_validator import validate_image_file, resize_image_to_square
 from apps.system.utils.avatar_presets import get_random_preset, is_local_upload, is_preset, make_preset_png
+from apps.system.utils.dept_scope import get_dept_subtree
 from apps.nc.services.nc_sync_service import NcSyncService
 from apps.nc.services.nc_api_client import NcApiClient
 
 logger = logging.getLogger(__name__)
-
-
-def _dept_subtree(root_id: int) -> set[int]:
-    """返回指定部门及其所有子部门的 ID 集合（广度优先遍历）。
-
-    用于部门管理员写权限校验：该管理员可对根部门与子部门内的用户执行写操作。
-
-    Args:
-        root_id (int): 根部门 ID。
-
-    Returns:
-        set[int]: 包含 root_id 本身及所有层级子部门的 ID 集合。
-    """
-    result: set[int] = {root_id}
-    queue = [root_id]
-    while queue:
-        pid = queue.pop()
-        for cid in Department.objects.filter(parent_id=pid).values_list("id", flat=True):
-            if cid not in result:
-                result.add(cid)
-                queue.append(cid)
-    return result
 
 
 class UserViewSet(viewsets.ViewSet):

@@ -193,64 +193,64 @@ class Command(BaseCommand):
                     if changed:
                         bm.save()
 
-            # 同步 数据采集 菜单及其子菜单/按钮（如果前端已存在则更新/创建）
-            data_parent, data_created = Menu.objects.get_or_create(name=DATA_COLLECT_PARENT_DEF["name"], defaults=DATA_COLLECT_PARENT_DEF)
-            if not data_created:
-                for k, v in DATA_COLLECT_PARENT_DEF.items():
-                    setattr(data_parent, k, v)
-                data_parent.save()
+        # 同步 数据采集 菜单及其子菜单/按钮（如果前端已存在则更新/创建）
+        data_parent, data_created = Menu.objects.get_or_create(name=DATA_COLLECT_PARENT_DEF["name"], defaults=DATA_COLLECT_PARENT_DEF)
+        if not data_created:
+            for k, v in DATA_COLLECT_PARENT_DEF.items():
+                setattr(data_parent, k, v)
+            data_parent.save()
 
-            # Create/update crawler children
-            for item in CRAWLER_CHILD_DEFS:
-                cm, c = Menu.objects.get_or_create(
-                    name=item["name"], parent=data_parent,
+        # Create/update crawler children
+        for item in CRAWLER_CHILD_DEFS:
+            cm, c = Menu.objects.get_or_create(
+                name=item["name"], parent=data_parent,
+                defaults={
+                    "type": 2,
+                    "path": item["path"],
+                    "component": item["component"],
+                    "perms": item.get("perms", ""),
+                    "icon": item.get("icon", ""),
+                    "order_num": item.get("order_num", 0),
+                    "visible": True,
+                    "status": True,
+                }
+            )
+            if not c:
+                changed = False
+                for attr in ("path", "component", "perms", "icon", "order_num"):
+                    new_val = item.get(attr)
+                    if getattr(cm, attr) != new_val:
+                        setattr(cm, attr, new_val)
+                        changed = True
+                if changed:
+                    cm.save()
+
+            # Sync crawler-specific button permissions
+            cb_defs = CRAWLER_BUTTON_DEFS.get(item["name"], [])
+            for b in cb_defs:
+                cbm, created_btn = Menu.objects.get_or_create(
+                    name=b["name"], parent=cm,
                     defaults={
-                        "type": 2,
-                        "path": item["path"],
-                        "component": item["component"],
-                        "perms": item.get("perms", ""),
-                        "icon": item.get("icon", ""),
-                        "order_num": item.get("order_num", 0),
+                        "type": 3,
+                        "path": "",
+                        "component": "",
+                        "perms": b.get("perms", ""),
+                        "icon": "",
+                        "order_num": b.get("order_num", 0),
                         "visible": True,
                         "status": True,
                     }
                 )
-                if not c:
+                if not created_btn:
                     changed = False
-                    for attr in ("path", "component", "perms", "icon", "order_num"):
-                        new_val = item.get(attr)
-                        if getattr(cm, attr) != new_val:
-                            setattr(cm, attr, new_val)
-                            changed = True
+                    if cbm.perms != b.get("perms", ""):
+                        cbm.perms = b.get("perms", "")
+                        changed = True
+                    if cbm.order_num != b.get("order_num", 0):
+                        cbm.order_num = b.get("order_num", 0)
+                        changed = True
                     if changed:
-                        cm.save()
-
-                # Sync crawler-specific button permissions
-                cb_defs = CRAWLER_BUTTON_DEFS.get(item["name"], [])
-                for b in cb_defs:
-                    cbm, created_btn = Menu.objects.get_or_create(
-                        name=b["name"], parent=cm,
-                        defaults={
-                            "type": 3,
-                            "path": "",
-                            "component": "",
-                            "perms": b.get("perms", ""),
-                            "icon": "",
-                            "order_num": b.get("order_num", 0),
-                            "visible": True,
-                            "status": True,
-                        }
-                    )
-                    if not created_btn:
-                        changed = False
-                        if cbm.perms != b.get("perms", ""):
-                            cbm.perms = b.get("perms", "")
-                            changed = True
-                        if cbm.order_num != b.get("order_num", 0):
-                            cbm.order_num = b.get("order_num", 0)
-                            changed = True
-                        if changed:
-                            cbm.save()
+                        cbm.save()
 
         # 将所有创建/更新的菜单绑定到 admin 岗位
         admin_position, _ = Position.objects.get_or_create(code="admin", defaults={"name": "管理员", "status": True})

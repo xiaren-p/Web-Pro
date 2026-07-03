@@ -25,7 +25,7 @@ def create_user(request, payload: dict):
     Returns:
         tuple: ``(User, None)`` 成功；``(None, (error_msg, status_code))`` 失败。
     """
-    from apps.system.views.user_view import _dept_subtree
+    from apps.system.utils.dept_scope import get_dept_subtree
 
     username = payload.get("username")
     password = payload.get("password") or "123456"
@@ -51,7 +51,7 @@ def create_user(request, payload: dict):
         _req_level = _req_p.admin_level if _req_p else AdminLevel.MEMBER
         if _req_level == AdminLevel.DEPT_ADMIN and _req_p and _req_p.dept_id:
             try:
-                if int(dept_id) not in _dept_subtree(_req_p.dept_id):
+                if int(dept_id) not in get_dept_subtree(_req_p.dept_id):
                     return (None, ("部门管理员只能在本部门内创建用户", 403))
             except (ValueError, TypeError):
                 pass
@@ -125,7 +125,7 @@ def update_user(request, user_id: str, payload: dict):
     Returns:
         tuple: ``(User, None)`` 成功；``(None, (error_msg, status_code))`` 失败。
     """
-    from apps.system.views.user_view import _dept_subtree
+    from apps.system.utils.dept_scope import get_dept_subtree
 
     try:
         user = User.objects.get(pk=user_id)
@@ -138,7 +138,7 @@ def update_user(request, user_id: str, payload: dict):
         if _req_level == AdminLevel.DEPT_ADMIN and _req_p and _req_p.dept_id:
             _target_p = getattr(user, "profile", None)
             _target_dept = getattr(_target_p, "dept_id", None)
-            if _target_dept is None or _target_dept not in _dept_subtree(_req_p.dept_id):
+            if _target_dept is None or _target_dept not in get_dept_subtree(_req_p.dept_id):
                 return (None, ("无权编辑其他部门的用户", 403))
 
     _old_email = user.email
@@ -240,7 +240,7 @@ def delete_users(request, ids: list[str]):
     Returns:
         tuple: ``(None, None)`` 成功；``(None, (error_msg, status_code))`` 失败。
     """
-    from apps.system.views.user_view import _dept_subtree
+    from apps.system.utils.dept_scope import get_dept_subtree
 
     users_qs = User.objects.filter(id__in=ids)
     if not users_qs.exists():
@@ -250,7 +250,7 @@ def delete_users(request, ids: list[str]):
         _req_p = getattr(request.user, "profile", None)
         _req_level = _req_p.admin_level if _req_p else AdminLevel.MEMBER
         if _req_level == AdminLevel.DEPT_ADMIN and _req_p and _req_p.dept_id:
-            _allowed = _dept_subtree(_req_p.dept_id)
+            _allowed = get_dept_subtree(_req_p.dept_id)
             for u in users_qs:
                 u_profile = getattr(u, "profile", None)
                 u_dept = getattr(u_profile, "dept_id", None)
