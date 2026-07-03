@@ -6,8 +6,8 @@
         <h2 class="page-header__title">开发者应用</h2>
         <p class="page-header__desc">
           通过 Client Credentials 授权，从外部脚本或服务无缝调用
-          <code>api/v2</code>
-          工作流接口。应用凭据不可访问 api/v1 管理接口。
+          <code>api/v1</code>
+          工作流接口。应用凭据不可访问管理接口。
         </p>
       </div>
       <el-button type="primary" :icon="Plus" @click="handleOpenCreate">创建应用</el-button>
@@ -308,10 +308,10 @@ const usageExample = computed(() => {
   return [
     "# 1. 获取 Access Token",
     `curl -X POST http://<SERVER>/o/token/ \\`,
-    `  -d "grant_type=client_credentials&client_id=${id}&client_secret=${secret}&scope=api_v2"`,
+    `  -d "grant_type=client_credentials&client_id=${id}&client_secret=${secret}&scope=api_access"`,
     "",
-    "# 2. 调用 api/v2 接口（以启动任务为例）",
-    `curl -X POST http://<SERVER>/api/v2/workflow/ \\`,
+    "# 2. 调用 API 接口（以启动任务为例）",
+    `curl -X POST http://<SERVER>/api/v1/ai/workflow/ \\`,
     `  -H "Authorization: Bearer <ACCESS_TOKEN>" \\`,
     `  -H "Content-Type: application/json" \\`,
     `  -d '{"workflow_type":"listing_image_upload","params":{"listing_id":1}}'`,

@@ -1,7 +1,7 @@
 /**
  * Plan Mode 数据契约类型定义。
  *
- * 与后端 ``api_v2/services/ai/plan_translator.py`` 输出的字段一一对应。
+ * 与后端 ``apps/ai/services/plan_translator.py`` 输出的字段一一对应。
  * 任何字段调整必须前后端同步修改，避免 SSE 帧出现"前端不识别字段"的回归。
  */
 
@@ -116,7 +116,7 @@ export interface AiConversation {
 /**
  * Dify 应用配置（聊天机器人 / 智能体）。
  *
- * 来自后端 ``GET /api/v2/ai/apps/``，前端用于渲染输入区的"应用切换器 chip"。
+ * 来自后端 ``GET /api/v1/ai/apps/``，前端用于渲染输入区的"应用切换器 chip"。
  */
 export interface AiApp {
   /** 后端 UUID（public_id） */
@@ -165,7 +165,7 @@ export interface AiSearchHit {
 }
 
 /**
- * ``POST /api/v2/ai/chat/`` 的响应结构。
+ * ``POST /api/v1/ai/chat/`` 的响应结构。
  *
  * 所有 ID 字段均为 UUID 字符串。
  */

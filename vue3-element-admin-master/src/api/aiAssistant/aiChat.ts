@@ -70,7 +70,11 @@ export function renameConversation(
   conversationId: string,
   title: string
 ): Promise<{ success: boolean; title: string }> {
-  return request({ method: "patch", url: `/ai/conversations/${conversationId}/rename/`, data: { title } });
+  return request({
+    method: "patch",
+    url: `/ai/conversations/${conversationId}/rename/`,
+    data: { title },
+  });
 }
 
 /**
@@ -92,7 +96,11 @@ export function pinConversation(
   conversationId: string,
   pinned: boolean
 ): Promise<{ success: boolean; pinned: boolean }> {
-  return request({ method: "patch", url: `/ai/conversations/${conversationId}/pin/`, data: { pinned } });
+  return request({
+    method: "patch",
+    url: `/ai/conversations/${conversationId}/pin/`,
+    data: { pinned },
+  });
 }
 
 /**
@@ -105,7 +113,11 @@ export function moveConversationToGroup(
   conversationId: string,
   groupId: string | null
 ): Promise<{ success: boolean }> {
-  return request({ method: "post", url: `/ai/conversations/${conversationId}/move/`, data: { group_id: groupId } });
+  return request({
+    method: "post",
+    url: `/ai/conversations/${conversationId}/move/`,
+    data: { group_id: groupId },
+  });
 }
 
 /**
@@ -118,7 +130,11 @@ export function searchConversations(
   keyword: string,
   limit: number = 30
 ): Promise<{ items: AiSearchHit[] }> {
-  return request({ method: "get", url: "/ai/conversations/search/", params: { q: keyword, limit } });
+  return request({
+    method: "get",
+    url: "/ai/conversations/search/",
+    params: { q: keyword, limit },
+  });
 }
 
 /* ── 分组管理 ──────────────────────────────────────────── */

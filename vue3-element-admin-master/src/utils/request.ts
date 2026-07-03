@@ -132,7 +132,7 @@ async function responseRejected(error: any): Promise<unknown> {
       return Promise.reject(new Error(msg || "Permission Denied"));
 
     default: {
-      // api_v2 端点采用 DRF 标准错误格式 {detail: "..."}，需展开公共字段兼容
+      // 外部应用调用端点采用 DRF 标准错误格式 {detail: "..."}，需展开公共字段兼容
       const detailMsg: string = msg || response.data?.detail || "请求失败";
       ElMessage.error(detailMsg);
       return Promise.reject(new Error(detailMsg));
@@ -157,11 +157,11 @@ const httpRequest = axios.create({
 httpRequest.interceptors.request.use(requestFulfilled, requestRejected);
 httpRequest.interceptors.response.use(responseFulfilled, responseRejected);
 
-// ── api_v2 请求实例 ───────────────────────────────────────────────────────────
+// ── 外部应用调用请求实例 ───────────────────────────────────────────────────────────
 
 /**
- * api_v2 专用请求实例，baseURL 自动适配环境：
- *   - 生产环境（VITE_APP_API_ORIGIN 非空）：`https://api.hanlis.cn/api/v2`
+ * 外部应用调用专用请求实例，baseURL 自动适配环境：
+ *   - 生产环境（VITE_APP_API_ORIGIN 非空）：`https://api.hanlis.cn/api/v1`
  *     → 绝对 URL，Axios 完全忽略 VITE_APP_BASE_API 的 /api/v1，不再拼错。
  *   - 开发环境（VITE_APP_API_ORIGIN 为空）：`/dev-api/api/v1`
  *     → Vite 代理匹配 /dev-api/api/v1/* 并剥去 /dev-api，转发到 Django localhost:8000。
