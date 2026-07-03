@@ -199,6 +199,7 @@
 </template>
 
 <script setup lang="ts">
+/** 团队工作报告列表页。展示团队成员日报/周报提交统计，支持按部门筛选、查看详情。 */
 import { ref, reactive, onMounted } from "vue";
 import { resolveAvatarSrc } from "@/utils/avatarPresets";
 import { User, Check, Warning, Search, Refresh, View } from "@element-plus/icons-vue";
