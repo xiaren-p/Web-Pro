@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="page-container app-container">
     <LossOrderSearchForm
       :filters="filters"
