@@ -158,7 +158,6 @@ urlpatterns = [
     # 负责人下拉（LxUser 模型）
     path('shops/owners', views.ShopOptionsViewSet.as_view({'get': 'owners'}), name='shops-owners'),
 # 财务统计（apps.finance）
-    path('', include('apps.finance.urls')),
 
     # 爬虫管理（apps.crawler）
     path('crawler/', include('apps.crawler.urls')),

@@ -18,6 +18,23 @@ def get_caller_dept_ids(user) -> set[int] | None:
         return None
     profile = getattr(user, "profile", None)
     if profile is None:
+        return set()
+    level = profile.admin_level
+    if level == AdminLevel.COMPANY_ADMIN:
+        return None
+    if level == AdminLevel.DEPT_ADMIN and profile.dept_id:
+        dept_ids: set[int] = set()
+
+        def _collect(did: int) -> None:
+            """递归收集部门及其所有子部门 ID。"""
+            if did in dept_ids:
+                return
+            dept_ids.add(did)
+            for cid in Department.objects.filter(parent_id=did).values_list("id", flat=True):
+                _collect(cid)
+
+        _collect(profile.dept_id)
+        return dept_ids
     return set()
 
 
@@ -41,27 +58,3 @@ def get_dept_subtree(root_id: int) -> set[int]:
                 result.add(cid)
                 queue.append(cid)
     return result
-    level = profile.admin_level
-    if level == AdminLevel.COMPANY_ADMIN:
-        return None
-    if level == AdminLevel.DEPT_ADMIN and profile.dept_id:
-        dept_ids: set[int] = set()
-
-        def _collect(did: int) -> None:
-            """递归收集部门及其所有子部门 ID。
-
-Args:
-    did (int): 起始部门 ID。
-
-Returns:
-    None: 结果累积到外层 dept_ids 集合。
-"""
-            if did in dept_ids:
-                return
-            dept_ids.add(did)
-            for cid in Department.objects.filter(parent_id=did).values_list("id", flat=True):
-                _collect(cid)
-
-        _collect(profile.dept_id)
-        return dept_ids
-    return set()
