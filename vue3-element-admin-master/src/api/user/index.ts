@@ -58,9 +58,11 @@ export interface UserInfo {
 const USER_BASE_URL = "/users";
 
 export const UserAPI = {
+  /** 获取当前登录用户信息。 */
   getInfo() {
     return request<any, UserInfo>({ url: `${USER_BASE_URL}/me`, method: "get" });
   },
+  /** 分页查询用户列表。 */
   getPage(queryParams: UserPageQuery) {
     return request<any, PageResult<UserPageVO[]>>({
       url: `${USER_BASE_URL}/page`,
@@ -68,15 +70,19 @@ export const UserAPI = {
       params: queryParams,
     });
   },
+  /** 获取用户编辑表单数据（含部门/岗位信息）。 */
   getFormData(userId: string) {
     return request<any, UserForm>({ url: `${USER_BASE_URL}/${userId}/form`, method: "get" });
   },
+  /** 创建用户。 */
   create(data: UserForm) {
     return request({ url: `${USER_BASE_URL}`, method: "post", data });
   },
+  /** 更新用户信息。 */
   update(id: string, data: UserForm) {
     return request({ url: `${USER_BASE_URL}/${id}`, method: "put", data });
   },
+  /** 重置用户密码为指定值。 */
   resetPassword(id: string, password: string) {
     return request({
       url: `${USER_BASE_URL}/${id}/password/reset`,
@@ -84,33 +90,43 @@ export const UserAPI = {
       params: { password },
     });
   },
+  /** 批量删除用户（逗号分隔 ID）。 */
   deleteByIds(ids: string) {
     return request({ url: `${USER_BASE_URL}/${ids}`, method: "delete" });
   },
+  /** 获取当前用户个人资料。 */
   getProfile() {
     return request<any, any>({ url: `${USER_BASE_URL}/profile`, method: "get" });
   },
+  /** 更新当前用户个人资料。 */
   updateProfile(data: any) {
     return request({ url: `${USER_BASE_URL}/profile`, method: "put", data });
   },
+  /** 修改当前用户密码。 */
   changePassword(data: any) {
     return request({ url: `${USER_BASE_URL}/password`, method: "put", data });
   },
+  /** 发送手机验证码。 */
   sendMobileCode(mobile: string) {
     return request({ url: `${USER_BASE_URL}/mobile/code`, method: "post", params: { mobile } });
   },
+  /** 绑定或更换手机号。 */
   bindOrChangeMobile(data: any) {
     return request({ url: `${USER_BASE_URL}/mobile`, method: "put", data });
   },
+  /** 发送邮箱验证码。 */
   sendEmailCode(email: string) {
     return request({ url: `${USER_BASE_URL}/email/code`, method: "post", params: { email } });
   },
+  /** 绑定或更换邮箱。 */
   bindOrChangeEmail(data: any) {
     return request({ url: `${USER_BASE_URL}/email`, method: "put", data });
   },
+  /** 获取用户下拉选项。 */
   getOptions() {
     return request<any, any[]>({ url: `${USER_BASE_URL}/options`, method: "get" });
   },
+  /** 上传用户头像（multipart/form-data）。 */
   uploadAvatar(file: File) {
     const form = new FormData();
     form.append("file", file);

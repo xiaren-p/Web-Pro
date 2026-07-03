@@ -80,9 +80,11 @@ function mapToBackend(data: MenuForm) {
 }
 
 export const MenuAPI = {
+  /** 获取当前用户可见的动态路由树。 */
   getRoutes() {
     return request<any, RouteVO[]>({ url: `${MENU_BASE_URL}/routes`, method: "get" });
   },
+  /** 获取菜单列表（支持关键字筛选）。 */
   getList(queryParams: MenuQuery) {
     return request<any, MenuVO[]>({
       url: `${MENU_BASE_URL}`,
@@ -90,9 +92,11 @@ export const MenuAPI = {
       params: queryParams,
     });
   },
+  /** 获取菜单树形结构（支持关键字筛选）。 */
   getTree(params?: MenuQuery) {
     return request<any, MenuVO[]>({ url: `${MENU_BASE_URL}/tree`, method: "get", params });
   },
+  /** 获取菜单下拉选项（可选仅父级）。 */
   getOptions(onlyParent?: boolean) {
     return request<any, any[]>({
       url: `${MENU_BASE_URL}/options`,
@@ -114,15 +118,19 @@ export const MenuAPI = {
       params: { scope: "assignable" },
     });
   },
+  /** 获取菜单编辑表单数据。 */
   getFormData(id: string) {
     return request<any, MenuForm>({ url: `${MENU_BASE_URL}/${id}/form`, method: "get" });
   },
+  /** 创建菜单。 */
   create(data: MenuForm) {
     return request({ url: `${MENU_BASE_URL}`, method: "post", data: mapToBackend(data) });
   },
+  /** 更新菜单。 */
   update(id: string, data: MenuForm) {
     return request({ url: `${MENU_BASE_URL}/${id}`, method: "put", data: mapToBackend(data) });
   },
+  /** 删除单个菜单。 */
   deleteById(id: string) {
     return request({ url: `${MENU_BASE_URL}/${id}`, method: "delete" });
   },

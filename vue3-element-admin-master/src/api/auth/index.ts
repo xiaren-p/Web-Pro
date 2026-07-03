@@ -14,15 +14,18 @@ export interface LoginFormData {
 const AUTH_BASE_URL = "/auth";
 
 export const AuthAPI = {
+  /** 用户名密码登录，返回 accessToken + refreshToken。 */
   login(data: LoginFormData) {
     return request<
       any,
       { accessToken: string; refreshToken: string; tokenType?: string; expiresIn: number }
     >({ url: `${AUTH_BASE_URL}/login`, method: "post", data });
   },
+  /** 登出（吊销当前 Token + 清除 Session）。 */
   logout() {
     return request({ url: `${AUTH_BASE_URL}/logout`, method: "delete" });
   },
+  /** 刷新 accessToken（使用 refreshToken，不旋转 refresh）。 */
   refreshToken(refreshToken: string) {
     return request<
       any,
@@ -35,6 +38,7 @@ export const AuthAPI = {
       withCredentials: false,
     });
   },
+  /** 获取图形验证码（base64 图片 + UUID）。 */
   getCaptcha() {
     return request<any, { img: string; uuid: string }>({
       url: `${AUTH_BASE_URL}/captcha`,
