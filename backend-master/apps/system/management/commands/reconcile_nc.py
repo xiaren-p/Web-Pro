@@ -585,9 +585,9 @@ class Command(BaseCommand):
             pending = list(NcSyncTask.objects.filter(status=SyncStatus.PENDING).order_by("id"))
             if not pending:
                 break
-        self.stdout.write(self.style.WARNING(
-                f"[reconcile_nc] 第 {round_num} 轮：执行 {len(pending)} 条 PENDING 任务..."
-            ))
+            self.stdout.write(self.style.WARNING(
+                    f"[reconcile_nc] 第 {round_num} 轮：执行 {len(pending)} 条 PENDING 任务..."
+                ))
             for idx, task in enumerate(pending):
                 ok = NcSyncService.execute_task(task)
                 if ok:
