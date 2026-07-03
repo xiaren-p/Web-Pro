@@ -90,8 +90,8 @@ export const MenuAPI = {
       params: queryParams,
     });
   },
-  getTree() {
-    return request<any, MenuVO[]>({ url: `${MENU_BASE_URL}/tree`, method: "get" });
+  getTree(params?: MenuQuery) {
+    return request<any, MenuVO[]>({ url: `${MENU_BASE_URL}/tree`, method: "get", params });
   },
   getOptions(onlyParent?: boolean) {
     return request<any, any[]>({
