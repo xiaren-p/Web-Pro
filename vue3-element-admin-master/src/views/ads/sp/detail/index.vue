@@ -2,7 +2,6 @@
   <div class="ad-campaign-detail p-6">
     <!-- 页头卡片 -->
     <div class="detail-header-card">
-      <!-- 第一行：面包屑导航 -->
       <div class="breadcrumb-row">
         <span class="breadcrumb-link" @click="goBack">
           <el-icon class="back-icon"><ArrowLeft /></el-icon>
@@ -12,12 +11,10 @@
         <span class="breadcrumb-current">SP 广告活动详情</span>
       </div>
 
-      <!-- 第二行：活动名称 + 类型徽标 -->
       <div class="title-row">
         <span v-if="campaignInfo?.targeting_type" class="targeting-badge">
           {{ formatTargetingType(campaignInfo.targeting_type) }}
         </span>
-        <!-- 广告活动状态图标 -->
         <span
           v-if="campaignInfo?.state"
           class="campaign-state-icon"
@@ -41,7 +38,6 @@
       </div>
     </div>
 
-    <!-- 横向功能导航 Tab -->
     <el-tabs v-model="activeTab" class="detail-tabs">
       <el-tab-pane label="广告组" name="adgroups">
         <div class="tab-indicators-wrapper">
@@ -51,9 +47,12 @@
           ref="adGroupsRef"
           :campaign-id="campaignId"
           :profile-id="profileId"
-          :initial-date-range="inheritedDateRange"
+          :inherited-date-range="inheritedDateRange"
+          @keyword-bid="onKeywordBid"
+          @keyword-state="onKeywordState"
         />
       </el-tab-pane>
+
       <el-tab-pane label="广告" name="ads">
         <div class="tab-indicators-wrapper">
           <Indicators v-if="activeSummary" :summary="activeSummary" />
@@ -62,93 +61,75 @@
           ref="adsRef"
           :campaign-id="campaignId"
           :profile-id="profileId"
-          :initial-date-range="inheritedDateRange"
+          :inherited-date-range="inheritedDateRange"
+          @keyword-bid="onKeywordBid"
+          @keyword-state="onKeywordState"
         />
       </el-tab-pane>
+
       <el-tab-pane label="投放" name="targeting">
+        <div class="tab-indicators-wrapper">
+          <Indicators v-if="activeSummary" :summary="activeSummary" />
+        </div>
         <template v-if="campaignInfo?.targeting_type?.toUpperCase() === 'AUTO'">
-          <div class="tab-indicators-wrapper">
-            <Indicators v-if="activeSummary" :summary="activeSummary" />
-          </div>
           <AutoTargetingPanel
             ref="autoTargetingRef"
             :campaign-id="campaignId"
             :profile-id="profileId"
-            :initial-date-range="inheritedDateRange"
-            @update-bid="onTargetBid"
-            @update-state="onTargetState"
+            :inherited-date-range="inheritedDateRange"
+            @target-bid="onTargetBid"
+            @target-state="onTargetState"
           />
         </template>
         <template v-else>
-          <div class="tab-indicators-wrapper">
-            <Indicators v-if="activeSummary" :summary="activeSummary" />
+          <div class="targeting-tabs-wrapper">
+            <div class="targeting-subtabs">
+              <el-radio-group v-model="targetingMode" size="small">
+                <el-radio-button value="keyword">关键词投放</el-radio-button>
+                <el-radio-button value="product">商品投放</el-radio-button>
+              </el-radio-group>
+            </div>
+            <KeywordPanel
+              v-if="targetingMode === 'keyword'"
+              ref="keywordRef"
+              :campaign-id="campaignId"
+              :profile-id="profileId"
+              :inherited-date-range="inheritedDateRange"
+              @keyword-bid="onKeywordBid"
+              @keyword-state="onKeywordState"
+            />
+            <ProductTargetingPanel
+              v-else
+              ref="productTargetingRef"
+              :campaign-id="campaignId"
+              :profile-id="profileId"
+              :inherited-date-range="inheritedDateRange"
+              @target-bid="onProductTargetBid"
+              @target-state="onProductTargetState"
+            />
           </div>
-          <KeywordPanel
-            v-if="targetingMode === 'keyword'"
-            ref="keywordRef"
-            :campaign-id="campaignId"
-            :profile-id="profileId"
-            :initial-date-range="inheritedDateRange"
-            @update-bid="onKeywordBid"
-            @update-state="onKeywordState"
-            @switch-mode="targetingMode = 'product'"
-          />
-          <ProductTargetingPanel
-            v-else
-            ref="productTargetingRef"
-            :campaign-id="campaignId"
-            :profile-id="profileId"
-            :initial-date-range="inheritedDateRange"
-            @update-bid="onProductTargetBid"
-            @update-state="onProductTargetState"
-            @switch-mode="targetingMode = 'keyword'"
-          />
         </template>
       </el-tab-pane>
+
       <el-tab-pane label="否定投放" name="negative">
-        <template v-if="campaignInfo?.targeting_type?.toUpperCase() === 'AUTO'">
-          <AutoNegativePanel
-            :campaign-id="campaignId"
-            :profile-id="profileId"
-            :initial-date-range="inheritedDateRange"
-          />
-        </template>
-        <template v-else>
-          <NegativeKeywordPanel
-            :campaign-id="campaignId"
-            :profile-id="profileId"
-            :initial-date-range="inheritedDateRange"
-          />
-        </template>
-      </el-tab-pane>
-      <el-tab-pane label="用户搜索词" name="search-terms">
-        <template v-if="campaignInfo?.targeting_type?.toUpperCase() === 'AUTO'">
-          <div class="tab-placeholder">自动 · 用户搜索词（占位）</div>
-        </template>
-        <template v-else>
-          <div class="tab-placeholder">手动 · 用户搜索词（占位）</div>
-        </template>
+        <AutoNegativePanel :campaign-id="campaignId" :profile-id="profileId" />
+        <NegativeKeywordPanel :campaign-id="campaignId" :profile-id="profileId" />
       </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
 <script setup lang="ts">
+/**
+ * 广告活动详情页。
+ *
+ * @description 薄编排层：组合 useCampaignDetail composable + 子面板组件。
+ *              竞价修改/状态调整/活动加载逻辑全部在 composable 中。
+ */
 import { computed, ref, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ArrowLeft, VideoPause, CircleClose, Shop } from "@element-plus/icons-vue";
 import { useLocalStorage } from "@vueuse/core";
-import {
-  getAdCampaignDetail,
-  type AdCampaignDetailResponse,
-  adjustKeywordBid,
-  adjustKeywordState,
-  adjustTargetBid,
-  adjustTargetState,
-  adjustProductTargetBid,
-  adjustProductTargetState,
-} from "@/api/ads";
-import { ElMessage } from "element-plus";
 import AdGroupsPanel from "@/views/ads/sp/detail/AdGroupsPanel.vue";
 import AdsPanel from "@/views/ads/sp/detail/AdsPanel.vue";
 import AutoTargetingPanel from "@/views/ads/sp/detail/AutoTargetingPanel.vue";
@@ -157,59 +138,53 @@ import KeywordPanel from "@/views/ads/sp/detail/KeywordPanel.vue";
 import NegativeKeywordPanel from "@/views/ads/sp/detail/NegativeKeywordPanel.vue";
 import ProductTargetingPanel from "@/views/ads/sp/detail/ProductTargetingPanel.vue";
 import Indicators from "@/views/ads/sp/Indicators.vue";
+import { useCampaignDetail } from "./composables/useCampaignDetail";
 
 defineOptions({ name: "AdCampaignDetail" });
 
 const route = useRoute();
 const router = useRouter();
 
-/** 当前激活的 Tab 标签（持久化，刷新后恢复上次所在 Tab） */
+/** 持久化的激活 Tab。 */
 const activeTab = useLocalStorage<string>("ad_detail_active_tab", "adgroups");
 
-/**
- * 从路由 query 中解析 campaign_id。
- *
- * @returns {string} 广告活动 ID，若不存在则返回空字符串。
- */
+/** 路由参数：广告活动 ID。 */
 const campaignId = computed<string>(() => String(route.query.campaign_id ?? ""));
 
-/**
- * 从路由 query 中解析 profile_id。
- *
- * @returns {string} 店铺 Profile ID，若不存在则返回空字符串。
- */
+/** 路由参数：店铺 Profile ID。 */
 const profileId = computed<string>(() => String(route.query.profile_id ?? ""));
 
-/**
- * 从路由 query 中解析父页面传入的日期范围，作为子面板的默认时间。
- * 若 date_start / date_end 均存在则构造二元数组，否则返回空数组。
- *
- * @returns {string[]} 格式为 ['YYYY-MM-DD', 'YYYY-MM-DD'] 的数组，或空数组
- */
+/** 父页面传入的日期范围。 */
 const inheritedDateRange = computed<string[]>(() => {
   const start = String(route.query.date_start ?? "");
   const end = String(route.query.date_end ?? "");
   return start && end ? [start, end] : [];
 });
 
-/** 广告活动基础信息，通过 API 异步加载 */
-const campaignInfo = ref<AdCampaignDetailResponse | null>(null);
+const {
+  campaignInfo,
+  loadCampaignInfo,
+  formatTargetingType,
+  onKeywordBid,
+  onKeywordState,
+  onTargetBid,
+  onTargetState,
+  onProductTargetBid,
+  onProductTargetState,
+} = useCampaignDetail(campaignId, profileId);
 
-/** 子面板组件引用（用于获取各面板的 summaryRow） */
+/** 子面板组件引用（用于获取 summaryRow）。 */
 const adGroupsRef = ref<InstanceType<typeof AdGroupsPanel>>();
 const adsRef = ref<InstanceType<typeof AdsPanel>>();
 const autoTargetingRef = ref<InstanceType<typeof AutoTargetingPanel>>();
 const keywordRef = ref<InstanceType<typeof KeywordPanel>>();
 const productTargetingRef = ref<InstanceType<typeof ProductTargetingPanel>>();
 
-/** 手动投放 Tab 的切换模式：关键词投放 / 商品投放 */
+/** 手动投放 Tab 切换模式。 */
 const targetingMode = ref<"keyword" | "product">("keyword");
 
 /**
- * 当前激活 Tab 对应的汇总指标数据。
- * 从已加载的子面板 defineExpose 的 summaryRow 中实时获取。
- *
- * @returns {Record<string, unknown> | null} 当前面板的汇总数据，或 null
+ * 当前激活 Tab 对应的汇总指标。
  */
 const activeSummary = computed<Record<string, unknown> | null>(() => {
   switch (activeTab.value) {
@@ -230,229 +205,27 @@ const activeSummary = computed<Record<string, unknown> | null>(() => {
   }
 });
 
-/**
- * 将投放类型字段值格式化为中文显示。
- *
- * @param {string} val - targeting_type 原始值（AUTO / MANUAL）
- * @returns {string} 中文显示文字；无法识别则原样返回。
- */
-function formatTargetingType(val: string): string {
-  if (!val) return "";
-  const map: Record<string, string> = { AUTO: "自动", MANUAL: "手动" };
-  return map[val.toUpperCase()] ?? val;
-}
-
-/**
- * 返回广告活动列表页。
- */
+/** 返回列表页。 */
 function goBack(): void {
   router.back();
 }
 
-// ── 投放子面板事件接收 + API 调用 + 失败还原 ─────────────────────────────────
-// 架构对齐主页面 AdsTable.vue + index.vue 的 emit 范式：
-//   子面板只负责弹确认窗 + emit 事件；父组件统一调 API + 处理失败还原。
-
-/**
- * 关键词竞价修改：写 SpBidAdjustment + 更新 LxSpKeyword.bid。
- *
- * @param {Object} payload - { row, bid }
- */
-async function onKeywordBid({ row, bid }: { row: any; bid: number }): Promise<void> {
-  if (!row?.keyword_id) {
-    ElMessage.error("缺少关键词标识，无法修改竞价");
-    return;
-  }
-  const oldBid = row.bid;
-  try {
-    await adjustKeywordBid({
-      campaign_id: campaignId.value,
-      profile_id: profileId.value,
-      keyword_id: row.keyword_id,
-      bid_after: bid,
-    });
-    row.bid = bid;
-    row._bidInput = bid;
-    ElMessage.success("竞价修改已记录，待执行推送");
-  } catch (error) {
-    row.bid = oldBid;
-    row._bidInput = oldBid;
-    console.error("[onKeywordBid] 修改竞价失败", error);
-    ElMessage.error("修改竞价失败");
-  }
-}
-
-/**
- * 关键词启停修改：写 SpBidAdjustment(BID_ENABLE/BID_PAUSE) + 更新 LxSpKeyword.state。
- */
-async function onKeywordState({
-  row,
-  state,
-}: {
-  row: any;
-  state: "enabled" | "paused";
-}): Promise<void> {
-  if (!row?.keyword_id) {
-    ElMessage.error("缺少关键词标识，无法修改状态");
-    return;
-  }
-  const oldState = row.state;
-  try {
-    await adjustKeywordState({
-      campaign_id: campaignId.value,
-      profile_id: profileId.value,
-      keyword_id: row.keyword_id,
-      state,
-    });
-    row.state = state;
-    ElMessage.success(state === "enabled" ? "启用已记录，待执行推送" : "暂停已记录，待执行推送");
-  } catch (error) {
-    row.state = oldState;
-    console.error("[onKeywordState] 修改状态失败", error);
-    ElMessage.error("修改状态失败");
-  }
-}
-
-/**
- * 自动定位组竞价修改：写 SpBidAdjustment + 更新 LxSpTarget.bid。
- */
-async function onTargetBid({ row, bid }: { row: any; bid: number }): Promise<void> {
-  if (!row?.target_id) {
-    ElMessage.error("缺少定位组标识，无法修改竞价");
-    return;
-  }
-  const oldBid = row.bid;
-  try {
-    await adjustTargetBid({
-      campaign_id: campaignId.value,
-      profile_id: profileId.value,
-      target_id: row.target_id,
-      bid_after: bid,
-    });
-    row.bid = bid;
-    row._bidInput = bid;
-    ElMessage.success("竞价修改已记录，待执行推送");
-  } catch (error) {
-    row.bid = oldBid;
-    row._bidInput = oldBid;
-    console.error("[onTargetBid] 修改竞价失败", error);
-    ElMessage.error("修改竞价失败");
-  }
-}
-
-/**
- * 自动定位组启停修改：写 SpBidAdjustment(BID_ENABLE/BID_PAUSE) + 更新 LxSpTarget.state。
- */
-async function onTargetState({
-  row,
-  state,
-}: {
-  row: any;
-  state: "enabled" | "paused";
-}): Promise<void> {
-  if (!row?.target_id) {
-    ElMessage.error("缺少定位组标识，无法修改状态");
-    return;
-  }
-  const oldState = row.state;
-  try {
-    await adjustTargetState({
-      campaign_id: campaignId.value,
-      profile_id: profileId.value,
-      target_id: row.target_id,
-      state,
-    });
-    row.state = state;
-    ElMessage.success(state === "enabled" ? "启用已记录，待执行推送" : "暂停已记录，待执行推送");
-  } catch (error) {
-    row.state = oldState;
-    console.error("[onTargetState] 修改状态失败", error);
-    ElMessage.error("修改状态失败");
-  }
-}
-
-/**
- * 商品投放竞价修改：写 SpBidAdjustment + 更新 LxSpTarget.bid（expression_type=manual）。
- */
-async function onProductTargetBid({ row, bid }: { row: any; bid: number }): Promise<void> {
-  if (!row?.target_id || !row?.campaign_id || !row?.profile_id) {
-    ElMessage.error("缺少商品投放标识，无法修改竞价");
-    return;
-  }
-  const oldBid = row.bid;
-  try {
-    await adjustProductTargetBid({
-      campaign_id: campaignId.value,
-      profile_id: profileId.value,
-      target_id: row.target_id,
-      bid_after: bid,
-    });
-    row.bid = bid;
-    row._bidInput = bid;
-    ElMessage.success("竞价修改已记录，待执行推送");
-  } catch (error) {
-    row.bid = oldBid;
-    row._bidInput = oldBid;
-    console.error("[onProductTargetBid] 修改竞价失败", error);
-    ElMessage.error("修改竞价失败");
-  }
-}
-
-/**
- * 商品投放启停修改：写 SpBidAdjustment(BID_ENABLE/BID_PAUSE) + 更新 LxSpTarget.state。
- */
-async function onProductTargetState({
-  row,
-  state,
-}: {
-  row: any;
-  state: "enabled" | "paused";
-}): Promise<void> {
-  if (!row?.target_id || !row?.campaign_id || !row?.profile_id) {
-    ElMessage.error("缺少商品投放标识，无法修改状态");
-    return;
-  }
-  const oldState = row.state;
-  try {
-    await adjustProductTargetState({
-      campaign_id: campaignId.value,
-      profile_id: profileId.value,
-      target_id: row.target_id,
-      state,
-    });
-    row.state = state;
-    ElMessage.success(state === "enabled" ? "启用已记录，待执行推送" : "暂停已记录，待执行推送");
-  } catch (error) {
-    row.state = oldState;
-    console.error("[onProductTargetState] 修改状态失败", error);
-    ElMessage.error("修改状态失败");
-  }
-}
-
 onMounted(() => {
-  getAdCampaignDetail(campaignId.value, profileId.value)
-    .then((res) => {
-      campaignInfo.value = res;
-    })
-    .catch(() => {
-      // 加载失败时保持展示 campaign_id 作为展示名称
-    });
+  loadCampaignInfo();
 });
 </script>
 
 <style scoped lang="scss">
 .ad-campaign-detail {
-  /* ── 页头卡片（下圆角归零，与 Tabs 无缝衔接）── */
   .detail-header-card {
     padding: var(--spacing-4) var(--spacing-5) var(--spacing-4);
     margin-bottom: 0;
-    background: #ffffff;
+    background: var(--el-bg-color);
     border: 1px solid var(--color-gray-200);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     box-shadow: var(--shadow-sm);
   }
 
-  /* 第一行：面包屑 */
   .breadcrumb-row {
     display: flex;
     gap: var(--spacing-2);
@@ -495,7 +268,6 @@ onMounted(() => {
     color: var(--color-gray-700);
   }
 
-  /* 第二行：标题 + 徽标 */
   .title-row {
     display: flex;
     gap: var(--spacing-3);
@@ -518,7 +290,6 @@ onMounted(() => {
     border-radius: var(--radius-full);
   }
 
-  /* 状态图标 */
   .campaign-state-icon {
     display: inline-flex;
     flex-shrink: 0;
@@ -528,12 +299,10 @@ onMounted(() => {
 
     &.state-enabled {
       color: var(--color-success-500);
-
       .el-icon {
         font-size: 16px;
       }
     }
-
     .dot-circle {
       display: inline-block;
       flex-shrink: 0;
@@ -543,18 +312,14 @@ onMounted(() => {
       border-radius: 50%;
       box-shadow: 0 0 0 3px var(--color-success-100);
     }
-
     &.state-paused {
       color: var(--color-gray-400);
-
       .el-icon {
         font-size: 16px;
       }
     }
-
     &.state-archived {
       color: var(--color-danger-500);
-
       .el-icon {
         font-size: 16px;
       }
@@ -587,23 +352,20 @@ onMounted(() => {
     }
   }
 
-  /* ── 导航 Tab（上圆角归零，与 header-card 无缝衔接）── */
   .detail-tabs {
     :deep(.el-tabs__header) {
       padding: 0 var(--spacing-1);
       margin-bottom: 0;
-      background: #ffffff;
+      background: var(--el-bg-color);
       border: 1px solid var(--color-gray-200);
       border-top: none;
       border-radius: 0 0 var(--radius-xl) var(--radius-xl);
       box-shadow: var(--shadow-xs);
     }
-
     :deep(.el-tabs__nav-wrap::after) {
       height: 1px;
       background: var(--color-gray-200);
     }
-
     :deep(.el-tabs__item) {
       height: 44px;
       padding: 0 18px;
@@ -612,17 +374,14 @@ onMounted(() => {
       line-height: 44px;
       color: var(--color-gray-500);
       transition: color var(--transition-fast);
-
       &:hover {
         color: var(--color-primary-600);
       }
-
       &.is-active {
         font-weight: var(--font-weight-semibold);
         color: var(--color-primary-600);
       }
     }
-
     :deep(.el-tabs__active-bar) {
       height: 2px;
       border-radius: 2px;
