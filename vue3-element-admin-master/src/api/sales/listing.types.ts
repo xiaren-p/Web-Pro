@@ -2,6 +2,7 @@
  * Listing 行项类型定义：销售-商品管理列表的行实体。
  */
 
+/** 商品 Listing VO（含完整维度信息与标签）。 */
 export interface ListingItemVO {
   listing_id: string;
   sid: number;
