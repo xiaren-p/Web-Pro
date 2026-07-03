@@ -51,8 +51,8 @@ const dictStore = useDictStore();
 
 interface Props {
   code: string;
-  /** v-model 绑定的选中值，支持 string / number / array */
-  modelValue?: string | number | (string | number)[];
+  /** v-model 绑定的选中值 */
+  modelValue?: string | number | boolean | (string | number)[];
   type?: "select" | "radio" | "checkbox";
   placeholder?: string;
   disabled?: boolean;
@@ -67,12 +67,12 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  (e: "update:modelValue", value: string | number | (string | number)[]): void;
+  (e: "update:modelValue", value: string | number | boolean | (string | number)[]): void;
 }>();
 
 const options = ref<Array<{ label: string; value: string | number }>>([]);
 
-const selectedValue = ref<string | number | (string | number)[] | undefined>(
+const selectedValue = ref<string | number | boolean | (string | number)[] | undefined>(
   typeof props.modelValue === "string" || typeof props.modelValue === "number"
     ? props.modelValue
     : Array.isArray(props.modelValue)
@@ -100,7 +100,7 @@ watch(
 );
 
 /** 选中值变化时同步 v-model。 */
-function handleChange(val: string | number | (string | number)[]): void {
+function handleChange(val: string | number | boolean | (string | number)[]): void {
   emit("update:modelValue", val);
 }
 
