@@ -1,5 +1,9 @@
 /**
- * 统计报表 API：当前仅承载亏损订单缓存同步与读取入口。
+ * 统计报表 API：亏损订单缓存同步与读取入口。
+ *
+ * @deprecated 后端统计模块（MonthlyLossOrder/statistics views）已于 2026-07 清理，
+ *   对应后端路由 /statistics/lossmakingorders_sync 和 /statistics/lossmakingorders_data
+ *   不再存在。此模块保留供历史参考，调用将返回 404。
  */
 import request from "@/utils/request";
 

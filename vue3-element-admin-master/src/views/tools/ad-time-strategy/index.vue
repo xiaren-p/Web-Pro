@@ -348,10 +348,9 @@ async function handleBatchDelete(): Promise<void> {
   }
 }
 
-/** 批量启用（status=1） */
+/** 批量启用（status=1）— 待后端提供批量状态更新接口后实现。 */
 async function handleBatchEnable(): Promise<void> {
-  // TODO: 后端可扩展批量状态更新接口
-  ElMessage.info("批量启用功能待实现");
+  ElMessage.warning("批量启用功能暂未开放");
 }
 
 /** 批量暂停（status=0） */
