@@ -22,13 +22,13 @@
     <el-card shadow="hover" class="data-table">
       <div class="data-table__toolbar">
         <div class="data-table__toolbar--actions">
-          <el-button v-if="isCompanyAdmin" type="success" icon="plus" @click="handleOpenDialog()">
+          <el-button v-if="isCompanyAdmin" type="success" icon="plus" @click="openDialog()">
             新增
           </el-button>
           <el-button
             v-if="isCompanyAdmin"
             type="danger"
-            :disabled="ids.length === 0"
+            :disabled="selectedIds.length === 0"
             icon="delete"
             @click="handleDelete()"
           >
@@ -39,7 +39,7 @@
 
       <el-table
         ref="dataTableRef"
-        v-loading="loading"
+        v-loading="isLoading"
         :data="positionList"
         highlight-current-row
         border
@@ -73,7 +73,7 @@
               size="small"
               link
               icon="position"
-              @click="handleOpenPermDrawer(scope.row)"
+              @click="openPermDrawer(scope.row)"
             >
               分配权限
             </el-button>
@@ -83,7 +83,7 @@
               size="small"
               link
               icon="edit"
-              @click="handleOpenDialog(scope.row.id)"
+              @click="openDialog(scope.row.id)"
             >
               编辑
             </el-button>
@@ -110,131 +110,63 @@
       />
     </el-card>
 
-    <!-- 岗位表单弹窗 -->
     <PositionDialog ref="positionDialogRef" @success="handleResetQuery" />
-
-    <!-- 分配权限抽屉 -->
     <PositionPermDrawer ref="positionPermDrawerRef" @success="handleResetQuery" />
   </div>
 </template>
-`r`n`r`n
+
 <script setup lang="ts">
 /**
- * 岗位管理列表页：展示所有岗位、支持增删改及菜单权限分配。
- * 所属板块：system。
+ * 岗位管理列表页。
+ *
+ * @description 薄编排层：组合 usePositionList composable 与 PositionDialog/PermDrawer。
+ *              查询/分页/删除/权限判断全部在 composable 中。
  */
-import { computed } from "vue";
-
-import { useUserStore } from "@/store/modules/user-store";
-import { PositionAPI, type PositionPageVO, type PositionPageQuery } from "@/api/position";
+import { usePositionList } from "./composables/usePositionList";
+import type { PositionPageVO } from "@/api/position";
 import PositionDialog from "./components/PositionDialog.vue";
 import PositionPermDrawer from "./components/PositionPermDrawer.vue";
 
-defineOptions({
-  name: "Position",
-  inheritAttrs: false,
-});
+defineOptions({ name: "Position", inheritAttrs: false });
 
 const queryFormRef = ref();
 const positionDialogRef = ref();
 const positionPermDrawerRef = ref();
 
-const loading = ref(false);
-const ids = ref<string[]>([]);
-const total = ref(0);
+const {
+  isCompanyAdmin,
+  isDeptAdmin,
+  isLoading,
+  selectedIds,
+  total,
+  queryParams,
+  positionList,
+  fetchData,
+  handleQuery,
+  handleSelectionChange,
+  handleDelete: deleteAction,
+} = usePositionList();
 
-const queryParams = reactive<PositionPageQuery>({
-  pageNum: 1,
-  pageSize: 10,
-});
-
-const userStore = useUserStore();
-
-/** 是否为公司管理员（含超管） */
-const isCompanyAdmin = computed(() => userStore.userInfo.roles?.includes("ROOT") ?? false);
-
-/** 是否为部门管理员 */
-const isDeptAdmin = computed(() => userStore.userInfo.roles?.includes("dept_admin") ?? false);
-
-/** 岗位表格数据 */
-const positionList = ref<PositionPageVO[]>();
-
-/** 获取分页数据 */
-function fetchData() {
-  loading.value = true;
-  PositionAPI.getPage(queryParams)
-    .then((data) => {
-      positionList.value = data.list;
-      total.value = data.total;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-}
-
-/** 查询（重置页码后获取数据） */
-function handleQuery() {
-  queryParams.pageNum = 1;
-  fetchData();
-}
-
-/** 重置查询 */
+/** 重置查询条件并重新查询。 */
 function handleResetQuery() {
-  queryFormRef.value.resetFields();
+  queryFormRef.value?.resetFields();
   queryParams.pageNum = 1;
   fetchData();
 }
 
-/** 行复选框选中 */
-function handleSelectionChange(selection: PositionPageVO[]) {
-  ids.value = selection.filter((item) => !item.isBuiltin).map((item) => item.id);
+/** 删除岗位（单个或批量）。 */
+function handleDelete(positionId?: string) {
+  deleteAction(positionId, () => queryFormRef.value?.resetFields());
 }
 
-/**
- * 打开岗位表单弹窗。
- *
- * @param positionId - 岗位ID（编辑时传入）。
- */
-function handleOpenDialog(positionId?: string) {
+/** 打开岗位表单弹窗。 */
+function openDialog(positionId?: string) {
   positionDialogRef.value.open(positionId);
 }
 
-/**
- * 打开岗位权限分配抽屉。
- *
- * @param row - 岗位行数据。
- */
-function handleOpenPermDrawer(row: PositionPageVO) {
+/** 打开权限分配抽屉。 */
+function openPermDrawer(row: PositionPageVO) {
   positionPermDrawerRef.value.open(row);
-}
-
-/**
- * 删除岗位（单个或批量）。
- *
- * @param positionId - 单个岗位ID，不传则删除勾选项。
- */
-function handleDelete(positionId?: string) {
-  const positionIds = positionId ? positionId : ids.value.join(",");
-  if (!positionIds) {
-    ElMessage.warning("请勾选需要删除的非内置岗位");
-    return;
-  }
-
-  ElMessageBox.confirm("确认删除已选中的数据项？", "警告", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-    type: "warning",
-  }).then(() => {
-    loading.value = true;
-    PositionAPI.deleteByIds(positionIds)
-      .then(() => {
-        ElMessage.success("删除成功");
-        handleResetQuery();
-      })
-      .finally(() => {
-        loading.value = false;
-      });
-  });
 }
 
 onMounted(fetchData);
