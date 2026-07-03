@@ -12,6 +12,7 @@ from apps.ads.sp.models.lx_sp_ad import LxSpAd
 from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.models.lx_shops import LxShops
 from apps.sales.models.lx_exchange_rate import LxExchangeRate
+from apps.ads.views._helpers import parse_exchange_rate
 
 _REF_TTL = 600
 
@@ -72,7 +73,7 @@ def get_rate_map() -> dict[str, dict[str, Any]]:
             result[r.code] = {
                 "icon": r.icon or "￥",
                 "code": r.code,
-                "rate": float(r.rate or 1.0),
+                "rate": parse_exchange_rate(r.my_rate, r.rate_org),
             }
     _cache.set(_key, result, _REF_TTL)
     return result
