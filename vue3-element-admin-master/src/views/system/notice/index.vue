@@ -56,7 +56,7 @@
             v-hasPerm="['sys:notice:query']"
             type="warning"
             icon="download"
-            @click="handleOpenExportDialog()"
+            @click="openExportDialog(queryParams.title)"
           >
             导出
           </el-button>
@@ -65,7 +65,7 @@
 
       <el-table
         ref="dataTableRef"
-        v-loading="loading"
+        v-loading="isLoading"
         :data="pageData"
         highlight-current-row
         class="data-table__content"
@@ -175,7 +175,7 @@
 
     <!-- 导出通知弹窗 -->
     <el-dialog
-      v-model="exportDialog.visible"
+      v-model="exportDialogVisible"
       title="导出通知"
       width="500px"
       append-to-body
@@ -202,7 +202,9 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" :loading="exportLoading" @click="handleExport">导出</el-button>
+          <el-button type="primary" :loading="isExportLoading" @click="handleExport">
+            导出
+          </el-button>
           <el-button @click="closeExportDialog">关闭</el-button>
         </div>
       </template>
@@ -214,8 +216,13 @@
 </template>
 
 <script setup lang="ts">
-import { NoticeAPI, type NoticePageQuery, type NoticePageVO } from "@/api/notice";
-import { useUserStoreHook } from "@/store/modules/user-store";
+/**
+ * 通知公告管理列表页。
+ *
+ * @description 薄编排层：组合 useNoticeList composable 与子组件。
+ *              搜索/表格/导出/发布/撤回/删除逻辑全部在 composable 中。
+ */
+import { useNoticeList } from "./composables/useNoticeList";
 import NoticeDialog from "./components/NoticeDialog.vue";
 import NoticeDetailDialog from "./components/NoticeDetailDialog.vue";
 
@@ -228,187 +235,54 @@ const queryFormRef = ref();
 const noticeDialogRef = ref();
 const noticeDetailDialogRef = ref();
 
-const loading = ref(false);
-const selectIds = ref<number[]>([]);
-const total = ref(0);
+const {
+  isLoading,
+  selectIds,
+  total,
+  queryParams,
+  pageData,
+  exportDialogVisible,
+  exportForm,
+  isExportLoading,
+  fetchData,
+  handleQuery,
+  handleSelectionChange,
+  handlePublish,
+  handleRevoke,
+  handleDelete: deleteAction,
+  openExportDialog,
+  closeExportDialog,
+  handleExport,
+} = useNoticeList();
 
-const queryParams = reactive<NoticePageQuery>({
-  pageNum: 1,
-  pageSize: 10,
-});
-
-// 通知公告表格数据
-const pageData = ref<NoticePageVO[]>([]);
-
-// 导出相关
-const exportDialog = reactive({
-  visible: false,
-});
-
-interface ExportForm {
-  type?: string;
-  level?: string;
-  publishStatus?: number;
-  title?: string;
-}
-
-const exportForm = reactive<ExportForm>({
-  type: undefined,
-  level: undefined,
-  publishStatus: undefined,
-  title: undefined,
-});
-const exportLoading = ref(false);
-
-function handleOpenExportDialog() {
-  exportDialog.visible = true;
-  // 默认填充筛选条件
-  exportForm.type = undefined;
-  exportForm.level = undefined;
-  exportForm.publishStatus = undefined;
-  exportForm.title = queryParams.title;
-}
-
-function closeExportDialog() {
-  exportDialog.visible = false;
-}
-
-async function handleExport() {
-  exportLoading.value = true;
-  try {
-    console.log("[Debug] Start Export, NoticeAPI keys:", Object.keys(NoticeAPI));
-    if (typeof (NoticeAPI as any).exportData !== "function") {
-      throw new Error("NoticeAPI.exportData is not a function. Check @/api/notice update.");
-    }
-    // 非管理员仅导出当前用户可见项，后端支持 onlyMine 参数；管理员导出所有匹配项
-    const params: any = { ...exportForm };
-    if (!isAdminUser()) params.onlyMine = true;
-    const response: any = await (NoticeAPI as any).exportData(params);
-
-    console.log("[Debug] Export response:", response);
-
-    // 处理二进制流下载
-    const blob = new Blob([response.data], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8",
-    });
-    const a = document.createElement("a");
-    const href = window.URL.createObjectURL(blob);
-    a.href = href;
-    a.download = `通知公告_${new Date().getTime()}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(href);
-    ElMessage.success("导出成功");
-    closeExportDialog();
-  } catch (err: any) {
-    console.error("导出异常:", err);
-    ElMessage.error("导出失败: " + (err.message || "未知错误"));
-  } finally {
-    exportLoading.value = false;
-  }
-}
-
-// 查询通知公告
-function handleQuery() {
-  queryParams.pageNum = 1;
-  fetchData();
-}
-
-// 发送请求接口：管理员查看全部，非管理员只查看分配给自己的（使用后端提供的 my-page）
-const userStore = useUserStoreHook();
-
-function isAdminUser() {
-  try {
-    const roles = (userStore.userInfo && userStore.userInfo.roles) || [];
-    const perms = (userStore.userInfo && (userStore.userInfo as any).perms) || [];
-    const rs = roles.map((r: any) => String(r).toLowerCase());
-    if (rs.includes("admin") || rs.includes("role_admin") || rs.includes("administrator"))
-      return true;
-    if (perms && Array.isArray(perms) && perms.includes("admin")) return true;
-  } catch {
-    // ignore and treat as non-admin
-  }
-  return false;
-}
-
-// 发送请求接口
-function fetchData() {
-  loading.value = true;
-  NoticeAPI.getPage(queryParams)
-    .then((data: any) => {
-      pageData.value = data.list;
-      total.value = data.total;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-}
-
-// 重置查询
+/** 重置查询条件并重新查询。 */
 function handleResetQuery() {
-  queryFormRef.value!.resetFields();
-  queryParams.pageNum = 1;
+  queryFormRef.value?.resetFields();
   handleQuery();
 }
 
-// 行复选框选中项变化
-function handleSelectionChange(selection: any) {
-  selectIds.value = selection.map((item: any) => item.id);
+/**
+ * 删除通知（单个或批量）。
+ *
+ * @param id - 单个通知ID；不传则删除当前勾选项。
+ */
+function handleDelete(id?: string) {
+  deleteAction(id, () => queryFormRef.value?.resetFields());
 }
 
-// 打开通知公告弹窗
+/**
+ * 打开通知编辑弹窗。
+ *
+ * @param id - 通知ID，不传为新增。
+ */
 function handleOpenDialog(id?: string) {
   noticeDialogRef.value.open(id);
 }
 
-// 发布通知公告
-function handlePublish(id: string) {
-  NoticeAPI.publish(id).then(() => {
-    ElMessage.success("发布成功");
-    handleQuery();
-  });
-}
-
-// 撤回通知公告
-function handleRevoke(id: string) {
-  NoticeAPI.revoke(id).then(() => {
-    ElMessage.success("撤回成功");
-    handleQuery();
-  });
-}
-
-// 删除通知公告
-function handleDelete(id?: number) {
-  const deleteIds = [id || selectIds.value].join(",");
-  if (!deleteIds) {
-    ElMessage.warning("请勾选删除项");
-    return;
-  }
-
-  ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-    type: "warning",
-  }).then(
-    () => {
-      loading.value = true;
-      NoticeAPI.deleteByIds(deleteIds)
-        .then(() => {
-          ElMessage.success("删除成功");
-          handleResetQuery();
-        })
-        .finally(() => (loading.value = false));
-    },
-    () => {
-      ElMessage.info("已取消删除");
-    }
-  );
-}
-
-const openDetailDialog = async (id: string) => {
+/** 打开通知详情弹窗。 */
+function openDetailDialog(id: string) {
   noticeDetailDialogRef.value.open(id);
-};
+}
 
 onMounted(() => {
   handleQuery();
