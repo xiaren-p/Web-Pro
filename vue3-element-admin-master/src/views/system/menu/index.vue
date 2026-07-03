@@ -158,7 +158,7 @@ const selectedMenuId = ref<string | undefined>();
 // 查询菜单
 function handleQuery() {
   loading.value = true;
-  MenuAPI.getTree()
+  MenuAPI.getTree(queryParams)
     .then((data) => {
       menuTableData.value = data;
     })

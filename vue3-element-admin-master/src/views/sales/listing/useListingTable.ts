@@ -336,9 +336,10 @@ export function useListingTable() {
       .then((res: any) => {
         // 假设响应结构为 { total: number, data: ListingItemVO[] } 或符合 request 拦截器处理后的结构
         const list = res.data || [];
+        const shopMap = new Map(shopListRaw.value.map((s) => [String(s.id), s]));
         tableData.value = list.map((item: ListingItemVO) => {
           // 查找店铺名称 (兼容 id 为数字或字符串的情况)
-          const shopObj = shopListRaw.value.find((s) => String(s.id) === String(item.sid));
+          const shopObj = shopMap.get(String(item.sid));
           const shopName = shopObj ? shopObj.label || shopObj.name : item.sid;
 
           // 状态转义：转为数字判定，避免 "1.0" 等带点字符串导致匹配失败或由前端自行截断
@@ -487,26 +488,24 @@ export function useListingTable() {
   }
 
   onMounted(async () => {
-    // 1. 先加载本地缓存的查询条件
     loadQueryFromCache();
 
-    // 2. 获取店铺下拉数据 (await 确保店铺字典加载完毕后再请求列表，解决店铺名无法匹配的问题)
-    try {
-      const res = await ShopsAPI.getOptions();
-      shopListRaw.value = res || [];
-    } catch (err) {
-      console.error("加载店铺数据失败", err);
+    // 并行加载店铺和负责人数据
+    const [shopRes, ownerRes] = await Promise.allSettled([
+      ShopsAPI.getOptions(),
+      ShopsAPI.getOwners(),
+    ]);
+    if (shopRes.status === "fulfilled") {
+      shopListRaw.value = shopRes.value || [];
+    } else {
+      console.error("加载店铺数据失败", shopRes.reason);
+    }
+    if (ownerRes.status === "fulfilled") {
+      ownerListRaw.value = ownerRes.value || [];
+    } else {
+      console.error("加载负责人数据失败", ownerRes.reason);
     }
 
-    // 加载负责人数据
-    try {
-      const res = await ShopsAPI.getOwners();
-      ownerListRaw.value = res || [];
-    } catch (err) {
-      console.error("加载负责人数据失败", err);
-    }
-
-    // 3. 执行查询
     handleQuery();
   });
 
