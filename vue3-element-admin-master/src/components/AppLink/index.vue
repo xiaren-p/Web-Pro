@@ -11,13 +11,12 @@ defineOptions({
 });
 
 import { isExternal } from "@/utils/index";
+import type { RouteLocationRaw } from "vue-router";
 
-const props = defineProps({
-  to: {
-    type: Object,
-    required: true,
-  },
-});
+/** 智能链接组件：自动判断外部链接（<a>）还是路由跳转（<router-link>）。 */
+const props = defineProps<{
+  to: RouteLocationRaw & { path?: string };
+}>();
 
 const isExternalLink = computed(() => {
   return isExternal(props.to.path || "");

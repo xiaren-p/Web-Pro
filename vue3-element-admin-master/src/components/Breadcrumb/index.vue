@@ -33,7 +33,12 @@ function getBreadcrumb() {
   let matched = currentRoute.matched.filter((item) => item.meta && item.meta.title);
   const first = matched[0];
   if (!isDashboard(first)) {
-    matched = [{ path: "/dashboard", meta: { title: "dashboard" } } as any].concat(matched);
+    const dashItem: RouteLocationMatched = {
+      path: "/dashboard",
+      name: "Dashboard",
+      meta: { title: "dashboard" },
+    } as RouteLocationMatched;
+    matched = [dashItem].concat(matched);
   }
   breadcrumbs.value = matched.filter((item) => {
     return item.meta && item.meta.title && item.meta.breadcrumb !== false;
