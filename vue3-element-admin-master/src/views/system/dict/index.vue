@@ -1,5 +1,6 @@
 <template>
   <div class="app-container">
+    <!-- 搜索区域 -->
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item label="关键字" prop="keywords">
@@ -69,7 +70,7 @@
               link
               size="small"
               icon="edit"
-              @click.stop="editDialog(scope.row.id)"
+              @click.stop="openEditDialog(scope.row.id)"
             >
               编辑
             </el-button>
@@ -101,6 +102,9 @@
 <script setup lang="ts">
 /**
  * 字典管理列表页。
+ *
+ * @description 薄编排层：组合 useDictList composable 与 DictTypeDialog。
+ *              字典分页查询、删除、跳转字典项页逻辑全部在 composable 中。
  */
 import { useDictList } from "./composables/useDictList";
 import type { DictPageVO } from "@/api/dict";
@@ -123,26 +127,48 @@ const {
   handleDelete: deleteAction,
 } = useDictList();
 
+/** 重置查询条件并重新获取数据。 */
 function handleResetQuery() {
   queryFormRef.value?.resetFields();
   queryParams.pageNum = 1;
   fetchData();
 }
+
+/**
+ * 删除字典（单个或批量）。
+ *
+ * @param id - 单个字典ID，不传则删除当前勾选项。
+ */
 function handleDelete(id?: string) {
   deleteAction(id, () => queryFormRef.value?.resetFields());
 }
+
+/** 打开新增字典弹窗。 */
 function openDialog() {
   dictTypeDialogRef.value.open();
 }
-function editDialog(id: string) {
+
+/**
+ * 打开编辑字典弹窗。
+ *
+ * @param id - 字典ID。
+ */
+function openEditDialog(id: string) {
   dictTypeDialogRef.value.open(id);
 }
+
+/**
+ * 跳转到字典数据管理页。
+ *
+ * @param row - 字典行数据。
+ */
 function openDictData(row: DictPageVO) {
   router.push({
     path: "/system/dict-item",
     query: { dictCode: row.dictCode, title: "[" + row.name + "]字典数据", status: row.status },
   });
 }
+
 onMounted(() => {
   handleQuery();
 });
