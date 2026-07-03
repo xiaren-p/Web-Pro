@@ -93,10 +93,10 @@ export async function fetchListingOwnerOptions(): Promise<ListingOwnerOptionRaw[
 
 /** 同步接口：以日期 + 币种作为缓存 key，返回 syncing 状态与 sync_time。 */
 export function fetchLossOrderSync(body: LossOrderSyncBody): Promise<LossOrderSyncResponse> {
-  return StatisticsAPI.lossmakingOrdersSync(body as Record<string, unknown>);
+  return StatisticsAPI.lossmakingOrdersSync(body as unknown as Record<string, unknown>);
 }
 
 /** 数据接口：通过 sync 返回的 key 拉取分页数据。 */
 export function fetchLossOrderData(body: LossOrderDataBody): Promise<LossOrderDataResponse> {
-  return StatisticsAPI.lossmakingOrdersData(body as Record<string, unknown>);
+  return StatisticsAPI.lossmakingOrdersData(body as unknown as Record<string, unknown>);
 }
