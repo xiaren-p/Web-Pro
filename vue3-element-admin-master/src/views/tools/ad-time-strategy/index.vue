@@ -1,174 +1,3 @@
-<template>
-  <div class="strategy-page">
-    <!-- 顶级蓝条与标题 -->
-    <div class="page-title-bar">
-      <span class="title-text">分时策略</span>
-    </div>
-
-    <!-- 搜索与筛选区域 -->
-    <div class="filter-panel">
-      <el-form :inline="true" :model="listQuery" class="filter-form">
-        <el-form-item>
-          <el-select
-            v-model="listQuery.status"
-            placeholder="全部状态"
-            style="width: 140px"
-            clearable
-          >
-            <el-option label="开启" :value="1" />
-            <el-option label="暂停" :value="0" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-input
-            v-model="listQuery.keyword"
-            placeholder="请输入模板名称"
-            style="width: 200px"
-            clearable
-          />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">查询</el-button>
-          <el-button @click="resetSearch">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </div>
-
-    <!-- 操作按钮行 -->
-    <div class="action-panel">
-      <div class="action-left">
-        <el-dropdown trigger="click" @command="handleAddTemplate">
-          <el-button type="primary">
-            + 添加模板
-            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-          </el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="bidding">分时调竞价策略</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <BiddingStrategyForm ref="formRef" @saved="onFormSaved" />
-      </div>
-      <div class="action-right">
-        <!-- 对应右侧配置列显示图标 -->
-        <el-button icon="Reading" plain />
-      </div>
-    </div>
-
-    <!-- 数据表格 -->
-    <div class="table-container">
-      <el-table
-        ref="tableRef"
-        :data="tableData"
-        style="width: 100%"
-        border
-        empty-text="没有匹配结果"
-        header-cell-class-name="table-header-gray"
-        @selection-change="handleSelectionChange"
-      >
-        <el-table-column type="selection" width="45" align="center" />
-        <el-table-column prop="name" label="模板名称" sortable min-width="160" />
-        <el-table-column prop="type" label="类型" min-width="100">
-          <template #default="{ row }">
-            {{ TYPE_MAP[row.type] || row.type || "-" }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="有效状态" min-width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
-              {{ STATUS_MAP[row.status] || "-" }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="creator" label="创建人" sortable min-width="110" />
-        <el-table-column prop="weight" label="权重" sortable min-width="80" />
-        <el-table-column prop="created_at" label="创建时间" sortable min-width="160" />
-        <el-table-column label="生效店铺" min-width="140">
-          <template #default="{ row }">
-            <template v-if="(row.shops || []).length > 0">
-              <el-popover placement="bottom" :width="260" trigger="hover" :show-after="200">
-                <template #reference>
-                  <el-link type="primary" :underline="false">
-                    {{ formatCondensed(row.shops, shopNameMap, totalShopCount, "店铺").text }}
-                  </el-link>
-                </template>
-                <div class="popover-list">
-                  <el-tag v-for="(sid, i) in row.shops" :key="i" size="small" style="margin: 2px">
-                    {{ shopNameMap[String(sid)] || sid }}
-                  </el-tag>
-                </div>
-              </el-popover>
-            </template>
-            <template v-else>-</template>
-          </template>
-        </el-table-column>
-        <el-table-column label="标签" min-width="140">
-          <template #default="{ row }">
-            <template v-if="getTagArray(row).length > 0">
-              <el-popover placement="bottom" :width="220" trigger="hover" :show-after="200">
-                <template #reference>
-                  <el-link type="primary" :underline="false">
-                    {{ formatCondensed(getTagArray(row), {} as any, totalTagCount, "标签").text }}
-                  </el-link>
-                </template>
-                <div class="popover-list">
-                  <el-tag
-                    v-for="(t, i) in getTagArray(row)"
-                    :key="i"
-                    size="small"
-                    style="margin: 2px"
-                  >
-                    {{ t }}
-                  </el-tag>
-                </div>
-              </el-popover>
-            </template>
-            <template v-else>-</template>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" min-width="140" fixed="right">
-          <template #header>
-            操作
-            <el-tooltip content="模板的基本操作" placement="top">
-              <el-icon class="question-icon"><QuestionFilled /></el-icon>
-            </el-tooltip>
-          </template>
-          <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </div>
-
-    <!-- 底部批量操作及分页 -->
-    <div class="pagination-bar">
-      <div class="batch-actions">
-        <el-checkbox v-model="selectAll" class="chk-all" @change="toggleSelectAll">
-          全选
-        </el-checkbox>
-        <el-button type="primary" :disabled="!hasSelection" @click="handleBatchEnable">
-          启用
-        </el-button>
-        <el-button :disabled="!hasSelection" @click="handleBatchPause">暂停</el-button>
-        <el-button :disabled="!hasSelection" @click="handleBatchDelete">删除</el-button>
-      </div>
-      <div class="pager-wrapper">
-        <el-pagination
-          v-model:current-page="page"
-          v-model:page-size="pageSize"
-          :page-sizes="[25, 50, 100]"
-          layout="sizes, prev, pager, next, jumper"
-          :total="total"
-          @size-change="fetchList"
-          @current-change="fetchList"
-        />
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 /**
  * 分时调价策略列表页。
@@ -377,6 +206,178 @@ onMounted(() => {
   loadOptionMeta();
 });
 </script>
+
+<template>
+  <div class="strategy-page">
+    <!-- 顶级蓝条与标题 -->
+    <div class="page-title-bar">
+      <span class="title-text">分时策略</span>
+    </div>
+
+    <!-- 搜索与筛选区域 -->
+    <div class="filter-panel">
+      <el-form :inline="true" :model="listQuery" class="filter-form">
+        <el-form-item>
+          <el-select
+            v-model="listQuery.status"
+            placeholder="全部状态"
+            style="width: 140px"
+            clearable
+          >
+            <el-option label="开启" :value="1" />
+            <el-option label="暂停" :value="0" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-input
+            v-model="listQuery.keyword"
+            placeholder="请输入模板名称"
+            style="width: 200px"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch">查询</el-button>
+          <el-button @click="resetSearch">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </div>
+
+    <!-- 操作按钮行 -->
+    <div class="action-panel">
+      <div class="action-left">
+        <el-dropdown trigger="click" @command="handleAddTemplate">
+          <el-button type="primary">
+            + 添加模板
+            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="bidding">分时调竞价策略</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <BiddingStrategyForm ref="formRef" @saved="onFormSaved" />
+      </div>
+      <div class="action-right">
+        <!-- 对应右侧配置列显示图标 -->
+        <el-button icon="Reading" plain />
+      </div>
+    </div>
+
+    <!-- 数据表格 -->
+    <div class="table-container">
+      <el-table
+        ref="tableRef"
+        :data="tableData"
+        style="width: 100%"
+        border
+        empty-text="没有匹配结果"
+        header-cell-class-name="table-header-gray"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="45" align="center" />
+        <el-table-column prop="name" label="模板名称" sortable min-width="160" />
+        <el-table-column prop="type" label="类型" min-width="100">
+          <template #default="{ row }">
+            {{ TYPE_MAP[row.type] || row.type || "-" }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="有效状态" min-width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
+              {{ STATUS_MAP[row.status] || "-" }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="creator" label="创建人" sortable min-width="110" />
+        <el-table-column prop="weight" label="权重" sortable min-width="80" />
+        <el-table-column prop="created_at" label="创建时间" sortable min-width="160" />
+        <el-table-column label="生效店铺" min-width="140">
+          <template #default="{ row }">
+            <template v-if="(row.shops || []).length > 0">
+              <el-popover placement="bottom" :width="260" trigger="hover" :show-after="200">
+                <template #reference>
+                  <el-link type="primary" :underline="false">
+                    {{ formatCondensed(row.shops, shopNameMap, totalShopCount, "店铺").text }}
+                  </el-link>
+                </template>
+                <div class="popover-list">
+                  <el-tag v-for="(sid, i) in row.shops" :key="i" size="small" style="margin: 2px">
+                    {{ shopNameMap[String(sid)] || sid }}
+                  </el-tag>
+                </div>
+              </el-popover>
+            </template>
+            <template v-else>-</template>
+          </template>
+        </el-table-column>
+        <el-table-column label="标签" min-width="140">
+          <template #default="{ row }">
+            <template v-if="getTagArray(row).length > 0">
+              <el-popover placement="bottom" :width="220" trigger="hover" :show-after="200">
+                <template #reference>
+                  <el-link type="primary" :underline="false">
+                    {{ formatCondensed(getTagArray(row), {} as any, totalTagCount, "标签").text }}
+                  </el-link>
+                </template>
+                <div class="popover-list">
+                  <el-tag
+                    v-for="(t, i) in getTagArray(row)"
+                    :key="i"
+                    size="small"
+                    style="margin: 2px"
+                  >
+                    {{ t }}
+                  </el-tag>
+                </div>
+              </el-popover>
+            </template>
+            <template v-else>-</template>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" min-width="140" fixed="right">
+          <template #header>
+            操作
+            <el-tooltip content="模板的基本操作" placement="top">
+              <el-icon class="question-icon"><QuestionFilled /></el-icon>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <!-- 底部批量操作及分页 -->
+    <div class="pagination-bar">
+      <div class="batch-actions">
+        <el-checkbox v-model="selectAll" class="chk-all" @change="toggleSelectAll">
+          全选
+        </el-checkbox>
+        <el-button type="primary" :disabled="!hasSelection" @click="handleBatchEnable">
+          启用
+        </el-button>
+        <el-button :disabled="!hasSelection" @click="handleBatchPause">暂停</el-button>
+        <el-button :disabled="!hasSelection" @click="handleBatchDelete">删除</el-button>
+      </div>
+      <div class="pager-wrapper">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[25, 50, 100]"
+          layout="sizes, prev, pager, next, jumper"
+          :total="total"
+          @size-change="fetchList"
+          @current-change="fetchList"
+        />
+      </div>
+    </div>
+  </div>
+</template>
+
 
 <style scoped lang="scss" src="./index.scss"></style>
 
