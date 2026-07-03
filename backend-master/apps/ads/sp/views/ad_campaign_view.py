@@ -15,17 +15,8 @@ from rest_framework.permissions import IsAuthenticated
 from apps.ads.sp.selectors.campaign_ref_selectors import get_profile_map, get_sid_country_map, get_rate_map, load_all_listing_caches, get_tag_asin_map, get_owner_asin_map, get_asin_info_map, get_asin_cp_map, get_cp_asin_map
 from apps.ads.views._helpers import get_operator_name
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
-from apps.ads.sp.selectors.campaign_ref_selectors import get_profile_map, get_sid_country_map, get_rate_map, load_all_listing_caches, get_tag_asin_map, get_owner_asin_map, get_asin_info_map, get_asin_cp_map, get_cp_asin_map
-from apps.ads.views._helpers import get_operator_name
 from rest_framework.request import Request
-from rest_framework.permissions import IsAuthenticated
-from apps.ads.sp.selectors.campaign_ref_selectors import get_profile_map, get_sid_country_map, get_rate_map, load_all_listing_caches, get_tag_asin_map, get_owner_asin_map, get_asin_info_map, get_asin_cp_map, get_cp_asin_map
-from apps.ads.views._helpers import get_operator_name
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from apps.ads.sp.selectors.campaign_ref_selectors import get_profile_map, get_sid_country_map, get_rate_map, load_all_listing_caches, get_tag_asin_map, get_owner_asin_map, get_asin_info_map, get_asin_cp_map, get_cp_asin_map
-from apps.ads.views._helpers import get_operator_name
 
 from apps.ads.models.lx_ads_portfolio import LxAdsPortfolio
 from apps.ads.models.lx_ads_profile import LxAdsProfile

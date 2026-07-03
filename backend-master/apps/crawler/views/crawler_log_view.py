@@ -5,9 +5,7 @@ from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.permissions import AllowAny
-from rest_framework.permissions import IsAuthenticated
 
 from apps.crawler.models import CrawlerLog
 from apps.crawler.serializers import CrawlerLogSerializer

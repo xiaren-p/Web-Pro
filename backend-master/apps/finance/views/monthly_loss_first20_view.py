@@ -190,12 +190,12 @@ class MonthlyLossFirst20ViewSet(viewsets.ViewSet):
             def make_variant_set(m):
                 """生成本月与其去横杠变体的集合。
 
-Args:
-    m (str): 月份字符串。
+                Args:
+                    m (str): 月份字符串。
 
-Returns:
-    set[str]: 月份及其去横杠格式组成的集合。
-"""
+                Returns:
+                    set[str]: 月份及其去横杠格式组成的集合。
+                """
                 return {m, m.replace('-', '')}
 
             qs_cur = MonthlyLossOrderFirst20.objects.filter(month__in=list(make_variant_set(cur_month)))
@@ -225,13 +225,13 @@ Returns:
             def aggregate_rows(rows, months_list):
                 """用 pandas 按产品与月份聚合行数据为字典。
 
-Args:
-    rows (list[dict]): 原始数据行。
-    months_list (list[str]): 月份列表。
+                Args:
+                    rows (list[dict]): 原始数据行。
+                    months_list (list[str]): 月份列表。
 
-Returns:
-    dict: 聚合后的数据字典。
-"""
+                Returns:
+                    dict: 聚合后的数据字典。
+                """
                 try:
                     df = pd.DataFrame(rows)
                     if df.empty:
@@ -467,10 +467,10 @@ Returns:
             def _cleanup(path_file, delay=30):
                 """延迟删除临时文件的后台清理函数。
 
-Args:
-    path_file (str): 临时文件路径。
-    delay (int): 删除前等待秒数，默认 30。
-"""
+                Args:
+                    path_file (str): 临时文件路径。
+                    delay (int): 删除前等待秒数，默认 30。
+                """
                 try:
                     time.sleep(delay)
                     try:
@@ -484,7 +484,7 @@ Args:
             return resp
         except Exception as e:
             tb = traceback.format_exc()
-            return drf_error('download failed', status=500, data={'msg': str(e), 'trace': tb})
+            return drf_error('download failed', status=500, data={'msg': str(e), })
 
 
 __all__ = ["MonthlyLossFirst20ViewSet"]

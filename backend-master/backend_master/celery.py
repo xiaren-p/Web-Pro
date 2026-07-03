@@ -2,7 +2,7 @@
 
 启动命令：
     # Worker
-    celery -A backend_master worker -l info -Q default -c 2
+    celery -A backend_master worker -l info -Q celery,parallel_queue,single_thread_queue
     # Beat（定时任务调度）
     celery -A backend_master beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
 """

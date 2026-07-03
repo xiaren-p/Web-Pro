@@ -419,21 +419,8 @@ REST_FRAMEWORK = {
 # /o/token/ 端点同时支持：
 #   - OIDC Authorization Code Flow（前端 SSO 登录）
 #   - Client Credentials Grant（外部应用调用）
-OAUTH2_PROVIDER = {
-    # 全局可用 Scope 字典
-    'SCOPES': {
-        'openid':  'OpenID Connect 身份标识',
-        'profile': '用户个人资料',
-        'email':   '用户邮箱',
-        'api_access':  'API 接口访问权限（外部应用调用）',
-    },
-    'DEFAULT_SCOPES': ['openid'],
-    # Token 有效期
-    'ACCESS_TOKEN_EXPIRE_SECONDS': 3600,
-    'REFRESH_TOKEN_EXPIRE_SECONDS': 86400 * 7,
-    # 启用 OIDC（/.well-known/openid-configuration 等端点）
-    'OIDC_ENABLED': True,
-}
+# 实际生效的 OAUTH2_PROVIDER 在下方的 OIDC Provider 段定义，
+# 此处不再重复声明以避免覆盖。
 
 # 认证令牌有效期（秒）
 ACCESS_TOKEN_EXPIRE_SECONDS = env('ACCESS_TOKEN_EXPIRE_SECONDS')

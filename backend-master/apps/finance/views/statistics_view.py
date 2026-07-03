@@ -253,7 +253,7 @@ class StatisticsViewSet(viewsets.ViewSet):
             })
         except Exception as e:
             tb = traceback.format_exc()
-            return drf_error('lossmakingorders_sync failed', status=500, data={'msg': str(e), 'trace': tb})
+            return drf_error('lossmakingorders_sync failed', status=500, data={'msg': str(e), })
 
 
     @action(detail=False, methods=["post"], url_path="lossmakingorders_data")
@@ -534,7 +534,7 @@ Returns:
             return drf_ok({'list': page_items, 'total': total, 'sync_time': sync_time})
         except Exception as e:
             tb = traceback.format_exc()
-            return drf_error('lossmakingorders_data failed', status=500, data={'msg': str(e), 'trace': tb})
+            return drf_error('lossmakingorders_data failed', status=500, data={'msg': str(e), })
 
 
 

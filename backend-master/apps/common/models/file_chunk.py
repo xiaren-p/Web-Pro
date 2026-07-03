@@ -42,7 +42,7 @@ class FileChunk(TimeStampedModel):
     )
 
     class Meta:
-        ordering = ["index"]
+        ordering = ["asset", "num"]
         db_table = 'api_v1_filechunk'
         verbose_name = "文件分片"
         verbose_name_plural = "文件分片"

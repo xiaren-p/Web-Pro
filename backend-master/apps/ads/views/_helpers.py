@@ -211,24 +211,3 @@ def get_operator_name(request: Request) -> str:
             return user.username
     return "未知用户"
 
-
-def get_operator_name(request: Request) -> str:
-    """获取当前登录用户的展示名（昵称优先，降级 username）。
-
-    Args:
-        request (Request): DRF 请求对象。
-
-    Returns:
-        str: 用户昵称或用户名；未认证返回 "未知用户"。
-    """
-    user = getattr(request, "user", None)
-    if user and user.is_authenticated:
-        try:
-            profile = getattr(user, "profile", None)
-            if profile and profile.nickname:
-                return profile.nickname
-        except Exception:
-            logger.warning("[get_operator_name] 获取用户昵称失败", exc_info=True)
-        if hasattr(user, "username") and user.username:
-            return user.username
-    return "未知用户"

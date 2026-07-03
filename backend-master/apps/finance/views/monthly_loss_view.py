@@ -585,10 +585,10 @@ Args:
                 except Exception:
                     pass
                 tb = traceback.format_exc()
-                return drf_error('failed to generate xlsx', status=500, data={'msg': str(e), 'trace': tb})
+                return drf_error('failed to generate xlsx', status=500, data={'msg': str(e), })
         except Exception as e:
             tb = traceback.format_exc()
-            return drf_error('download failed', status=500, data={'msg': str(e), 'trace': tb})
+            return drf_error('download failed', status=500, data={'msg': str(e), })
 
 
 

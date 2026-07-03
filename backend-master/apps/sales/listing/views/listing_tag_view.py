@@ -6,11 +6,8 @@ from typing import Any
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ViewSet
-from rest_framework.permissions import IsAuthenticated
 
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.common.utils.responses import drf_error, drf_ok
