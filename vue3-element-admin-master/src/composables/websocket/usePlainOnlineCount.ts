@@ -8,6 +8,15 @@ interface PlainOnlineCountOptions {
   debug?: boolean;
 }
 
+/**
+ * 在线人数 WebSocket 订阅 Composable（原生 WebSocket 实现）。
+ *
+ * 通过 WebSocket 连接到后端实时通道，接收在线人数更新。
+ * 支持自动重连和主动 ping 保活。
+ *
+ * @param options - 可选的连接配置。
+ * @returns 在线人数 ref 和连接状态。
+ */
 export function usePlainOnlineCount(options: PlainOnlineCountOptions = {}) {
   const envPing = Number(import.meta.env.VITE_APP_WS_PING_INTERVAL) || 0;
   const reconnectInterval = options.reconnectInterval ?? 15000;

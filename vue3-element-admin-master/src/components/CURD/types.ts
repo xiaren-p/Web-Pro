@@ -5,10 +5,14 @@ import type PageModal from "./PageModal.vue";
 import type PageSearch from "./PageSearch.vue";
 import type { CSSProperties } from "vue";
 
+/** PageSearch 组件实例类型。 */
 export type PageSearchInstance = InstanceType<typeof PageSearch>;
+/** PageContent 组件实例类型。 */
 export type PageContentInstance = InstanceType<typeof PageContent>;
+/** PageModal 组件实例类型。 */
 export type PageModalInstance = InstanceType<typeof PageModal>;
 
+/** 通用键值对对象类型。 */
 export type IObject = Record<string, any>;
 
 type DateComponent = "date-picker" | "time-picker" | "time-select" | "custom-tag" | "input-tag";
