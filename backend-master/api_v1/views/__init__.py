@@ -18,11 +18,11 @@ from apps.sales.listing.views.image_view import ImageUploadViewSet
 
 from apps.ads.views.shop_profile_view import ShopProfileViewSet
 from apps.ads.views.ad_portfolio_view import AdPortfolioViewSet
-from apps.ads.sp.views.ad_campaign_view import AdCampaignViewSet
-from apps.ads.sp.views.ad_group_view import AdGroupViewSet
+from apps.ads.sp.views.campaign_view import AdCampaignViewSet
+from apps.ads.sp.views.group_view import AdGroupViewSet
 from apps.ads.sp.views.ad_view import AdViewSet
-from apps.ads.sp.views.auto_targeting_view import AutoTargetingViewSet
-from apps.ads.sp.views.auto_negative_targeting_view import AutoNegativeTargetingViewSet
+from apps.ads.sp.views.targeting_view import AutoTargetingViewSet
+from apps.ads.sp.views.negative_targeting_view import AutoNegativeTargetingViewSet
 from apps.ads.sp.views.keyword_view import KeywordViewSet
 from apps.ads.sp.views.negative_keyword_view import NegativeKeywordViewSet
 from apps.ads.sp.timing.views.time_pricing_strategy_view import TimePricingStrategyViewSet
