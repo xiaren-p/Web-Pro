@@ -84,7 +84,7 @@ export const NoticeAPI = {
     });
   },
   getMyNoticePage(params: any) {
-    return this.getMyPage(params);
+    return NoticeAPI.getMyPage(params);
   },
   exportData(params: any) {
     return request({

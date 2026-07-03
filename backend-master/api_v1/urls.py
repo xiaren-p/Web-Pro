@@ -153,6 +153,8 @@ urlpatterns = [
     path('menus/tree', views.MenuViewSet.as_view({'get': 'tree'}), name='menus-tree'),
     path('menus', views.MenuViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='menus-list-create'),
     path('menus/options', views.MenuViewSet.as_view({'get': 'options'}), name='menus-options'),
+    path('menus/<str:id>/form', views.MenuViewSet.as_view({'get': 'form'}), name='menu-form'),
+    path('menus/<str:id>', views.MenuViewSet.as_view({'put': 'update_or_delete', 'delete': 'update_or_delete'}), name='menu-update-delete'),
     # 店铺下拉（LxShops + LxUser 模型，shop_options_view）
     path('shops/options', views.ShopOptionsViewSet.as_view({'get': 'shops'}), name='shops-options'),
     # 负责人下拉（LxUser 模型）

@@ -109,18 +109,18 @@ export const DictAPI = {
     });
   },
   getDictItemPage(dictCode: string, params: DictItemPageQuery) {
-    return this.getItemPage(dictCode, params);
+    return DictAPI.getItemPage(dictCode, params);
   },
   getDictItemFormData(dictCode: string, itemId: string) {
-    return this.getItemForm(dictCode, itemId);
+    return DictAPI.getItemForm(dictCode, itemId);
   },
   updateDictItem(dictCode: string, itemId: string, data: DictItemForm) {
-    return this.updateItem(dictCode, itemId, data);
+    return DictAPI.updateItem(dictCode, itemId, data);
   },
   createDictItem(dictCode: string, data: DictItemForm) {
-    return this.createItem(dictCode, data);
+    return DictAPI.createItem(dictCode, data);
   },
   deleteDictItems(dictCode: string, ids: string) {
-    return this.deleteItems(dictCode, ids);
+    return DictAPI.deleteItems(dictCode, ids);
   },
 };

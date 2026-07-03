@@ -54,6 +54,6 @@ export const ConfigAPI = {
     return request({ url: `${CONFIG_BASE_URL}/refresh-cache`, method: "post" });
   },
   deleteById(id: string) {
-    return this.deleteByIds(id);
+    return ConfigAPI.deleteByIds(id);
   },
 };
