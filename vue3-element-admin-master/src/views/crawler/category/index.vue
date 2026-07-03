@@ -125,6 +125,7 @@
 </template>
 
 <script setup lang="ts">
+/** 爬虫分类管理列表页。管理商品分类映射。 */
 defineOptions({ name: "CrawlerCategory", inheritAttrs: false });
 
 import { ref, reactive, onMounted } from "vue";

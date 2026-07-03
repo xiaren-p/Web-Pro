@@ -82,6 +82,7 @@
 </template>
 
 <script setup lang="ts">
+/** 我的工作报告列表页。展示个人日报/周报提交记录，支持编辑、删除、查看详情。 */
 import { ref, onMounted, reactive } from "vue";
 import { Plus, View, Edit, Delete } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";

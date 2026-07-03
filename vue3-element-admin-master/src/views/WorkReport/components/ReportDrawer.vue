@@ -105,6 +105,7 @@
 </template>
 
 <script setup lang="ts">
+/** 工作报告编辑抽屉。输入日报/周报内容并提交。 */
 import { ref, reactive, watch, computed } from "vue";
 import { resolveAvatarSrc } from "@/utils/avatarPresets";
 import { ElMessage } from "element-plus";

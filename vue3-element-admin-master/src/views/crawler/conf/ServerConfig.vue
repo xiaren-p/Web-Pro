@@ -104,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+/** 爬虫服务器配置页。管理爬虫服务器连接参数。 */
 import { ref, reactive, onMounted } from "vue";
 import { CrawlerAPI } from "@/api/crawler/conf";
 import { ElMessage, ElMessageBox } from "element-plus";
