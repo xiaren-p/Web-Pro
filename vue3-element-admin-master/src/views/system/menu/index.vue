@@ -132,7 +132,6 @@
     <MenuFormDrawer ref="menuFormDrawerRef" @success="handleQuery" />
   </div>
 </template>
-
 <script setup lang="ts">
 import { MenuAPI, type MenuQuery, type MenuVO } from "@/api/menu";
 import { MenuTypeEnum } from "@/enums/system/menu-enum";
@@ -147,15 +146,11 @@ const queryFormRef = ref();
 const menuFormDrawerRef = ref();
 
 const loading = ref(false);
-// 查询参数
 const queryParams = reactive<MenuQuery>({});
-// 菜单表格数据
 const menuTableData = ref<MenuVO[]>([]);
-
-// 选择表格的行菜单ID
 const selectedMenuId = ref<string | undefined>();
 
-// 查询菜单
+/** Query menu tree. */
 function handleQuery() {
   loading.value = true;
   MenuAPI.getTree(queryParams)
@@ -167,32 +162,32 @@ function handleQuery() {
     });
 }
 
-// 重置查询
+/** Reset query and re-search. */
 function handleResetQuery() {
   queryFormRef.value.resetFields();
   handleQuery();
 }
 
-// 行点击事件
+/** Row click handler. */
 function handleRowClick(row: MenuVO) {
   selectedMenuId.value = row.id;
 }
 
 /**
- * 打开表单弹窗
+ * Open menu form drawer.
  *
- * @param parentId 父菜单ID
- * @param menuId 菜单ID
+ * @param parentId - Parent menu ID (for creating child).
+ * @param menuId - Menu ID (for editing).
  */
 function handleOpenDialog(parentId?: string, menuId?: string) {
   menuFormDrawerRef.value.open(parentId, menuId);
 }
 
-// 删除菜单
+/** Delete menu. */
 function handleDelete(menuId: string) {
   if (!menuId) {
     ElMessage.warning("请勾选删除项");
-    return false;
+    return;
   }
 
   ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
