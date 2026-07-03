@@ -72,7 +72,8 @@ const emit = defineEmits<{
 
 const options = ref<Array<{ label: string; value: string | number }>>([]);
 
-const selectedValue = ref<string | number | boolean | (string | number)[] | undefined>(
+/** 内部选中值。any 是因为驱动 select/radio/checkbox 三种 Element Plus 组件，其 v-model 类型互不兼容。 */
+const selectedValue = ref<any>(
   typeof props.modelValue === "string" || typeof props.modelValue === "number"
     ? props.modelValue
     : Array.isArray(props.modelValue)
@@ -99,9 +100,9 @@ watch(
   { immediate: true }
 );
 
-/** 选中值变化时同步 v-model。 */
-function handleChange(val: string | number | boolean | (string | number)[]): void {
-  emit("update:modelValue", val);
+/** 选中值变化时同步 v-model。Element Plus 各组件 emit 的 val 类型不同（select→string|number, checkbox→array），故用 unknown。 */
+function handleChange(val: unknown): void {
+  emit("update:modelValue", val as string | number | boolean | (string | number)[]);
 }
 
 onMounted(async () => {
