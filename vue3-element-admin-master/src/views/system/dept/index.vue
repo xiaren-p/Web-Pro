@@ -10,14 +10,12 @@
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-
         <el-form-item label="部门状态" prop="status">
           <el-select v-model="queryParams.status" placeholder="全部" clearable style="width: 100px">
             <el-option :value="1" label="正常" />
             <el-option :value="0" label="禁用" />
           </el-select>
         </el-form-item>
-
         <el-form-item class="search-buttons">
           <el-button class="filter-item" type="primary" icon="search" @click="handleQuery">
             搜索
@@ -26,7 +24,6 @@
         </el-form-item>
       </el-form>
     </div>
-
     <el-card shadow="hover" class="data-table">
       <div class="data-table__toolbar">
         <div class="data-table__toolbar--actions">
@@ -44,7 +41,6 @@
           </el-button>
         </div>
       </div>
-
       <el-table
         v-loading="isLoading"
         :data="deptList"
@@ -63,9 +59,7 @@
             <el-tag v-else type="info">禁用</el-tag>
           </template>
         </el-table-column>
-
         <el-table-column prop="sort" label="排序" width="100" />
-
         <el-table-column label="操作" fixed="right" align="left" width="200">
           <template #default="scope">
             <el-button
@@ -114,7 +108,6 @@
         </el-table-column>
       </el-table>
     </el-card>
-
     <DeptFormDialog ref="deptFormDialogRef" @success="handleQuery" />
   </div>
 </template>
@@ -129,14 +122,10 @@
 import { useDeptList } from "./composables/useDeptList";
 import DeptFormDialog from "./components/DeptFormDialog.vue";
 
-defineOptions({
-  name: "Dept",
-  inheritAttrs: false,
-});
+defineOptions({ name: "Dept", inheritAttrs: false });
 
 const queryFormRef = ref();
 const deptFormDialogRef = ref();
-
 const {
   isCompanyAdmin,
   isDeptAdmin,
@@ -157,21 +146,12 @@ function handleResetQuery() {
   handleQuery();
 }
 
-/**
- * 删除部门（单个或批量）。
- *
- * @param deptId - 单个部门ID，不传则删除勾选项。
- */
+/** 删除部门（单个或批量）。 */
 function handleDelete(deptId?: string) {
   deleteAction(deptId, () => queryFormRef.value?.resetFields());
 }
 
-/**
- * 打开部门编辑弹窗。
- *
- * @param parentId - 父部门ID（新建子部门时传入）。
- * @param deptId - 部门ID（编辑时传入）。
- */
+/** 打开部门编辑弹窗。 */
 function openDialog(parentId?: string, deptId?: string) {
   deptFormDialogRef.value.open(parentId, deptId);
 }
