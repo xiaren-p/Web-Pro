@@ -30,13 +30,13 @@
     <el-card shadow="hover" class="data-table">
       <div class="data-table__toolbar">
         <div class="data-table__toolbar--actions">
-          <el-button v-if="isCompanyAdmin" type="success" icon="plus" @click="handleOpenDialog()">
+          <el-button v-if="isCompanyAdmin" type="success" icon="plus" @click="openDialog()">
             新增
           </el-button>
           <el-button
             v-if="isCompanyAdmin"
             type="danger"
-            :disabled="selectIds.length === 0"
+            :disabled="selectedIds.length === 0"
             icon="delete"
             @click="handleDelete()"
           >
@@ -46,7 +46,7 @@
       </div>
 
       <el-table
-        v-loading="loading"
+        v-loading="isLoading"
         :data="deptList"
         row-key="id"
         default-expand-all
@@ -79,7 +79,7 @@
               link
               size="small"
               icon="plus"
-              @click.stop="handleOpenDialog(scope.row.id, undefined)"
+              @click.stop="openDialog(scope.row.id, undefined)"
             >
               新增
             </el-button>
@@ -94,7 +94,7 @@
               link
               size="small"
               icon="edit"
-              @click.stop="handleOpenDialog(scope.row.parentId, scope.row.id)"
+              @click.stop="openDialog(scope.row.parentId, scope.row.id)"
             >
               编辑
             </el-button>
@@ -120,10 +120,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-
-import { useUserStore } from "@/store/modules/user-store";
-import { DeptAPI, type DeptVO, type DeptQuery } from "@/api/dept";
+/**
+ * 部门管理列表页。
+ *
+ * @description 薄编排层：组合 useDeptList composable 与 DeptFormDialog。
+ *              部门树查询、权限判断、子孙部门收集、删除逻辑全部在 composable 中。
+ */
+import { useDeptList } from "./composables/useDeptList";
 import DeptFormDialog from "./components/DeptFormDialog.vue";
 
 defineOptions({
@@ -133,151 +136,44 @@ defineOptions({
 
 const queryFormRef = ref();
 const deptFormDialogRef = ref();
-const userStore = useUserStore();
 
-/** Query form ref. */
-const isCompanyAdmin = computed(() => userStore.userInfo.roles?.includes("ROOT") ?? false);
+const {
+  isCompanyAdmin,
+  isDeptAdmin,
+  myDeptIdStr,
+  myDeptDescendantIds,
+  isLoading,
+  selectedIds,
+  queryParams,
+  deptList,
+  handleQuery,
+  handleSelectionChange,
+  handleDelete: deleteAction,
+} = useDeptList();
 
-/** Whether current user is department admin. */
-const isDeptAdmin = computed(() => userStore.userInfo.roles?.includes("dept_admin") ?? false);
-
-/** Current user department ID. */
-const myDeptId = computed(() => userStore.userInfo.deptId ?? null);
-
-/** Current user department ID as string (aligned with DeptVO.id type). */
-const myDeptIdStr = computed<string | null>(() =>
-  myDeptId.value != null ? String(myDeptId.value) : null
-);
-
-/**
- * Recursively collect all descendant IDs in the node tree.
- *
- * @param children - Current level child node list.
- * @param result - Collection result set.
- */
-function addAllDescendants(children: DeptVO[] | undefined, result: Set<string>): void {
-  children?.forEach((c) => {
-    result.add(String(c.id));
-    addAllDescendants(c.children, result);
-  });
-}
-
-/**
- * Find target node in tree and recursively collect all descendant IDs (excluding self).
- *
- * @param nodes - Current level node list.
- * @param targetId - Target parent node ID.
- * @param result - Collection result set.
- * @returns Whether target node was found.
- */
-function collectDescendantIds(nodes: DeptVO[], targetId: string, result: Set<string>): boolean {
-  for (const node of nodes) {
-    if (String(node.id) === targetId) {
-      addAllDescendants(node.children, result);
-      return true;
-    }
-    if (node.children && collectDescendantIds(node.children, targetId, result)) return true;
-  }
-  return false;
-}
-
-/** All descendant department IDs of current user department (excluding self). */
-const myDeptDescendantIds = computed<Set<string>>(() => {
-  const result = new Set<string>();
-  if (!isDeptAdmin.value || !myDeptIdStr.value || !deptList.value) return result;
-  collectDescendantIds(deptList.value, myDeptIdStr.value, result);
-  return result;
-});
-
-const loading = ref(false);
-const selectIds = ref<string[]>([]);
-const queryParams = reactive<DeptQuery>({ pageNum: 1, pageSize: 10 });
-const deptList = ref<DeptVO[]>();
-
-/** Query department list. */
-function handleQuery() {
-  loading.value = true;
-  DeptAPI.getList(queryParams).then((data) => {
-    deptList.value = data;
-    loading.value = false;
-  });
-}
-
-/** Reset query and re-search. */
+/** 重置查询条件并重新查询。 */
 function handleResetQuery() {
-  queryFormRef.value.resetFields();
+  queryFormRef.value?.resetFields();
   handleQuery();
 }
 
-/** Table selection change handler. */
-function handleSelectionChange(selection: DeptVO[]) {
-  selectIds.value = selection.map((item) => String(item.id));
+/**
+ * 删除部门（单个或批量）。
+ *
+ * @param deptId - 单个部门ID，不传则删除勾选项。
+ */
+function handleDelete(deptId?: string) {
+  deleteAction(deptId, () => queryFormRef.value?.resetFields());
 }
 
 /**
- * Open department form dialog.
+ * 打开部门编辑弹窗。
  *
- * @param parentId - Parent department ID (for creating child).
- * @param deptId - Department ID (for editing).
+ * @param parentId - 父部门ID（新建子部门时传入）。
+ * @param deptId - 部门ID（编辑时传入）。
  */
-function handleOpenDialog(parentId?: string, deptId?: string) {
+function openDialog(parentId?: string, deptId?: string) {
   deptFormDialogRef.value.open(parentId, deptId);
-}
-
-/** Delete department (single or batch). */
-function handleDelete(deptId?: string) {
-  const deptIds = [deptId || selectIds.value].join(",");
-
-  if (!deptIds) {
-    ElMessage.warning("请勾选删除项");
-    return;
-  }
-
-  ElMessageBox.confirm(
-    `<div style="font-size:14px;line-height:1.7;color:#303133">
-      <p style="margin:0 0 12px;font-weight:600;font-size:15px">确认删除所选部门？此操作不可撤销。</p>
-      <div style="border-top:1px solid #ebeef5;margin-bottom:12px"></div>
-      <p style="margin:0 0 8px;font-weight:600;color:#606266">Nextcloud 同步影响</p>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
-        <div style="display:flex;align-items:flex-start;gap:8px">
-          <span style="color:#f56c6c;font-size:15px;flex-shrink:0;margin-top:1px">x</span>
-          <span>部门对应的 NC 群组将被<b>立即删除</b></span>
-        </div>
-        <div style="display:flex;align-items:flex-start;gap:8px">
-          <span style="color:#f56c6c;font-size:15px;flex-shrink:0;margin-top:1px">x</span>
-          <span>所有成员将<b>即刻失去</b>部门文件夹的访问权限</span>
-        </div>
-        <div style="display:flex;align-items:flex-start;gap:8px">
-          <span style="color:#67c23a;font-size:15px;flex-shrink:0;margin-top:1px">OK</span>
-          <span>部门文件夹及文件<b>不会被删除</b>，保留为孤立状态</span>
-        </div>
-      </div>
-      <div style="background:#fffbe6;border:1px solid #ffe58f;border-radius:6px;padding:10px 12px;color:#8a6d00;font-size:13px;line-height:1.6">
-        * 建议删除前先在 Nextcloud 中备份或迁移文件夹内的数据
-      </div>
-    </div>`,
-    "删除部门警告",
-    {
-      confirmButtonText: "我已知晓，确认删除",
-      cancelButtonText: "取消",
-      type: "warning",
-      dangerouslyUseHTMLString: true,
-      confirmButtonClass: "el-button--danger",
-    }
-  ).then(
-    () => {
-      loading.value = true;
-      DeptAPI.deleteByIds(deptIds)
-        .then(() => {
-          ElMessage.success("删除成功");
-          handleResetQuery();
-        })
-        .finally(() => (loading.value = false));
-    },
-    () => {
-      ElMessage.info("已取消删除");
-    }
-  );
 }
 
 onMounted(() => {
