@@ -9,8 +9,8 @@
 <style scoped>
 .placeholder-page {
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
   min-height: 400px;
 }
 </style>

@@ -133,28 +133,27 @@ defineOptions({
 
 const queryFormRef = ref();
 const deptFormDialogRef = ref();
-
 const userStore = useUserStore();
 
-/** 是否为公司管理员（含超管） */
+/** Query form ref. */
 const isCompanyAdmin = computed(() => userStore.userInfo.roles?.includes("ROOT") ?? false);
 
-/** 是否为部门管理员 */
+/** Whether current user is department admin. */
 const isDeptAdmin = computed(() => userStore.userInfo.roles?.includes("dept_admin") ?? false);
 
-/** 当前用户所属部门 ID */
+/** Current user department ID. */
 const myDeptId = computed(() => userStore.userInfo.deptId ?? null);
 
-/** 当前用户所属部门 ID（字符串，与 DeptVO.id 类型对齐） */
+/** Current user department ID as string (aligned with DeptVO.id type). */
 const myDeptIdStr = computed<string | null>(() =>
   myDeptId.value != null ? String(myDeptId.value) : null
 );
 
 /**
- * 递归将节点树中所有子孙 ID 加入 result。
+ * Recursively collect all descendant IDs in the node tree.
  *
- * @param {DeptVO[] | undefined} children - 当前层子节点列表。
- * @param {Set<string>} result - 收集结果集合。
+ * @param children - Current level child node list.
+ * @param result - Collection result set.
  */
 function addAllDescendants(children: DeptVO[] | undefined, result: Set<string>): void {
   children?.forEach((c) => {
@@ -164,12 +163,12 @@ function addAllDescendants(children: DeptVO[] | undefined, result: Set<string>):
 }
 
 /**
- * 在 nodes 树中找到 targetId 节点，递归收集其全部子孙 ID（不含自身）。
+ * Find target node in tree and recursively collect all descendant IDs (excluding self).
  *
- * @param {DeptVO[]} nodes - 当前层节点列表。
- * @param {string} targetId - 目标父节点 ID。
- * @param {Set<string>} result - 收集结果集合。
- * @returns {boolean} 是否已找到目标节点。
+ * @param nodes - Current level node list.
+ * @param targetId - Target parent node ID.
+ * @param result - Collection result set.
+ * @returns Whether target node was found.
  */
 function collectDescendantIds(nodes: DeptVO[], targetId: string, result: Set<string>): boolean {
   for (const node of nodes) {
@@ -182,7 +181,7 @@ function collectDescendantIds(nodes: DeptVO[], targetId: string, result: Set<str
   return false;
 }
 
-/** 当前用户所属部门的全部子孙部门 ID 集合（不含本级） */
+/** All descendant department IDs of current user department (excluding self). */
 const myDeptDescendantIds = computed<Set<string>>(() => {
   const result = new Set<string>();
   if (!isDeptAdmin.value || !myDeptIdStr.value || !deptList.value) return result;
@@ -191,12 +190,11 @@ const myDeptDescendantIds = computed<Set<string>>(() => {
 });
 
 const loading = ref(false);
-const selectIds = ref<number[]>([]);
+const selectIds = ref<string[]>([]);
 const queryParams = reactive<DeptQuery>({ pageNum: 1, pageSize: 10 });
-
 const deptList = ref<DeptVO[]>();
 
-// 查询部门
+/** Query department list. */
 function handleQuery() {
   loading.value = true;
   DeptAPI.getList(queryParams).then((data) => {
@@ -205,29 +203,29 @@ function handleQuery() {
   });
 }
 
-// 重置查询
+/** Reset query and re-search. */
 function handleResetQuery() {
   queryFormRef.value.resetFields();
   handleQuery();
 }
 
-// 处理选中项变化
-function handleSelectionChange(selection: any) {
-  selectIds.value = selection.map((item: any) => item.id);
+/** Table selection change handler. */
+function handleSelectionChange(selection: DeptVO[]) {
+  selectIds.value = selection.map((item) => String(item.id));
 }
 
 /**
- * 打开部门弹窗
+ * Open department form dialog.
  *
- * @param parentId 父部门ID
- * @param deptId 部门ID
+ * @param parentId - Parent department ID (for creating child).
+ * @param deptId - Department ID (for editing).
  */
 function handleOpenDialog(parentId?: string, deptId?: string) {
   deptFormDialogRef.value.open(parentId, deptId);
 }
 
-// 删除部门
-function handleDelete(deptId?: number) {
+/** Delete department (single or batch). */
+function handleDelete(deptId?: string) {
   const deptIds = [deptId || selectIds.value].join(",");
 
   if (!deptIds) {
@@ -242,20 +240,20 @@ function handleDelete(deptId?: number) {
       <p style="margin:0 0 8px;font-weight:600;color:#606266">Nextcloud 同步影响</p>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
         <div style="display:flex;align-items:flex-start;gap:8px">
-          <span style="color:#f56c6c;font-size:15px;flex-shrink:0;margin-top:1px">✕</span>
+          <span style="color:#f56c6c;font-size:15px;flex-shrink:0;margin-top:1px">x</span>
           <span>部门对应的 NC 群组将被<b>立即删除</b></span>
         </div>
         <div style="display:flex;align-items:flex-start;gap:8px">
-          <span style="color:#f56c6c;font-size:15px;flex-shrink:0;margin-top:1px">✕</span>
+          <span style="color:#f56c6c;font-size:15px;flex-shrink:0;margin-top:1px">x</span>
           <span>所有成员将<b>即刻失去</b>部门文件夹的访问权限</span>
         </div>
         <div style="display:flex;align-items:flex-start;gap:8px">
-          <span style="color:#67c23a;font-size:15px;flex-shrink:0;margin-top:1px">✓</span>
+          <span style="color:#67c23a;font-size:15px;flex-shrink:0;margin-top:1px">OK</span>
           <span>部门文件夹及文件<b>不会被删除</b>，保留为孤立状态</span>
         </div>
       </div>
       <div style="background:#fffbe6;border:1px solid #ffe58f;border-radius:6px;padding:10px 12px;color:#8a6d00;font-size:13px;line-height:1.6">
-        💡 建议删除前先在 Nextcloud 中备份或迁移文件夹内的数据，再由 NC 管理员手动清理孤立的 Group Folder。
+        * 建议删除前先在 Nextcloud 中备份或迁移文件夹内的数据
       </div>
     </div>`,
     "删除部门警告",

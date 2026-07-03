@@ -273,8 +273,8 @@ function handleSelectionChange(selection: DraftRow[]) {
   justify-content: center;
 
   :deep(.el-button) {
-    padding: 4px;
     min-height: unset;
+    padding: 4px;
   }
 }
 </style>
