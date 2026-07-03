@@ -406,17 +406,23 @@
 </template>
 
 <script setup lang="ts">
-import { provide, ref, computed, onMounted, onUnmounted } from "vue";
+/**
+ * 商品列表页。
+ *
+ * @description 薄编排层：组合 useListingTable（数据查询）、useListingColumns（列配置/选择）、
+ *              各子对话框组件。remark 编辑、标签操作、批量分类等在此。
+ */
+import { provide, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { SalesProductListingAPI, type ListingItemVO } from "@/api/sales/listing";
 import useClipboard from "vue-clipboard3";
 import { useListingTable } from "./useListingTable";
+import { useListingColumns } from "./composables/useListingColumns";
 import ListingSearchForm from "./components/ListingSearchForm.vue";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import BatchTagDialog from "./components/BatchTagDialog.vue";
 import EditTagDialog from "./components/EditTagDialog.vue";
 import BatchAssortDialog from "./components/BatchAssortDialog.vue";
-import { defaultColumns } from "./constants";
 import { Edit, Picture, StarFilled, ArrowDown, Setting } from "@element-plus/icons-vue";
 
 defineOptions({ name: "SalesProductListing" });
@@ -439,18 +445,69 @@ const {
   handleCurrentChange,
 } = listingHooks;
 
-const columnConfigVisible = ref(false);
+const {
+  columnConfigVisible,
+  columns,
+  tableColumns,
+  handleConfigSave,
+  handleConfigReset,
+  isShiftDown,
+} = useListingColumns();
 
-// 批量操作相关
+// ── 选择相关 ────────────────────────────────────────────────────────────────────
 const selectedRows = ref<ListingItemVO[]>([]);
+const tableRef = ref();
+let lastSelectedIndex = -1;
+
+function handleSelectionChange(selection: ListingItemVO[]) {
+  selectedRows.value = selection;
+}
+
+function handleSelect(selection: any[], row: any) {
+  const currentIndex = tableData.value.findIndex((item) => item === row);
+  const isSelected = selection.some((item) => item === row);
+
+  if (isShiftDown.value && lastSelectedIndex !== -1 && lastSelectedIndex !== currentIndex) {
+    const start = Math.min(lastSelectedIndex, currentIndex);
+    const end = Math.max(lastSelectedIndex, currentIndex);
+    for (let i = start; i <= end; i++) {
+      tableRef.value?.toggleRowSelection(tableData.value[i], isSelected);
+    }
+    window.getSelection()?.removeAllRanges();
+  }
+  lastSelectedIndex = currentIndex;
+}
+
+// ── 批量操作 ────────────────────────────────────────────────────────────────────
 const batchTagDialogVisible = ref(false);
 const batchTagDialogRef = ref();
-
-// 批量分类相关
 const batchAssortDialogVisible = ref(false);
 
+function handleBatchOpen() {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning("请先勾选商品");
+    return;
+  }
+  batchTagDialogRef.value?.init?.();
+  batchTagDialogVisible.value = true;
+}
+
+function handleBatchAssortOpen() {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning("请先勾选商品");
+    return;
+  }
+  batchAssortDialogVisible.value = true;
+}
+
+// ── 标签 ────────────────────────────────────────────────────────────────────────
 const tagDialogVisible = ref(false);
 const currentEditTagRow = ref<any>(null);
+
+function handleEditTags(row: ListingItemVO) {
+  currentEditTagRow.value = row;
+  tagDialogVisible.value = true;
+}
 
 function getVariants(val: any) {
   if (!val || val === "--") return [];
@@ -481,69 +538,7 @@ function getRowTags(row: any): TagItem[] {
   return row.label.filter((t: any) => t && t.tagName);
 }
 
-function handleSelectionChange(selection: ListingItemVO[]) {
-  selectedRows.value = selection;
-}
-
-const isShiftDown = ref(false);
-function handleKeyDown(e: KeyboardEvent) {
-  if (e.key === "Shift") isShiftDown.value = true;
-}
-function handleKeyUp(e: KeyboardEvent) {
-  if (e.key === "Shift") isShiftDown.value = false;
-}
-
-onMounted(() => {
-  window.addEventListener("keydown", handleKeyDown);
-  window.addEventListener("keyup", handleKeyUp);
-});
-onUnmounted(() => {
-  window.removeEventListener("keydown", handleKeyDown);
-  window.removeEventListener("keyup", handleKeyUp);
-});
-
-const tableRef = ref();
-let lastSelectedIndex = -1;
-
-function handleSelect(selection: any[], row: any) {
-  const currentIndex = tableData.value.findIndex((item) => item === row);
-  const isSelected = selection.some((item) => item === row);
-
-  if (isShiftDown.value && lastSelectedIndex !== -1 && lastSelectedIndex !== currentIndex) {
-    const start = Math.min(lastSelectedIndex, currentIndex);
-    const end = Math.max(lastSelectedIndex, currentIndex);
-
-    for (let i = start; i <= end; i++) {
-      tableRef.value?.toggleRowSelection(tableData.value[i], isSelected);
-    }
-    window.getSelection()?.removeAllRanges();
-  }
-
-  lastSelectedIndex = currentIndex;
-}
-
-function handleBatchOpen() {
-  if (selectedRows.value.length === 0) {
-    ElMessage.warning("请先勾选商品");
-    return;
-  }
-  batchTagDialogRef.value?.init?.();
-  batchTagDialogVisible.value = true;
-}
-
-function handleBatchAssortOpen() {
-  if (selectedRows.value.length === 0) {
-    ElMessage.warning("请先勾选商品");
-    return;
-  }
-  batchAssortDialogVisible.value = true;
-}
-
-function handleEditTags(row: ListingItemVO) {
-  currentEditTagRow.value = row;
-  tagDialogVisible.value = true;
-}
-
+// ── 备注 ────────────────────────────────────────────────────────────────────────
 function handleEditRemark(row: any) {
   ElMessageBox.prompt("请输入备注内容", "编辑备注", {
     confirmButtonText: "确定",
@@ -572,8 +567,8 @@ function handleEditRemark(row: any) {
     });
 }
 
-// 复制功能
-const handleCopy = async (text: string) => {
+/** 复制文本到剪贴板。 */
+async function handleCopy(text: string) {
   if (!text) return;
   try {
     await toClipboard(text);
@@ -581,53 +576,6 @@ const handleCopy = async (text: string) => {
   } catch {
     ElMessage.error("复制失败");
   }
-};
-
-const STORAGE_KEY = "SALES_PRODUCT_LISTING_COLUMNS_V5";
-
-// 初始化列配置（合并本地缓存）
-const initColumns = () => {
-  const cached = localStorage.getItem(STORAGE_KEY);
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached);
-      const defaultMap = new Map(defaultColumns.map((c) => [c.prop, c]));
-      const cachedProps = new Set();
-
-      const merged = parsed
-        .map((c: any) => {
-          const def = defaultMap.get(c.prop);
-          if (def) {
-            cachedProps.add(c.prop);
-            return { ...c, category: def.category, label: def.label };
-          }
-          return null;
-        })
-        .filter(Boolean);
-
-      const newCols = defaultColumns.filter((c) => !cachedProps.has(c.prop));
-      return [...merged, ...newCols];
-    } catch (e) {
-      console.error("读取列配置失败", e);
-    }
-  }
-  return JSON.parse(JSON.stringify(defaultColumns));
-};
-
-const columns = ref(initColumns());
-
-// 仅获取可见列，用于表格渲染
-const tableColumns = computed(() => columns.value.filter((c: any) => c.visible));
-
-function handleConfigSave(newColumns: any[]) {
-  columns.value = newColumns;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newColumns));
-  ElMessage.success("配置已保存");
-}
-function handleConfigReset() {
-  columns.value = JSON.parse(JSON.stringify(defaultColumns));
-  localStorage.removeItem(STORAGE_KEY);
-  ElMessage.success("已恢复默认配置");
 }
 </script>
 
