@@ -44,6 +44,7 @@
 </template>
 
 <script setup lang="ts">
+/** 登录页。 */
 import loginLogo from "@/assets/login_logo.png";
 import bg from "@/assets/images/login-bg-3.png";
 // removed unused import

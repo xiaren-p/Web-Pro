@@ -78,7 +78,9 @@
     <!-- 取消注册、第三方和忘记密码入口，简化登录页 -->
   </div>
 </template>
+
 <script setup lang="ts">
+/** 登录表单组件。处理用户认证。 */
 import type { FormInstance } from "element-plus";
 import { AuthAPI, type LoginFormData } from "@/api/auth";
 import router from "@/router";
@@ -195,7 +197,6 @@ function checkCapsLock(event: KeyboardEvent) {
 
 // 已移除多表单切换逻辑
 </script>
-
 <style lang="scss" scoped>
 .third-party-login {
   .divider-container {

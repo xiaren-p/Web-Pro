@@ -46,6 +46,7 @@
 </template>
 
 <script setup lang="ts">
+/** 仪表盘首页。聚合展示核心业务指标。 */
 import DashboardHeader from "./components/DashboardHeader.vue";
 import RealTimeSales from "./components/RealTimeSales.vue";
 import RealTimeAds from "./components/RealTimeAds.vue";

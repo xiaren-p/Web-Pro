@@ -13,6 +13,7 @@
 </template>
 
 <script setup lang="ts">
+/** 爬虫配置总览页。管理服务器和卖家配置。 */
 import { ref } from "vue";
 import ServerConfig from "./ServerConfig.vue";
 import SellerConfig from "./SellerConfig.vue";
