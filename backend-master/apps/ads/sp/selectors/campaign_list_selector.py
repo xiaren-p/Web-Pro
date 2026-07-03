@@ -26,6 +26,7 @@ from apps.ads.utils.ad_status import resolve_service_status
 from apps.ads.views._helpers import (
     BIDDING_STRATEGY_LABEL, CAMPAIGN_TYPE_SHORT,
     build_campaign_profile_key, build_campaign_profile_query,
+    fmt_money,
 )
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.sales.listing.models.lx_listing_data import LxListingData
@@ -540,96 +541,241 @@ def _serialize(obj: LxSpCampaign) -> dict[str, Any]:
 
 
 def _empty_metrics() -> dict[str, Any]:
-    """返回空的指标字典。"""
+    """返回指标字段的空默认值，用于无指标数据的广告活动占位。"""
     return {
-        "sales": 0.0, "same_sales": 0.0, "orders": 0, "same_orders": 0,
-        "units": 0, "cost": 0.0, "clicks": 0, "impressions": 0,
-        "acos": 0.0, "roas": 0.0, "ctr": 0.0, "cpc": 0.0,
-        "cpa": 0.0, "spends_percent": 0.0, "ads_sales_percent": 0.0,
-        "order_conversion_rate": 0.0, "ads_orders_percent": 0.0,
+        "adsSales": 0,
+        "adsSalesPercent": 0,
+        "directSales": 0,
+        "adsOrders": 0,
+        "directOrders": 0,
+        "adsVolume": 0,
+        "adsOrderPrice": 0,
+        "is": "---",
+        "acos": 0,
+        "roas": 0,
+        "cvr": 0,
+        "impressions": 0,
+        "impressionsPercent": 0,
+        "clicks": 0,
+        "clicksPercent": 0,
+        "ctr": 0,
+        "cpc": 0,
+        "spends": 0,
+        "spendsPercent": 0,
+        "cpa": 0,
     }
 
 
-def _compute_metrics_from_agg(agg_map, campaign_pairs, **ctx) -> dict[str, dict[str, Any]]:
-    """从聚合数据计算每个 campaign 的指标。"""
+def _compute_metrics_from_agg(
+    agg_map: dict[str, dict[str, Any]],
+    pairs: list[tuple[str, str]],
+    *,
+    total_clicks_all: int = 0,
+    total_impressions_all: int = 0,
+    total_spends_ref: float = 0.0,
+    total_ads_sales_ref: float = 0.0,
+    campaign_currency_map: dict[str, dict[str, Any]],
+    is_single_currency: bool,
+    rate_usd_to_cny: float = 1.0,
+) -> dict[str, dict[str, Any]]:
+    """从预聚合 agg_map 为当前分页计算完整衍生指标，零额外数据库查询。
+
+    Args:
+        agg_map (dict): campaign 复合键 → 原始聚合值字典。
+        pairs (list[tuple[str, str]]): 当前分页的 (campaign_id, profile_id) 复合键列表。
+        total_clicks_all (int): 全量筛选集的点击总数。
+        total_impressions_all (int): 全量筛选集的曝光总数。
+        total_spends_ref (float): 全量筛选集的花费基准值（已换算为参考货币）。
+        total_ads_sales_ref (float): 全量筛选集的广告销售额基准值（已换算为参考货币）。
+        campaign_currency_map (dict[str, dict]): campaign 复合键 → 货币信息。
+        is_single_currency (bool): 是否仅含单一货币。
+        rate_usd_to_cny (float): 美元对人民币汇率。
+    Returns:
+        dict[str, dict[str, Any]]: campaign 复合键 → 格式化后的指标字典。
+    """
     result: dict[str, dict[str, Any]] = {}
-    total_clicks_all = float(ctx.get("total_clicks_all", 0) or 0)
-    total_impressions_all = float(ctx.get("total_impressions_all", 0) or 0)
-    total_spends_ref = float(ctx.get("total_spends_ref", 0) or 0)
-    total_ads_sales_ref = float(ctx.get("total_ads_sales_ref", 0) or 0)
-    campaign_currency_map = ctx.get("campaign_currency_map", {})
-    is_single = ctx.get("is_single_currency", True)
-    rate_usd_to_cny = float(ctx.get("rate_usd_to_cny", 7.2))
+    for cid, pid in pairs:
+        row_key = build_campaign_profile_key(cid, pid)
+        data = agg_map.get(
+            row_key,
+            {"sales": 0.0, "same_sales": 0.0, "orders": 0,
+             "same_orders": 0, "units": 0, "cost": 0.0,
+             "clicks": 0, "impressions": 0},
+        )
+        ccy = campaign_currency_map.get(row_key, {"icon": "$", "code": "USD", "rate": rate_usd_to_cny})
+        icon: str = ccy["icon"]
+        rate: float = (ccy["rate"] / rate_usd_to_cny) if not is_single_currency else 1.0
 
-    for cid, pid in campaign_pairs:
-        key = f"{cid}::{pid}"
-        agg = agg_map.get(key, {})
-        sales = float(agg.get("sales", 0) or 0)
-        cost = float(agg.get("cost", 0) or 0)
-        clicks = int(agg.get("clicks", 0) or 0)
-        impressions = int(agg.get("impressions", 0) or 0)
-        orders = int(agg.get("orders", 0) or 0)
-        same_sales = float(agg.get("same_sales", 0) or 0)
-        same_orders = int(agg.get("same_orders", 0) or 0)
-        units = int(agg.get("units", 0) or 0)
+        r_sales = data["sales"]
+        r_same_sales = data["same_sales"]
+        r_orders = data["orders"]
+        r_same_orders = data["same_orders"]
+        r_units = data["units"]
+        r_cost = data["cost"]
+        r_clicks = data["clicks"]
+        r_impressions = data["impressions"]
 
-        acos = (cost / sales * 100) if sales > 0 else 0.0
-        roas = (sales / cost) if cost > 0 else 0.0
-        ctr = (clicks / impressions * 100) if impressions > 0 else 0.0
-        cpc = (cost / clicks) if clicks > 0 else 0.0
-        cpa = (cost / orders) if orders > 0 else 0.0
-        spends_pct = (cost / total_spends_ref * 100) if total_spends_ref > 0 else 0.0
-        sales_pct = (sales / total_ads_sales_ref * 100) if total_ads_sales_ref > 0 else 0.0
-        cvr = (orders / clicks * 100) if clicks > 0 else 0.0
-        orders_pct = (orders / total_clicks_all * 100) if total_clicks_all > 0 else 0.0
+        ref_sales = r_sales * rate
+        ref_spends = r_cost * rate
 
-        result[key] = {
-            "sales": sales, "same_sales": same_sales, "orders": orders,
-            "same_orders": same_orders, "units": units, "cost": cost,
-            "clicks": clicks, "impressions": impressions,
-            "acos": round(acos, 2), "roas": round(roas, 2),
-            "ctr": round(ctr, 2), "cpc": round(cpc, 2), "cpa": round(cpa, 2),
-            "spends_percent": round(spends_pct, 2),
-            "ads_sales_percent": round(sales_pct, 2),
-            "order_conversion_rate": round(cvr, 2),
-            "ads_orders_percent": round(orders_pct, 2),
+        result[row_key] = {
+            "adsSales": fmt_money(r_sales, icon),
+            "adsSalesPercent": (
+                f"{round(ref_sales / total_ads_sales_ref * 100, 2)}%"
+                if total_ads_sales_ref > 0 else "0"
+            ),
+            "directSales": fmt_money(r_same_sales, icon),
+            "adsOrders": r_orders,
+            "directOrders": r_same_orders,
+            "adsVolume": r_units,
+            "adsOrderPrice": fmt_money(round(r_sales / r_orders, 2), icon) if r_orders > 0 else "0",
+            "is": "---",
+            "acos": f"{round(r_cost / r_sales * 100, 2)}%" if r_sales > 0 else "0",
+            "roas": round(r_sales / r_cost, 2) if r_cost > 0 else 0,
+            "cvr": f"{round(r_orders / r_clicks * 100, 2)}%" if r_clicks > 0 else "0",
+            "impressions": r_impressions,
+            "impressionsPercent": (
+                f"{round(r_impressions / total_impressions_all * 100, 2)}%"
+                if total_impressions_all > 0 else "0"
+            ),
+            "clicks": r_clicks,
+            "clicksPercent": (
+                f"{round(r_clicks / total_clicks_all * 100, 2)}%"
+                if total_clicks_all > 0 else "0"
+            ),
+            "ctr": f"{round(r_clicks / r_impressions * 100, 2)}%" if r_impressions > 0 else "0",
+            "cpc": fmt_money(round(r_cost / r_clicks, 2), icon) if r_clicks > 0 else "0",
+            "spends": fmt_money(r_cost, icon),
+            "spendsPercent": (
+                f"{round(ref_spends / total_spends_ref * 100, 2)}%"
+                if total_spends_ref > 0 else "0"
+            ),
+            "cpa": fmt_money(round(r_cost / r_orders, 2), icon) if r_orders > 0 else "0",
         }
     return result
 
 
-def _compute_summary_from_agg(agg_map, all_pairs_set, **ctx) -> dict[str, Any]:
-    """计算全量筛选集的汇总指标行。"""
-    total_sales = 0.0; total_cost = 0.0; total_clicks = 0; total_impressions = 0
-    total_orders = 0; total_same_sales = 0.0; total_same_orders = 0; total_units = 0
+def _compute_summary_from_agg(
+    agg_map: dict[str, dict[str, Any]],
+    all_pairs_set: set[tuple[str, str]],
+    *,
+    is_single_currency: bool,
+    ref_currency: dict[str, Any],
+    currency_by_campaign_all: dict[str, dict[str, Any]],
+    rate_usd_to_cny: float = 1.0,
+    budget_by_campaign_all: dict[str, float] | None = None,
+) -> dict[str, Any]:
+    """从预聚合 agg_map 中计算全量汇总行基准元数据，不增数据库查询。
 
-    for key, agg in agg_map.items():
-        if key not in all_pairs_set:
+    Args:
+        agg_map (dict): campaign 复合键 → 原始聚合值字典。
+        all_pairs_set (set[tuple[str, str]]): 有效 (campaign_id, profile_id) 对集合。
+        is_single_currency (bool): 是否仅含单一货币。
+        ref_currency (dict): 参考货币信息。
+        currency_by_campaign_all (dict): campaign → 货币信息映射（多币种时传入）。
+        rate_usd_to_cny (float): 美元对人民币汇率。
+        budget_by_campaign_all (dict | None): campaign 复合键 → daily_budget（已换算），
+            用于汇总统计预算总和，与销售额同口径计算；None 时不展示 budget 字段。
+    Returns:
+        dict[str, Any]: 含所有指标字段，含 _meta 内部基准值。
+    """
+    icon: str = ref_currency["icon"]
+
+    t_sales = t_same_sales = t_cost = 0.0
+    t_orders = t_same_orders = t_units = t_clicks = t_impressions = 0
+    t_budget = 0.0
+
+    for cp_key, data in agg_map.items():
+        key_from_map = cp_key
+        try:
+            parts = cp_key.split("::")
+            pair = (parts[0], parts[1])
+        except (IndexError, ValueError):
             continue
-        total_sales += float(agg.get("sales", 0) or 0)
-        total_cost += float(agg.get("cost", 0) or 0)
-        total_clicks += int(agg.get("clicks", 0) or 0)
-        total_impressions += int(agg.get("impressions", 0) or 0)
-        total_orders += int(agg.get("orders", 0) or 0)
-        total_same_sales += float(agg.get("same_sales", 0) or 0)
-        total_same_orders += int(agg.get("same_orders", 0) or 0)
-        total_units += int(agg.get("units", 0) or 0)
+        if pair not in all_pairs_set:
+            continue
 
-    acos = (total_cost / total_sales * 100) if total_sales > 0 else 0.0
-    roas = (total_sales / total_cost) if total_cost > 0 else 0.0
-    ctr = (total_clicks / total_impressions * 100) if total_impressions > 0 else 0.0
-    cpc = (total_cost / total_clicks) if total_clicks > 0 else 0.0
-    cpa = (total_cost / total_orders) if total_orders > 0 else 0.0
+        r_sales = data["sales"]
+        r_same_sales = data["same_sales"]
+        r_orders = data["orders"]
+        r_same_orders = data["same_orders"]
+        r_units = data["units"]
+        r_cost = data["cost"]
+        r_clicks = data["clicks"]
+        r_impressions = data["impressions"]
 
-    return {
-        "_isSummary": True,
-        "sales": total_sales, "same_sales": total_same_sales, "orders": total_orders,
-        "same_orders": total_same_orders, "units": total_units, "cost": total_cost,
-        "clicks": total_clicks, "impressions": total_impressions,
-        "acos": round(acos, 2), "roas": round(roas, 2),
-        "ctr": round(ctr, 2), "cpc": round(cpc, 2), "cpa": round(cpa, 2),
-        "_meta": {"clicks": total_clicks, "impressions": total_impressions,
-                   "spends_ref": total_cost, "ads_sales_ref": total_sales},
+        if not is_single_currency:
+            ccy = currency_by_campaign_all.get(key_from_map, {"rate": rate_usd_to_cny})
+            rate = ccy.get("rate", rate_usd_to_cny) / rate_usd_to_cny
+            t_sales += r_sales * rate
+            t_same_sales += r_same_sales * rate
+            t_cost += r_cost * rate
+        else:
+            t_sales += r_sales
+            t_same_sales += r_same_sales
+            t_cost += r_cost
+
+        t_orders += r_orders
+        t_same_orders += r_same_orders
+        t_units += r_units
+        t_clicks += r_clicks
+        t_impressions += r_impressions
+
+    # 预算总和：遍历全量集合从 budget_by_campaign_all 取值，多币种时换算到参考货币
+    if budget_by_campaign_all is not None:
+        for cp_key, raw_budget in budget_by_campaign_all.items():
+            try:
+                parts = cp_key.split("::")
+                pair = (parts[0], parts[1])
+            except (IndexError, ValueError):
+                continue
+            if pair not in all_pairs_set:
+                continue
+            if not is_single_currency:
+                ccy = currency_by_campaign_all.get(cp_key, {"rate": rate_usd_to_cny})
+                rate = ccy.get("rate", rate_usd_to_cny) / rate_usd_to_cny
+                t_budget += raw_budget * rate
+            else:
+                t_budget += raw_budget
+
+    acos = f"{round(t_cost / t_sales * 100, 2)}%" if t_sales > 0 else "0"
+    roas = round(t_sales / t_cost, 2) if t_cost > 0 else 0
+    cvr = f"{round(t_orders / t_clicks * 100, 2)}%" if t_clicks > 0 else "0"
+    ctr = f"{round(t_clicks / t_impressions * 100, 2)}%" if t_impressions > 0 else "0"
+    cpc_raw = round(t_cost / t_clicks, 2) if t_clicks > 0 else 0
+    cpa_raw = round(t_cost / t_orders, 2) if t_orders > 0 else 0
+
+    result: dict[str, Any] = {
+        "adsSales": fmt_money(t_sales, icon),
+        "adsSalesPercent": "100%" if t_sales > 0 else "0",
+        "directSales": fmt_money(t_same_sales, icon),
+        "adsOrders": t_orders,
+        "directOrders": t_same_orders,
+        "adsVolume": t_units,
+        "adsOrderPrice": fmt_money(round(t_sales / t_orders, 2), icon) if t_orders > 0 else "0",
+        "is": "---",
+        "acos": acos,
+        "roas": roas,
+        "cvr": cvr,
+        "impressions": t_impressions,
+        "impressionsPercent": "100%" if t_impressions > 0 else "0",
+        "clicks": t_clicks,
+        "clicksPercent": "100%" if t_clicks > 0 else "0",
+        "ctr": ctr,
+        "cpc": fmt_money(cpc_raw, icon) if cpc_raw != 0 else "0",
+        "spends": fmt_money(t_cost, icon),
+        "spendsPercent": "100%" if t_cost > 0 else "0",
+        "cpa": fmt_money(cpa_raw, icon) if cpa_raw != 0 else "0",
+        "_meta": {
+            "ads_sales_ref": round(t_sales, 6),
+            "spends_ref": round(t_cost, 6),
+            "clicks": t_clicks,
+            "impressions": t_impressions,
+        },
     }
+    if budget_by_campaign_all is not None:
+        result["budget"] = fmt_money(t_budget, icon)
+    return result
 
 
 def _build_latest_adjustment_map(items, sid_to_country) -> dict[str, dict[str, Any]]:
