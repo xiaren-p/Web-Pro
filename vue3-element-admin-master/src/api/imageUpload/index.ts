@@ -48,6 +48,7 @@ export interface ImageSyncQueueVO {
 const IMAGE_UPLOAD_BASE_URL = "/image-uploads";
 
 export const ImageUploadAPI = {
+  /** 分页查询图片上传记录。 */
   getPage(params: ImageUploadPageQuery) {
     return request<any, PageResult<ImageUploadVO[]>>({
       url: `${IMAGE_UPLOAD_BASE_URL}/page`,
@@ -55,18 +56,22 @@ export const ImageUploadAPI = {
       params,
     });
   },
+  /** 获取图片上传编辑表单数据。 */
   getFormData(id: string) {
     return request<any, ImageUploadForm>({
       url: `${IMAGE_UPLOAD_BASE_URL}/${id}/form`,
       method: "get",
     });
   },
+  /** 创建图片上传记录。 */
   create(data: ImageUploadForm) {
     return request({ url: `${IMAGE_UPLOAD_BASE_URL}`, method: "post", data });
   },
+  /** 更新图片上传记录。 */
   update(id: string, data: ImageUploadForm) {
     return request({ url: `${IMAGE_UPLOAD_BASE_URL}/${id}`, method: "put", data });
   },
+  /** 批量删除图片上传记录。 */
   deleteByIds(ids: string) {
     return request({ url: `${IMAGE_UPLOAD_BASE_URL}/${ids}`, method: "delete" });
   },
