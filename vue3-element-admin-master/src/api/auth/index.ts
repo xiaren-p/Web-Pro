@@ -3,6 +3,7 @@
  */
 import request from "@/utils/request";
 
+/** 登录表单数据。 */
 export interface LoginFormData {
   username: string;
   password: string;
@@ -14,18 +15,32 @@ export interface LoginFormData {
 const AUTH_BASE_URL = "/auth";
 
 export const AuthAPI = {
-  /** 用户名密码登录，返回 accessToken + refreshToken。 */
+  /**
+   * 用户名密码登录。
+   *
+   * @param data - 登录表单数据。
+   * @returns 包含 accessToken + refreshToken 的响应。
+   */
   login(data: LoginFormData) {
     return request<
       any,
       { accessToken: string; refreshToken: string; tokenType?: string; expiresIn: number }
     >({ url: `${AUTH_BASE_URL}/login`, method: "post", data });
   },
-  /** 登出（吊销当前 Token + 清除 Session）。 */
+  /**
+   * 登出（吊销当前 Token + 清除 Session）。
+   *
+   * @returns 登出结果。
+   */
   logout() {
     return request({ url: `${AUTH_BASE_URL}/logout`, method: "delete" });
   },
-  /** 刷新 accessToken（使用 refreshToken，不旋转 refresh）。 */
+  /**
+   * 刷新 accessToken（使用 refreshToken，不旋转 refresh）。
+   *
+   * @param refreshToken - 当前的 refreshToken。
+   * @returns 新的 accessToken。
+   */
   refreshToken(refreshToken: string) {
     return request<
       any,
@@ -38,7 +53,11 @@ export const AuthAPI = {
       withCredentials: false,
     });
   },
-  /** 获取图形验证码（base64 图片 + UUID）。 */
+  /**
+   * 获取图形验证码。
+   *
+   * @returns base64 图片 + UUID。
+   */
   getCaptcha() {
     return request<any, { img: string; uuid: string }>({
       url: `${AUTH_BASE_URL}/captcha`,
