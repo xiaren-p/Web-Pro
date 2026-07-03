@@ -24,19 +24,19 @@ def refresh_listing_caches(self) -> dict:
     Returns:
         dict: 执行摘要。
     """
-    from apps.ads.sp.views.ad_campaign_view import (
-        _get_profile_map,
-        _get_rate_map,
-        _get_sid_country_map,
-        _load_all_listing_caches,
+    from apps.ads.sp.selectors.campaign_ref_selectors import (
+        get_profile_map,
+        get_rate_map,
+        get_sid_country_map,
+        load_all_listing_caches,
     )
 
     logger.info("[refresh_listing_caches] 开始刷新参考数据缓存")
     try:
-        _load_all_listing_caches()
-        _get_profile_map()
-        _get_sid_country_map()
-        _get_rate_map()
+        load_all_listing_caches()
+        get_profile_map()
+        get_sid_country_map()
+        get_rate_map()
         logger.info("[refresh_listing_caches] 刷新完成")
         return {"status": "ok"}
     except Exception as exc:

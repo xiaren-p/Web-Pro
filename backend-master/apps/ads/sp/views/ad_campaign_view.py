@@ -12,15 +12,19 @@ from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.sp.selectors.campaign_ref_selectors import get_profile_map, get_sid_country_map, get_rate_map, load_all_listing_caches, get_tag_asin_map, get_owner_asin_map, get_asin_info_map, get_asin_cp_map, get_cp_asin_map
 from apps.ads.views._helpers import get_operator_name
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.sp.selectors.campaign_ref_selectors import get_profile_map, get_sid_country_map, get_rate_map, load_all_listing_caches, get_tag_asin_map, get_owner_asin_map, get_asin_info_map, get_asin_cp_map, get_cp_asin_map
 from apps.ads.views._helpers import get_operator_name
 from rest_framework.request import Request
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.sp.selectors.campaign_ref_selectors import get_profile_map, get_sid_country_map, get_rate_map, load_all_listing_caches, get_tag_asin_map, get_owner_asin_map, get_asin_info_map, get_asin_cp_map, get_cp_asin_map
 from apps.ads.views._helpers import get_operator_name
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from apps.ads.sp.selectors.campaign_ref_selectors import get_profile_map, get_sid_country_map, get_rate_map, load_all_listing_caches, get_tag_asin_map, get_owner_asin_map, get_asin_info_map, get_asin_cp_map, get_cp_asin_map
 from apps.ads.views._helpers import get_operator_name
 
 from apps.ads.models.lx_ads_portfolio import LxAdsPortfolio
@@ -54,7 +58,7 @@ from apps.ads.sp.rules.models.sp_campaign_adjustment import (
 _REF_TTL = 600
 
 
-def _get_profile_map() -> dict[str, dict[str, str]]:
+def get_profile_map() -> dict[str, dict[str, str]]:
     """profile_id → {profile_alias, country_code, sid} 全量缓存。"""
 
     _key = "sp_ref_profile_map_v3"
@@ -73,7 +77,7 @@ def _get_profile_map() -> dict[str, dict[str, str]]:
     return result
 
 
-def _get_sid_country_map() -> dict[int, str]:
+def get_sid_country_map() -> dict[int, str]:
     """sid → 中文国家名 全量缓存。"""
 
     _key = "sp_ref_sid_country_v2"
@@ -88,7 +92,7 @@ def _get_sid_country_map() -> dict[int, str]:
     return result
 
 
-def _get_rate_map() -> dict[str, dict[str, Any]]:
+def get_rate_map() -> dict[str, dict[str, Any]]:
     """currency_code → {icon, code, rate} 全量缓存（取每币种最新记录）。"""
 
     _key = "sp_ref_rate_map_v2"
@@ -107,7 +111,7 @@ def _get_rate_map() -> dict[str, dict[str, Any]]:
     return result
 
 
-def _load_all_listing_caches() -> None:
+def load_all_listing_caches() -> None:
     """一次全表扫描 LxListingData，同时产出 tag/owner/asin_info 三个缓存。
 
     Celery Beat 280s 刷新保证缓存有效，请求端不应触发重建——
@@ -187,19 +191,19 @@ def _load_all_listing_caches() -> None:
 
 
 
-def _get_tag_asin_map() -> dict[str, set[str]]:
+def get_tag_asin_map() -> dict[str, set[str]]:
     """globalTagId → {asin, ...}。Celery 280s 刷新保证缓存有效，miss 时返回空字典。"""
 
     return _cache.get("sp_tag_asin_map_v2") or {}
 
 
-def _get_owner_asin_map() -> dict[str, set[str]]:
+def get_owner_asin_map() -> dict[str, set[str]]:
     """principal_uid → {asin, ...}。Celery 280s 刷新保证缓存有效，miss 时返回空字典。"""
 
     return _cache.get("sp_owner_asin_map_v2") or {}
 
 
-def _get_asin_info_map() -> dict[str, dict[str, list[str]]]:
+def get_asin_info_map() -> dict[str, dict[str, list[str]]]:
     """asin → {tags: [globalTagId...], owners: [principal_name...]}。Celery 280s 刷新保证缓存有效。"""
 
     tags = _cache.get("sp_asin_tags_map_v2") or {}
@@ -213,19 +217,19 @@ def _get_asin_info_map() -> dict[str, dict[str, list[str]]]:
     return result
 
 
-def _get_asin_cp_map() -> dict[str, set[str]]:
+def get_asin_cp_map() -> dict[str, set[str]]:
     """ASIN → {cp_key, ...} 映射。聚后负责人/标签/MSKU/parent_asin 筛选用。"""
 
     return _cache.get("sp_asin_cp_map_v1") or {}
 
 
-def _get_sku_cp_map() -> dict[str, set[str]]:
+def get_sku_cp_map() -> dict[str, set[str]]:
     """MSKU → {cp_key, ...} 映射。聚后 MSKU 搜索筛选用。"""
 
     return _cache.get("sp_sku_cp_map_v1") or {}
 
 
-def _get_cp_asin_map() -> dict[str, set[str]]:
+def get_cp_asin_map() -> dict[str, set[str]]:
     """cp_key → {asin, ...} 映射。响应中补充 ASIN 字段用。"""
 
     return _cache.get("sp_cp_asin_map_v1") or {}
@@ -362,14 +366,14 @@ class AdCampaignViewSet(viewsets.ViewSet):
                     tag_name__in=tag_list, status="normal"
                 ).values_list("global_tag_id", flat=True))
                 if tag_gids:
-                    tag_asin_cache = _get_tag_asin_map()
+                    tag_asin_cache = get_tag_asin_map()
                     tag_asins: set[str] = set()
                     for gid in tag_gids:
                         gid_str = str(gid)
                         if gid_str and gid_str in tag_asin_cache:
                             tag_asins |= tag_asin_cache[gid_str]
                     if tag_asins:
-                        asin_cp_map = _get_asin_cp_map()
+                        asin_cp_map = get_asin_cp_map()
                         tag_cp_keys = set()
                         for asin_val in tag_asins:
                             tag_cp_keys |= asin_cp_map.get(asin_val, set())
@@ -385,13 +389,13 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if owner_ids:
             owner_list = [str(o).strip() for o in owner_ids.split(",") if str(o).strip()]
             if owner_list:
-                owner_asin_cache = _get_owner_asin_map()
+                owner_asin_cache = get_owner_asin_map()
                 owner_asins: set[str] = set()
                 for uid in owner_list:
                     if uid in owner_asin_cache:
                         owner_asins |= owner_asin_cache[uid]
                 if owner_asins:
-                    asin_cp_map = _get_asin_cp_map()
+                    asin_cp_map = get_asin_cp_map()
                     owner_cp_keys = set()
                     for asin_val in owner_asins:
                         owner_cp_keys |= asin_cp_map.get(asin_val, set())
@@ -428,8 +432,8 @@ class AdCampaignViewSet(viewsets.ViewSet):
         if skus:
             sku_list = [s.strip() for s in skus.split(",") if s.strip()]
             if sku_list:
-                asin_cp_map = _get_asin_cp_map()
-                sku_cp_map = _get_sku_cp_map()
+                asin_cp_map = get_asin_cp_map()
+                sku_cp_map = get_sku_cp_map()
                 if not asin_cp_map and not sku_cp_map:
                     search_cp_keys = None
                 else:
@@ -619,8 +623,8 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         # 主题：店铺与国家数据（全量缓存，20 分钟刷新）
         item_profile_ids = [item.profile_id for item in items if item.profile_id]
-        all_profile_info = _get_profile_map()
-        sid_country = _get_sid_country_map()
+        all_profile_info = get_profile_map()
+        sid_country = get_sid_country_map()
 
         profile_map: dict[str, dict[str, str]] = {}
         for pid in item_profile_ids:
@@ -651,7 +655,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
 
         # 主题：汇率体系（全量缓存，20 分钟刷新）
         _default_ccy: dict[str, Any] = {"icon": "￥", "code": "CNY", "rate": 1.0}
-        rate_map_all = _get_rate_map()
+        rate_map_all = get_rate_map()
 
         # 从缓存的 profile 信息中提取全量筛选集的币种集合
         all_currency_codes: set[str] = set()
@@ -801,7 +805,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         asin_label_map: dict[str, list[str]] = {}
         asin_principal_map: dict[str, list[str]] = {}
         if all_asins:
-            asin_info = _get_asin_info_map()
+            asin_info = get_asin_info_map()
             # 批量查 LxListingTag 把 globalTagId 映射为 tag_name
             all_tag_ids: set[str] = set()
             for asin_val in all_asins:
@@ -1362,7 +1366,7 @@ class AdCampaignViewSet(viewsets.ViewSet):
         profile_ids = {p for _, p in latest_by_pair.keys()}
         profile_info_map: dict[int, dict[str, str]] = {}
         if profile_ids:
-            cached_profiles = _get_profile_map()
+            cached_profiles = get_profile_map()
             for pid in profile_ids:
                 info = cached_profiles.get(str(pid))
                 if info:
