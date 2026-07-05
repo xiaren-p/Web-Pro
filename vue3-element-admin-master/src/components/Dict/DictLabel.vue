@@ -17,7 +17,7 @@ interface Props {
   /** 字典编码 */
   code: string;
   /** 字典项的值 */
-  modelValue: string | number;
+  modelValue?: string | number;
   /** 标签大小 */
   size?: string;
 }
