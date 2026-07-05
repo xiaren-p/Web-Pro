@@ -93,11 +93,6 @@ async function handleUpload(options: UploadRequestOptions) {
   }
 }
 
-/** 预览图片（占位）。 */
-function handlePreview() {
-  console.log("预览图片,停止冒泡");
-}
-
 /** 删除图片。 */
 function handleDelete() {
   modelValue.value = "";

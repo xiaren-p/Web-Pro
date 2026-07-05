@@ -52,17 +52,7 @@ const previewImageIndex = ref(0);
 const modelValue = defineModel<string[]>("modelValue", { default: () => [] });
 const fileList = ref<UploadUserFile[]>([]);
 
-/** 删除指定图片。 */
-function handleRemove(imageUrl: string) {
-  const index = modelValue.value.indexOf(imageUrl);
-  if (index !== -1) {
-    modelValue.value.splice(index, 1);
-    fileList.value.splice(index, 1);
-  }
-}
-
-/**
- * 上传前校验文件格式和大小。
+/** 上传前校验文件格式和大小。
  *
  * @param file - 待上传文件。
  * @returns 是否通过校验。
@@ -86,7 +76,7 @@ function handleBeforeUpload(file: UploadRawFile) {
 }
 
 /** 上传文件。 */
-function handleUpload(options: UploadRequestOptions) {
+function handleUpload(_options: UploadRequestOptions) {
   return new Promise((_resolve, reject) => {
     ElMessage.error("图片上传功能已下线");
     reject(new Error("File module decommissioned"));
