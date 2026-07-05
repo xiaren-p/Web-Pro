@@ -105,7 +105,9 @@ export interface ColumnConfig {
   visible: boolean;
   fixed?: "left" | "right";
   category?: string;
-  sortable?: boolean;
+  sortable?: boolean | string;
+  minWidth?: number;
+  /** 额外业务字段 */
   [key: string]: unknown;
 }
 
