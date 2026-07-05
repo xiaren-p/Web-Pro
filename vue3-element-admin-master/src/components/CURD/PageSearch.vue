@@ -66,7 +66,7 @@
  */
 import type { IObject, IForm, ISearchConfig, ISearchComponent } from "./types";
 import { ArrowUp, ArrowDown } from "@element-plus/icons-vue";
-import { ElInput, ElSelect, ElCascader, ElInputNumber, ElDatePicker, ElTimePicker, ElTimeSelect, ElTreeSelect } from "element-plus";
+import { ElInput, ElSelect, ElCascader, ElInputNumber, ElDatePicker, ElTimePicker, ElTimeSelect, ElTreeSelect, ElInputTag } from "element-plus";
 import type { FormInstance } from "element-plus";
 import InputTag from "@/components/InputTag/index.vue";
 
