@@ -12,7 +12,10 @@ export type PageContentInstance = InstanceType<typeof PageContent>;
 /** PageModal 组件实例类型。 */
 export type PageModalInstance = InstanceType<typeof PageModal>;
 
-/** 通用键值对对象类型。 */
+/**
+ * CURD 通用键值对类型。
+ * 使用 any 是因为 CURD 表单/表格数据字段完全由业务配置决定，无法静态定义。
+ */
 export type IObject = Record<string, any>;
 
 type DateComponent = "date-picker" | "time-picker" | "time-select" | "custom-tag" | "input-tag";

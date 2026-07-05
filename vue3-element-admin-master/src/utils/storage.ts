@@ -8,7 +8,7 @@ export class Storage {
   /**
    * localStorage 存储
    */
-  static set(key: string, value: any): void {
+  static set(key: string, value: unknown): void {
     localStorage.setItem(key, JSON.stringify(value));
   }
 
@@ -31,7 +31,7 @@ export class Storage {
   /**
    * sessionStorage 存储
    */
-  static sessionSet(key: string, value: any): void {
+  static sessionSet(key: string, value: unknown): void {
     sessionStorage.setItem(key, JSON.stringify(value));
   }
 
