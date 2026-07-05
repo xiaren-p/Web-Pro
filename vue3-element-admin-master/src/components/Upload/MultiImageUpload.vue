@@ -103,7 +103,11 @@ function handleSuccess(response: unknown, uploadFile: { uid: number }) {
   ElMessage.success("上传成功");
   const res = response as FileInfo;
   const index = fileList.value.findIndex((file) => file.uid === uploadFile.uid);
-  if (index !== -1) { fileList.value[index].url = res.url; fileList.value[index].status = "success"; modelValue.value[index] = res.url; }
+  if (index !== -1) {
+    fileList.value[index].url = res.url;
+    fileList.value[index].status = "success";
+    modelValue.value[index] = res.url;
+  }
 }
 
 /** 上传失败回调。 */
