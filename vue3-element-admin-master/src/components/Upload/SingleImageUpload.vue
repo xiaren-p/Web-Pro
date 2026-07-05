@@ -91,7 +91,6 @@ async function handleUpload(options: UploadRequestOptions) {
     options.onError?.(err as never);
     throw err;
   }
-  }
 }
 
 /** 预览图片（占位）。 */
