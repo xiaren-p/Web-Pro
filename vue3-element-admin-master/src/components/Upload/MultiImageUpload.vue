@@ -98,15 +98,13 @@ function handleExceed() {
   ElMessage.warning("最多只能上传" + props.limit + "张图片");
 }
 
-/** 上传成功回调。 */
-function handleSuccess(fileInfo: FileInfo, uploadFile: UploadUserFile) {
+/** 上传成功回调（Element Plus on-success 签名为 response, uploadFile, uploadFiles）。 */
+function handleSuccess(response: unknown, uploadFile: { uid: number }) {
   ElMessage.success("上传成功");
+  const res = response as FileInfo;
   const index = fileList.value.findIndex((file) => file.uid === uploadFile.uid);
-  if (index !== -1) {
-    fileList.value[index].url = fileInfo.url;
-    fileList.value[index].status = "success";
-    modelValue.value[index] = fileInfo.url;
-  }
+  if (index !== -1) { fileList.value[index].url = res.url; fileList.value[index].status = "success"; modelValue.value[index] = res.url; }
+}
 }
 
 /** 上传失败回调。 */
