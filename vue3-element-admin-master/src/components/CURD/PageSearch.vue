@@ -76,14 +76,15 @@ const emit = defineEmits<{
 }>();
 
 const componentMap = new Map<ISearchComponent, unknown>([
-  ["input", markRaw(ElInput)],
-  ["select", markRaw(ElSelect)],
-  ["cascader", markRaw(ElCascader)],
-  ["input-number", markRaw(ElInputNumber)],
-  ["date-picker", markRaw(ElDatePicker)],
-  ["time-picker", markRaw(ElTimePicker)],
-  ["time-select", markRaw(ElTimeSelect)],
-  ["tree-select", markRaw(ElTreeSelect)],
+  // @ts-expect-error: Element Plus components auto-imported by unplugin
+  ["input", markRaw(ElInput as never)],
+  ["select", markRaw(ElSelect as never)],
+  ["cascader", markRaw(ElCascader as never)],
+  ["input-number", markRaw(ElInputNumber as never)],
+  ["date-picker", markRaw(ElDatePicker as never)],
+  ["time-picker", markRaw(ElTimePicker as never)],
+  ["time-select", markRaw(ElTimeSelect as never)],
+  ["tree-select", markRaw(ElTreeSelect as never)],
   ["input-tag", markRaw(ElInputTag)],
   ["custom-tag", markRaw(InputTag)],
 ]);
