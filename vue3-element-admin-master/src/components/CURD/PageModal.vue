@@ -178,7 +178,7 @@ const formRef = ref<FormInstance>(); // 表单实例
 const formItems = reactive(props.modalConfig.formItems ?? []); // 表单配置项
 const formData = reactive<IObject>({}); // 表单数据
 const formRules: FormRules = {}; // 表单验证规则
-const isisFormDisabledd = ref(false); // 表单禁用状态
+const isFormDisabled = ref(false); // 表单禁用状态
 
 // 获取tooltip提示框属性
 const getTooltipProps = (tips: string | IObject) => {
