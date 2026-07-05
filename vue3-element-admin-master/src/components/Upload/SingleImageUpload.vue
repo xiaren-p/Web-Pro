@@ -87,8 +87,10 @@ async function handleUpload(options: UploadRequestOptions) {
     options.onSuccess?.(fileInfo as unknown as Record<string, unknown>);
     return fileInfo;
   } catch (err: unknown) {
-    options.onError?.(err as Error);
+    // Element Plus UploadAjaxError 类型推断复杂，用 unknown 承接后原样回传
+    options.onError?.(err as never);
     throw err;
+  }
   }
 }
 
