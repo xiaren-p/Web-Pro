@@ -59,8 +59,8 @@
         </el-form>
 
         <template #footer>
-          <el-button v-if="!formDisable" type="primary" @click="handleSubmit">确 定</el-button>
-          <el-button @click="handleClose">{{ !formDisable ? "取 消" : "关闭" }}</el-button>
+          <el-button v-if="!isFormDisabled" type="primary" @click="handleSubmit">确 定</el-button>
+          <el-button @click="handleClose">{{ !isFormDisabled ? "取 消" : "关闭" }}</el-button>
         </template>
       </el-drawer>
     </template>
@@ -124,8 +124,8 @@
         </el-form>
 
         <template #footer>
-          <el-button v-if="!formDisable" type="primary" @click="handleSubmit">确 定</el-button>
-          <el-button @click="handleClose">{{ !formDisable ? "取 消" : "关闭" }}</el-button>
+          <el-button v-if="!isFormDisabled" type="primary" @click="handleSubmit">确 定</el-button>
+          <el-button @click="handleClose">{{ !isFormDisabled ? "取 消" : "关闭" }}</el-button>
         </template>
       </el-dialog>
     </template>
@@ -178,7 +178,7 @@ const formRef = ref<FormInstance>(); // 表单实例
 const formItems = reactive(props.modalConfig.formItems ?? []); // 表单配置项
 const formData = reactive<IObject>({}); // 表单数据
 const formRules: FormRules = {}; // 表单验证规则
-const formDisable = ref(false); // 表单禁用状态
+const isisFormDisabledd = ref(false); // 表单禁用状态
 
 // 获取tooltip提示框属性
 const getTooltipProps = (tips: string | IObject) => {
@@ -244,16 +244,17 @@ onMounted(() => {
 
 // 暴露的属性和方法
 defineExpose({
+  /** 设置表单数据。 */
   setFormData,
-  // 展示/因此 modal
+  /** 设置弹窗可见性。 */
   setModalVisible: (visible: boolean = true) => (modalVisible.value = visible),
-  // 获取表单数据
+  /** 获取表单字段值。 */
   getFormData: (key: string) => formData[key] ?? formData,
-  // 设置表单项值
-  setFormItemData: (key: string, value: any) => (formData[key] = value),
-  // 禁用表单
+  /** 设置单个表单项值。 */
+  setFormItemData: (key: string, value: unknown) => (formData[key] = value),
+  /** 禁用/启用表单。 */
   handleDisabled: (disable: boolean) => {
-    formDisable.value = disable;
+    isFormDisabled.value = disable;
     props.modalConfig.form = {
       ...props.modalConfig.form,
       disabled: disable,
