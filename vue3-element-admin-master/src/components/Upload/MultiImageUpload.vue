@@ -76,7 +76,8 @@ function handleBeforeUpload(file: UploadRawFile) {
 }
 
 /** 上传文件。 */
-function handleUpload(_options: UploadRequestOptions) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function handleUpload(options: UploadRequestOptions) {
   return new Promise((_resolve, reject) => {
     ElMessage.error("图片上传功能已下线");
     reject(new Error("File module decommissioned"));
