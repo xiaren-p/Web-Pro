@@ -249,7 +249,7 @@ const emit = defineEmits<{ (e: "update:modelValue", value: string): void }>();
 
 const iconSelectRef = ref();
 const popoverContentRef = ref();
-const isisPopoverVisible = ref(false);
+const isPopoverVisible = ref(false);
 const activeTab = ref("svg");
 
 const svgIcons = ref<string[]>([]);
