@@ -3,9 +3,7 @@
     <el-badge v-if="noticeList.length > 0" :value="noticeList.length" :max="99">
       <div class="i-svg:bell" />
     </el-badge>
-
     <div v-else class="i-svg:bell" />
-
     <template #dropdown>
       <div class="p-5">
         <template v-if="noticeList.length > 0">
@@ -20,19 +18,14 @@
               >
                 {{ item.title }}
               </el-text>
-
-              <div class="text-xs text-gray">
-                {{ item.publishTime }}
-              </div>
+              <div class="text-xs text-gray">{{ item.publishTime }}</div>
             </div>
           </div>
           <el-divider />
           <div class="flex-x-between">
             <el-link type="primary" underline="never" @click="handleViewMoreNotice">
               <span class="text-xs">查看更多</span>
-              <el-icon class="text-xs">
-                <ArrowRight />
-              </el-icon>
+              <el-icon class="text-xs"><ArrowRight /></el-icon>
             </el-link>
             <el-link
               v-if="noticeList.length > 0"
@@ -70,8 +63,8 @@
           {{ noticeDetail.publishTime }}
         </span>
       </div>
-
       <div class="max-h-60vh pt-16px mb-24px overflow-y-auto border-t border-solid border-color">
+        <!-- 后端返回的 HTML 内容，由后端负责 XSS 过滤 -->
         <div v-html="noticeDetail.content"></div>
       </div>
     </div>
@@ -79,32 +72,34 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 通知组件：WebSocket 实时推送 + 下拉列表，支持查看详情、全部已读、跳转通知页。
+ */
 import { NoticeAPI, type NoticePageVO, type NoticeDetailVO } from "@/api/notice";
 import router from "@/router";
+import { useStomp } from "@/composables/websocket/useStomp";
 
 const noticeList = ref<NoticePageVO[]>([]);
 const noticeDialogVisible = ref(false);
 const noticeDetail = ref<NoticeDetailVO | null>(null);
 
-import { useStomp } from "@/composables/websocket/useStomp";
 const { subscribe, unsubscribe, isConnected } = useStomp();
 
 watch(
   () => isConnected.value,
   (connected) => {
     if (connected) {
-      subscribe("/user/queue/message", (message: any) => {
+      subscribe("/user/queue/message", (message: unknown) => {
         console.log("收到通知消息：", message);
-        const data = JSON.parse(message.body);
+        const data = JSON.parse((message as { body: string }).body);
         const id = data.id;
         if (!noticeList.value.some((notice) => notice.id == id)) {
           noticeList.value.unshift({
             id,
-            title: data.title,
-            type: data.type,
-            publishTime: data.publishTime,
+            title: data.title as string,
+            type: data.type as number,
+            publishTime: data.publishTime as string,
           });
-
           ElNotification({
             title: "您收到一条新的通知消息！",
             message: data.title,
@@ -117,41 +112,39 @@ watch(
   }
 );
 
-/**
- * 获取我的通知公告
- */
-function featchMyNotice() {
+/** 获取当前用户的未读通知。 */
+function fetchMyNotice() {
   NoticeAPI.getMyNoticePage({ pageNum: 1, pageSize: 5, isRead: 0 }).then((data) => {
     noticeList.value = data.list;
   });
 }
 
-// 阅读通知公告
+/**
+ * 阅读通知详情并标记已读。
+ *
+ * @param id - 通知ID。
+ */
 function handleReadNotice(id: string) {
   NoticeAPI.getDetail(id).then((data) => {
     noticeDialogVisible.value = true;
     noticeDetail.value = data;
-    // 标记为已读（后端持久化），成功后从本地列表移除
     NoticeAPI.read(id)
       .then(() => {
         const index = noticeList.value.findIndex((notice) => notice.id === id);
-        if (index >= 0) {
-          noticeList.value.splice(index, 1);
-        }
+        if (index >= 0) noticeList.value.splice(index, 1);
       })
       .catch(() => {
-        // 若标记失败，不影响阅读体验，仅在控制台记录
         console.warn("标记通知已读失败:", id);
       });
   });
 }
 
-// 查看更多
+/** 跳转到通知列表页。 */
 function handleViewMoreNotice() {
   router.push({ name: "MyNotice" });
 }
 
-// 全部已读
+/** 全部标记已读。 */
 function handleMarkAllAsRead() {
   NoticeAPI.readAll().then(() => {
     noticeList.value = [];
@@ -159,9 +152,8 @@ function handleMarkAllAsRead() {
 }
 
 onMounted(() => {
-  featchMyNotice();
+  fetchMyNotice();
 });
-
 onBeforeUnmount(() => {
   unsubscribe("/user/queue/message");
 });
