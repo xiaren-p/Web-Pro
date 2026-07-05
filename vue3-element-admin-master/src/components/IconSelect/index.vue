@@ -1,8 +1,8 @@
 <template>
   <div ref="iconSelectRef" :style="{ width: props.width }">
-    <el-popover :visible="popoverVisible" :width="props.width" placement="bottom-end">
+    <el-popover :visible="isPopoverVisible" :width="props.width" placement="bottom-end">
       <template #reference>
-        <div @click="popoverVisible = !popoverVisible">
+        <div @click="isPopoverVisible = !isPopoverVisible">
           <slot>
             <el-input v-model="selectedIcon" readonly placeholder="点击选择图标" class="reference">
               <template #prepend>
@@ -29,7 +29,7 @@
 
                 <el-icon
                   :style="{
-                    transform: popoverVisible ? 'rotate(180deg)' : 'rotate(0)',
+                    transform: isPopoverVisible ? 'rotate(180deg)' : 'rotate(0)',
                     transition: 'transform .5s',
                   }"
                 >
@@ -240,22 +240,16 @@ const TABLER_ECOMMERCE_ICONS = [
   "link",
 ];
 
-const props = defineProps({
-  modelValue: {
-    type: String,
-    default: "",
-  },
-  width: {
-    type: String,
-    default: "500px",
-  },
+const props = withDefaults(defineProps<{ modelValue?: string; width?: string }>(), {
+  modelValue: "",
+  width: "500px",
 });
 
-const emit = defineEmits(["update:modelValue"]);
+const emit = defineEmits<{ (e: "update:modelValue", value: string): void }>();
 
 const iconSelectRef = ref();
 const popoverContentRef = ref();
-const popoverVisible = ref(false);
+const isisPopoverVisible = ref(false);
 const activeTab = ref("svg");
 
 const svgIcons = ref<string[]>([]);
@@ -287,7 +281,7 @@ function loadIcons() {
   filteredSvgIcons.value = svgIcons.value;
 }
 
-function handleTabClick(tabPane: any) {
+function handleTabClick(tabPane: { props: { name: string } }) {
   activeTab.value = tabPane.props.name;
   filterIcons();
 }
@@ -316,14 +310,14 @@ function selectIcon(icon: string) {
   const iconName =
     activeTab.value === "element" ? "el-icon-" + icon : activeTab.value === "tabler" ? icon : icon;
   emit("update:modelValue", iconName);
-  popoverVisible.value = false;
+  isPopoverVisible.value = false;
 }
 
 function togglePopover() {
-  popoverVisible.value = !popoverVisible.value;
+  isPopoverVisible.value = !isPopoverVisible.value;
 }
 
-onClickOutside(iconSelectRef, () => (popoverVisible.value = false), {
+onClickOutside(iconSelectRef, () => (isPopoverVisible.value = false), {
   ignore: [popoverContentRef],
 });
 
