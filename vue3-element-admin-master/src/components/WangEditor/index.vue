@@ -56,7 +56,8 @@ const editorConfig = ref<Partial<IEditorConfig>>({
           ElMessage.error(err instanceof Error ? err.message : "图片上传失败");
         }
       },
-    } as IEditorConfig["MENU_CONF"],
+    // wangeditor v5 类型系统复杂，MENU_CONF.uploadImage 类型不兼容 Partial<IEditorConfig>，需 any 绕过
+    } as any,
   },
 });
 
