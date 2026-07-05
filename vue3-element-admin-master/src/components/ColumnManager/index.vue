@@ -1,3 +1,95 @@
+<template>
+  <el-drawer
+    v-model="visible"
+    title="表头字段显示与排序配置"
+    size="880px"
+    class="column-config-drawer"
+    append-to-body
+  >
+    <div class="column-config-container">
+      <div class="config-left">
+        <div class="search-box">
+          <el-input v-model="searchText" placeholder="搜索" :prefix-icon="Search" clearable />
+        </div>
+        <el-scrollbar class="checkbox-groups">
+          <div v-for="group in filteredGroups" :key="group.title" class="group-section">
+            <div class="group-header">
+              <span class="title">{{ group.title }}</span>
+              <el-button type="primary" link size="small" @click="toggleGroup(group)">
+                {{ isGroupAllChecked(group) ? "取消" : "全选" }}
+              </el-button>
+            </div>
+            <div class="group-items">
+              <el-checkbox
+                v-for="col in group.columns"
+                :key="col.prop"
+                v-model="col.visible"
+                :label="col.label"
+                size="small"
+                class="group-item-checkbox"
+              />
+            </div>
+          </div>
+        </el-scrollbar>
+      </div>
+      <div class="config-right">
+        <div class="selected-count">
+          已选
+          <span>({{ visibleColumns.length }})</span>
+          <span v-if="visibleColumns.length > 50" class="limit-tip">最多50项</span>
+        </div>
+        <div class="sort-tip">点击可拖拽排序</div>
+        <el-scrollbar>
+          <div ref="sortListRef" class="sort-list">
+            <div
+              v-for="(col, index) in visibleColumns"
+              :key="col.prop"
+              class="sort-item"
+              :data-id="col.prop"
+            >
+              <div class="sort-handle">
+                <el-icon class="drag-icon"><Rank /></el-icon>
+                <span class="sort-index">{{ index + 1 }}</span>
+                <span class="sort-label">{{ col.label }}</span>
+              </div>
+              <div class="sort-actions">
+                <el-icon
+                  class="action-icon"
+                  :class="{ active: col.fixed === 'left' }"
+                  title="固定在左侧"
+                  @click="toggleFixed(col, 'left')"
+                >
+                  <ArrowLeft />
+                </el-icon>
+                <el-icon
+                  class="action-icon"
+                  :class="{ active: col.fixed === 'right' }"
+                  title="固定在右侧"
+                  @click="toggleFixed(col, 'right')"
+                >
+                  <ArrowRight />
+                </el-icon>
+                <el-icon class="action-icon delete-icon" @click="col.visible = false">
+                  <Close />
+                </el-icon>
+              </div>
+            </div>
+          </div>
+        </el-scrollbar>
+      </div>
+    </div>
+    <template #footer>
+      <div class="drawer-footer">
+        <el-button @click="resetToDefault">恢复默认</el-button>
+        <div>
+          <el-button @click="visible = false">取消</el-button>
+          <el-button type="primary" @click="saveConfig">保存并应用</el-button>
+        </div>
+      </div>
+    </template>
+  </el-drawer>
+</template>
+
 <script setup lang="ts">
 /**
  * 列管理组件：拖拽排序、显示/隐藏、固定列，支持分组。
@@ -133,96 +225,3 @@ watch(
   { deep: true }
 );
 </script>
-
-<template>
-  <el-drawer
-    v-model="visible"
-    title="表头字段显示与排序配置"
-    size="880px"
-    class="column-config-drawer"
-    append-to-body
-  >
-    <div class="column-config-container">
-      <div class="config-left">
-        <div class="search-box">
-          <el-input v-model="searchText" placeholder="搜索" :prefix-icon="Search" clearable />
-        </div>
-        <el-scrollbar class="checkbox-groups">
-          <div v-for="group in filteredGroups" :key="group.title" class="group-section">
-            <div class="group-header">
-              <span class="title">{{ group.title }}</span>
-              <el-button type="primary" link size="small" @click="toggleGroup(group)">
-                {{ isGroupAllChecked(group) ? "取消" : "全选" }}
-              </el-button>
-            </div>
-            <div class="group-items">
-              <el-checkbox
-                v-for="col in group.columns"
-                :key="col.prop"
-                v-model="col.visible"
-                :label="col.label"
-                size="small"
-                class="group-item-checkbox"
-              />
-            </div>
-          </div>
-        </el-scrollbar>
-      </div>
-      <div class="config-right">
-        <div class="selected-count">
-          已选
-          <span>({{ visibleColumns.length }})</span>
-          <span v-if="visibleColumns.length > 50" class="limit-tip">最多50项</span>
-        </div>
-        <div class="sort-tip">点击可拖拽排序</div>
-        <el-scrollbar>
-          <div ref="sortListRef" class="sort-list">
-            <div
-              v-for="(col, index) in visibleColumns"
-              :key="col.prop"
-              class="sort-item"
-              :data-id="col.prop"
-            >
-              <div class="sort-handle">
-                <el-icon class="drag-icon"><Rank /></el-icon>
-                <span class="sort-index">{{ index + 1 }}</span>
-                <span class="sort-label">{{ col.label }}</span>
-              </div>
-              <div class="sort-actions">
-                <el-icon
-                  class="action-icon"
-                  :class="{ active: col.fixed === 'left' }"
-                  title="固定在左侧"
-                  @click="toggleFixed(col, 'left')"
-                >
-                  <ArrowLeft />
-                </el-icon>
-                <el-icon
-                  class="action-icon"
-                  :class="{ active: col.fixed === 'right' }"
-                  title="固定在右侧"
-                  @click="toggleFixed(col, 'right')"
-                >
-                  <ArrowRight />
-                </el-icon>
-                <el-icon class="action-icon delete-icon" @click="col.visible = false">
-                  <Close />
-                </el-icon>
-              </div>
-            </div>
-          </div>
-        </el-scrollbar>
-      </div>
-    </div>
-    <template #footer>
-      <div class="drawer-footer">
-        <el-button @click="resetToDefault">恢复默认</el-button>
-        <div>
-          <el-button @click="visible = false">取消</el-button>
-          <el-button type="primary" @click="saveConfig">保存并应用</el-button>
-        </div>
-      </div>
-    </template>
-  </el-drawer>
-</template>
-
