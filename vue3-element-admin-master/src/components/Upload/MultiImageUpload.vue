@@ -112,8 +112,9 @@ function handleError(error: unknown) {
   ElMessage.error("上传失败: " + (error as Error).message);
 }
 
-/** 预览图片。 */
-function handlePreviewImage(imageUrl: string) {
+/** 预览图片（Element Plus on-preview 传递 UploadFile）。 */
+function handlePreviewImage(uploadFile: { url?: string }) {
+  const imageUrl = uploadFile.url || "";
   previewImageIndex.value = modelValue.value.findIndex((url) => url === imageUrl);
   isPreviewVisible.value = true;
 }
