@@ -112,7 +112,7 @@
 
       <el-form-item v-if="formData.type !== MenuTypeEnum.BUTTON" label="图标" prop="icon">
         <!-- 图标选择器 -->
-        <icon-select v-model="formData.icon" />
+        <icon-select v-model="(formData.icon as string)" />
       </el-form-item>
     </el-form>
 

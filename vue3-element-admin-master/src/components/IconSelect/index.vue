@@ -252,7 +252,7 @@ const activeTab = ref("svg");
 const svgIcons = ref<string[]>([]);
 const elementIcons = ref<string[]>(Object.keys(ElementPlusIconsVue));
 const tablerIcons = ref<string[]>(TABLER_ECOMMERCE_ICONS);
-const selectedIcon = defineModel<string | undefined>("modelValue", { default: "" });
+const selectedIcon = defineModel<string>("modelValue", { required: true, default: "" });
 
 const filterText = ref("");
 const filteredSvgIcons = ref<string[]>([]);
