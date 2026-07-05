@@ -281,8 +281,8 @@ function loadIcons() {
   filteredSvgIcons.value = svgIcons.value;
 }
 
-function handleTabClick(tabPane: { props: { name: string } }) {
-  activeTab.value = tabPane.props.name;
+function handleTabClick(tabPane: unknown) {
+  activeTab.value = (tabPane as { props: { name: string } }).props.name;
   filterIcons();
 }
 
