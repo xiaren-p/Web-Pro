@@ -59,7 +59,7 @@
     </div>
   </div>
 </template>
-`r`n`r`n
+
 <script setup lang="ts">
 /**
  * Plan 提案交互卡片。
@@ -138,6 +138,7 @@ function handleCancel(): void {
   emit("cancel");
 }
 </script>
+`r`n`r`n
 
 <style scoped lang="scss">
 .plan-card {
