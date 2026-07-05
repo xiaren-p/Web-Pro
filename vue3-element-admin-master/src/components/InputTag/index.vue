@@ -12,7 +12,7 @@
         {{ tag }}
       </el-tag>
       <el-input
-        v-if="inputVisible"
+        v-if="isInputVisible"
         ref="inputRef"
         v-model.trim="inputValue"
         style="min-width: 100px"
@@ -25,50 +25,48 @@
     </div>
   </el-scrollbar>
 </template>
-`r`n`r`n
+
 <script setup lang="ts">
+/**
+ * 标签输入组件：支持动态添加/删除标签，v-model 绑定标签数组。
+ */
 import type { InputInstance } from "element-plus";
 
 const inputValue = ref("");
-const inputVisible = ref(false);
+const isInputVisible = ref(false);
 const inputRef = ref<InputInstance>();
 
-// 定义 model，用于与父组件的 v-model绑定
 const tags = defineModel<string[]>();
 
-defineProps({
-  config: {
-    type: Object as () => {
-      buttonAttrs: Record<string, any>;
-      inputAttrs: Record<string, any>;
-      tagAttrs: Record<string, any>;
-    },
-    default: () => ({
-      buttonAttrs: {},
-      inputAttrs: {},
-      tagAttrs: {},
-    }),
-  },
+interface InputTagConfig {
+  buttonAttrs: Record<string, unknown>;
+  inputAttrs: Record<string, unknown>;
+  tagAttrs: Record<string, unknown>;
+}
+
+withDefaults(defineProps<{ config?: InputTagConfig }>(), {
+  config: () => ({ buttonAttrs: {}, inputAttrs: {}, tagAttrs: {} }),
 });
 
-const handleClose = (tag: string) => {
+/** 移除指定标签。 */
+function handleClose(tag: string) {
   if (tags.value) {
-    const newTags = tags.value.filter((t) => t !== tag);
-    tags.value = [...newTags];
+    tags.value = tags.value.filter((t) => t !== tag);
   }
-};
+}
 
-const showInput = () => {
-  inputVisible.value = true;
+/** 展示输入框并聚焦。 */
+function showInput() {
+  isInputVisible.value = true;
   nextTick(() => inputRef.value?.focus());
-};
+}
 
-const handleInputConfirm = () => {
+/** 确认输入：将输入值加入标签列表。 */
+function handleInputConfirm() {
   if (inputValue.value) {
-    const newTags = [...(tags.value || []), inputValue.value];
-    tags.value = newTags;
+    tags.value = [...(tags.value || []), inputValue.value];
   }
-  inputVisible.value = false;
+  isInputVisible.value = false;
   inputValue.value = "";
-};
+}
 </script>
