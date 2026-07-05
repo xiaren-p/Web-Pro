@@ -1,4 +1,3 @@
-<!-- 复制组件 -->
 <template>
   <el-button link :style="style" @click="handleClipboard">
     <slot>
@@ -6,57 +5,23 @@
     </slot>
   </el-button>
 </template>
-`r`n`r`n
+
 <script setup lang="ts">
-defineOptions({
-  name: "CopyButton",
-  inheritAttrs: false,
-});
+/**
+ * 复制按钮组件。点击将传入文本复制到剪贴板。
+ */
+defineOptions({ name: "CopyButton", inheritAttrs: false });
 
-const props = defineProps({
-  text: {
-    type: String,
-    default: "",
-  },
-  style: {
-    type: Object,
-    default: () => ({}),
-  },
-});
+const props = defineProps<{ content?: string; style?: Record<string, string> }>();
+const emit = defineEmits<{ (e: "success"): void }>();
 
-function handleClipboard() {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    // 使用 Clipboard API
-    navigator.clipboard
-      .writeText(props.text)
-      .then(() => {
-        ElMessage.success("Copy successfully");
-      })
-      .catch((error) => {
-        ElMessage.warning("Copy failed");
-        console.log("[CopyButton] Copy failed", error);
-      });
-  } else {
-    // 兼容性处理（useClipboard 有兼容性问题）
-    const input = document.createElement("input");
-    input.style.position = "absolute";
-    input.style.left = "-9999px";
-    input.setAttribute("value", props.text);
-    document.body.appendChild(input);
-    input.select();
-    try {
-      const successful = document.execCommand("copy");
-      if (successful) {
-        ElMessage.success("Copy successfully!");
-      } else {
-        ElMessage.warning("Copy failed!");
-      }
-    } catch (err) {
-      ElMessage.error("Copy failed.");
-      console.log("[CopyButton] Copy failed.", err);
-    } finally {
-      document.body.removeChild(input);
-    }
+async function handleClipboard() {
+  if (!props.content) return;
+  try {
+    await navigator.clipboard.writeText(props.content);
+    emit("success");
+  } catch {
+    // clipboard API not available
   }
 }
 </script>

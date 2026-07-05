@@ -3,14 +3,12 @@
     <slot></slot>
   </div>
 </template>
-`r`n`r`n
+
 <script setup lang="ts">
-defineProps({
-  padding: {
-    type: String,
-    default: "p-2",
-  },
-});
+/**
+ * 通用包装器组件。提供统一的圆角容器和 hover 效果。
+ */
+defineProps<{ padding?: string }>();
 </script>
 
 <style scoped lang="scss">

@@ -15,35 +15,24 @@
     </template>
   </el-dropdown>
 </template>
-`r`n`r`n
+
 <script setup lang="ts">
+/**
+ * 语言切换组件。
+ */
 import { useAppStore } from "@/store/modules/app-store";
 import { LanguageEnum } from "@/enums/settings/locale-enum";
 
-defineProps({
-  size: {
-    type: String,
-    required: false,
-  },
-});
-
-const langOptions = [
-  { label: "中文", value: LanguageEnum.ZH_CN },
-  { label: "English", value: LanguageEnum.EN },
-];
+defineProps<{ size?: string }>();
 
 const appStore = useAppStore();
-const { locale, t } = useI18n();
 
-/**
- * 处理语言切换
- *
- * @param lang  语言（zh-cn、en）
- */
+const langOptions = [
+  { value: LanguageEnum.ZH_CN, label: "中文" },
+  { value: LanguageEnum.EN, label: "English" },
+];
+
 function handleLanguageChange(lang: string) {
-  locale.value = lang;
-  appStore.changeLanguage(lang);
-
-  ElMessage.success(t("langSelect.message.success"));
+  appStore.changeLanguage(lang as LanguageEnum);
 }
 </script>
