@@ -66,6 +66,7 @@
  */
 import type { IObject, IForm, ISearchConfig, ISearchComponent } from "./types";
 import { ArrowUp, ArrowDown } from "@element-plus/icons-vue";
+import { ElInput, ElSelect, ElCascader, ElInputNumber, ElDatePicker, ElTimePicker, ElTimeSelect, ElTreeSelect } from "element-plus";
 import type { FormInstance } from "element-plus";
 import InputTag from "@/components/InputTag/index.vue";
 
@@ -75,7 +76,7 @@ const emit = defineEmits<{
   resetClick: [queryParams: IObject];
 }>();
 
-const componentMap = new Map<ISearchComponent, unknown>([
+const componentMap = new Map<ISearchComponent, any>([
   ["input", markRaw(ElInput)],
   ["select", markRaw(ElSelect)],
   ["cascader", markRaw(ElCascader)],
