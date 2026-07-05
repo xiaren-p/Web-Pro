@@ -105,7 +105,6 @@ function handleSuccess(response: unknown, uploadFile: { uid: number }) {
   const index = fileList.value.findIndex((file) => file.uid === uploadFile.uid);
   if (index !== -1) { fileList.value[index].url = res.url; fileList.value[index].status = "success"; modelValue.value[index] = res.url; }
 }
-}
 
 /** 上传失败回调。 */
 function handleError(error: unknown) {
