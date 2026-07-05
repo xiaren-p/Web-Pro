@@ -240,10 +240,7 @@ const TABLER_ECOMMERCE_ICONS = [
   "link",
 ];
 
-const props = withDefaults(defineProps<{ modelValue?: string; width?: string }>(), {
-  modelValue: "",
-  width: "500px",
-});
+const props = withDefaults(defineProps<{ width?: string }>(), { width: "500px" });
 
 const emit = defineEmits<{ (e: "update:modelValue", value: string): void }>();
 
