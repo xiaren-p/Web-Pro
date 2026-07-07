@@ -118,6 +118,11 @@ export function useAdCampaignList() {
       const merged: Record<string, unknown> = { ...defaults };
       for (const k of Object.keys(defaults)) {
         const v = c[k];
+        // range 特殊处理：只接受有效的 2 元素数组，否则保留默认 7 天
+        if (k === "range") {
+          if (Array.isArray(v) && v.length === 2) merged[k] = v;
+          continue;
+        }
         if (Array.isArray(defaults[k as keyof typeof defaults])) {
           if (Array.isArray(v)) merged[k] = v;
         } else if (typeof v === "string") {
