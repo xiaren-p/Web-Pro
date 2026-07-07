@@ -38,10 +38,7 @@ const filteredOptions = computed(() => {
 });
 
 /** 展示用的选项（限制 100 条减少 DOM 渲染，Edge 浏览器卡顿保护）。全选逻辑仍用 filteredOptions。 */
-const displayOptions = computed(() => {
-  const all = filteredOptions.value;
-  return all.length > 100 ? all.slice(0, 100) : all;
-});
+const displayOptions = computed(() => filteredOptions.value);
 
 function handleHeaderSearch() {
   if (props.remote) {
