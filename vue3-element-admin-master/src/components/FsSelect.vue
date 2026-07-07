@@ -37,6 +37,12 @@ const filteredOptions = computed(() => {
   });
 });
 
+/** 展示用的选项（限制 100 条减少 DOM 渲染，Edge 浏览器卡顿保护）。全选逻辑仍用 filteredOptions。 */
+const displayOptions = computed(() => {
+  const all = filteredOptions.value;
+  return all.length > 100 ? all.slice(0, 100) : all;
+});
+
 function handleHeaderSearch() {
   if (props.remote) {
     onRemote(searchKeyword.value);
@@ -225,7 +231,7 @@ const containerStyle = computed((): Record<string, string> => {
       </el-option>
 
       <el-option
-        v-for="option in filteredOptions"
+        v-for="option in displayOptions"
         :key="option.value"
         :label="option.label || option.title || option.value"
         :value="option.value"
