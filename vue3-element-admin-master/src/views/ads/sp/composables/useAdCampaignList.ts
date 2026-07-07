@@ -390,25 +390,17 @@ export function useAdCampaignList() {
         ? buildParentAsinOptions(allSkus.value)
         : allSkus.value;
     if (!q) {
-      skuOptions.value = sourceOptions.slice();
+      skuOptions.value = sourceOptions.slice(0, 200);  // 初始展示200条
       return;
     }
+    // 搜索时全量过滤，不限制
     skuOptions.value = sourceOptions.filter((s: any) =>
       `${s.title || ""}${s.code || ""}${s.value || ""}`.toLowerCase().includes(q)
     );
   }
 
-  async function remoteSearchSku(query: string) {
-    if (query) {
-      try {
-        const res = await getAdSkuOptions({ keyword: query });
-        skuOptions.value = res.skus || [];
-      } catch {
-        syncSkuOptions(query);
-      }
-    } else {
-      syncSkuOptions(query);
-    }
+  function remoteSearchSku(query: string) {
+    syncSkuOptions(query);
   }
 
   async function loadSkuOptions(): Promise<void> {

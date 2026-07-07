@@ -180,8 +180,7 @@ class ShopProfileViewSet(viewsets.ViewSet):
         qs = qs.values("seller_sku", "asin", "parent_asin", "item_name", "small_image_url").distinct()
         skus = []
         seen: set[str] = set()
-        limit = None if keyword else 200  # 搜索时不过滤数量，初始加载限制200
-        for row in qs[:limit]:
+        for row in qs:
             key = row["seller_sku"]
             if key in seen:
                 continue
