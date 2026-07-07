@@ -399,22 +399,8 @@ export function useAdCampaignList() {
     );
   }
 
-  let _skuTimer: ReturnType<typeof setTimeout> | null = null;
-
   function remoteSearchSku(query: string) {
-    if (_skuTimer) clearTimeout(_skuTimer);
-    if (!query) {
-      syncSkuOptions(query);
-      return;
-    }
-    _skuTimer = setTimeout(async () => {
-      try {
-        const res = await getAdSkuOptions({ keyword: query });
-        skuOptions.value = res.skus || [];
-      } catch {
-        syncSkuOptions(query);
-      }
-    }, 500);
+    syncSkuOptions(query);
   }
 
   async function loadSkuOptions(): Promise<void> {
