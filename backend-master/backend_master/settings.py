@@ -143,13 +143,13 @@ CELERY_TASK_ROUTES = {
     'apps.ads.sp.tasks.listing_cache_refresh_task.refresh_listing_caches': {'queue': 'celery'},
     # ── parallel_queue（concurrency=4）：可并行的批量任务 ────────────────────
     'apps.ai.tasks.chat_task.run_ai_chat_task':                            {'queue': 'parallel_queue'},
+    'apps.ads.sp.rules.tasks.bid_adjustment_task.run_bid_adjustment_task':                   {'queue': 'parallel_queue'},
+    'apps.ads.sp.rules.tasks.campaign_adjustment_task.run_campaign_adjustment_task':         {'queue': 'parallel_queue'},
     # ── single_thread_queue（concurrency=1）：须顺序执行的任务 ───────────────
     'apps.ads.sp.rules.tasks.ad_campaign_submit_task.submit_pending_campaigns_task': {'queue': 'single_thread_queue'},
     'apps.sales.listing.tasks.listing_image_upload_task.upload_listing_images_task':  {'queue': 'single_thread_queue'},
     'apps.ads.sp.timing.tasks.ad_time_pricing_task.run_ad_time_pricing_task':         {'queue': 'single_thread_queue'},
     'apps.ads.sp.timing.tasks.time_pricing_task.run_time_pricing_task':                       {'queue': 'single_thread_queue'},
-    'apps.ads.sp.rules.tasks.bid_adjustment_task.run_bid_adjustment_task':                   {'queue': 'parallel_queue'},
-    'apps.ads.sp.rules.tasks.campaign_adjustment_task.run_campaign_adjustment_task':         {'queue': 'parallel_queue'},
     'apps.ads.sp.rules.tasks.optimization_strategy_task.run_optimization_strategy_task':       {'queue': 'single_thread_queue'},
     'apps.ads.sp.rules.tasks.optimization_execution_task.run_optimization_execution_task':     {'queue': 'single_thread_queue'},
     'apps.sales.listing.tasks.listing_tag_sync_task.run_listing_tag_sync_task':                  {'queue': 'single_thread_queue'},
