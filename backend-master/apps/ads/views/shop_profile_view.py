@@ -1,7 +1,6 @@
 """广告通用店铺配置下拉数据视图（LxAdsProfile）。"""
 from __future__ import annotations
 
-from django.db.models import Q
 from django.core.cache import cache
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -156,45 +155,50 @@ class ShopProfileViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="sku-options")
     def sku_options(self, request: Request) -> Response:
-        """获取 SKU/ASIN/MSKU 搜索下拉选项数据，数据源为 LxListingData。
+        """获取 SKU/ASIN/MSKU 搜索下拉选项数据。
 
-        支持按关键词模糊匹配 seller_sku、asin、item_name 三个字段，
-        未传关键词时返回全部非空 seller_sku 的数据。
-
-        Args:
-            request (Request): DRF 请求对象，可选 body 字段：
-
-            - keyword (str): 模糊搜索关键词。
-
-        Returns:
-            Response: 包含 ``skus`` 选项列表，每项为 {value, label, asin, image}。
+        首次请求全量缓存至 Redis（TTL 600s），后续搜索在内存中毫秒级过滤。
         """
-        keyword = (request.data.get("keyword") or "").strip()
-        qs = LxListingData.objects.exclude(seller_sku="").exclude(asin="")
-        if keyword:
-            qs = qs.filter(
-                Q(seller_sku__icontains=keyword)
-                | Q(asin__icontains=keyword)
-                | Q(item_name__icontains=keyword)
+        keyword = (request.data.get("keyword") or "").strip().lower()
+
+        # 从 Redis 读取全量缓存
+        _CACHE_KEY = "sku_options_cache_v1"
+        all_skus: list[dict] = cache.get(_CACHE_KEY)  # type: ignore[assignment]
+        if all_skus is None:
+            qs = (
+                LxListingData.objects
+                .exclude(seller_sku="")
+                .exclude(asin="")
+                .values("seller_sku", "asin", "parent_asin", "item_name", "small_image_url")
+                .distinct()
             )
-        qs = qs.values("seller_sku", "asin", "parent_asin", "item_name", "small_image_url").distinct()
-        skus = []
-        seen: set[str] = set()
-        limit = 100 if not keyword else None
-        for row in qs[:limit]:
-            key = row["seller_sku"]
-            if key in seen:
-                continue
-            seen.add(key)
-            skus.append({
-                "value": key,
-                "label": key,
-                "code": row["asin"] or "",
-                "title": row["item_name"] or "",
-                "img": row["small_image_url"] or "",
-                "parent": row["parent_asin"] or "",
-            })
-        return drf_ok({"skus": skus})
+            seen: set[str] = set()
+            all_skus = []
+            for row in qs.iterator(chunk_size=2000):
+                key = row["seller_sku"]
+                if key in seen:
+                    continue
+                seen.add(key)
+                all_skus.append({
+                    "value": key,
+                    "label": key,
+                    "code": row["asin"] or "",
+                    "title": row["item_name"] or "",
+                    "img": row["small_image_url"] or "",
+                    "parent": row["parent_asin"] or "",
+                })
+            cache.set(_CACHE_KEY, all_skus, 600)
+
+        # 搜索 / 初始展示
+        if keyword:
+            result = [s for s in all_skus
+                      if keyword in str(s.get("value", "")).lower()
+                      or keyword in str(s.get("code", "")).lower()
+                      or keyword in str(s.get("title", "")).lower()]
+        else:
+            result = all_skus
+
+        return drf_ok({"skus": result})
 
     @action(detail=False, methods=["post"], url_path="enum-labels")
     def enum_labels(self, request: Request) -> Response:

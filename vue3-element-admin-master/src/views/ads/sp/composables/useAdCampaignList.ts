@@ -390,7 +390,7 @@ export function useAdCampaignList() {
         ? buildParentAsinOptions(allSkus.value)
         : allSkus.value;
     if (!q) {
-      skuOptions.value = sourceOptions.slice(0, 100);
+      skuOptions.value = sourceOptions.slice();
       return;
     }
     // 搜索时全量过滤，不限制
@@ -399,22 +399,8 @@ export function useAdCampaignList() {
     );
   }
 
-  let _skuTimer: ReturnType<typeof setTimeout> | null = null;
-
   function remoteSearchSku(query: string) {
-    if (_skuTimer) clearTimeout(_skuTimer);
-    if (!query) {
-      skuOptions.value = allSkus.value.slice(0, 100);
-      return;
-    }
-    _skuTimer = setTimeout(async () => {
-      try {
-        const res = await getAdSkuOptions({ keyword: query });
-        skuOptions.value = res.skus || [];
-      } catch {
-        syncSkuOptions(query);
-      }
-    }, 500);
+    syncSkuOptions(query);
   }
 
   async function loadSkuOptions(): Promise<void> {
