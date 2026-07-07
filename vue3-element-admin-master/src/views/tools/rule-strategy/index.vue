@@ -77,3 +77,115 @@ async function loadRuleData(): Promise<void> {
 
 onMounted(loadRuleData);
 </script>
+
+<style scoped lang="scss">
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.25);
+
+  &__left {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+
+  &__icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+    backdrop-filter: blur(8px);
+
+    .el-icon {
+      color: #fff;
+    }
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.3px;
+  }
+
+  &__divider {
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.35);
+  }
+
+  &__stat {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+
+    .stat-item {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+
+      .stat-value {
+        font-size: 16px;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      .stat-label {
+        opacity: 0.85;
+      }
+    }
+  }
+}
+
+:deep(.el-tabs) {
+  padding: 0 24px;
+  background: var(--el-bg-color);
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+
+  .el-tabs__header {
+    padding: 0 24px;
+    margin: 0 -24px 20px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+
+  .el-tabs__nav-wrap::after {
+    display: none;
+  }
+
+  .el-tabs__item {
+    height: 56px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 56px;
+    color: var(--el-text-color-secondary);
+    transition: all 0.25s ease;
+
+    &:hover {
+      color: var(--el-color-primary);
+    }
+
+    &.is-active {
+      font-weight: 600;
+      color: var(--el-color-primary);
+    }
+  }
+
+  .el-tabs__active-bar {
+    height: 3px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 3px 3px 0 0;
+  }
+}
+</style>
