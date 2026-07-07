@@ -398,8 +398,17 @@ export function useAdCampaignList() {
     );
   }
 
-  function remoteSearchSku(query: string) {
-    syncSkuOptions(query);
+  async function remoteSearchSku(query: string) {
+    if (query) {
+      try {
+        const res = await getAdSkuOptions({ keyword: query });
+        skuOptions.value = res.skus || [];
+      } catch {
+        syncSkuOptions(query);
+      }
+    } else {
+      syncSkuOptions(query);
+    }
   }
 
   async function loadSkuOptions(): Promise<void> {
