@@ -17,7 +17,7 @@ import type {
  * @returns {Promise<{ results: DeveloperApp[] }>} 应用列表（不含 Secret）。
  */
 export function fetchApps(): Promise<{ results: DeveloperApp[] }> {
-  return request.get("/api/v1/developer/apps/");
+  return request.get("/developer/apps/");
 }
 
 /**
@@ -27,7 +27,7 @@ export function fetchApps(): Promise<{ results: DeveloperApp[] }> {
  * @returns {Promise<DeveloperAppCreated>} 创建结果（含 client_secret，仅此一次）。
  */
 export function createApp(payload: AppCreatePayload): Promise<DeveloperAppCreated> {
-  return request.post("/api/v1/developer/apps/create/", payload);
+  return request.post("/developer/apps/create/", payload);
 }
 
 /**
@@ -37,7 +37,7 @@ export function createApp(payload: AppCreatePayload): Promise<DeveloperAppCreate
  * @returns {Promise<void>}
  */
 export function deleteApp(appId: number): Promise<void> {
-  return request.delete(`/api/v1/developer/apps/${appId}/`);
+  return request.delete(`/developer/apps/${appId}/`);
 }
 
 /**
@@ -47,5 +47,5 @@ export function deleteApp(appId: number): Promise<void> {
  * @returns {Promise<SecretRotated>} 新 Secret 及轮换时间（仅此一次）。
  */
 export function rotateAppSecret(appId: number): Promise<SecretRotated> {
-  return request.post(`/api/v1/developer/apps/${appId}/rotate-secret/`);
+  return request.post(`/developer/apps/${appId}/rotate-secret/`);
 }
