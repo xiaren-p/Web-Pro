@@ -390,7 +390,7 @@ export function useAdCampaignList() {
         ? buildParentAsinOptions(allSkus.value)
         : allSkus.value;
     if (!q) {
-      skuOptions.value = sourceOptions.slice(0, 200);  // 初始展示200条
+      skuOptions.value = sourceOptions.slice();
       return;
     }
     // 搜索时全量过滤，不限制
