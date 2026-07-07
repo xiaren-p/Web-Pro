@@ -211,6 +211,10 @@ function onRemote(query: string) {
   if (props.remote && typeof props.remoteMethod === "function") props.remoteMethod(query);
 }
 
+function onChange() {
+  // no-op, watch handles emit
+}
+
 function selectOnly(value: string | number) {
   internalValue.value = props.multiple ? [value] : value;
   emit("only", value);
