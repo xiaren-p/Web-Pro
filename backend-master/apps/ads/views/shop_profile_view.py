@@ -157,46 +157,20 @@ class ShopProfileViewSet(viewsets.ViewSet):
     def sku_options(self, request: Request) -> Response:
         """获取 SKU/ASIN/MSKU 搜索下拉选项数据。
 
-        首次请求全量缓存至 Redis（TTL 600s），后续搜索在内存中毫秒级过滤。
+        数据由 Celery 定时任务 ``refresh_listing_caches`` 预热到 Redis，
+        搜索在内存中毫秒级过滤。
         """
         keyword = (request.data.get("keyword") or "").strip().lower()
 
-        # 从 Redis 读取全量缓存
-        _CACHE_KEY = "sku_options_cache_v1"
-        all_skus: list[dict] = cache.get(_CACHE_KEY)  # type: ignore[assignment]
-        if all_skus is None:
-            qs = (
-                LxListingData.objects
-                .exclude(seller_sku="")
-                .exclude(asin="")
-                .values("seller_sku", "asin", "parent_asin", "item_name", "small_image_url")
-                .distinct()
-            )
-            seen: set[str] = set()
-            all_skus = []
-            for row in qs.iterator(chunk_size=2000):
-                key = row["seller_sku"]
-                if key in seen:
-                    continue
-                seen.add(key)
-                all_skus.append({
-                    "value": key,
-                    "label": key,
-                    "code": row["asin"] or "",
-                    "title": row["item_name"] or "",
-                    "img": row["small_image_url"] or "",
-                    "parent": row["parent_asin"] or "",
-                })
-            cache.set(_CACHE_KEY, all_skus, 600)
+        all_skus: list[dict] = cache.get("sku_options_cache_v1") or []
 
-        # 搜索 / 初始展示
         if keyword:
             result = [s for s in all_skus
                       if keyword in str(s.get("value", "")).lower()
                       or keyword in str(s.get("code", "")).lower()
                       or keyword in str(s.get("title", "")).lower()]
         else:
-            result = all_skus
+            result = all_skus[:100]
 
         return drf_ok({"skus": result})
 

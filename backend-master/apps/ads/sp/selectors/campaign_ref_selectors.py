@@ -89,6 +89,30 @@ def load_all_listing_caches() -> dict[str, Any]:
     _all = list(LxListingData.objects.values(
         "asin", "global_tags", "principal_info",
     ))
+    # SKU 下拉选项缓存：seller_sku 去重后的全量列表
+    sku_qs = (
+        LxListingData.objects
+        .exclude(seller_sku="")
+        .exclude(asin="")
+        .values("seller_sku", "asin", "parent_asin", "item_name", "small_image_url")
+    )
+    sku_list: list[dict[str, str]] = []
+    sku_seen: set[str] = set()
+    for row in sku_qs.iterator(chunk_size=2000):
+        key = row["seller_sku"]
+        if key in sku_seen:
+            continue
+        sku_seen.add(key)
+        sku_list.append({
+            "value": key,
+            "label": key,
+            "code": row["asin"] or "",
+            "title": row["item_name"] or "",
+            "img": row["small_image_url"] or "",
+            "parent": row["parent_asin"] or "",
+        })
+    _redis.set("sku_options_cache_v1", sku_list, _REF_TTL)
+
     ad_rows = list(LxSpAd.objects.values("asin", "campaign_id", "profile_id"))
 
     # sp_tag_asin_map_v2: tag_id → [asin, ...]
@@ -149,6 +173,7 @@ def load_all_listing_caches() -> dict[str, Any]:
         "tags_count": len(tag_asin),
         "owners_count": len(owner_asin),
         "asins_count": len(asin_tags),
+        "sku_count": len(sku_list),
     }
 
 
