@@ -170,7 +170,7 @@ class ShopProfileViewSet(viewsets.ViewSet):
                       or keyword in str(s.get("code", "")).lower()
                       or keyword in str(s.get("title", "")).lower()]
         else:
-            result = all_skus
+            result = all_skus[:100]
 
         return drf_ok({"skus": result})
 
