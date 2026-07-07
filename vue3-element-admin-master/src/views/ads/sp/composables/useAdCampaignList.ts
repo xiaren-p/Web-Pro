@@ -88,10 +88,20 @@ export function useAdCampaignList() {
   // ── 筛选状态 ──────────────────────────────────────────────────────────────────
   function initFiltersFromCache(): Record<string, unknown> {
     const cached = readCache(STORAGE_KEYS.filters);
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 7);
+    const fmt = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    };
+    const defaultRange = [fmt(start), fmt(end)];
     const defaults = {
       countries: [] as string[],
       profiles: [] as string[],
-      range: [] as string[],
+      range: defaultRange,
       adsTypes: [] as string[],
       portfolios: [] as string[],
       asinSearchType: "sku",
