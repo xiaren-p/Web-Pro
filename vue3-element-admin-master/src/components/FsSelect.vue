@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, nextTick } from "vue";
 import type { PropType } from "vue";
 
 const props = defineProps({
@@ -37,8 +37,19 @@ const filteredOptions = computed(() => {
   });
 });
 
-/** 展示用的选项（限制 100 条减少 DOM 渲染，Edge 浏览器卡顿保护）。全选逻辑仍用 filteredOptions。 */
-const displayOptions = computed(() => filteredOptions.value);
+/** 虚拟滚动 — 初始展示 100 项，滚动到底加载 30 项。全选逻辑仍用 filteredOptions。 */
+const VISIBLE_CHUNK = 100;
+const LOAD_MORE = 30;
+const visibleEnd = ref(VISIBLE_CHUNK);
+const displayOptions = computed(() => filteredOptions.value.slice(0, visibleEnd.value));
+
+/** 下拉面板滚动事件：触底加载更多。 */
+function onPopoverScroll(e: Event) {
+  const el = e.target as HTMLElement;
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 20) {
+    visibleEnd.value = Math.min(visibleEnd.value + LOAD_MORE, filteredOptions.value.length);
+  }
+}
 
 function handleHeaderSearch() {
   if (props.remote) {
@@ -48,12 +59,20 @@ function handleHeaderSearch() {
 
 function onVisibleChange(visible: boolean) {
   if (!visible) {
+    visibleEnd.value = VISIBLE_CHUNK;  // 关闭时重置
     if (props.remote) {
       searchKeyword.value = "";
       onRemote("");
     } else if (props.filterable) {
       searchKeyword.value = "";
     }
+  } else {
+    visibleEnd.value = VISIBLE_CHUNK;  // 打开时重置
+    // 给 popover 的滚动容器绑事件
+    nextTick(() => {
+      const popover = document.querySelector('.fs-select-popper .el-select-dropdown__wrap');
+      if (popover) popover.addEventListener('scroll', onPopoverScroll, { passive: true });
+    });
   }
 }
 
@@ -210,6 +229,17 @@ const containerStyle = computed((): Record<string, string> => {
             @input="handleHeaderSearch"
           />
         </div>
+        <div class="fs-select-popper__count">
+          <template v-if="displayOptions.length < filteredOptions.length">
+            显示 {{ displayOptions.length }} / 共 {{ filteredOptions.length }} 项
+          </template>
+          <template v-else>
+            共 {{ filteredOptions.length }} 项
+          </template>
+          <template v-if="multiple && Array.isArray(internalValue)">
+            ，已选 {{ (internalValue as any[]).filter(v => v !== ALL_OPTION).length }} 项
+          </template>
+        </div>
       </template>
 
       <el-option
@@ -353,6 +383,12 @@ const containerStyle = computed((): Record<string, string> => {
   // 搜索框
   &__header {
     padding: 8px 8px 4px;
+  }
+
+  &__count {
+    padding: 4px 8px 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
   }
 
   // 全选行
