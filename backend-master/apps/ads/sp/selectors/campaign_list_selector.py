@@ -203,6 +203,14 @@ def build_campaign_list_data(params: dict) -> dict:
             if not _s:
                 all_pairs_key_set.clear()
                 break
+            # 将 tuple (c,p) 转为 string "c::p" 与 all_pairs_key_set 格式对齐
+            try:
+                sample = next(iter(_s))
+            except StopIteration:
+                all_pairs_key_set.clear()
+                break
+            if isinstance(sample, tuple):
+                _s = {f"{c}::{p}" for c, p in _s}
             all_pairs_key_set &= _s
 
     all_pairs_list = [
