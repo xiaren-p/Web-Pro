@@ -96,8 +96,8 @@ def build_campaign_list_data(params: dict) -> dict:
                 if tag_asins:
                     asin_cp_map = get_asin_cp_map()
                     tag_cp_keys = set()
-                for asin_val in tag_asins:
-                    tag_cp_keys |= set(asin_cp_map.get(asin_val, set()))
+                    for asin_val in tag_asins:
+                        tag_cp_keys |= set(asin_cp_map.get(asin_val, set()))
                 else:
                     tag_cp_keys = set()
             else:
