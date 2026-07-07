@@ -178,18 +178,27 @@ const internalValue = ref<ValueType>(
     : (props.modelValue ?? "")
 );
 
+/** 浅层比较 value 变化，避免 JSON.stringify 开销。 */
+function isSameValue(a: ValueType, b: ValueType): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+  return false;
+}
+
 watch(
   () => props.modelValue,
   (v) => {
     const newVal: ValueType = props.multiple ? (Array.isArray(v) ? v.slice() : []) : (v ?? "");
-    if (JSON.stringify(internalValue.value) === JSON.stringify(newVal)) return;
+    if (isSameValue(internalValue.value, newVal)) return;
     internalValue.value = newVal;
   },
   { deep: true }
 );
 
 watch(internalValue, (newV, oldV) => {
-  if (JSON.stringify(oldV) === JSON.stringify(newV)) return;
+  if (isSameValue(oldV, newV)) return;
   if (props.multiple && Array.isArray(newV) && newV.includes(ALL_OPTION)) {
     toggleAll();
     return;

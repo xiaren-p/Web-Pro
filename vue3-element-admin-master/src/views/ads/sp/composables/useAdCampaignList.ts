@@ -543,12 +543,12 @@ export function useAdCampaignList() {
     loadTableData();
   });
 
+  // 筛选变更时持久化到 localStorage。Object.assign 会触发顶层变更，shallow 足够。
   watch(
     filters,
     (v) => {
       writeCache(STORAGE_KEYS.filters, { ...v });
-    },
-    { deep: true }
+    }
   );
 
   watch(
