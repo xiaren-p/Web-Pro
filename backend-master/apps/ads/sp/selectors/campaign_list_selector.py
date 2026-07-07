@@ -92,12 +92,12 @@ def build_campaign_list_data(params: dict) -> dict:
                 for gid in tag_gids:
                     gid_str = str(gid)
                     if gid_str and gid_str in tag_asin_cache:
-                        tag_asins |= tag_asin_cache[gid_str]
+                        tag_asins |= set(tag_asin_cache[gid_str])
                 if tag_asins:
                     asin_cp_map = get_asin_cp_map()
                     tag_cp_keys = set()
-                    for asin_val in tag_asins:
-                        tag_cp_keys |= asin_cp_map.get(asin_val, set())
+                for asin_val in tag_asins:
+                    tag_cp_keys |= set(asin_cp_map.get(asin_val, set()))
                 else:
                     tag_cp_keys = set()
             else:
@@ -113,12 +113,12 @@ def build_campaign_list_data(params: dict) -> dict:
             owner_asins: set[str] = set()
             for uid in owner_list:
                 if uid in owner_asin_cache:
-                    owner_asins |= owner_asin_cache[uid]
+                    owner_asins |= set(owner_asin_cache[uid])
             if owner_asins:
                 asin_cp_map = get_asin_cp_map()
                 owner_cp_keys = set()
                 for asin_val in owner_asins:
-                    owner_cp_keys |= asin_cp_map.get(asin_val, set())
+                    owner_cp_keys |= set(asin_cp_map.get(asin_val, set()))
             else:
                 owner_cp_keys = set()
 
@@ -161,7 +161,7 @@ def build_campaign_list_data(params: dict) -> dict:
                 if asin_search_type == "parent_asin":
                     if asin_cp_map:
                         for val in sku_list:
-                            search_cp_keys |= asin_cp_map.get(val, set())
+                            search_cp_keys |= set(asin_cp_map.get(val, set()))
                     children = list(
                         LxListingData.objects.filter(parent_asin__in=sku_list)
                         .exclude(asin="")
@@ -170,13 +170,13 @@ def build_campaign_list_data(params: dict) -> dict:
                     )
                     for child_sku, child_asin in children:
                         if child_sku and sku_cp_map:
-                            search_cp_keys |= sku_cp_map.get(child_sku, set())
+                            search_cp_keys |= set(sku_cp_map.get(child_sku, set()))
                         if child_asin and asin_cp_map:
-                            search_cp_keys |= asin_cp_map.get(child_asin, set())
+                            search_cp_keys |= set(asin_cp_map.get(child_asin, set()))
                 else:
                     if sku_cp_map:
                         for val in sku_list:
-                            search_cp_keys |= sku_cp_map.get(val, set())
+                            search_cp_keys |= set(sku_cp_map.get(val, set()))
                     if asin_cp_map:
                         related_asins = list(
                             LxListingData.objects.filter(seller_sku__in=sku_list)
@@ -185,7 +185,7 @@ def build_campaign_list_data(params: dict) -> dict:
                             .distinct()
                         )
                         for asin_val in related_asins:
-                            search_cp_keys |= asin_cp_map.get(asin_val, set())
+                            search_cp_keys |= set(asin_cp_map.get(asin_val, set()))
 
     date_start = params.get("date_start")
     date_end = params.get("date_end")

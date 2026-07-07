@@ -412,7 +412,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
-    'EXCEPTION_HANDLER': 'apps.system.utils.responses.custom_exception_handler',
+    'EXCEPTION_HANDLER': 'apps.common.utils.responses.custom_exception_handler',
 }
 
 # OAuth2 / OIDC Provider 配置（django-oauth-toolkit）
