@@ -2,6 +2,7 @@
   <div class="draft-editor">
     <!-- 侧边栏 -->
     <aside class="draft-editor__sidebar">
+      <div class="draft-editor__nav-back" @click="router.back()">← 返回草稿箱</div>
       <div
         v-for="section in sections"
         :key="section.key"
@@ -11,24 +12,26 @@
       >
         {{ section.label }}
       </div>
-      <div class="draft-editor__nav-back" @click="router.back()">← 返回草稿箱</div>
     </aside>
 
-    <!-- 内容区 -->
-    <main ref="contentRef" class="draft-editor__content">
-      <BasicInfoSection :id="'basic'" />
-      <PricingSection :id="'pricing'" />
-      <ImagesSection :id="'images'" />
-      <DescriptionSection :id="'description'" />
-      <MoreAttributesSection :id="'more'" />
-    </main>
+    <!-- 右侧：内容区 + 底部操作栏 -->
+    <div class="draft-editor__right">
+      <!-- 内容区 -->
+      <main ref="contentRef" class="draft-editor__content">
+        <BasicInfoSection :id="'basic'" />
+        <PricingSection :id="'pricing'" />
+        <ImagesSection :id="'images'" />
+        <DescriptionSection :id="'description'" />
+        <MoreAttributesSection :id="'more'" />
+      </main>
 
-    <!-- 底部操作栏 -->
-    <footer class="draft-editor__footer">
-      <el-button size="default" @click="router.back()">取消</el-button>
-      <el-button size="default">保存</el-button>
-      <el-button type="primary" size="default">发布</el-button>
-    </footer>
+      <!-- 底部操作栏 -->
+      <footer class="draft-editor__footer">
+        <el-button size="default" @click="router.back()">取消</el-button>
+        <el-button size="default">保存</el-button>
+        <el-button type="primary" size="default">发布</el-button>
+      </footer>
+    </div>
   </div>
 </template>
 
@@ -124,15 +127,24 @@ onBeforeUnmount(() => observer?.disconnect());
   background: var(--app-bg);
 
   &__sidebar {
-    position: sticky;
-    top: 0;
     width: 200px;
-    height: 100%;
     padding: 24px 0;
     overflow-y: auto;
     background: var(--surface-hover);
     border-right: 1px solid var(--border-subtle);
     flex-shrink: 0;
+  }
+
+  &__nav-back {
+    padding: 16px 24px;
+    font-size: var(--font-size-sm);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-subtle);
+
+    &:hover {
+      color: var(--color-primary-600);
+    }
   }
 
   &__nav-item {
@@ -155,16 +167,11 @@ onBeforeUnmount(() => observer?.disconnect());
     }
   }
 
-  &__nav-back {
-    margin-top: auto;
-    padding: 16px 24px;
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-    cursor: pointer;
-
-    &:hover {
-      color: var(--color-primary-600);
-    }
+  &__right {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
   }
 
   &__content {
@@ -174,15 +181,13 @@ onBeforeUnmount(() => observer?.disconnect());
   }
 
   &__footer {
-    position: sticky;
-    bottom: 0;
-    z-index: 10;
     display: flex;
     gap: 12px;
     justify-content: flex-end;
     padding: 12px 24px;
     background: var(--surface-base);
     border-top: 1px solid var(--border-base);
+    flex-shrink: 0;
   }
 }
 </style>
