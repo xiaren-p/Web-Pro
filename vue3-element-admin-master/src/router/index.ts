@@ -88,6 +88,12 @@ export const constantRoutes: RouteRecordRaw[] = [
         component: () => import("@/views/tools/rule-strategy/index.vue"),
         meta: { title: "SP 广告规则策略", icon: "setting", hidden: true },
       },
+      {
+        path: "/sales/listing-management/draft-editor",
+        name: "DraftEditor",
+        component: () => import("@/views/sales/listing-management/draft-editor/index.vue"),
+        meta: { title: "添加草稿", hidden: true, keepAlive: false },
+      },
     ],
   },
 ];
