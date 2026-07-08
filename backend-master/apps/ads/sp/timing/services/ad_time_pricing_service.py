@@ -4,7 +4,6 @@
 """
 from __future__ import annotations
 
-import json as _json
 import logging
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -19,7 +18,7 @@ from apps.ads.models.lx_ads_profile import LxAdsProfile
 from apps.ads.sp.models.lx_sp_ad import LxSpAd
 from apps.ads.sp.models.lx_sp_campaign import LxSpCampaign
 from apps.ads.sp.timing.models.lx_time_pricing_strategy import LxTimePricingStrategy, StrategyStatus
-from apps.sales.listing.models.lx_product_info import LxProductInfo
+from apps.ads.sp.services.listing_fields_loader import load_asin_product_fields
 from apps.ads.sp.timing.models.ad_time_pricing_hit import AdTimePricingHit, ManualRulesStatus, TimePricingHitStatus
 from apps.ads.sp.timing.services.strategy_matcher import match_strategy_against_product
 from apps.ads.sp.timing.services.time_pricing_shared import (
@@ -30,43 +29,6 @@ from apps.ads.sp.timing.services.time_pricing_shared import (
 from apps.common.utils.timezone_utils import country_to_timezone, get_fixed_utc_offset
 
 logger = logging.getLogger(__name__)
-
-
-# ============================================================
-# 辅助函数
-# ============================================================
-
-def _parse_str_or_json_field(raw_val: Any) -> list[str]:
-    """解析字段值（JSON 数组字符串或纯文本），返回扁平化值列表。"""
-    if not raw_val:
-        return []
-    try:
-        parsed = _json.loads(raw_val)
-    except (_json.JSONDecodeError, TypeError):
-        val = str(raw_val).strip()
-        return [val] if val else []
-    if isinstance(parsed, list):
-        return [str(item).strip() for item in parsed if item and str(item).strip()]
-    val = str(raw_val).strip()
-    return [val] if val else []
-
-
-def _extract_principal_uids(principal_list: Any) -> list[int]:
-    """从 principal_list JSON 字段提取所有 uid。"""
-    if not principal_list:
-        return []
-    if isinstance(principal_list, str):
-        try:
-            principal_list = _json.loads(principal_list)
-        except (_json.JSONDecodeError, TypeError):
-            return []
-    if not isinstance(principal_list, list):
-        return []
-    return list({
-        item["uid"]
-        for item in principal_list
-        if isinstance(item, dict) and "uid" in item
-    })
 
 
 # ============================================================
@@ -274,17 +236,7 @@ def _load_ads_and_products(
     logger.info("[process_new_ads] 有广告的 campaign=%d，唯一 ASIN=%d",
                 len(campaign_to_ads), len(all_asins))
 
-    asin_to_fields: dict[str, dict[str, list[Any]]] = {}
-    if all_asins:
-        products = LxProductInfo.objects.filter(asin__in=list(all_asins)).only(
-            "asin", "assort", "label", "principal_list",
-        )
-        for p in products:
-            asin_to_fields[p.asin] = {
-                "assorts": _parse_str_or_json_field(p.assort),
-                "labels": _parse_str_or_json_field(p.label),
-                "principal_uids": _extract_principal_uids(p.principal_list),
-            }
+    asin_to_fields: dict[str, dict[str, list[Any]]] = load_asin_product_fields(all_asins)
     logger.info("[process_new_ads] 产品信息命中 ASIN=%d", len(asin_to_fields))
 
     return campaign_to_ads, asin_to_fields

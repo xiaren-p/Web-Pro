@@ -7,7 +7,8 @@ from rest_framework.permissions import IsAuthenticated
 from apps.ads.models.lx_ads_profile import LxAdsProfile
 from apps.ads.sp.timing.models.lx_time_pricing_strategy import LxTimePricingStrategy
 from apps.sales.models.lx_user import LxUser
-from apps.sales.listing.models.lx_product_info import LxProductInfo
+from apps.sales.listing.models.lx_listing_meta import LxListingMeta
+from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.ads.sp.timing.serializers.ads_time_pricing_strategy_serializer import LxTimePricingStrategySerializer
 from apps.common.utils.pagination import paginate_queryset
 from apps.common.utils.responses import drf_error, drf_ok
@@ -91,30 +92,27 @@ class TimePricingStrategyViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="assorts")
     def assorts(self, request):
-        """获取归类选项（LxProductInfo.assort 去重，扁平化 JSON 数组）。"""
+        """获取归类选项（LxListingMeta.assort 去重）。"""
         values = (
-            LxProductInfo.objects
-            .exclude(assort__isnull=True)
+            LxListingMeta.objects
             .exclude(assort="")
             .values_list("assort", flat=True)
             .distinct()
         )
-        flat = _flatten_json_values(values)
-        data = [{"value": v, "label": v} for v in sorted(flat)]
+        data = [{"value": v, "label": v} for v in sorted(values) if v]
         return drf_ok(data)
 
     @action(detail=False, methods=["get"], url_path="labels")
     def labels(self, request):
-        """获取标签选项（LxProductInfo.label 去重，扁平化 JSON 数组）。"""
+        """获取标签选项（LxListingTag.tag_name 去重）。"""
         values = (
-            LxProductInfo.objects
-            .exclude(label__isnull=True)
-            .exclude(label="")
-            .values_list("label", flat=True)
+            LxListingTag.objects
+            .filter(status="normal")
+            .exclude(tag_name="")
+            .values_list("tag_name", flat=True)
             .distinct()
         )
-        flat = _flatten_json_values(values)
-        data = [{"value": v, "label": v} for v in sorted(flat)]
+        data = [{"value": v, "label": v} for v in sorted(values) if v]
         return drf_ok(data)
 
     # 主题：校验按 ID 提取

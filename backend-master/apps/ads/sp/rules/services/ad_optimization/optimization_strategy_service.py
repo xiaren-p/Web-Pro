@@ -24,7 +24,7 @@ from apps.ads.sp.models.lx_sp_campaign import LxSpCampaign
 from apps.ads.sp.models.lx_sp_target import LxSpTarget, SpTargetExpressionType
 from apps.ads.sp.rules.models.lx_ad_rule import AdRuleStatus, LxAdRule
 from apps.ads.sp.rules.models.lx_ad_rule_group import LxAdRuleGroup
-from apps.sales.listing.models.lx_product_info import LxProductInfo
+from apps.ads.sp.services.listing_fields_loader import load_asin_product_fields
 from apps.ads.sp.rules.models.sp_ad_optimization_strategy import (
     ManualRulesStatus,
     SpAdOptimizationStrategy,
@@ -185,17 +185,7 @@ def _load_campaigns() -> tuple[
                 len(campaign_to_asins), len(all_asins))
 
     # 3. 批量加载产品字段
-    asin_to_fields: dict[str, dict[str, list[Any]]] = {}
-    if all_asins:
-        products = LxProductInfo.objects.filter(asin__in=list(all_asins)).only(
-            "asin", "assort", "label", "principal_list",
-        )
-        for p in products:
-            asin_to_fields[p.asin] = {
-                "assorts": _parse_str_or_json_field(p.assort),
-                "labels": _parse_str_or_json_field(p.label),
-                "principal_uids": _extract_principal_uids(p.principal_list),
-            }
+    asin_to_fields = load_asin_product_fields(all_asins)
     logger.info("[process_optimization_strategies] 产品画像 ASIN=%d", len(asin_to_fields))
 
     # 4. 批量加载自动定位组（仅 auto campaign）
