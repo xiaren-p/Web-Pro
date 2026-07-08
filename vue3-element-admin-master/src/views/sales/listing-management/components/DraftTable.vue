@@ -244,9 +244,10 @@ onBeforeUnmount(() => {
   display: -webkit-box;
   overflow: hidden;
   text-overflow: ellipsis;
-  -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   line-height: 1.4;
+  -webkit-box-orient: vertical;
 }
 
 /* 国家小号字体 */
