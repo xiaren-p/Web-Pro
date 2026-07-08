@@ -1,8 +1,9 @@
 <template>
-  <div class="draft-table__wrapper">
+  <div ref="wrapperRef" class="draft-table__wrapper">
     <el-table
       v-loading="false"
       :data="tableData"
+      :height="tableHeight"
       class="draft-table"
       @selection-change="handleSelectionChange"
     >
@@ -121,7 +122,7 @@
  * 草稿箱数据表格：14 列 + 复选框，含图片占位、MSKU 加粗、多用省略、库存红色警戒、
  * 销售类型标签、必填项图标、操作按钮等自定义列渲染。当前无数据，展示空状态。
  */
-import { ref } from "vue";
+import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { Edit, View, Delete } from "@element-plus/icons-vue";
 
 defineOptions({ name: "DraftTable" });
@@ -150,49 +151,47 @@ const selectedRows = ref<DraftRow[]>([]);
 function handleSelectionChange(selection: DraftRow[]) {
   selectedRows.value = selection;
 }
+
+/** 动态测量 wrapper 高度，传给 el-table height prop */
+const wrapperRef = ref<HTMLElement>();
+const tableHeight = ref<number | undefined>(undefined);
+let resizeObserver: ResizeObserver | null = null;
+
+function measureHeight() {
+  if (wrapperRef.value) {
+    tableHeight.value = wrapperRef.value.clientHeight;
+  }
+}
+
+onMounted(() => {
+  nextTick(() => {
+    measureHeight();
+    if (wrapperRef.value) {
+      resizeObserver = new ResizeObserver(measureHeight);
+      resizeObserver.observe(wrapperRef.value);
+    }
+  });
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
 </script>
 
 <style scoped lang="scss">
 .draft-table__wrapper {
-  display: flex;
   flex: 1;
-  flex-direction: column;
   min-height: 0;
   overflow: hidden;
-
-  :deep(.el-table) {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-  }
 
   :deep(.el-table::before),
   :deep(.el-table--border::after) {
     display: none;
   }
 
-  :deep(.el-table__inner-wrapper) {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-  }
-
-  :deep(.el-table__header-wrapper) {
-    flex-shrink: 0;
-  }
-
-  :deep(.el-table__body-wrapper) {
-    flex: 1 !important;
-    height: unset !important;
-  }
-
-  :deep(.el-scrollbar) {
-    height: 100%;
-  }
-
   :deep(.el-table__empty-block) {
-    height: 100% !important;
-    min-height: unset !important;
+    align-items: center;
   }
 }
 
