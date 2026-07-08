@@ -1,3 +1,102 @@
+<template>
+  <div class="fs-select" :style="containerStyle">
+    <el-select
+      v-model="internalValue"
+      :multiple="multiple"
+      :filterable="false"
+      :remote="remote"
+      :remote-method="onRemote"
+      :reserve-keyword="reserveKeyword"
+      :placeholder="placeholder"
+      :clearable="clearable"
+      :size="size"
+      collapse-tags
+      style="width: 100%"
+      :remote-show-suffix="true"
+      popper-class="fs-select-popper"
+      @change="onChange"
+      @visible-change="onVisibleChange"
+    >
+      <template v-if="remote || filterable" #header>
+        <div class="fs-select-popper__header" @click.stop>
+          <el-input
+            v-model="searchKeyword"
+            placeholder="输入关键字进行搜索..."
+            size="small"
+            clearable
+            @input="handleHeaderSearch"
+          />
+        </div>
+        <div class="fs-select-popper__count">
+          <template v-if="displayOptions.length < filteredOptions.length">
+            显示 {{ displayOptions.length }} / 共 {{ filteredOptions.length }} 项
+          </template>
+          <template v-else>共 {{ filteredOptions.length }} 项</template>
+          <template v-if="multiple && Array.isArray(internalValue)">
+            ，已选 {{ (internalValue as any[]).filter((v) => v !== ALL_OPTION).length }} 项
+          </template>
+        </div>
+      </template>
+
+      <el-option
+        v-if="multiple && showSelectAll"
+        :key="ALL_OPTION"
+        :label="selectAllLabel"
+        :value="ALL_OPTION"
+        class="fs-select-popper__all-option"
+      >
+        <el-checkbox
+          :model-value="isAllSelected"
+          :indeterminate="isIndeterminate"
+          @click.stop.prevent="toggleAll"
+        />
+        <span class="fs-select-popper__label">{{ selectAllLabel }}</span>
+      </el-option>
+
+      <el-option
+        v-for="option in displayOptions"
+        :key="option.value"
+        :label="option.label || option.title || option.value"
+        :value="option.value"
+        :class="{ 'fs-select-popper__check-option': multiple }"
+      >
+        <template #default>
+          <el-checkbox
+            v-if="multiple"
+            :model-value="isChecked(option.value)"
+            class="fs-select-popper__check"
+          />
+          <img v-if="option.img" :src="option.img" class="fs-option-img" />
+          <span class="fs-option-content">
+            <el-tooltip
+              :content="option.title || option.label"
+              :show-after="500"
+              placement="top-start"
+            >
+              <span class="fs-option-title">
+                {{ option.title || option.label }}
+              </span>
+            </el-tooltip>
+            <small v-if="option.code" class="sku-code">
+              {{ option.code }}
+              <span v-if="option.value && option.value !== option.code">{{ option.value }}</span>
+            </small>
+          </span>
+          <el-button
+            v-if="showOnly"
+            class="only-btn"
+            type="text"
+            size="small"
+            @click.stop.prevent="selectOnly(option.value)"
+          >
+            仅筛选此项
+          </el-button>
+        </template>
+      </el-option>
+    </el-select>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from "vue";
 import type { PropType } from "vue";
@@ -59,7 +158,7 @@ function handleHeaderSearch() {
 
 function onVisibleChange(visible: boolean) {
   if (!visible) {
-    visibleEnd.value = VISIBLE_CHUNK;  // 关闭时重置
+    visibleEnd.value = VISIBLE_CHUNK; // 关闭时重置
     if (props.remote) {
       searchKeyword.value = "";
       onRemote("");
@@ -67,11 +166,11 @@ function onVisibleChange(visible: boolean) {
       searchKeyword.value = "";
     }
   } else {
-    visibleEnd.value = VISIBLE_CHUNK;  // 打开时重置
+    visibleEnd.value = VISIBLE_CHUNK; // 打开时重置
     // 给 popover 的滚动容器绑事件
     nextTick(() => {
-      const popover = document.querySelector('.fs-select-popper .el-select-dropdown__wrap');
-      if (popover) popover.addEventListener('scroll', onPopoverScroll, { passive: true });
+      const popover = document.querySelector(".fs-select-popper .el-select-dropdown__wrap");
+      if (popover) popover.addEventListener("scroll", onPopoverScroll, { passive: true });
     });
   }
 }
@@ -199,107 +298,6 @@ const containerStyle = computed((): Record<string, string> => {
   return { minWidth: `${Math.min(total, 260)}px`, maxWidth: "260px" };
 });
 </script>
-
-<template>
-  <div class="fs-select" :style="containerStyle">
-    <el-select
-      v-model="internalValue"
-      :multiple="multiple"
-      :filterable="false"
-      :remote="remote"
-      :remote-method="onRemote"
-      :reserve-keyword="reserveKeyword"
-      :placeholder="placeholder"
-      :clearable="clearable"
-      :size="size"
-      collapse-tags
-      style="width: 100%"
-      :remote-show-suffix="true"
-      popper-class="fs-select-popper"
-      @change="onChange"
-      @visible-change="onVisibleChange"
-    >
-      <template v-if="remote || filterable" #header>
-        <div class="fs-select-popper__header" @click.stop>
-          <el-input
-            v-model="searchKeyword"
-            placeholder="输入关键字进行搜索..."
-            size="small"
-            clearable
-            @input="handleHeaderSearch"
-          />
-        </div>
-        <div class="fs-select-popper__count">
-          <template v-if="displayOptions.length < filteredOptions.length">
-            显示 {{ displayOptions.length }} / 共 {{ filteredOptions.length }} 项
-          </template>
-          <template v-else>
-            共 {{ filteredOptions.length }} 项
-          </template>
-          <template v-if="multiple && Array.isArray(internalValue)">
-            ，已选 {{ (internalValue as any[]).filter(v => v !== ALL_OPTION).length }} 项
-          </template>
-        </div>
-      </template>
-
-      <el-option
-        v-if="multiple && showSelectAll"
-        :key="ALL_OPTION"
-        :label="selectAllLabel"
-        :value="ALL_OPTION"
-        class="fs-select-popper__all-option"
-      >
-        <el-checkbox
-          :model-value="isAllSelected"
-          :indeterminate="isIndeterminate"
-          @click.stop.prevent="toggleAll"
-        />
-        <span class="fs-select-popper__label">{{ selectAllLabel }}</span>
-      </el-option>
-
-      <el-option
-        v-for="option in displayOptions"
-        :key="option.value"
-        :label="option.label || option.title || option.value"
-        :value="option.value"
-        :class="{ 'fs-select-popper__check-option': multiple }"
-      >
-        <template #default>
-          <el-checkbox
-            v-if="multiple"
-            :model-value="isChecked(option.value)"
-            class="fs-select-popper__check"
-          />
-          <img v-if="option.img" :src="option.img" class="fs-option-img" />
-          <span class="fs-option-content">
-            <el-tooltip
-              :content="option.title || option.label"
-              :show-after="500"
-              placement="top-start"
-            >
-              <span class="fs-option-title">
-                {{ option.title || option.label }}
-              </span>
-            </el-tooltip>
-            <small v-if="option.code" class="sku-code">
-              {{ option.code }}
-              <span v-if="option.value && option.value !== option.code">{{ option.value }}</span>
-            </small>
-          </span>
-          <el-button
-            v-if="showOnly"
-            class="only-btn"
-            type="text"
-            size="small"
-            @click.stop.prevent="selectOnly(option.value)"
-          >
-            仅筛选此项
-          </el-button>
-        </template>
-      </el-option>
-    </el-select>
-  </div>
-</template>
 
 <style scoped>
 /**
