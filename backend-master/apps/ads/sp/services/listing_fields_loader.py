@@ -6,8 +6,6 @@ from __future__ import annotations
 from typing import Any
 from collections import defaultdict
 
-from django.db.models import Q
-
 from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_meta import LxListingMeta
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
@@ -51,6 +49,8 @@ def load_asin_product_fields(
     asin_to_labels: dict[str, set[str]] = defaultdict(set)
     asin_to_uids: dict[str, set[int]] = defaultdict(set)
     tag_ids_to_resolve: set[str] = set()
+    # 记录哪些 ASIN 有 tagName 为空的标签（避免二次全表扫描）
+    asin_tag_ids: dict[str, set[str]] = defaultdict(set)
 
     listings = (
         LxListingData.objects
@@ -69,6 +69,7 @@ def load_asin_product_fields(
                     tid = str(tag.get("globalTagId") or tag.get("id") or "")
                     if tid:
                         tag_ids_to_resolve.add(tid)
+                        asin_tag_ids[asin].add(tid)
         # 负责人
         for p in (row.principal_info or []):
             if isinstance(p, dict):
@@ -77,22 +78,19 @@ def load_asin_product_fields(
                     asin_to_uids[asin].add(int(uid))
 
     # ── 标签 ID → name 批量解析 ──
-    tag_name_map: dict[str, str] = {}
     if tag_ids_to_resolve:
+        tag_name_map: dict[str, str] = {}
         for t in LxListingTag.objects.filter(
             global_tag_id__in=list(tag_ids_to_resolve),
             status="normal",
         ).values_list("global_tag_id", "tag_name").iterator(chunk_size=2000):
             tag_name_map[str(t[0])] = t[1] or ""
-        # 回填：把解析到的 tag_name 加到对应 ASIN
-        for row in listings.iterator(chunk_size=2000):
-            asin = row.asin
-            for tag in (row.global_tags or []):
-                if isinstance(tag, dict) and not tag.get("tagName"):
-                    tid = str(tag.get("globalTagId") or tag.get("id") or "")
-                    name = tag_name_map.get(tid, "")
-                    if name:
-                        asin_to_labels[asin].add(name)
+        # 回填：只需处理有空白标签的 ASIN
+        for asin, tids in asin_tag_ids.items():
+            for tid in tids:
+                name = tag_name_map.get(tid, "")
+                if name:
+                    asin_to_labels[asin].add(name)
 
     # ── 组装结果 ──
     all_asins = set(asin_to_assorts) | set(asin_to_labels) | set(asin_to_uids)
