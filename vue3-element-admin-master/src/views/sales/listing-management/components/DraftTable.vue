@@ -1,118 +1,119 @@
 <template>
-  <el-table
-    v-loading="false"
-    :data="tableData"
-    class="draft-table"
-    max-height="100%"
-    @selection-change="handleSelectionChange"
-  >
-    <!-- 空状态 -->
-    <template #empty>
-      <div class="draft-table__empty">
-        <p class="draft-table__empty-text">暂无数据</p>
-      </div>
-    </template>
-
-    <!-- 复选框列 -->
-    <el-table-column type="selection" width="48" align="center" />
-
-    <!-- 图片 -->
-    <el-table-column prop="image" label="图片" width="60" align="center">
-      <template #default>
-        <div class="cell-thumb">
-          <div class="cell-thumb__placeholder" />
+  <div class="draft-table__wrapper">
+    <el-table
+      v-loading="false"
+      :data="tableData"
+      class="draft-table"
+      @selection-change="handleSelectionChange"
+    >
+      <!-- 空状态 -->
+      <template #empty>
+        <div class="draft-table__empty">
+          <p class="draft-table__empty-text">暂无数据</p>
         </div>
       </template>
-    </el-table-column>
 
-    <!-- 草稿版本 -->
-    <el-table-column prop="draftVersion" label="草稿版本" width="100" />
+      <!-- 复选框列 -->
+      <el-table-column type="selection" width="48" align="center" />
 
-    <!-- MSKU（加粗） -->
-    <el-table-column prop="msku" label="MSKU" width="120">
-      <template #default>
-        <span class="cell-msku">-</span>
-      </template>
-    </el-table-column>
+      <!-- 图片 -->
+      <el-table-column prop="image" label="图片" width="60" align="center">
+        <template #default>
+          <div class="cell-thumb">
+            <div class="cell-thumb__placeholder" />
+          </div>
+        </template>
+      </el-table-column>
 
-    <!-- 变体属性（双行省略） -->
-    <el-table-column prop="variantAttr" label="变体属性" width="150">
-      <template #default>
-        <div class="cell-line-clamp">-</div>
-      </template>
-    </el-table-column>
+      <!-- 草稿版本 -->
+      <el-table-column prop="draftVersion" label="草稿版本" width="100" />
 
-    <!-- 标题（双行省略） -->
-    <el-table-column prop="title" label="标题" width="200">
-      <template #default>
-        <div class="cell-line-clamp">-</div>
-      </template>
-    </el-table-column>
+      <!-- MSKU（加粗） -->
+      <el-table-column prop="msku" label="MSKU" width="120">
+        <template #default>
+          <span class="cell-msku">-</span>
+        </template>
+      </el-table-column>
 
-    <!-- 店铺 -->
-    <el-table-column prop="shop" label="店铺" width="120" />
+      <!-- 变体属性（双行省略） -->
+      <el-table-column prop="variantAttr" label="变体属性" width="150">
+        <template #default>
+          <div class="cell-line-clamp">-</div>
+        </template>
+      </el-table-column>
 
-    <!-- 国家（小号字体，缩写） -->
-    <el-table-column prop="country" label="国家" width="80" align="center">
-      <template #default>
-        <span class="cell-country">-</span>
-      </template>
-    </el-table-column>
+      <!-- 标题（双行省略） -->
+      <el-table-column prop="title" label="标题" width="200">
+        <template #default>
+          <div class="cell-line-clamp">-</div>
+        </template>
+      </el-table-column>
 
-    <!-- 配送方式 -->
-    <el-table-column prop="deliveryMethod" label="配送方式" width="100" />
+      <!-- 店铺 -->
+      <el-table-column prop="shop" label="店铺" width="120" />
 
-    <!-- 价格（¥前缀，右对齐） -->
-    <el-table-column prop="price" label="价格" width="100" align="right">
-      <template #default>
-        <span class="cell-price">-</span>
-      </template>
-    </el-table-column>
+      <!-- 国家（小号字体，缩写） -->
+      <el-table-column prop="country" label="国家" width="80" align="center">
+        <template #default>
+          <span class="cell-country">-</span>
+        </template>
+      </el-table-column>
 
-    <!-- 库存（<10 红色） -->
-    <el-table-column prop="stock" label="库存" width="80" align="center">
-      <template #default>
-        <span>-</span>
-      </template>
-    </el-table-column>
+      <!-- 配送方式 -->
+      <el-table-column prop="deliveryMethod" label="配送方式" width="100" />
 
-    <!-- 销售类型（el-tag） -->
-    <el-table-column prop="saleType" label="销售类型" width="100">
-      <template #default>
-        <span>-</span>
-      </template>
-    </el-table-column>
+      <!-- 价格（¥前缀，右对齐） -->
+      <el-table-column prop="price" label="价格" width="100" align="right">
+        <template #default>
+          <span class="cell-price">-</span>
+        </template>
+      </el-table-column>
 
-    <!-- 必填项完整（✅/❌ 图标） -->
-    <el-table-column prop="requiredComplete" label="必填项完整" width="120" align="center">
-      <template #default>
-        <span>-</span>
-      </template>
-    </el-table-column>
+      <!-- 库存（<10 红色） -->
+      <el-table-column prop="stock" label="库存" width="80" align="center">
+        <template #default>
+          <span>-</span>
+        </template>
+      </el-table-column>
 
-    <!-- 操作人 -->
-    <el-table-column prop="operator" label="操作人" width="100" />
+      <!-- 销售类型（el-tag） -->
+      <el-table-column prop="saleType" label="销售类型" width="100">
+        <template #default>
+          <span>-</span>
+        </template>
+      </el-table-column>
 
-    <!-- 操作时间 -->
-    <el-table-column prop="operateTime" label="操作时间" width="160" />
+      <!-- 必填项完整（✅/❌ 图标） -->
+      <el-table-column prop="requiredComplete" label="必填项完整" width="120" align="center">
+        <template #default>
+          <span>-</span>
+        </template>
+      </el-table-column>
 
-    <!-- 操作（三图标 + tooltip） -->
-    <el-table-column prop="actions" label="操作" width="80" align="center" fixed="right">
-      <template #default>
-        <div class="cell-actions">
-          <el-tooltip content="编辑" placement="top">
-            <el-button link type="primary" size="small" :icon="Edit" disabled />
-          </el-tooltip>
-          <el-tooltip content="预览" placement="top">
-            <el-button link type="primary" size="small" :icon="View" disabled />
-          </el-tooltip>
-          <el-tooltip content="删除" placement="top">
-            <el-button link type="danger" size="small" :icon="Delete" disabled />
-          </el-tooltip>
-        </div>
-      </template>
-    </el-table-column>
-  </el-table>
+      <!-- 操作人 -->
+      <el-table-column prop="operator" label="操作人" width="100" />
+
+      <!-- 操作时间 -->
+      <el-table-column prop="operateTime" label="操作时间" width="160" />
+
+      <!-- 操作（三图标 + tooltip） -->
+      <el-table-column prop="actions" label="操作" width="80" align="center" fixed="right">
+        <template #default>
+          <div class="cell-actions">
+            <el-tooltip content="编辑" placement="top">
+              <el-button link type="primary" size="small" :icon="Edit" disabled />
+            </el-tooltip>
+            <el-tooltip content="预览" placement="top">
+              <el-button link type="primary" size="small" :icon="View" disabled />
+            </el-tooltip>
+            <el-tooltip content="删除" placement="top">
+              <el-button link type="danger" size="small" :icon="Delete" disabled />
+            </el-tooltip>
+          </div>
+        </template>
+      </el-table-column>
+    </el-table>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -152,8 +153,17 @@ function handleSelectionChange(selection: DraftRow[]) {
 </script>
 
 <style scoped lang="scss">
-.draft-table {
+.draft-table__wrapper {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+
   :deep(.el-table) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
     border: none;
   }
 
@@ -162,6 +172,19 @@ function handleSelectionChange(selection: DraftRow[]) {
     display: none;
   }
 
+  :deep(.el-table__inner-wrapper) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  :deep(.el-table__body-wrapper) {
+    flex: 1;
+    overflow-y: auto !important;
+  }
+}
+
+.draft-table {
   /* 表头 */
   :deep(.el-table__header-wrapper th.el-table__cell),
   :deep(.el-table__header th) {
@@ -215,7 +238,6 @@ function handleSelectionChange(selection: DraftRow[]) {
   gap: var(--spacing-4);
   align-items: center;
   justify-content: center;
-  min-height: 320px;
 
   &-text {
     font-size: var(--font-size-base);
