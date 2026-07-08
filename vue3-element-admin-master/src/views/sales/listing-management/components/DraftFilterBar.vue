@@ -78,7 +78,7 @@
     <el-form-item label="MSKU" prop="msku">
       <el-input v-model="filterParams.msku" placeholder="请输入MSKU" class="filter-search-input">
         <template #append>
-          <el-button type="primary" :icon="Search" class="filter-search-btn">搜索</el-button>
+          <el-button type="primary" :icon="Search">搜索</el-button>
         </template>
       </el-input>
     </el-form-item>
@@ -125,20 +125,15 @@ function disabledDate(time: Date) {
   align-items: center;
 
   :deep(.el-form-item) {
-    margin-right: var(--spacing-3);
-    margin-bottom: 0;
-
-    &:last-child {
-      margin-right: 0;
-    }
+    margin-right: 16px;
+    margin-bottom: 12px;
   }
 
   :deep(.el-form-item__label) {
-    height: 32px;
-    padding-right: var(--spacing-1);
     font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
     line-height: 32px;
-    color: var(--text-primary);
+    color: var(--text-secondary);
   }
 }
 
@@ -157,11 +152,6 @@ function disabledDate(time: Date) {
 
 .filter-search-input {
   width: 240px;
-}
-
-.filter-search-btn {
-  height: 32px;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
 .filter-label-with-tip {
