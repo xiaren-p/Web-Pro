@@ -402,7 +402,7 @@ def _is_in_any_segment_now(hit: AdTimePricingHit, strategies: list[LxTimePricing
             seg_start_utc = seg_start_naive.replace(tzinfo=site_tz).astimezone(UTC_TZ)
             seg_end_utc = seg_end_naive.replace(tzinfo=site_tz).astimezone(UTC_TZ)
 
-            if seg_start_utc <= now_utc <= seg_end_utc:
+            if seg_start_utc <= now_utc < seg_end_utc:
                 return True
         except (ValueError, TypeError):
             continue

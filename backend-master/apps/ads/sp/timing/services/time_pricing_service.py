@@ -113,7 +113,7 @@ def _in_time_range(hit: AdTimePricingHit, strategy: LxTimePricingStrategy) -> bo
             seg_start_utc = seg_start_naive.replace(tzinfo=site_tz).astimezone(UTC_TZ)
             seg_end_utc = seg_end_naive.replace(tzinfo=site_tz).astimezone(UTC_TZ)
 
-            if seg_start_utc <= now_utc <= seg_end_utc:
+            if seg_start_utc <= now_utc < seg_end_utc:
                 return True
         except (ValueError, TypeError):
             continue
