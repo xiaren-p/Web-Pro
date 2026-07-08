@@ -26,10 +26,10 @@ from apps.ads.sp.rules.models.lx_ad_rule_group import LxAdRuleGroup
 
 # 前端 targetGroup 值 → LxSpTarget.expression.type 数据库值
 _EXPR_TYPE_AUTO_MAP = {
-    "close_match": "closeMatch",
-    "loose_match": "looseMatch",
-    "substitutes": "substitutes",
-    "complements": "complements",
+    "close_match": "queryHighRelMatches",
+    "loose_match": "queryBroadRelMatches",
+    "substitutes": "asinSubstituteRelated",
+    "complements": "asinAccessoryRelated",
 }
 
 

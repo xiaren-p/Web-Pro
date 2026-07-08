@@ -59,10 +59,10 @@ EXPRESSION_TYPE_AUTO = "auto"
 COMPARISON_TARGET_TARGETING = "targeting"
 
 _EXPR_TYPE_LABEL: dict[str, str] = {
-    "closeMatch": "同类商品",
-    "looseMatch": "紧密匹配",
-    "substitutes": "关联商品",
-    "complements": "宽泛匹配",
+    "queryHighRelMatches": "同类商品",
+    "queryBroadRelMatches": "紧密匹配",
+    "asinSubstituteRelated": "关联商品",
+    "asinAccessoryRelated": "宽泛匹配",
 }
 
 

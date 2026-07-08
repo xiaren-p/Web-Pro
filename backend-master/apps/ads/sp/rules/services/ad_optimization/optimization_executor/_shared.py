@@ -43,10 +43,10 @@ BATCH_SIZE = 500
 
 # 前端 targetGroup 值 → LxSpTarget.expression 中实际存储的 type 值
 EXPR_TYPE_AUTO_MAP: dict[str, str] = {
-    "close_match": "closeMatch",
-    "loose_match": "looseMatch",
-    "substitutes": "substitutes",
-    "complements": "complements",
+    "close_match": "queryHighRelMatches",
+    "loose_match": "queryBroadRelMatches",
+    "substitutes": "asinSubstituteRelated",
+    "complements": "asinAccessoryRelated",
 }
 
 

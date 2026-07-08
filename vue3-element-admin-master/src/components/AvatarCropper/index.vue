@@ -13,10 +13,10 @@
     <template #footer>
       <div class="cropper-footer">
         <div class="zoom-actions">
-          <el-button @click="handleZoomIn" :icon="ZoomIn" circle size="small" />
-          <el-button @click="handleZoomOut" :icon="ZoomOut" circle size="small" />
-          <el-button @click="handleRotate" :icon="RefreshRight" circle size="small" />
-          <el-button @click="handleRotateBack" :icon="RefreshLeft" circle size="small" />
+          <el-button :icon="ZoomIn" circle size="small" @click="handleZoomIn" />
+          <el-button :icon="ZoomOut" circle size="small" @click="handleZoomOut" />
+          <el-button :icon="RefreshRight" circle size="small" @click="handleRotate" />
+          <el-button :icon="RefreshLeft" circle size="small" @click="handleRotateBack" />
         </div>
         <div class="confirm-actions">
           <el-button @click="handleCancel">取消</el-button>
