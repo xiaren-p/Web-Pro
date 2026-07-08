@@ -1,19 +1,18 @@
 <template>
   <div class="drafts-page">
-    <DraftFilterBar />
-    <DraftActionBar />
-    <div class="drafts-page__table-block content-block content-block--flush">
+    <section class="drafts-page__filters content-block">
+      <DraftFilterBar />
+    </section>
+
+    <section class="drafts-page__table content-block content-block--flush">
+      <DraftActionBar />
       <DraftTable />
       <DraftPagination />
-    </div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * 草稿箱页面：组合筛选区、操作栏、数据表格、分页器四个子组件。
- * 当前为纯 UI 占位，所有数据为空，由各子组件管理自身状态。
- */
 import DraftFilterBar from "./components/DraftFilterBar.vue";
 import DraftActionBar from "./components/DraftActionBar.vue";
 import DraftTable from "./components/DraftTable.vue";
@@ -28,13 +27,17 @@ defineOptions({ name: "ListingDraftsPage" });
   flex: 1;
   flex-direction: column;
   min-height: 0;
+  padding: var(--spacing-6);
 
-  &__table-block {
+  &__filters {
+    padding-bottom: 12px;
+  }
+
+  &__table {
     display: flex;
     flex: 1;
     flex-direction: column;
-    min-height: 0;
-    overflow: hidden;
+    min-height: 420px;
   }
 }
 </style>
