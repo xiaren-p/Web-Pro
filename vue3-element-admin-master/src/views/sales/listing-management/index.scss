@@ -52,6 +52,10 @@
     border-radius: 0 var(--radius-md) var(--radius-md) 0;
   }
 
+  :deep(.el-input-group .el-input__wrapper) {
+    border-radius: var(--radius-md) 0 0 var(--radius-md);
+  }
+
   /* ── 空状态垂直居中 ── */
   :deep(.el-table__empty-block) {
     align-items: center;
