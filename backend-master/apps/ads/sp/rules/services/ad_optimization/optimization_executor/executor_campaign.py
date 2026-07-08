@@ -602,6 +602,8 @@ def _execute_targeting_bid_item(
             if cs_days != max_days:
                 cache_key = (cs_days, "keyword" if etype == "keyword" else "target")
                 filtered = _cs_metrics_cache.get(cache_key, {}).get(entity_id)
+                if filtered is None:
+                    filtered = _build_metrics_dict(0, 0, 0, 0, 0, 0)
             else:
                 filtered = metrics
 
