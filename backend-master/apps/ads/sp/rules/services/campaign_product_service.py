@@ -5,16 +5,15 @@
 
 查询链路：
   1. campaign_id + profile_id → LxSpAd → ASIN 列表
-  2. ASIN → LxProductInfo → assort / label / principal_list(uid)
+  2. ASIN → LxListingData + LxListingMeta + LxListingTag → 分类/标签/负责人
   3. 扁平化去重 → 统一返回
 """
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from apps.ads.sp.models.lx_sp_ad import LxSpAd
-from apps.sales.listing.models.lx_product_info import LxProductInfo
+from apps.ads.sp.services.listing_fields_loader import load_asin_product_fields
 
 
 # ============================================================
@@ -44,44 +43,6 @@ def get_asins_by_campaign(campaign_id: int, profile_id: int) -> list[str]:
 # 步骤 2：ASIN → 产品信息（assort / label / principal_uids）
 # ============================================================
 
-def _parse_json_field(raw_val: str, target_set: set[str]) -> None:
-    """解析字段值（可能是 JSON 数组字符串或纯文本），提取独立值加入集合。"""
-    if not raw_val:
-        return
-    try:
-        parsed = json.loads(raw_val)
-    except (json.JSONDecodeError, TypeError):
-        target_set.add(str(raw_val).strip())
-        return
-    if isinstance(parsed, list):
-        for item in parsed:
-            if item and str(item).strip():
-                target_set.add(str(item).strip())
-    else:
-        target_set.add(str(raw_val).strip())
-
-
-def _extract_principal_uids(principal_list: Any) -> list[int]:
-    """从 principal_list 字段中提取所有 uid。
-
-    principal_list 格式：[{"uid": 10390386, "realname": "陈慧瑩"}, ...]
-    兼容 JSON 字符串和已解析的 Python list。
-    """
-    if not principal_list:
-        return []
-    if isinstance(principal_list, str):
-        try:
-            principal_list = json.loads(principal_list)
-        except (json.JSONDecodeError, TypeError):
-            return []
-    if not isinstance(principal_list, list):
-        return []
-    return [
-        item["uid"] for item in principal_list
-        if isinstance(item, dict) and "uid" in item
-    ]
-
-
 def get_product_fields_by_asins(asins: list[str]) -> dict[str, list[str | int]]:
     """根据 ASIN 列表获取扁平化去重后的产品字段。
 
@@ -98,21 +59,15 @@ def get_product_fields_by_asins(asins: list[str]) -> dict[str, list[str | int]]:
     if not asins:
         return {"assorts": [], "labels": [], "principal_uids": []}
 
-    products = LxProductInfo.objects.filter(asin__in=asins)
-    if not products.exists():
-        return {"assorts": [], "labels": [], "principal_uids": []}
-
+    asin_fields = load_asin_product_fields(set(asins))
     assorts: set[str] = set()
     labels: set[str] = set()
     principal_uids: set[int] = set()
 
-    for p in products:
-        for field_name, target in [("assort", assorts), ("label", labels)]:
-            val = getattr(p, field_name, "")
-            if val:
-                _parse_json_field(val, target)
-        for uid in _extract_principal_uids(p.principal_list):
-            principal_uids.add(uid)
+    for fields in asin_fields.values():
+        assorts.update(fields.get("assorts", []))
+        labels.update(fields.get("labels", []))
+        principal_uids.update(fields.get("principal_uids", []))
 
     return {
         "assorts": sorted(assorts),

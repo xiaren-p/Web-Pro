@@ -33,7 +33,6 @@ from apps.sales.models.lx_exchange_rate import LxExchangeRate
 from apps.sales.models.lx_shops import LxShops
 from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
-from apps.sales.listing.models.lx_product_info import LxProductInfo
 from apps.ads.sp.models.lx_sp_ad import LxSpAd
 from apps.ads.sp.services.ads_metrics_service import (
     _build_summary_row,

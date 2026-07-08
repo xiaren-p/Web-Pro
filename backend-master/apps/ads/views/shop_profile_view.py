@@ -12,7 +12,6 @@ from apps.ads.models.lx_ads_profile import LxAdsProfile
 from apps.ads.sp.models.lx_sp_campaign import LxSpCampaign
 from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
-from apps.sales.listing.models.lx_product_info import LxProductInfo
 from apps.sales.models.lx_shops import LxShops
 from apps.ads.utils.ad_status import _LABEL_MAP as SERVICE_STATUS_LABEL
 from apps.common.utils.responses import drf_ok

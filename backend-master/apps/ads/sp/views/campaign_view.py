@@ -47,7 +47,7 @@ from apps.ads.sp.rules.models.sp_campaign_adjustment import (
 
 
 def _flat_parse_label(raw_label: str) -> list[str]:
-    """[已废弃] 解析 LxProductInfo.label 字段。保留以兼容潜在外部引用。
+    """[已废弃] 解析 LxListingData.global_tags 字段。保留以兼容潜在外部引用。
 
     新代码已切换到 LxListingData.global_tags（JSON 数组），不再使用此函数。
 

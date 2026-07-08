@@ -4,7 +4,6 @@ from apps.sales.listing.models.lx_listing_data import LxListingData, ListingStat
 from apps.sales.listing.models.lx_listing_meta import LxListingMeta
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.sales.listing.models.lx_order_profit import LxOrderProfit
-from apps.sales.listing.models.lx_product_info import LxProductInfo
 
 __all__ = [
     "ImageSyncQueue", "ImageSyncStatus",
@@ -13,5 +12,4 @@ __all__ = [
     "LxListingMeta",
     "LxListingTag",
     "LxOrderProfit",
-    "LxProductInfo",
 ]
