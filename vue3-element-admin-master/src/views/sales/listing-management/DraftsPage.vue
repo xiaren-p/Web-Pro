@@ -24,7 +24,7 @@ defineOptions({ name: "ListingDraftsPage" });
 const router = useRouter();
 
 function handleAddDraft() {
-  router.push("/sales/listing-management/draft-editor");
+  router.push("/sales/listing-management/draft-editor/index");
 }
 </script>
 
