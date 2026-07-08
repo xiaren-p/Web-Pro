@@ -4,7 +4,7 @@
       <span class="draft-section__bar" />
       报价
     </div>
-    <el-form label-position="left" label-width="200px" size="default" class="draft-section__form">
+    <el-form label-position="left" label-width="200px" size="default" class="draft-section__body">
       <el-form-item label="MSKU Seller SKU" required>
         <el-input
           v-model="f.msku"
@@ -19,23 +19,27 @@
       </el-form-item>
 
       <el-form-item label="商品状况 Artikelzustand" required>
-        <el-select v-model="f.productCondition" style="width: 200px">
+        <el-select v-model="f.productCondition" class="draft-field-input--md">
           <el-option label="Neu" value="Neu" />
           <el-option label="Gebraucht" value="Gebraucht" />
         </el-select>
       </el-form-item>
 
       <el-form-item label="价格 Ihr Preis" required>
-        <div class="field-row">
-          <el-input v-model="f.price" placeholder="示例：50.00" style="width: 160px" />
-          <span class="field-unit">{{ f.currency }}</span>
+        <div class="draft-field-row">
+          <el-input v-model="f.price" placeholder="示例：50.00" class="draft-field-input--md" />
+          <span class="draft-field-unit">{{ f.currency }}</span>
         </div>
       </el-form-item>
 
       <el-form-item label="优惠价 Angebotspreis">
-        <div class="field-row">
-          <el-input v-model="f.promotionPrice" placeholder="示例：219.99" style="width: 160px" />
-          <span class="field-unit">{{ f.currency }}</span>
+        <div class="draft-field-row">
+          <el-input
+            v-model="f.promotionPrice"
+            placeholder="示例：219.99"
+            class="draft-field-input--md"
+          />
+          <span class="draft-field-unit">{{ f.currency }}</span>
         </div>
       </el-form-item>
 
@@ -45,7 +49,7 @@
           type="date"
           value-format="YYYY-MM-DD"
           placeholder="示例：2017-06-30"
-          style="width: 200px"
+          class="draft-field-input--md"
         />
       </el-form-item>
 
@@ -55,7 +59,7 @@
           type="date"
           value-format="YYYY-MM-DD"
           placeholder="示例：2017-07-01"
-          style="width: 200px"
+          class="draft-field-input--md"
         />
       </el-form-item>
     </el-form>
@@ -63,51 +67,15 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 报价 section：MSKU、商品编码、商品状况、价格、优惠价、优惠日期。
+ *
+ * 通过 inject 获取父组件 provide 的 formData。
+ */
 import { inject } from "vue";
 
 defineOptions({ name: "PricingSection" });
 
+/** 注入父组件共享的草稿表单数据 */
 const f = inject<any>("draftForm");
 </script>
-
-<style scoped lang="scss">
-.draft-section {
-  &__header {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    padding-bottom: 16px;
-    margin-bottom: 20px;
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  &__bar {
-    display: inline-block;
-    width: 4px;
-    height: 18px;
-    background: var(--color-primary-600);
-    border-radius: 2px;
-  }
-
-  &__form {
-    padding: 20px 24px;
-    background: var(--surface-base);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-  }
-}
-
-.field-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.field-unit {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-</style>

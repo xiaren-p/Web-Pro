@@ -4,7 +4,7 @@
       <span class="draft-section__bar" />
       图片
     </div>
-    <div class="draft-section__form">
+    <div class="draft-section__body">
       <el-upload drag multiple :auto-upload="false" :on-change="handleChange" accept="image/*">
         <el-icon :size="40"><UploadFilled /></el-icon>
         <div class="upload-hint">将图片拖拽到此处即可上传</div>
@@ -15,49 +15,28 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 图片 section：拖拽上传区域。
+ *
+ * 通过 inject 获取父组件 provide 的 formData。
+ * 上传文件追加到 formData.images 数组。
+ */
 import { inject } from "vue";
 import { UploadFilled } from "@element-plus/icons-vue";
 import type { UploadFile } from "element-plus";
 
 defineOptions({ name: "ImagesSection" });
 
+/** 注入父组件共享的草稿表单数据 */
 const f = inject<any>("draftForm");
 
+/** 文件变更回调：将原始文件追加到 images 数组 */
 function handleChange(file: UploadFile) {
   if (file.raw) f.images.push(file.raw);
 }
 </script>
 
 <style scoped lang="scss">
-.draft-section {
-  &__header {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    padding-bottom: 16px;
-    margin-bottom: 20px;
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  &__bar {
-    display: inline-block;
-    width: 4px;
-    height: 18px;
-    background: var(--color-primary-600);
-    border-radius: 2px;
-  }
-
-  &__form {
-    padding: 20px 24px;
-    background: var(--surface-base);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-  }
-}
-
 .upload-hint {
   margin-top: 8px;
   font-size: var(--font-size-sm);

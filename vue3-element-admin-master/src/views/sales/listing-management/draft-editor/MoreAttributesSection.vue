@@ -4,7 +4,7 @@
       <span class="draft-section__bar" />
       更多属性
     </div>
-    <div class="draft-section__form">
+    <div class="draft-section__body">
       <el-button type="primary" size="small" style="margin-bottom: 16px">应用刊登模板</el-button>
       <p class="search-hint">搜索字段请在此处操作，不要用 Ctrl+F（可能会找不到）</p>
 
@@ -35,7 +35,7 @@
         </el-form-item>
 
         <el-form-item label="需要电池吗？Sind Batterien erforderlich?" required>
-          <el-select v-model="f.batteryRequired" style="width: 160px">
+          <el-select v-model="f.batteryRequired" class="draft-field-input--sm">
             <el-option label="是" value="yes" />
             <el-option label="否" value="no" />
           </el-select>
@@ -50,43 +50,20 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 更多属性 section：制造商、操作系统、价目表、原产国、电池需求、危险品规管。
+ *
+ * 通过 inject 获取父组件 provide 的 formData。
+ */
 import { inject } from "vue";
 
 defineOptions({ name: "MoreAttributesSection" });
 
+/** 注入父组件共享的草稿表单数据 */
 const f = inject<any>("draftForm");
 </script>
 
 <style scoped lang="scss">
-.draft-section {
-  &__header {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    padding-bottom: 16px;
-    margin-bottom: 20px;
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  &__bar {
-    display: inline-block;
-    width: 4px;
-    height: 18px;
-    background: var(--color-primary-600);
-    border-radius: 2px;
-  }
-
-  &__form {
-    padding: 20px 24px;
-    background: var(--surface-base);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-  }
-}
-
 .search-hint {
   margin-bottom: 16px;
   font-size: var(--font-size-xs);

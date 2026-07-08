@@ -1,6 +1,6 @@
 <template>
   <div class="draft-editor">
-    <!-- 侧边栏 -->
+    <!-- 侧边栏：返回链接 + section 导航 -->
     <aside class="draft-editor__sidebar">
       <div class="draft-editor__nav-back" @click="router.back()">← 返回草稿箱</div>
       <div
@@ -16,16 +16,15 @@
 
     <!-- 右侧：内容区 + 底部操作栏 -->
     <div class="draft-editor__right">
-      <!-- 内容区 -->
       <main ref="contentRef" class="draft-editor__content">
-        <BasicInfoSection :id="'basic'" />
-        <PricingSection :id="'pricing'" />
-        <ImagesSection :id="'images'" />
-        <DescriptionSection :id="'description'" />
-        <MoreAttributesSection :id="'more'" />
+        <BasicInfoSection id="basic" />
+        <PricingSection id="pricing" />
+        <ImagesSection id="images" />
+        <DescriptionSection id="description" />
+        <MoreAttributesSection id="more" />
       </main>
 
-      <!-- 底部操作栏 -->
+      <!-- 底部操作栏：横跨侧边栏+内容区下方 -->
       <footer class="draft-editor__footer">
         <el-button size="default" @click="router.back()">取消</el-button>
         <el-button size="default">保存</el-button>
@@ -36,6 +35,15 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 刊登草稿编辑器主页面。
+ *
+ * 布局：左侧固定侧边栏（返回 + section 导航）+ 右侧内容区（滚动表单）+ 底部操作栏。
+ * 状态管理：通过 provide/inject 将 formData 共享给各 section 子组件。
+ * Scroll-spy：IntersectionObserver 监听各 section 可见性，高亮侧边栏对应项。
+ *
+ * 路由：静态路由 /sales/listing-management/draft-editor（hidden: true）
+ */
 import { reactive, ref, onMounted, onBeforeUnmount, provide } from "vue";
 import { useRouter } from "vue-router";
 import BasicInfoSection from "./BasicInfoSection.vue";
@@ -48,6 +56,7 @@ defineOptions({ name: "DraftEditor" });
 
 const router = useRouter();
 
+/** section 导航配置 */
 const sections = [
   { key: "basic", label: "基本信息" },
   { key: "pricing", label: "报价" },
@@ -56,6 +65,7 @@ const sections = [
   { key: "more", label: "更多属性" },
 ];
 
+/** 草稿表单数据（通过 provide 共享给子组件） */
 const formData = reactive({
   shop: "",
   listingType: "",
@@ -94,10 +104,12 @@ const formData = reactive({
 
 provide("draftForm", formData);
 
+/** 当前可见的 section key（scroll-spy 驱动） */
 const activeSection = ref("basic");
 const contentRef = ref<HTMLElement>();
 let observer: IntersectionObserver | null = null;
 
+/** 平滑滚动到指定 section */
 function scrollTo(key: string) {
   document.getElementById(key)?.scrollIntoView({ behavior: "smooth" });
 }
@@ -126,21 +138,25 @@ onBeforeUnmount(() => observer?.disconnect());
   height: 100%;
   background: var(--app-bg);
 
+  /* ── 侧边栏 ── */
   &__sidebar {
-    width: 200px;
-    padding: 24px 0;
+    width: 220px;
+    padding: 0;
     overflow-y: auto;
-    background: var(--surface-hover);
-    border-right: 1px solid var(--border-subtle);
+    background: var(--surface-base);
+    border-right: 1px solid var(--border-base);
+    box-shadow: 2px 0 8px rgb(15 23 42 / 4%);
     flex-shrink: 0;
   }
 
   &__nav-back {
-    padding: 16px 24px;
+    padding: 18px 24px;
     font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
     color: var(--text-tertiary);
     cursor: pointer;
     border-bottom: 1px solid var(--border-subtle);
+    transition: color var(--transition-ui);
 
     &:hover {
       color: var(--color-primary-600);
@@ -148,7 +164,7 @@ onBeforeUnmount(() => observer?.disconnect());
   }
 
   &__nav-item {
-    padding: 12px 24px;
+    padding: 14px 24px;
     font-size: var(--font-size-base);
     color: var(--text-secondary);
     cursor: pointer;
@@ -157,16 +173,18 @@ onBeforeUnmount(() => observer?.disconnect());
 
     &:hover {
       color: var(--text-primary);
+      background: var(--surface-subtle);
     }
 
     &.is-active {
       font-weight: var(--font-weight-semibold);
       color: var(--color-primary-600);
-      background: var(--surface-base);
+      background: var(--color-primary-50);
       border-left-color: var(--color-primary-600);
     }
   }
 
+  /* ── 右侧区域 ── */
   &__right {
     display: flex;
     flex: 1;
@@ -176,7 +194,7 @@ onBeforeUnmount(() => observer?.disconnect());
 
   &__content {
     flex: 1;
-    padding: 24px;
+    padding: 28px 32px;
     overflow-y: auto;
   }
 
@@ -184,10 +202,78 @@ onBeforeUnmount(() => observer?.disconnect());
     display: flex;
     gap: 12px;
     justify-content: flex-end;
-    padding: 12px 24px;
+    padding: 14px 32px;
     background: var(--surface-base);
     border-top: 1px solid var(--border-base);
+    box-shadow: 0 -2px 8px rgb(15 23 42 / 4%);
     flex-shrink: 0;
+  }
+
+  /* ── 子 section 共享样式（穿透到子组件） ── */
+  :deep(.draft-section) {
+    margin-bottom: 24px;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    &__header {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      border-bottom: 2px solid var(--border-subtle);
+    }
+
+    &__bar {
+      display: inline-block;
+      width: 4px;
+      height: 20px;
+      background: var(--color-primary-600);
+      border-radius: 2px;
+    }
+
+    &__body {
+      padding: 24px;
+      background: var(--surface-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-xs);
+    }
+  }
+
+  :deep(.draft-field-row) {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  :deep(.draft-field-hint) {
+    margin-top: 4px;
+    font-size: var(--font-size-xs);
+    color: var(--text-tertiary);
+  }
+
+  :deep(.draft-field-unit) {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-secondary);
+  }
+
+  :deep(.draft-field-input--sm) {
+    width: 120px;
+  }
+
+  :deep(.draft-field-input--md) {
+    width: 200px;
+  }
+
+  :deep(.draft-field-input--lg) {
+    width: 280px;
   }
 }
 </style>

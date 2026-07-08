@@ -4,9 +4,9 @@
       <span class="draft-section__bar" />
       基本信息
     </div>
-    <el-form label-position="left" label-width="200px" size="default" class="draft-section__form">
+    <el-form label-position="left" label-width="200px" size="default" class="draft-section__body">
       <el-form-item label="店铺" required>
-        <el-select v-model="f.shop" placeholder="请选择" style="width: 280px" />
+        <el-select v-model="f.shop" placeholder="请选择" class="draft-field-input--lg" />
       </el-form-item>
 
       <el-form-item label="上架类型" required>
@@ -33,7 +33,7 @@
           show-word-limit
           placeholder="示例：Blaue Adidas-Turnschuhe"
         />
-        <div class="field-hint">首字母大写</div>
+        <div class="draft-field-hint">首字母大写</div>
       </el-form-item>
 
       <el-form-item label="商品亮点 Artikel-Highlight">
@@ -50,11 +50,11 @@
       </el-form-item>
 
       <el-form-item label="包装尺寸 Paket-Abmessungen" required>
-        <div class="field-row">
-          <el-input v-model="f.packageLength" placeholder="示例：75.50" style="width: 100px" />
-          <el-input v-model="f.packageWidth" placeholder="示例：10.00" style="width: 100px" />
-          <el-input v-model="f.packageHeight" placeholder="示例：50.00" style="width: 100px" />
-          <el-select v-model="f.packageDimensionUnit" style="width: 120px">
+        <div class="draft-field-row">
+          <el-input v-model="f.packageLength" placeholder="75.50" class="draft-field-input--sm" />
+          <el-input v-model="f.packageWidth" placeholder="10.00" class="draft-field-input--sm" />
+          <el-input v-model="f.packageHeight" placeholder="50.00" class="draft-field-input--sm" />
+          <el-select v-model="f.packageDimensionUnit" class="draft-field-input--md">
             <el-option label="Zentimeter" value="Zentimeter" />
             <el-option label="Inch" value="Inch" />
           </el-select>
@@ -62,9 +62,9 @@
       </el-form-item>
 
       <el-form-item label="包裹重量 Paketgewicht" required>
-        <div class="field-row">
-          <el-input v-model="f.packageWeight" placeholder="示例：24" style="width: 140px" />
-          <el-select v-model="f.packageWeightUnit" style="width: 100px">
+        <div class="draft-field-row">
+          <el-input v-model="f.packageWeight" placeholder="24" class="draft-field-input--sm" />
+          <el-select v-model="f.packageWeightUnit" class="draft-field-input--sm">
             <el-option label="Pfund" value="Pfund" />
             <el-option label="Kilogramm" value="Kilogramm" />
           </el-select>
@@ -89,52 +89,16 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 基本信息 section：店铺、上架类型、Amazon分类、商品类型、商品名称、
+ * 商品亮点、品牌名、包装尺寸、包裹重量、销售类型、配送渠道。
+ *
+ * 通过 inject 获取父组件 provide 的 formData。
+ */
 import { inject } from "vue";
 
 defineOptions({ name: "BasicInfoSection" });
 
+/** 注入父组件共享的草稿表单数据 */
 const f = inject<any>("draftForm");
 </script>
-
-<style scoped lang="scss">
-.draft-section {
-  &__header {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    padding-bottom: 16px;
-    margin-bottom: 20px;
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  &__bar {
-    display: inline-block;
-    width: 4px;
-    height: 18px;
-    background: var(--color-primary-600);
-    border-radius: 2px;
-  }
-
-  &__form {
-    padding: 20px 24px;
-    background: var(--surface-base);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-  }
-}
-
-.field-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.field-hint {
-  margin-top: 4px;
-  font-size: var(--font-size-xs);
-  color: var(--text-tertiary);
-}
-</style>
