@@ -3,9 +3,6 @@
 承载 Listing 的分页查询与标签/分类/备注的批量 upsert 接口。
 所有数据形态加工（货币符号映射、principal_info 字段补齐、状态码二值化等）
 均在后端定型，前端拿到字段直接渲染。
-
-自 LxListingInfo 迁移至 LxListingData 后，主查询集不再依赖 select_related，
-关联数据（店铺、元数据、利润）改为手动批量查询拼装。
 """
 from __future__ import annotations
 
@@ -24,7 +21,6 @@ from apps.sales.models.lx_exchange_rate import LxExchangeRate
 from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_meta import LxListingMeta
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
-from apps.sales.listing.models.lx_order_profit import LxOrderProfit
 from apps.common.utils.responses import drf_error, drf_ok
 from apps.sales.listing.models.listing_tag_modify_queue import (
     ListingTagModifyQueue,
