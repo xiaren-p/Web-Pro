@@ -158,15 +158,41 @@ function handleSelectionChange(selection: DraftRow[]) {
   flex: 1;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 
   :deep(.el-table) {
+    display: flex;
     flex: 1;
-    min-height: 0;
+    flex-direction: column;
   }
 
   :deep(.el-table::before),
   :deep(.el-table--border::after) {
     display: none;
+  }
+
+  :deep(.el-table__inner-wrapper) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  :deep(.el-table__header-wrapper) {
+    flex-shrink: 0;
+  }
+
+  :deep(.el-table__body-wrapper) {
+    flex: 1 !important;
+    height: unset !important;
+  }
+
+  :deep(.el-scrollbar) {
+    height: 100%;
+  }
+
+  :deep(.el-table__empty-block) {
+    height: 100% !important;
+    min-height: unset !important;
   }
 }
 
