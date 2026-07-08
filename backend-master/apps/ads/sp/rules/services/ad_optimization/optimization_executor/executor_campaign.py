@@ -414,8 +414,6 @@ def _check_condition_sets(
     last_metrics: dict[str, Any] | None = None
     for cs in condition_sets:
         days = int(cs.get("days", 30) or 30)
-        if not _check_campaign_min_days(campaign, days, today):
-            return False, None
         metrics = _aggregate_campaign_report(
             campaign.campaign_id, campaign.profile_id, days, today,
         )
