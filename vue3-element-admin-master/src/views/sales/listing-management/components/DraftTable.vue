@@ -154,17 +154,42 @@ function handleSelectionChange(selection: DraftRow[]) {
 
 <style scoped lang="scss">
 .draft-table__wrapper {
+  display: flex;
   flex: 1;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
 
   :deep(.el-table) {
-    height: 100%;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
   }
 
   :deep(.el-table::before),
   :deep(.el-table--border::after) {
     display: none;
+  }
+
+  :deep(.el-table__hidden-columns) {
+    display: none;
+  }
+
+  :deep(.el-table__inner-wrapper) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    overflow-x: hidden !important;
+  }
+
+  :deep(.el-table__header-wrapper) {
+    flex-shrink: 0;
+    overflow-x: hidden !important;
+  }
+
+  :deep(.el-table__body-wrapper) {
+    flex: 1;
+    overflow: auto !important;
   }
 
   :deep(.el-table__empty-block) {
