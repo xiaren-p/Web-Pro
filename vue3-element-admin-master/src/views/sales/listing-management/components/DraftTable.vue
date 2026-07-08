@@ -185,27 +185,15 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow: hidden;
 
-  :deep(.el-table::before),
-  :deep(.el-table--border::after) {
-    display: none;
-  }
-
   :deep(.el-table__empty-block) {
     align-items: center;
   }
 }
 
 .draft-table {
-  /* 表头 */
-  :deep(.el-table__header-wrapper th.el-table__cell),
-  :deep(.el-table__header th) {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold) !important;
-    color: var(--text-secondary) !important;
+  /* 模块特色：表头居中对齐（全局未设） */
+  :deep(.el-table__header-wrapper th.el-table__cell) {
     text-align: center;
-    background-color: var(--surface-subtle) !important;
-    border-bottom: 1px solid var(--border-base) !important;
-    box-shadow: none;
   }
 
   :deep(.el-table__header th .cell) {
@@ -213,30 +201,7 @@ onBeforeUnmount(() => {
     width: 100%;
   }
 
-  /* 表体 */
-  :deep(.el-table .el-table__cell) {
-    padding: 12px 0 !important;
-    font-size: var(--font-size-sm);
-    color: var(--text-primary);
-    border-right: none !important;
-    border-bottom: 1px solid var(--border-subtle) !important;
-  }
-
-  :deep(.el-table .cell) {
-    padding-right: 14px;
-    padding-left: 14px;
-    line-height: 1.5;
-  }
-
-  /* 行 hover */
-  :deep(.el-table .el-table__row) {
-    transition: background-color var(--transition-ui);
-  }
-
-  :deep(.el-table .el-table__row:hover > td.el-table__cell) {
-    background-color: var(--surface-hover) !important;
-  }
-
+  /* 模块特色：行 hover 首列 3px 蓝色指示条（与 listing 模块一致） */
   :deep(.el-table .el-table__row:hover > td.el-table__cell:first-child) {
     box-shadow: inset 3px 0 0 var(--color-primary-600);
   }

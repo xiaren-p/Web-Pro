@@ -122,10 +122,6 @@ function handleCurrentChange(val: number) {
 
   &__jump-input {
     width: 64px;
-
-    :deep(.el-input__wrapper) {
-      padding: 0 8px;
-    }
   }
 }
 </style>

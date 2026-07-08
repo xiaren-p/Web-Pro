@@ -128,22 +128,10 @@ function disabledDate(time: Date) {
     margin-right: 16px;
     margin-bottom: 12px;
   }
-
-  :deep(.el-form-item__label) {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    line-height: 32px;
-    color: var(--text-secondary);
-  }
 }
 
 .filter-select--sm {
   width: 100px;
-
-  :deep(.el-select__wrapper) {
-    min-height: 32px;
-    border-radius: var(--radius-sm);
-  }
 }
 
 .filter-daterange {
