@@ -352,7 +352,7 @@ const props = defineProps<{
 }>();
 
 /** 列可见性持久化（只存 prop → visible 映射，列定义结构始终以代码为准） */
-const _savedColVis = useLocalStorage<Record<string, boolean>>("ads_panel_col_vis", {});
+const _savedColumns = useLocalStorage<any[]>("ads_panel_columns", []);
 
 /** 筛选条件持久化（不含日期范围，日期由父组件 props 注入） */
 const _savedFilters = useLocalStorage("ads_panel_filters", {
@@ -494,12 +494,32 @@ const activeColumns = ref([
   { prop: "cpa", label: "CPA", visible: false, category: "业绩", sortable: "custom" },
 ]);
 
-// 用存储的可见性覆盖默认定义（仅覆盖有记录的列，新列保留代码默认值）
-activeColumns.value.forEach((col) => {
-  if (_savedColVis.value[col.prop] !== undefined) {
-    col.visible = _savedColVis.value[col.prop];
+// 用缓存的完整列配置恢复可见性与顺序
+(function restoreColumns() {
+  const cached = _savedColumns.value;
+  if (cached && cached.length > 0) {
+    const defaultMap = new Map(activeColumns.value.map((c) => [c.prop, c]));
+    const cachedProps = new Set<string>();
+    const merged: any[] = [];
+    for (const c of cached) {
+      const def = defaultMap.get(c.prop);
+      if (def) {
+        cachedProps.add(c.prop);
+        merged.push({
+          ...c,
+          category: def.category,
+          label: def.label,
+          sortable: (def as any).sortable,
+          minWidth: (def as any).minWidth,
+        });
+      }
+    }
+    for (const c of activeColumns.value) {
+      if (!cachedProps.has(c.prop)) merged.push(c);
+    }
+    activeColumns.value = merged;
   }
-});
+})();
 
 /** 合并显示在商品列单元格内的字段 prop 集合，不单独渲染为独立表格列 */
 const MERGED_PRODUCT_PROPS = new Set(["title", "price", "rating", "reviews"]);
@@ -550,7 +570,7 @@ function rowClassName({ row }: { row: any }): string {
  */
 function onColumnConfigSave(columns: typeof activeColumns.value): void {
   activeColumns.value = columns;
-  _savedColVis.value = Object.fromEntries(columns.map((c) => [c.prop, c.visible]));
+  _savedColumns.value = JSON.parse(JSON.stringify(columns));
   ElMessage.success("列配置已保存");
 }
 

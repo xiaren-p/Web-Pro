@@ -47,7 +47,7 @@
           ref="adGroupsRef"
           :campaign-id="campaignId"
           :profile-id="profileId"
-          :inherited-date-range="inheritedDateRange"
+          :initial-date-range="inheritedDateRange"
           @keyword-bid="onKeywordBid"
           @keyword-state="onKeywordState"
         />
@@ -61,7 +61,7 @@
           ref="adsRef"
           :campaign-id="campaignId"
           :profile-id="profileId"
-          :inherited-date-range="inheritedDateRange"
+          :initial-date-range="inheritedDateRange"
           @keyword-bid="onKeywordBid"
           @keyword-state="onKeywordState"
         />
@@ -76,7 +76,7 @@
             ref="autoTargetingRef"
             :campaign-id="campaignId"
             :profile-id="profileId"
-            :inherited-date-range="inheritedDateRange"
+            :initial-date-range="inheritedDateRange"
             @target-bid="onTargetBid"
             @target-state="onTargetState"
           />
@@ -94,7 +94,7 @@
               ref="keywordRef"
               :campaign-id="campaignId"
               :profile-id="profileId"
-              :inherited-date-range="inheritedDateRange"
+              :initial-date-range="inheritedDateRange"
               @keyword-bid="onKeywordBid"
               @keyword-state="onKeywordState"
             />
@@ -103,7 +103,7 @@
               ref="productTargetingRef"
               :campaign-id="campaignId"
               :profile-id="profileId"
-              :inherited-date-range="inheritedDateRange"
+              :initial-date-range="inheritedDateRange"
               @target-bid="onProductTargetBid"
               @target-state="onProductTargetState"
             />
@@ -112,7 +112,11 @@
       </el-tab-pane>
 
       <el-tab-pane label="否定投放" name="negative">
-        <AutoNegativePanel :campaign-id="campaignId" :profile-id="profileId" />
+        <AutoNegativePanel
+          :campaign-id="campaignId"
+          :profile-id="profileId"
+          :initial-date-range="inheritedDateRange"
+        />
         <NegativeKeywordPanel :campaign-id="campaignId" :profile-id="profileId" />
       </el-tab-pane>
     </el-tabs>

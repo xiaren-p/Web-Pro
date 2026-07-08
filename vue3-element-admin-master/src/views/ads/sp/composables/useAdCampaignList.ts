@@ -88,6 +88,8 @@ export function useAdCampaignList() {
   // ── 筛选状态 ──────────────────────────────────────────────────────────────────
   function initFiltersFromCache(): Record<string, unknown> {
     const cached = readCache(STORAGE_KEYS.filters);
+    // 优先读取子页面写入的最新日期（双向同步）
+    const detailRange = readCache("ADS_SP_DATE_RANGE") as string[] | null;
     const end = new Date();
     const start = new Date();
     start.setDate(start.getDate() - 7);
@@ -129,7 +131,15 @@ export function useAdCampaignList() {
           merged[k] = v;
         }
       }
+      // 用子页面写入的最新日期覆盖（双向同步）
+      if (Array.isArray(detailRange) && detailRange.length === 2 && detailRange[0]) {
+        merged.range = detailRange;
+      }
       return merged;
+    }
+    // 无筛选缓存：用子页面写入的最新日期覆盖默认范围
+    if (Array.isArray(detailRange) && detailRange.length === 2 && detailRange[0]) {
+      defaults.range = detailRange;
     }
     return defaults;
   }

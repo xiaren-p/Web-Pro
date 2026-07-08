@@ -378,6 +378,7 @@ import ColumnManager from "@/components/ColumnManager/index.vue";
 import BatchBidAdjustDialog from "@/components/BatchBidAdjustDialog/index.vue";
 import { getAutoTargeting, batchAdjustTargetState, batchAdjustTargetBid } from "@/api/ads";
 import { DATE_SHORTCUTS } from "@/utils/ads-date-shortcuts";
+import { getDefaultDateRange, DATE_RANGE_KEY } from "@/utils/date";
 
 defineOptions({ name: "AutoTargetingPanel" });
 
@@ -398,14 +399,16 @@ const emit = defineEmits<{
 }>();
 
 /** 列可见性持久化 */
-const _savedColVis = useLocalStorage<Record<string, boolean>>("auto_targeting_panel_col_vis", {});
+const _savedColumns = useLocalStorage<any[]>("auto_targeting_panel_columns", []);
 
 /** 筛选条件持久化（不含日期范围） */
 const _savedFilters = useLocalStorage("auto_targeting_panel_filters", { state: "" });
 
 /** 筛选条件，range 以父页面传入的日期范围初始化 */
 const filters = ref({
-  range: (props.initialDateRange?.length === 2 ? [...props.initialDateRange] : []) as string[],
+  range: (props.initialDateRange?.length === 2
+    ? [...props.initialDateRange]
+    : getDefaultDateRange()) as string[],
   state: _savedFilters.value.state,
 });
 
@@ -538,12 +541,31 @@ const activeColumns = ref([
   { prop: "cpa", label: "CPA", visible: false, category: "业绩", sortable: "custom" },
 ]);
 
-// 用存储的可见性覆盖代码默认定义（仅覆盖有记录的列）
-activeColumns.value.forEach((col) => {
-  if (_savedColVis.value[col.prop] !== undefined) {
-    col.visible = _savedColVis.value[col.prop];
+(function restoreColumns() {
+  const cached = _savedColumns.value;
+  if (cached && cached.length > 0) {
+    const defaultMap = new Map(activeColumns.value.map((c) => [c.prop, c]));
+    const cachedProps = new Set<string>();
+    const merged: any[] = [];
+    for (const c of cached) {
+      const def = defaultMap.get(c.prop);
+      if (def) {
+        cachedProps.add(c.prop);
+        merged.push({
+          ...c,
+          category: def.category,
+          label: def.label,
+          sortable: (def as any).sortable,
+          minWidth: (def as any).minWidth,
+        });
+      }
+    }
+    for (const c of activeColumns.value) {
+      if (!cachedProps.has(c.prop)) merged.push(c);
+    }
+    activeColumns.value = merged;
   }
-});
+})();
 
 /**
  * 过滤出 visible=true 的列用于动态渲染。
@@ -579,7 +601,7 @@ function rowClassName({ row }: { row: any }): string {
  */
 function onColumnConfigSave(columns: typeof activeColumns.value): void {
   activeColumns.value = columns;
-  _savedColVis.value = Object.fromEntries(columns.map((c) => [c.prop, c.visible]));
+  _savedColumns.value = JSON.parse(JSON.stringify(columns));
   ElMessage.success("列配置已保存");
 }
 
@@ -589,6 +611,17 @@ watch(
   () => {
     _savedFilters.value = { state: filters.value.state };
   }
+);
+
+// 日期范围变更同步到共享缓存，供列表页回读
+watch(
+  () => filters.value.range,
+  (val) => {
+    if (val?.length === 2) {
+      localStorage.setItem(DATE_RANGE_KEY, JSON.stringify(val));
+    }
+  },
+  { deep: true }
 );
 
 /**

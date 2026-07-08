@@ -272,12 +272,13 @@
  */
 import type { AutoNegativeTargetingParams } from "@/api/ads";
 
-import { onMounted, reactive, ref } from "vue";
+import { onMounted, reactive, ref, watch } from "vue";
 import { Operation, VideoPause, CircleClose } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 
 import { getAutoNegativeTargeting } from "@/api/ads";
 import { DATE_SHORTCUTS } from "@/utils/ads-date-shortcuts";
+import { getDefaultDateRange, DATE_RANGE_KEY } from "@/utils/date";
 
 const props = defineProps<{
   campaignId: string;
@@ -287,7 +288,9 @@ const props = defineProps<{
 
 // ── 筛选状态 ──────────────────────────────────────────
 const filters = reactive({
-  range: props.initialDateRange ?? (null as string[] | null),
+  range: (props.initialDateRange?.length === 2
+    ? [...props.initialDateRange]
+    : getDefaultDateRange()) as string[],
   state: "",
   expType: "",
   keyword: "",
@@ -372,13 +375,25 @@ function onSearch(): void {
 }
 
 function onReset(): void {
-  filters.range = props.initialDateRange ?? null;
+  filters.range =
+    props.initialDateRange?.length === 2 ? [...props.initialDateRange] : getDefaultDateRange();
   filters.state = "";
   filters.expType = "";
   filters.keyword = "";
   pagination.pageNum = 1;
   fetchData();
 }
+
+// 日期范围变更同步到共享缓存，供列表页回读
+watch(
+  () => filters.range,
+  (val) => {
+    if (val?.length === 2) {
+      localStorage.setItem(DATE_RANGE_KEY, JSON.stringify(val));
+    }
+  },
+  { deep: true }
+);
 
 onMounted(fetchData);
 </script>

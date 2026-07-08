@@ -642,24 +642,36 @@ const defaultColumns = [
   { prop: "cpa", label: "CPA", visible: false, category: "业绩", minWidth: 80, sortable: "custom" },
 ];
 
-const _savedColVis = useLocalStorage<Record<string, boolean>>("keyword_panel_col_vis", {});
+const _savedColumns = useLocalStorage<any[]>("keyword_panel_columns", []);
 
 const activeColumns = ref(
-  defaultColumns.map((col) => {
-    const saved = _savedColVis.value[col.prop];
-    return { ...col, visible: saved !== undefined ? saved : col.visible };
-  })
+  (() => {
+    const cached = _savedColumns.value;
+    if (cached && cached.length > 0) {
+      const defaultMap = new Map(defaultColumns.map((c) => [c.prop, c]));
+      const cachedProps = new Set<string>();
+      const merged: any[] = [];
+      for (const c of cached) {
+        const def = defaultMap.get(c.prop);
+        if (def) {
+          cachedProps.add(c.prop);
+          merged.push({ ...c, ...def });
+        }
+      }
+      for (const c of defaultColumns) {
+        if (!cachedProps.has(c.prop)) merged.push(c);
+      }
+      return merged;
+    }
+    return defaultColumns.map((col) => ({ ...col }));
+  })()
 );
 
 const visibleColumns = computed(() => activeColumns.value.filter((c) => c.visible));
 
 function onColumnConfigSave(cols: typeof defaultColumns): void {
   activeColumns.value = cols;
-  const vis: Record<string, boolean> = {};
-  for (const c of cols) {
-    vis[c.prop] = c.visible;
-  }
-  _savedColVis.value = vis;
+  _savedColumns.value = JSON.parse(JSON.stringify(cols));
 }
 
 // ── 抽屉状态 ──────────────────────────────────────────
