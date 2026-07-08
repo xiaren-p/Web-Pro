@@ -5,7 +5,7 @@
     </section>
 
     <section class="drafts-page__table content-block content-block--flush">
-      <DraftActionBar />
+      <DraftActionBar @add-draft="handleAddDraft" />
       <DraftTable />
       <DraftPagination />
     </section>
@@ -13,12 +13,19 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from "vue-router";
 import DraftFilterBar from "./components/DraftFilterBar.vue";
 import DraftActionBar from "./components/DraftActionBar.vue";
 import DraftTable from "./components/DraftTable.vue";
 import DraftPagination from "./components/DraftPagination.vue";
 
 defineOptions({ name: "ListingDraftsPage" });
+
+const router = useRouter();
+
+function handleAddDraft() {
+  router.push("/sales/listing-management/draft-editor");
+}
 </script>
 
 <style scoped lang="scss">

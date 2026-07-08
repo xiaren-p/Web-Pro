@@ -1,7 +1,9 @@
 <template>
   <div class="drafts-toolbar">
     <div class="drafts-toolbar__left">
-      <el-button type="primary" :icon="Plus" size="small">添加草稿</el-button>
+      <el-button type="primary" :icon="Plus" size="small" @click="emit('add-draft')">
+        添加草稿
+      </el-button>
       <el-button disabled size="small">发布</el-button>
       <el-button disabled size="small">删除</el-button>
     </div>
@@ -18,6 +20,8 @@
 import { Plus, Refresh, QuestionFilled, Setting } from "@element-plus/icons-vue";
 
 defineOptions({ name: "DraftActionBar" });
+
+const emit = defineEmits<{ "add-draft": [] }>();
 </script>
 
 <style scoped lang="scss">
