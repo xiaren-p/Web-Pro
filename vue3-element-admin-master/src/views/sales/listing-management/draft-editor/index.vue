@@ -212,38 +212,38 @@ onBeforeUnmount(() => observer?.disconnect());
   /* ── 子 section 共享样式（穿透到子组件） ── */
   :deep(.draft-section) {
     margin-bottom: 24px;
+  }
 
-    &:last-child {
-      margin-bottom: 0;
-    }
+  :deep(.draft-section:last-child) {
+    margin-bottom: 0;
+  }
 
-    &__header {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      padding-bottom: 14px;
-      margin-bottom: 20px;
-      font-size: var(--font-size-xl);
-      font-weight: var(--font-weight-semibold);
-      color: var(--text-primary);
-      border-bottom: 2px solid var(--border-subtle);
-    }
+  :deep(.draft-section__header) {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding-bottom: 14px;
+    margin-bottom: 20px;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--border-subtle);
+  }
 
-    &__bar {
-      display: inline-block;
-      width: 4px;
-      height: 20px;
-      background: var(--color-primary-600);
-      border-radius: 2px;
-    }
+  :deep(.draft-section__bar) {
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: var(--color-primary-600);
+    border-radius: 2px;
+  }
 
-    &__body {
-      padding: 24px;
-      background: var(--surface-base);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-xl);
-      box-shadow: var(--shadow-xs);
-    }
+  :deep(.draft-section__body) {
+    padding: 24px;
+    background: var(--surface-base);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xs);
   }
 
   :deep(.draft-field-row) {
