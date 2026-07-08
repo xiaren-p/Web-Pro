@@ -2,7 +2,6 @@
  * 刊登管理页面全局样式（与 listing 模块一致的"精密跨境运营控制台"风格）
  * 所有颜色 / 间距 / 圆角 / 阴影均引用 src/styles/variables.scss 中的 CSS 变量
  * 内容块容器复用全局 .content-block / .content-block--flush（src/styles/index.scss）
- * Element Plus 组件样式由全局 element-plus.scss 统一管理，本文件不重复覆盖
  */
 
 /* ═══════════════════════════════════════════════════════════════
@@ -23,6 +22,49 @@
     sans-serif;
   color: var(--text-primary);
   background: var(--app-bg);
+
+  /* ── 按钮加大 ── */
+  :deep(.el-button) {
+    min-height: 36px;
+    padding: 6px 18px;
+    font-size: var(--font-size-base);
+    border-radius: var(--radius-lg);
+  }
+
+  :deep(.el-button.el-button--small) {
+    min-height: 30px;
+    padding: 4px 14px;
+    font-size: var(--font-size-sm);
+  }
+
+  /* ── 输入框 / 下拉框加大圆角 ── */
+  :deep(.el-input__wrapper),
+  :deep(.el-select__wrapper) {
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: var(--radius-lg);
+  }
+
+  :deep(.el-input-group__append .el-button) {
+    min-height: 36px;
+    padding: 6px 18px;
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  }
+
+  /* ── 表单项加大 ── */
+  :deep(.el-form-item__label) {
+    font-size: var(--font-size-base);
+  }
+
+  /* ── 空状态垂直居中 ── */
+  :deep(.el-table__empty-block) {
+    align-items: center;
+  }
+
+  /* ── 分页器靠右 ── */
+  :deep(.el-pagination) {
+    justify-content: flex-end;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════

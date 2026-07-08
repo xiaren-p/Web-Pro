@@ -1,14 +1,12 @@
 <template>
   <div class="drafts-pager">
     <div class="drafts-pager__row">
-      <div class="drafts-pager__left">
-        <span class="drafts-pager__total">
-          <el-icon :size="14"><List /></el-icon>
-          共 {{ total }} 条
-        </span>
-      </div>
+      <span class="drafts-pager__total">
+        <el-icon :size="14"><List /></el-icon>
+        共 {{ total }} 条
+      </span>
 
-      <div class="drafts-pager__center">
+      <div class="drafts-pager__controls">
         <el-pagination
           small
           background
@@ -18,9 +16,7 @@
           :current-page="pageNum"
           @current-change="handleCurrentChange"
         />
-      </div>
 
-      <div class="drafts-pager__right">
         <span class="drafts-pager__label">每页</span>
         <el-select
           :model-value="pageSize"
@@ -33,15 +29,6 @@
           <el-option label="100条" :value="100" />
         </el-select>
         <span class="drafts-pager__label">条/页</span>
-
-        <span class="drafts-pager__label">前往</span>
-        <el-input
-          v-model="jumpPage"
-          size="small"
-          class="drafts-pager__jump-input"
-          placeholder="1"
-        />
-        <span class="drafts-pager__label">页</span>
       </div>
     </div>
   </div>
@@ -56,8 +43,6 @@ defineOptions({ name: "DraftPagination" });
 const pageNum = ref(1);
 const pageSize = ref(20);
 const total = ref(0);
-
-const jumpPage = ref("");
 
 function handleSizeChange(val: number) {
   pageSize.value = val;
@@ -81,34 +66,23 @@ function handleCurrentChange(val: number) {
     display: flex;
     gap: var(--spacing-3);
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     padding: 10px 18px;
-  }
-
-  &__left {
-    flex-shrink: 0;
-  }
-
-  &__center {
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-  }
-
-  &__right {
-    display: flex;
-    flex-shrink: 0;
-    gap: var(--spacing-2);
-    align-items: center;
   }
 
   &__total {
     display: flex;
     gap: 6px;
     align-items: center;
+    margin-right: auto;
     font-size: var(--font-size-xs);
     color: var(--text-secondary);
+  }
+
+  &__controls {
+    display: flex;
+    gap: var(--spacing-2);
+    align-items: center;
   }
 
   &__label {
@@ -118,10 +92,6 @@ function handleCurrentChange(val: number) {
 
   &__size-select {
     width: 88px;
-  }
-
-  &__jump-input {
-    width: 64px;
   }
 }
 </style>

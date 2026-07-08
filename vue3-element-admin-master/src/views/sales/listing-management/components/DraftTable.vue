@@ -184,10 +184,6 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-
-  :deep(.el-table__empty-block) {
-    align-items: center;
-  }
 }
 
 .draft-table {
