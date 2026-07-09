@@ -130,14 +130,14 @@ const filteredRecords = computed(() => {
   return allRecords.value.filter((r) => types.includes(r.execution_type));
 });
 
-/** 执行类型 → 中文标签 */
+/** 执行类型 → 中文标签（大小写不敏感） */
 function typeLabel(type: string): string {
-  return TYPE_LABELS[type] || type;
+  return TYPE_LABELS[type] || TYPE_LABELS[type.toUpperCase()] || type;
 }
 
-/** 执行类型 → Element Plus Tag 颜色 */
+/** 执行类型 → Element Plus Tag 颜色（大小写不敏感） */
 function typeTag(type: string): "success" | "warning" | "info" | "danger" {
-  return (TYPE_TAGS[type] as any) || "info";
+  return (TYPE_TAGS[type] || TYPE_TAGS[type.toUpperCase()]) as any || "info";
 }
 
 /**
