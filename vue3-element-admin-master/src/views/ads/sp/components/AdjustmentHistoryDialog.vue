@@ -5,10 +5,9 @@
     width="920px"
     destroy-on-close
     class="adj-history-dialog"
-    @opened="onDialogOpened"
   >
     <div class="adj-history-filters">
-      <ElRadioGroup v-model="filterType" size="small">
+      <ElRadioGroup :key="dialogKey" v-model="filterType" size="small">
         <ElRadioButton value="">全部</ElRadioButton>
         <ElRadioButton value="BID_ADJUSTMENT">自动规则</ElRadioButton>
         <ElRadioButton value="MANUAL_ADJUSTMENT">手动修改</ElRadioButton>
@@ -18,13 +17,10 @@
         <ElRadioButton value="budget">预算调整</ElRadioButton>
       </ElRadioGroup>
     </div>
-
     <div class="adj-history-table">
       <ElTable :data="filteredRecords" size="small" max-height="420" stripe empty-text="暂无数据">
         <ElTableColumn prop="adjustment_time" label="时间" min-width="155">
-          <template #default="{ row }">
-            {{ formatTime(row.adjustment_time) }}
-          </template>
+          <template #default="{ row }">{{ formatTime(row.adjustment_time) }}</template>
         </ElTableColumn>
         <ElTableColumn prop="execution_type" label="类型" width="100">
           <template #default="{ row }">
@@ -41,14 +37,10 @@
           </template>
         </ElTableColumn>
         <ElTableColumn prop="before" label="调整前" width="80" align="right">
-          <template #default="{ row }">
-            {{ row.bid_before ?? row.budget_before ?? "-" }}
-          </template>
+          <template #default="{ row }">{{ row.bid_before ?? row.budget_before ?? "-" }}</template>
         </ElTableColumn>
         <ElTableColumn prop="after" label="调整后" width="80" align="right">
-          <template #default="{ row }">
-            {{ row.bid_after ?? row.budget_after ?? "-" }}
-          </template>
+          <template #default="{ row }">{{ row.bid_after ?? row.budget_after ?? "-" }}</template>
         </ElTableColumn>
         <ElTableColumn label="操作人/规则" width="140" show-overflow-tooltip>
           <template #default="{ row }">
@@ -69,7 +61,6 @@
         <ElTableColumn prop="msg" label="说明" min-width="150" show-overflow-tooltip />
       </ElTable>
     </div>
-
     <div class="adj-history-footer">
       <span>共 {{ filteredRecords.length }} 条</span>
     </div>
@@ -83,7 +74,7 @@
  * 支持按类型筛选（自动规则/手动修改/分时开始/分时回调/暂停启用/预算调整）。
  * 通过 ref.open(params) 调用，params 需包含 entity_id + profile_id。
  */
-import { ref, computed, nextTick } from "vue";
+import { ref, computed } from "vue";
 import {
   ElDialog,
   ElTable,
@@ -128,6 +119,8 @@ const TYPE_TAGS: Record<string, string> = {
 const visible = ref(false);
 /** 弹窗标题 */
 const title = ref("");
+/** radio-group 重渲染 key，每次打开弹窗递增强制刷新 */
+const dialogKey = ref(0);
 /** 当前选中的类型筛选值，空字符串=全部 */
 const filterType = ref("");
 /** 店铺站点时区（IANA 名），用于时间显示 */
@@ -207,21 +200,6 @@ function formatTime(time: string): string {
 }
 
 /**
- * 弹窗打开完成回调：强制 filterType 刷新一次，
- * 解决页面刷新后 el-radio-button 未正确渲染的时序问题。
- */
-let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-function onDialogOpened(): void {
-  if (refreshTimer) clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(() => {
-    filterType.value = "";
-    nextTick(() => {
-      filterType.value = "";
-    });
-  }, 50);
-}
-
-/**
  * 打开弹窗并加载调整历史数据。
  * 由父组件通过 defineExpose 的 ref 调用。
  *
@@ -236,8 +214,9 @@ async function open(params: Record<string, number | string>): Promise<void> {
     const res = await getAdjustmentHistory(params);
     allRecords.value = res.records || [];
     storeTimezone.value = (res as any).timezone || "";
+    dialogKey.value++;
   } finally {
-    // loading handled by parent if needed
+    // 数据加载完成后 filterType 保持 ""（全部）
   }
 }
 
@@ -250,9 +229,6 @@ defineExpose({ open });
 }
 .adj-history-filters {
   margin-bottom: var(--spacing-2, 10px);
-}
-.adj-history-table {
-  min-height: 360px;
 }
 .adj-history-footer {
   margin-top: 8px;
@@ -270,7 +246,7 @@ defineExpose({ open });
   white-space: pre-line;
 }
 
-/* 覆盖各父组件泄漏到弹窗的 el-table 表头样式 */
+/* 覆盖各父组件泄漏到弹窗的 el-table 样式 */
 .adj-history-dialog .el-table__header-wrapper th.el-table__cell {
   height: 32px !important;
   padding: 2px 0 !important;
@@ -283,5 +259,11 @@ defineExpose({ open });
 }
 .adj-history-dialog .el-table .cell {
   padding: 0 8px;
+}
+.adj-history-dialog .el-table__empty-block {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>
