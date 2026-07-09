@@ -7,7 +7,7 @@
     class="adj-history-dialog"
   >
     <div class="adj-history-filters">
-      <ElRadioGroup v-model="filterType" size="small" @change="handleFilter">
+      <ElRadioGroup v-model="filterType" size="small">
         <ElRadioButton value="">全部</ElRadioButton>
         <ElRadioButton value="BID_ADJUSTMENT">自动规则</ElRadioButton>
         <ElRadioButton value="MANUAL_ADJUSTMENT">手动修改</ElRadioButton>
@@ -26,7 +26,12 @@
       </ElTableColumn>
       <ElTableColumn prop="execution_type" label="类型" width="100">
         <template #default="{ row }">
-          <ElTooltip :content="typeDetail(row)" placement="top" :show-after="300">
+          <ElTooltip
+            :content="typeDetail(row)"
+            placement="top"
+            :show-after="300"
+            popper-class="adj-detail-tooltip"
+          >
             <ElTag :type="typeTag(row.execution_type)" size="small" effect="plain">
               {{ typeLabel(row.execution_type) }}
             </ElTag>
@@ -69,10 +74,11 @@
 </template>
 
 <script setup lang="ts">
-/** 投放实体调整历史记录弹窗。
- *  展示关键词/定位组/商品投放/广告活动的完整竞价和状态变更历史，
- *  支持按类型筛选（自动规则/手动修改/分时开始/分时回调/暂停启用/预算调整）。
- *  通过 ref.open(params) 调用，params 需包含 entity_id + profile_id。
+/**
+ * 投放实体调整历史记录弹窗。
+ * 展示关键词/定位组/商品投放/广告活动的完整竞价和状态变更历史，
+ * 支持按类型筛选（自动规则/手动修改/分时开始/分时回调/暂停启用/预算调整）。
+ * 通过 ref.open(params) 调用，params 需包含 entity_id + profile_id。
  */
 import { ref, computed } from "vue";
 import {
@@ -149,33 +155,46 @@ function typeTag(type: string): "success" | "warning" | "info" | "danger" {
 }
 
 /**
- * 悬停时显示的完整调整详情。
- * 自动规则：显示规则名 + 竞价变化 + msg
- * 分时调价：显示策略名 + 竞价变化 + msg
- * 手动修改：显示操作人 + 竞价变化 + msg
+ * 悬停时显示的完整调整详情，与竞价 * 星标格式一致。
+ *
+ * 自动规则：规则组「新广告 8-30（一）」—「AUTO 广告活动 规则一」规则
+ *           时间  竞价 0.14 → 0.12
+ *           竞价调整成功 0.14 → 0.12
+ * 分时调价：分时策略「通用竞价分时」
+ * 手动修改：由 陈慧瑩 完成
  */
 function typeDetail(row: AdjustmentHistoryItem): string {
-  const parts: string[] = [];
+  const lines: string[] = [];
 
   if (row.rule_name) {
-    parts.push(`「${row.rule_name}」规则修改`);
+    const prefix = row.group_name ? `规则组「${row.group_name}」—` : "";
+    lines.push(`${prefix}「${row.rule_name}」规则`);
   } else if (row.strategy_name) {
-    parts.push(`分时策略「${row.strategy_name}」`);
+    lines.push(`分时策略「${row.strategy_name}」`);
   } else if (row.operator) {
-    parts.push(`由 ${row.operator} 完成`);
+    lines.push(`由 ${row.operator} 完成`);
+  } else {
+    lines.push(typeLabel(row.execution_type));
   }
 
+  const timeInfo: string[] = [];
+  if (row.adjustment_time) {
+    timeInfo.push(formatTime(row.adjustment_time));
+  }
   if (row.bid_before !== undefined && row.bid_before !== null) {
-    parts.push(`竞价 ${row.bid_before} → ${row.bid_after}`);
+    timeInfo.push(`竞价 ${row.bid_before} → ${row.bid_after}`);
   } else if (row.budget_before !== undefined && row.budget_before !== null) {
-    parts.push(`预算 ${row.budget_before} → ${row.budget_after}`);
+    timeInfo.push(`预算 ${row.budget_before} → ${row.budget_after}`);
+  }
+  if (timeInfo.length) {
+    lines.push(timeInfo.join("  "));
   }
 
   if (row.msg) {
-    parts.push(row.msg);
+    lines.push(row.msg);
   }
 
-  return parts.join(" | ") || typeLabel(row.execution_type);
+  return lines.join("\n") || typeLabel(row.execution_type);
 }
 
 /**
@@ -184,11 +203,6 @@ function typeDetail(row: AdjustmentHistoryItem): string {
  */
 function formatTime(time: string): string {
   return formatTimeInZone(time, storeTimezone.value || undefined);
-}
-
-/** 筛选类型切换回调（computed 已自动处理，函数仅用于绑定） */
-function handleFilter(): void {
-  // noop — filteredRecords computed 已响应 filterType 变化
 }
 
 /**
@@ -224,8 +238,17 @@ defineExpose({ open });
 }
 .adj-history-footer {
   margin-top: 8px;
+  text-align: right;
   font-size: 12px;
   color: var(--text-secondary, #909399);
-  text-align: right;
+}
+</style>
+
+<style>
+.adj-detail-tooltip {
+  max-width: 420px;
+  white-space: pre-line;
+  font-size: 12px;
+  line-height: 1.6;
 }
 </style>

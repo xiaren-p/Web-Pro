@@ -8,9 +8,36 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from apps.ads.sp.rules.models.lx_ad_rule import LxAdRule
+from apps.ads.sp.rules.models.lx_ad_rule_group import LxAdRuleGroup
 from apps.ads.sp.rules.models.sp_bid_adjustment import SpBidAdjustment
 from apps.ads.sp.rules.models.sp_campaign_adjustment import SpCampaignAdjustment
 from apps.ads.sp.timing.models.lx_time_pricing_strategy import LxTimePricingStrategy
+
+
+def _build_group_name_map(rule_ids: set[int]) -> dict[int, str]:
+    """批量查询 rule_id → LxAdRuleGroup.name 映射。
+
+    遍历所有规则组的 rule_order，找出每个 rule_id 属于哪个组。
+
+    Args:
+        rule_ids: 规则 ID 集合
+
+    Returns:
+        {rule_id: group_name}
+    """
+    if not rule_ids:
+        return {}
+    result: dict[int, str] = {}
+    for group in LxAdRuleGroup.objects.filter(
+        rule_order__overlap=list(rule_ids),
+    ):
+        for rid in (group.rule_order or []):
+            try:
+                if int(rid) in rule_ids:
+                    result[int(rid)] = group.name
+            except (ValueError, TypeError):
+                continue
+    return result
 
 
 def _build_rule_name_map(records: list[SpBidAdjustment]) -> dict[int, str]:
@@ -107,6 +134,8 @@ def query_entity_adjustment_history(
 
     rule_name_map = _build_rule_name_map(records)
     strategy_name_map = _build_strategy_name_map(records)
+    rule_ids = {r.auto_rule_id for r in records if r.auto_rule_id}
+    group_name_map = _build_group_name_map(rule_ids)
 
     return [
         {
@@ -122,6 +151,7 @@ def query_entity_adjustment_history(
             "time_pricing_rule_id": r.time_pricing_rule_id,
             "rule_name": rule_name_map.get(r.auto_rule_id or 0, ""),
             "strategy_name": strategy_name_map.get(r.time_pricing_rule_id or 0, ""),
+            "group_name": group_name_map.get(r.auto_rule_id or 0, ""),
         }
         for r in records
     ]
@@ -151,6 +181,8 @@ def query_campaign_adjustment_history(
     ).order_by("-adjustment_time"))
 
     rule_name_map = _build_campaign_rule_name_map(records)
+    rule_ids = {r.auto_rule_id for r in records if r.auto_rule_id}
+    group_name_map = _build_group_name_map(rule_ids)
 
     return [
         {
@@ -164,6 +196,7 @@ def query_campaign_adjustment_history(
             "execution_status": r.execution_status,
             "auto_rule_id": r.auto_rule_id,
             "rule_name": rule_name_map.get(r.auto_rule_id or 0, ""),
+            "group_name": group_name_map.get(r.auto_rule_id or 0, ""),
         }
         for r in records
     ]

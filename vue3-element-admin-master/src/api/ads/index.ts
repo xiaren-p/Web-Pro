@@ -904,6 +904,7 @@ export interface AdjustmentHistoryItem {
   time_pricing_rule_id?: number;
   rule_name?: string;
   strategy_name?: string;
+  group_name?: string;
 }
 
 /** 调整历史响应 */
