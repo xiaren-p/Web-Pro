@@ -265,7 +265,7 @@ Returns:
     records = list(SpBidAdjustment.objects.filter(
         adjustment_status=AdjustmentStatusChoices.PENDING,
         created_at__gte=timezone.now() - timezone.timedelta(hours=2),
-    ).order_by("profile_id"))
+    ).order_by("profile_id", "adjustment_time"))
     if not records:
         logger.info("[bid_adjustment] 无待执行记录")
         return {"processed": 0, "success": 0, "failed": 0, "errors": []}
@@ -289,11 +289,19 @@ Returns:
             sid = _get_profile_sid(profile_id)
             keywords: list[tuple[SpBidAdjustment, dict]] = []
             targets: list[tuple[SpBidAdjustment, dict]] = []
+            seen_kw: set[int] = set()
+            seen_tg: set[int] = set()
 
             for rec in group:
                 if rec.keyword_id:
+                    if rec.keyword_id in seen_kw:
+                        continue
+                    seen_kw.add(rec.keyword_id)
                     keywords.append((rec, _build_payload(rec)))
                 else:
+                    if rec.target_id in seen_tg:
+                        continue
+                    seen_tg.add(rec.target_id)
                     targets.append((rec, _build_payload(rec)))
                 all_updates.append(rec)
                 processed += 1

@@ -268,7 +268,7 @@ Returns:
     records = list(SpCampaignAdjustment.objects.filter(
         adjustment_status=AdjustmentStatusChoices.PENDING,
         created_at__gte=timezone.now() - timezone.timedelta(hours=2),
-    ).order_by("profile_id"))
+    ).order_by("profile_id", "adjustment_time"))
     if not records:
         logger.info("[campaign_adjustment] 无待执行记录")
         return {"processed": 0, "success": 0, "failed": 0, "errors": []}
@@ -292,7 +292,11 @@ Returns:
             sid = _get_profile_sid(profile_id)
 
             campaign_pairs: list[tuple[SpCampaignAdjustment, dict]] = []
+            seen_campaign: set[int] = set()
             for rec in group:
+                if rec.campaign_id in seen_campaign:
+                    continue
+                seen_campaign.add(rec.campaign_id)
                 campaign_pairs.append((rec, _build_payload(rec)))
                 all_updates.append(rec)
                 processed += 1
