@@ -31,19 +31,6 @@
 
       <span style="flex: 1" />
 
-      <el-tooltip content="切换查看不同投放类型" placement="top">
-        <el-icon
-          class="mode-switch-hint"
-          style="margin-right: 6px; font-size: 14px; color: var(--text-tertiary); cursor: help"
-        >
-          <QuestionFilled />
-        </el-icon>
-      </el-tooltip>
-      <el-button-group size="small" style="margin-right: 6px">
-        <el-button @click="emit('switch-mode')">关键词</el-button>
-        <el-button type="primary" disabled>商品</el-button>
-      </el-button-group>
-
       <el-tooltip content="列配置" placement="top">
         <el-button
           text
@@ -312,14 +299,7 @@
  */
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import {
-  Operation,
-  VideoPause,
-  ArrowDown,
-  QuestionFilled,
-  CircleClose,
-  Clock,
-} from "@element-plus/icons-vue";
+import { Operation, VideoPause, ArrowDown, CircleClose, Clock } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import BatchBidAdjustDialog from "@/components/BatchBidAdjustDialog/index.vue";
@@ -342,7 +322,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "target-bid", payload: { row: any; bid: number }): void;
   (e: "target-state", payload: { row: any; state: "enabled" | "paused" }): void;
-  (e: "switch-mode"): void;
 }>();
 
 const loading = ref(false);
@@ -863,19 +842,11 @@ onMounted(() => {
   height: 100%;
 }
 
-.filter-bar {
-  display: flex;
+.filter-item {
   flex-shrink: 0;
-  gap: 10px;
-  align-items: center;
-  padding: 8px 0;
-
-  .filter-item {
-    flex-shrink: 0;
-  }
-  .w-110 {
-    width: 110px;
-  }
+}
+.w-110 {
+  width: 110px;
 }
 
 .data-table-container {
