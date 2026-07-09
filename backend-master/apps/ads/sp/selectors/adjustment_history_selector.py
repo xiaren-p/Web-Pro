@@ -14,6 +14,17 @@ from apps.ads.sp.timing.models.lx_time_pricing_strategy import LxTimePricingStra
 
 
 def _build_rule_name_map(records: list[SpBidAdjustment]) -> dict[int, str]:
+    """批量查询 auto_rule_id → LxAdRule.name 映射。
+
+    从 SpBidAdjustment 记录中收集所有非空的 auto_rule_id，
+    一次 DB 查询取出对应规则名称，避免 N+1 查询。
+
+    Args:
+        records: 竞价调整记录列表
+
+    Returns:
+        {rule_id: rule_name}
+    """
     rule_ids = {r.auto_rule_id for r in records if r.auto_rule_id}
     if not rule_ids:
         return {}
@@ -23,6 +34,17 @@ def _build_rule_name_map(records: list[SpBidAdjustment]) -> dict[int, str]:
 
 
 def _build_strategy_name_map(records: list[SpBidAdjustment]) -> dict[int, str]:
+    """批量查询 time_pricing_rule_id → LxTimePricingStrategy.name 映射。
+
+    从 SpBidAdjustment 记录中收集所有非空的 time_pricing_rule_id，
+    一次 DB 查询取出对应策略名称，避免 N+1 查询。
+
+    Args:
+        records: 竞价调整记录列表
+
+    Returns:
+        {strategy_id: strategy_name}
+    """
     tp_ids = {r.time_pricing_rule_id for r in records if r.time_pricing_rule_id}
     if not tp_ids:
         return {}
@@ -34,6 +56,17 @@ def _build_strategy_name_map(records: list[SpBidAdjustment]) -> dict[int, str]:
 
 
 def _build_campaign_rule_name_map(records: list[SpCampaignAdjustment]) -> dict[int, str]:
+    """批量查询 SpCampaignAdjustment.auto_rule_id → LxAdRule.name 映射。
+
+    从广告活动调整记录中收集所有非空的 auto_rule_id，
+    一次 DB 查询取出对应规则名称。
+
+    Args:
+        records: 广告活动调整记录列表
+
+    Returns:
+        {rule_id: rule_name}
+    """
     rule_ids = {r.auto_rule_id for r in records if r.auto_rule_id}
     if not rule_ids:
         return {}

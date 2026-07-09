@@ -69,11 +69,17 @@
 </template>
 
 <script setup lang="ts">
+/** 投放实体调整历史记录弹窗。
+ *  展示关键词/定位组/商品投放/广告活动的完整竞价和状态变更历史，
+ *  支持按类型筛选（自动规则/手动修改/分时开始/分时回调/暂停启用/预算调整）。
+ *  通过 ref.open(params) 调用，params 需包含 entity_id + profile_id。
+ */
 import { ref, computed } from "vue";
 import { ElDialog, ElTable, ElTableColumn, ElTag, ElRadioGroup, ElRadioButton, ElTooltip } from "element-plus";
 import { getAdjustmentHistory, type AdjustmentHistoryItem } from "@/api/ads";
 import { formatTimeInZone } from "@/utils/timezones";
 
+/** 执行类型中文标签映射，与后端 ExecutionTypeChoices 保持一致 */
 const TYPE_LABELS: Record<string, string> = {
   BID_ADJUSTMENT: "自动规则",
   MANUAL_ADJUSTMENT: "手动修改",
@@ -87,6 +93,7 @@ const TYPE_LABELS: Record<string, string> = {
   CAMPAIGN_ENABLE: "活动启用",
 };
 
+/** 执行类型 Element Plus Tag 颜色映射 */
 const TYPE_TAGS: Record<string, string> = {
   BID_ADJUSTMENT: "",
   MANUAL_ADJUSTMENT: "success",
@@ -100,27 +107,45 @@ const TYPE_TAGS: Record<string, string> = {
   CAMPAIGN_ENABLE: "success",
 };
 
+/** 弹窗可见性 */
 const visible = ref(false);
+/** 弹窗标题 */
 const title = ref("");
+/** 当前选中的类型筛选值，空字符串=全部 */
 const filterType = ref("");
+/** 店铺站点时区（IANA 名），用于时间显示 */
 const storeTimezone = ref("");
+/** 全量调整记录 */
 const allRecords = ref<AdjustmentHistoryItem[]>([]);
+/** 加载状态 */
 const loading = ref(false);
 
+/**
+ * 根据当前 filterType 筛选记录。
+ * 空值=全部，可支持逗号分隔的多类型筛选。
+ */
 const filteredRecords = computed(() => {
   if (!filterType.value) return allRecords.value;
   const types = filterType.value.split(",");
   return allRecords.value.filter((r) => types.includes(r.execution_type));
 });
 
+/** 执行类型 → 中文标签 */
 function typeLabel(type: string): string {
   return TYPE_LABELS[type] || type;
 }
 
+/** 执行类型 → Element Plus Tag 颜色 */
 function typeTag(type: string): "success" | "warning" | "info" | "danger" {
   return (TYPE_TAGS[type] as any) || "info";
 }
 
+/**
+ * 悬停时显示的完整调整详情。
+ * 自动规则：显示规则名 + 竞价变化 + msg
+ * 分时调价：显示策略名 + 竞价变化 + msg
+ * 手动修改：显示操作人 + 竞价变化 + msg
+ */
 function typeDetail(row: AdjustmentHistoryItem): string {
   const parts: string[] = []
 
@@ -145,14 +170,25 @@ function typeDetail(row: AdjustmentHistoryItem): string {
   return parts.join(" | ") || typeLabel(row.execution_type)
 }
 
+/**
+ * 将 UTC ISO 时间按店铺时区格式化为本地时间字符串。
+ * 时区信息由后端 getAdjustmentHistory 响应的 timezone 字段提供。
+ */
 function formatTime(time: string): string {
   return formatTimeInZone(time, storeTimezone.value || undefined);
 }
 
+/** 筛选类型切换回调（computed 已自动处理，函数仅用于绑定） */
 function handleFilter(): void {
-  // filterType computed already handles it
+  // noop — filteredRecords computed 已响应 filterType 变化
 }
 
+/**
+ * 打开弹窗并加载调整历史数据。
+ * 由父组件通过 defineExpose 的 ref 调用。
+ *
+ * @param params - { keyword_id | target_id | campaign_id, profile_id }
+ */
 async function open(params: Record<string, number | string>): Promise<void> {
   visible.value = true;
   title.value = "调整历史";
@@ -176,12 +212,12 @@ defineExpose({ open });
   padding: 12px 20px;
 }
 .adj-history-filters {
-  margin-bottom: 10px;
+  margin-bottom: var(--spacing-2, 10px);
 }
 .adj-history-footer {
   margin-top: 8px;
-  font-size: 12px;
-  color: #909399;
   text-align: right;
+  font-size: 12px;
+  color: var(--text-secondary, #909399);
 }
 </style>

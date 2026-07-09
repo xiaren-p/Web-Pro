@@ -1,4 +1,5 @@
 """投放实体调整历史查询视图。"""
+
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -13,6 +14,7 @@ from apps.ads.sp.selectors.adjustment_history_selector import (
 )
 from apps.common.utils.responses import drf_error, drf_ok
 
+# 认证 + 权限配置
 _AUTH = [BearerTokenAuthentication]
 _PERM = [IsApiAccessible]
 
@@ -29,6 +31,10 @@ def get_adjustment_history(request: Request) -> Response:
         campaign_id: int
         profile_id:  int  (必填)
         days:        int  (可选，默认 90)
+
+    Returns:
+        drf_ok({total, records, timezone})
+        - timezone: 店铺 IANA 时区名，供前端按站点时间显示
     """
     profile_id = request.query_params.get("profile_id")
     if not profile_id:

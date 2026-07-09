@@ -915,6 +915,10 @@ export interface AdjustmentHistoryResponse {
 
 /**
  * 查询投放实体或广告活动的调整历史。
+ * 包含自动规则、手动修改、分时调价、暂停/启用、预算调整所有类型。
+ *
+ * @param params - { keyword_id | target_id | campaign_id, profile_id }
+ * @returns 调整历史响应，含全量记录和店铺时区信息
  */
 export function getAdjustmentHistory(
   params: Record<string, number | string>
