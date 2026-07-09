@@ -256,4 +256,14 @@ defineExpose({ open });
   font-size: 12px;
   line-height: 1.6;
 }
+
+.adj-history-dialog .el-table th.el-table__cell {
+  height: 36px;
+  padding: 4px 0;
+  line-height: 28px;
+  font-size: 12px;
+}
+.adj-history-dialog .el-table td.el-table__cell {
+  padding: 6px 0;
+}
 </style>
