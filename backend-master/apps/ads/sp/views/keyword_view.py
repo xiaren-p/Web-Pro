@@ -121,8 +121,11 @@ class KeywordViewSet(viewsets.ViewSet):
         if keyword:
             qs = qs.filter(keyword_text__icontains=keyword)
 
-        # 分页
-        total, items, p_num, p_size = paginate_queryset(request, qs)
+        # 获取全量数据（先全量排序再分页）
+        all_items = list(qs)
+        total = len(all_items)
+        page_num = max(1, int(data.get("pageNum", 1)))
+        page_size = min(max(1, int(data.get("pageSize", 25))), 250)
 
         # 主题：货币符号（LxAdsProfile → LxExchangeRate，一步查表）
         currency_icon = resolve_currency_icon(profile_id)
@@ -155,7 +158,7 @@ class KeywordViewSet(viewsets.ViewSet):
 
         # 主题：广告组名称批量映射
         item_ad_group_ids = list({
-            item.ad_group_id for item in items if item.ad_group_id
+            item.ad_group_id for item in all_items if item.ad_group_id
         })
         adgroup_map: dict[int, str] = {}
         adgroup_state_map: dict[int, str] = {}
@@ -185,7 +188,7 @@ class KeywordViewSet(viewsets.ViewSet):
 
         # 主题：组装响应列表
         res_list: list[dict[str, Any]] = []
-        for item in items:
+        for item in all_items:
             gid_val = item.ad_group_id
             match_type_val = str(item.match_type or "")
 
@@ -216,7 +219,7 @@ class KeywordViewSet(viewsets.ViewSet):
             res_list.append(row)
 
         # 主题：最近修改信息（拆分为状态变更和竞价变更两路，供两个星标各自展示）
-        keyword_ids = [str(k.keyword_id) for k in items if k.keyword_id]
+        keyword_ids = [str(k.keyword_id) for k in all_items if k.keyword_id]
         pid = int(profile_id)
         state_adj_map = build_bid_latest_adjustment_map(
             keyword_ids, "keyword_id", pid,
@@ -253,13 +256,17 @@ class KeywordViewSet(viewsets.ViewSet):
                 reverse=reverse,
             )
 
+        # 手动分页切片
+        start = (page_num - 1) * page_size
+        res_list_page = res_list[start:start + page_size]
+
         return drf_ok({
             "total": total,
-            "list": res_list,
+            "list": res_list_page,
             "summary": summary,
             "currency_icon": currency_icon,
-            "pageNum": p_num,
-            "pageSize": p_size,
+            "pageNum": page_num,
+            "pageSize": page_size,
         })
 
     @staticmethod

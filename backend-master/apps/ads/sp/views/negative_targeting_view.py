@@ -39,7 +39,7 @@ from apps.ads.sp.services.ads_metrics_service import (
 from apps.ads.utils.ad_status import resolve_service_status
 from apps.common.utils.pagination import paginate_queryset
 from apps.common.utils.responses import drf_ok
-from apps.ads.views._helpers import NEGATIVE_TYPE_LABEL
+from apps.ads.views._helpers import NEGATIVE_TYPE_LABEL, _sortable_val
 
 
 class AutoNegativeTargetingViewSet(viewsets.ViewSet):
@@ -124,8 +124,11 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
         if keyword:
             qs = qs.filter(negative_text__icontains=keyword)
 
-        # 分页
-        total, items, p_num, p_size = paginate_queryset(request, qs)
+        # 获取全量数据（先全量排序再分页）
+        all_items = list(qs)
+        total = len(all_items)
+        page_num = max(1, int(data.get("pageNum", 1)))
+        page_size = min(max(1, int(data.get("pageSize", 25))), 250)
 
         # 主题：货币符号（LxAdsProfile → LxExchangeRate，一步查表）
         currency_icon = resolve_currency_icon(profile_id)
@@ -150,7 +153,7 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
 
         # 主题：广告组名称批量映射
         item_ad_group_ids = list({
-            item.ad_group_id for item in items if item.ad_group_id
+            item.ad_group_id for item in all_items if item.ad_group_id
         })
         adgroup_map: dict[int, str] = {}
         adgroup_state_map: dict[int, str] = {}
@@ -174,7 +177,7 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
 
         # 主题：组装响应列表
         res_list: list[dict[str, Any]] = []
-        for item in items:
+        for item in all_items:
             gid_val = item.ad_group_id
             exp_type_val = str(item.negative_type or "")
 
@@ -206,13 +209,23 @@ class AutoNegativeTargetingViewSet(viewsets.ViewSet):
             )
             res_list.append(row)
 
+        sort_prop = str(data.get("sort_prop") or "").strip()
+        sort_order = str(data.get("sort_order") or "").strip()
+        if sort_prop and res_list:
+            reverse = sort_order == "desc"
+            res_list.sort(key=lambda r: _sortable_val(r.get(sort_prop)), reverse=reverse)
+
+        # 手动分页切片
+        start = (page_num - 1) * page_size
+        res_list_page = res_list[start:start + page_size]
+
         return drf_ok({
             "total": total,
-            "list": res_list,
+            "list": res_list_page,
             "summary": summary,
             "currency_icon": currency_icon,
-            "pageNum": p_num,
-            "pageSize": p_size,
+            "pageNum": page_num,
+            "pageSize": page_size,
         })
 
     @staticmethod

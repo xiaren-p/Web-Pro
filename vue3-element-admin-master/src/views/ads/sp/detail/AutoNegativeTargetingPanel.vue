@@ -67,6 +67,7 @@
         border
         height="calc(100vh - 460px)"
         style="width: 100%"
+        @sort-change="handleSortChange"
       >
         <!-- 固定左：勾选 -->
         <el-table-column
@@ -127,6 +128,7 @@
           :label="col.label"
           :min-width="(col as any).minWidth || 120"
           align="center"
+          :sortable="(col as any).sortable ?? true"
           show-overflow-tooltip
         >
           <template #default="{ row }">
@@ -299,6 +301,9 @@ const filters = reactive({
 // ── 分页状态 ──────────────────────────────────────────
 const pagination = reactive({ pageNum: 1, pageSize: 25, total: 0 });
 
+// ── 排序状态 ──────────────────────────────────────────
+const sortParams = reactive({ prop: "", order: "" });
+
 // ── 数据状态 ──────────────────────────────────────────
 const loading = ref(false);
 const rows = ref<any[]>([]);
@@ -353,6 +358,12 @@ function fetchData(): void {
     keyword: filters.keyword || undefined,
     pageNum: pagination.pageNum,
     pageSize: pagination.pageSize,
+    ...(sortParams.prop && sortParams.order
+      ? {
+          sort_prop: sortParams.prop,
+          sort_order: sortParams.order === "ascending" ? "asc" : "desc",
+        }
+      : {}),
   };
 
   getAutoNegativeTargeting(params)
@@ -374,7 +385,16 @@ function onSearch(): void {
   fetchData();
 }
 
+function handleSortChange({ prop, order }: { prop: string; order: string }): void {
+  sortParams.prop = prop || "";
+  sortParams.order = order || "";
+  pagination.pageNum = 1;
+  fetchData();
+}
+
 function onReset(): void {
+  sortParams.prop = "";
+  sortParams.order = "";
   filters.range =
     props.initialDateRange?.length === 2 ? [...props.initialDateRange] : getDefaultDateRange();
   filters.state = "";

@@ -141,8 +141,11 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         if state:
             qs = qs.filter(state=state)
 
-        # 分页
-        total, items, p_num, p_size = paginate_queryset(request, qs)
+        # 获取全量数据（先全量排序再分页）
+        all_items = list(qs)
+        total = len(all_items)
+        page_num = max(1, int(data.get("pageNum", 1)))
+        page_size = min(max(1, int(data.get("pageSize", 25))), 250)
 
         # 主题：货币符号（LxAdsProfile → LxExchangeRate，一步查表）
         currency_icon = resolve_currency_icon(profile_id)
@@ -175,7 +178,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
 
         # 主题：广告组名称批量映射
         item_ad_group_ids = list({
-            item.ad_group_id for item in items if item.ad_group_id
+            item.ad_group_id for item in all_items if item.ad_group_id
         })
         adgroup_map: dict[int, str] = {}
         adgroup_state_map: dict[int, str] = {}
@@ -205,7 +208,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
 
         # 主题：组装响应列表
         res_list: list[dict[str, Any]] = []
-        for item in items:
+        for item in all_items:
             gid_val = item.ad_group_id
 
             row: dict[str, Any] = {
@@ -238,7 +241,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             res_list.append(row)
 
          # 主题：最近修改信息（拆分为状态变更和竞价变更两路）
-        target_ids = [str(it.target_id) for it in items if it.target_id]
+        target_ids = [str(it.target_id) for it in all_items if it.target_id]
         state_adj_map = build_bid_latest_adjustment_map(
             target_ids, "target_id", profile_id,
             types={BidExecutionTypeChoices.BID_PAUSE, BidExecutionTypeChoices.BID_ENABLE},
@@ -271,13 +274,17 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             reverse = sort_order == "desc"
             res_list.sort(key=lambda r: _sortable_val(r.get(sort_prop)), reverse=reverse)
 
+        # 手动分页切片
+        start = (page_num - 1) * page_size
+        res_list_page = res_list[start:start + page_size]
+
         return drf_ok({
             "total": total,
-            "list": res_list,
+            "list": res_list_page,
             "summary": summary,
             "currency_icon": currency_icon,
-            "pageNum": p_num,
-            "pageSize": p_size,
+            "pageNum": page_num,
+            "pageSize": page_size,
         })
 
     @staticmethod
@@ -417,7 +424,11 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         if state:
             qs = qs.filter(state=state)
 
-        total, items, p_num, p_size = paginate_queryset(request, qs)
+        # 获取全量数据（先全量排序再分页）
+        all_items = list(qs)
+        total = len(all_items)
+        page_num = max(1, int(data.get("pageNum", 1)))
+        page_size = min(max(1, int(data.get("pageSize", 25))), 250)
 
         currency_icon = resolve_currency_icon(int(profile_id))
 
@@ -439,13 +450,13 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         except LxSpCampaign.DoesNotExist:
             pass
 
-        target_ids = [str(it.target_id) for it in items]
+        target_ids = [str(it.target_id) for it in all_items]
         metrics_map, summary = self._build_target_metrics(
             target_ids, int(campaign_id), int(profile_id),
             date_start, date_end, currency_icon,
         )
 
-        ad_group_ids = {it.ad_group_id for it in items if it.ad_group_id}
+        ad_group_ids = {it.ad_group_id for it in all_items if it.ad_group_id}
         adgroup_map = {}
         adgroup_default_bid_map: dict[str, float] = {}
         campaign_map = {}
@@ -465,7 +476,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
                         pass
 
         res_list = []
-        for item in items:
+        for item in all_items:
             row = {
                 "target_id": item.target_id,
                 "campaign_id": item.campaign_id,
@@ -491,7 +502,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             res_list.append(row)
 
          # 主题：最近修改信息（product targeting - 拆分为状态和竞价两路）
-        target_ids = [str(it.target_id) for it in items if it.target_id]
+        target_ids = [str(it.target_id) for it in all_items if it.target_id]
         state_adj_map = build_bid_latest_adjustment_map(
             target_ids, "target_id", profile_id,
             types={BidExecutionTypeChoices.BID_PAUSE, BidExecutionTypeChoices.BID_ENABLE},
@@ -524,13 +535,17 @@ class AutoTargetingViewSet(viewsets.ViewSet):
             reverse = sort_order == "desc"
             res_list.sort(key=lambda r: _sortable_val(r.get(sort_prop)), reverse=reverse)
 
+        # 手动分页切片
+        start = (page_num - 1) * page_size
+        res_list_page = res_list[start:start + page_size]
+
         return drf_ok({
             "total": total,
-            "list": res_list,
+            "list": res_list_page,
             "summary": summary,
             "currency_icon": currency_icon,
-            "pageNum": p_num,
-            "pageSize": p_size,
+            "pageNum": page_num,
+            "pageSize": page_size,
         })
 
     @action(detail=False, methods=["post"], url_path="adjust-bid")
@@ -744,7 +759,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         is_tp = is_time_pricing_active(cid_int, pid_int)
         operator = get_operator_name(request)
 
-        item_ids = [int(it["id"]) for it in items if it.get("id")]
+        item_ids = [int(it["id"]) for it in all_items if it.get("id")]
         existing_map: dict[int, LxSpTarget] = {}
         for t in LxSpTarget.objects.filter(
             target_id__in=item_ids, profile_id=pid_int,

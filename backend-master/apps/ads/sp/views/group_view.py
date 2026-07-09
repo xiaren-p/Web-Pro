@@ -124,8 +124,11 @@ class AdGroupViewSet(viewsets.ViewSet):
         if keyword:
             qs = qs.filter(name__icontains=keyword)
 
-        # 分页
-        total, items, p_num, p_size = paginate_queryset(request, qs)
+        # 获取全量数据（先全量排序再分页）
+        all_items = list(qs)
+        total = len(all_items)
+        page_num = max(1, int(data.get("pageNum", 1)))
+        page_size = min(max(1, int(data.get("pageSize", 25))), 250)
 
         # 主题：父广告活动基础信息（同 campaign 下所有广告组共用，单次点查）
         campaign_name = ""
@@ -150,7 +153,7 @@ class AdGroupViewSet(viewsets.ViewSet):
         currency_icon = resolve_currency_icon(profile_id_int)
 
         # 主题：商品广告数量统计（通过 LxSpAd 按 campaign_id + ad_group_id 分组统计）
-        item_ad_group_ids = [item.ad_group_id for item in items if item.ad_group_id]
+        item_ad_group_ids = [item.ad_group_id for item in all_items if item.ad_group_id]
         product_counts: dict[int, int] = {}
         if item_ad_group_ids:
             product_counts = dict(
@@ -171,7 +174,7 @@ class AdGroupViewSet(viewsets.ViewSet):
 
         # 主题：组装响应列表
         res_list = []
-        for item in items:
+        for item in all_items:
             row: dict[str, Any] = {
                 "ad_group_id": item.ad_group_id,
                 "name": item.name or "",
@@ -195,20 +198,24 @@ class AdGroupViewSet(viewsets.ViewSet):
             )
             res_list.append(row)
 
-        # 主题：排序 — 根据前端 sort_prop / sort_order 对 res_list 排序
+        # 主题：排序 — 全量排序后再分页
         sort_prop = str(data.get("sort_prop") or "").strip()
         sort_order = str(data.get("sort_order") or "").strip()
         if sort_prop and res_list:
             reverse = sort_order == "desc"
             res_list.sort(key=lambda r: _sortable_val(r.get(sort_prop)), reverse=reverse)
 
+        # 手动分页切片
+        start = (page_num - 1) * page_size
+        res_list_page = res_list[start:start + page_size]
+
         return drf_ok({
             "total": total,
-            "list": res_list,
+            "list": res_list_page,
             "summary": summary,
             "currency_icon": currency_icon,
-            "pageNum": p_num,
-            "pageSize": p_size,
+            "pageNum": page_num,
+            "pageSize": page_size,
         })
 
     @staticmethod

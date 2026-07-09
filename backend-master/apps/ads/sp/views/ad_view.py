@@ -138,8 +138,11 @@ class AdViewSet(viewsets.ViewSet):
         # 提前获取全量 ad_id（分页前），保证 % 指标分母覆盖完整广告组
         all_ad_ids = [str(ad_id) for ad_id in qs.values_list("ad_id", flat=True)]
 
-        # 分页
-        total, items, p_num, p_size = paginate_queryset(request, qs)
+        # 获取全量数据（先全量排序再分页）
+        all_items = list(qs)
+        total = len(all_items)
+        page_num = max(1, int(data.get("pageNum", 1)))
+        page_size = min(max(1, int(data.get("pageSize", 25))), 250)
 
         # 主题：货币符号（LxAdsProfile.currency_code → LxExchangeRate.code，一步查表）
         currency_icon = resolve_currency_icon(profile_id)
@@ -165,7 +168,7 @@ class AdViewSet(viewsets.ViewSet):
 
         # 主题：广告组名称批量映射
         item_ad_group_ids = list({
-            item.ad_group_id for item in items if item.ad_group_id
+            item.ad_group_id for item in all_items if item.ad_group_id
         })
         adgroup_map: dict[int, str] = {}
         adgroup_state_map: dict[int, str] = {}
@@ -185,7 +188,7 @@ class AdViewSet(viewsets.ViewSet):
         sid = ads_profile.sid if ads_profile else 0
 
         # Step 2：收集本页所有 SKU 并与 LxListingData 做批量匹配
-        item_skus = [item.sku for item in items if item.sku]
+        item_skus = [item.sku for item in all_items if item.sku]
         listing_map: dict[str, dict[str, Any]] = {}
         if item_skus and sid:
             for ld in LxListingData.objects.filter(
@@ -207,7 +210,7 @@ class AdViewSet(viewsets.ViewSet):
 
         # 主题：组装响应列表
         res_list: list[dict[str, Any]] = []
-        for item in items:
+        for item in all_items:
             ld = listing_map.get(item.sku, {})
 
             row: dict[str, Any] = {
@@ -244,18 +247,22 @@ class AdViewSet(viewsets.ViewSet):
             )
             res_list.append(row)
 
-        # 主题：排序 — 根据前端 sort_prop / sort_order 对 res_list 排序
+        # 主题：排序 — 全量排序后再分页
         sort_prop = str(data.get("sort_prop") or "").strip()
         sort_order = str(data.get("sort_order") or "").strip()
         if sort_prop and res_list:
             reverse = sort_order == "desc"
             res_list.sort(key=lambda r: _sortable_val(r.get(sort_prop)), reverse=reverse)
 
+        # 手动分页切片
+        start = (page_num - 1) * page_size
+        res_list_page = res_list[start:start + page_size]
+
         return drf_ok({
             "total": total,
-            "list": res_list,
+            "list": res_list_page,
             "summary": summary,
             "currency_icon": currency_icon,
-            "pageNum": p_num,
-            "pageSize": p_size,
+            "pageNum": page_num,
+            "pageSize": page_size,
         })
