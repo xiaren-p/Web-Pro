@@ -4,6 +4,7 @@
     :title="title"
     width="920px"
     destroy-on-close
+    append-to-body
     class="adj-history-dialog"
   >
     <div class="adj-history-filters">
@@ -246,10 +247,10 @@ defineExpose({ open });
   white-space: pre-line;
 }
 
-/* 覆盖各父组件泄漏到弹窗的 el-table 样式 */
+/* 弹窗表单默认样式（append-to-body 隔离父组件泄漏） */
 .adj-history-dialog .el-table__header-wrapper th.el-table__cell {
-  height: 32px !important;
-  padding: 2px 0 !important;
+  height: 32px;
+  padding: 2px 0;
   font-size: 12px;
   line-height: 28px;
   background: var(--el-table-header-bg-color, #f5f7fa);
