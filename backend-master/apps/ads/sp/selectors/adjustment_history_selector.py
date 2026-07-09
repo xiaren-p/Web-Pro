@@ -7,10 +7,39 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-from django.db.models import Q
-
+from apps.ads.sp.rules.models.lx_ad_rule import LxAdRule
 from apps.ads.sp.rules.models.sp_bid_adjustment import SpBidAdjustment
 from apps.ads.sp.rules.models.sp_campaign_adjustment import SpCampaignAdjustment
+from apps.ads.sp.timing.models.lx_time_pricing_strategy import LxTimePricingStrategy
+
+
+def _build_rule_name_map(records: list[SpBidAdjustment]) -> dict[int, str]:
+    rule_ids = {r.auto_rule_id for r in records if r.auto_rule_id}
+    if not rule_ids:
+        return {}
+    return dict(
+        LxAdRule.objects.filter(id__in=list(rule_ids)).values_list("id", "name")
+    )
+
+
+def _build_strategy_name_map(records: list[SpBidAdjustment]) -> dict[int, str]:
+    tp_ids = {r.time_pricing_rule_id for r in records if r.time_pricing_rule_id}
+    if not tp_ids:
+        return {}
+    return dict(
+        LxTimePricingStrategy.objects.filter(
+            id__in=list(tp_ids),
+        ).values_list("id", "name")
+    )
+
+
+def _build_campaign_rule_name_map(records: list[SpCampaignAdjustment]) -> dict[int, str]:
+    rule_ids = {r.auto_rule_id for r in records if r.auto_rule_id}
+    if not rule_ids:
+        return {}
+    return dict(
+        LxAdRule.objects.filter(id__in=list(rule_ids)).values_list("id", "name")
+    )
 
 
 def query_entity_adjustment_history(
@@ -39,9 +68,12 @@ def query_entity_adjustment_history(
     else:
         filter_kwargs["target_id"] = entity_id
 
-    records = SpBidAdjustment.objects.filter(
+    records = list(SpBidAdjustment.objects.filter(
         **filter_kwargs,
-    ).order_by("-adjustment_time")
+    ).order_by("-adjustment_time"))
+
+    rule_name_map = _build_rule_name_map(records)
+    strategy_name_map = _build_strategy_name_map(records)
 
     return [
         {
@@ -55,6 +87,8 @@ def query_entity_adjustment_history(
             "execution_status": r.execution_status,
             "auto_rule_id": r.auto_rule_id,
             "time_pricing_rule_id": r.time_pricing_rule_id,
+            "rule_name": rule_name_map.get(r.auto_rule_id or 0, ""),
+            "strategy_name": strategy_name_map.get(r.time_pricing_rule_id or 0, ""),
         }
         for r in records
     ]
@@ -77,11 +111,13 @@ def query_campaign_adjustment_history(
           operator, msg, adjustment_status, execution_status}]
     """
     date_start = datetime.now() - timedelta(days=days)
-    records = SpCampaignAdjustment.objects.filter(
+    records = list(SpCampaignAdjustment.objects.filter(
         campaign_id=campaign_id,
         profile_id=profile_id,
         adjustment_time__gte=date_start,
-    ).order_by("-adjustment_time")
+    ).order_by("-adjustment_time"))
+
+    rule_name_map = _build_campaign_rule_name_map(records)
 
     return [
         {
@@ -94,6 +130,7 @@ def query_campaign_adjustment_history(
             "adjustment_status": r.adjustment_status,
             "execution_status": r.execution_status,
             "auto_rule_id": r.auto_rule_id,
+            "rule_name": rule_name_map.get(r.auto_rule_id or 0, ""),
         }
         for r in records
     ]

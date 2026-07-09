@@ -902,6 +902,8 @@ export interface AdjustmentHistoryItem {
   execution_status: string;
   auto_rule_id?: number;
   time_pricing_rule_id?: number;
+  rule_name?: string;
+  strategy_name?: string;
 }
 
 /** 调整历史响应 */

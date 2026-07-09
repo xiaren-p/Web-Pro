@@ -2,7 +2,7 @@
   <ElDialog
     v-model="visible"
     :title="title"
-    width="780px"
+    width="900px"
     destroy-on-close
     class="adj-history-dialog"
   >
@@ -122,20 +122,27 @@ function typeTag(type: string): "success" | "warning" | "info" | "danger" {
 }
 
 function typeDetail(row: AdjustmentHistoryItem): string {
-  const parts: string[] = [];
-  if (row.auto_rule_id) {
-    parts.push(`规则 ID: ${row.auto_rule_id}`);
+  const parts: string[] = []
+
+  if (row.rule_name) {
+    parts.push(`「${row.rule_name}」规则修改`)
+  } else if (row.strategy_name) {
+    parts.push(`分时策略「${row.strategy_name}」`)
+  } else if (row.operator) {
+    parts.push(`由 ${row.operator} 完成`)
   }
-  if (row.time_pricing_rule_id) {
-    parts.push(`分时策略 ID: ${row.time_pricing_rule_id}`);
+
+  if (row.bid_before !== undefined && row.bid_before !== null) {
+    parts.push(`竞价 ${row.bid_before} → ${row.bid_after}`)
+  } else if (row.budget_before !== undefined && row.budget_before !== null) {
+    parts.push(`预算 ${row.budget_before} → ${row.budget_after}`)
   }
-  if (parts.length === 0 && row.operator) {
-    parts.push(`操作人: ${row.operator}`);
-  }
+
   if (row.msg) {
-    parts.push(row.msg);
+    parts.push(row.msg)
   }
-  return parts.join(" | ") || typeLabel(row.execution_type);
+
+  return parts.join(" | ") || typeLabel(row.execution_type)
 }
 
 function formatTime(time: string): string {
