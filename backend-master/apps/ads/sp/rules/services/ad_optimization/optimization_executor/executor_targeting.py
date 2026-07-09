@@ -39,13 +39,13 @@ from apps.ads.sp.rules.models.sp_bid_adjustment import (
 from apps.ads.sp.rules.services.ad_optimization.optimization_executor._shared import (
     BATCH_SIZE,
     DEFAULT_CONDITION_DAYS,
-    DEFAULT_CYCLE_DAYS,
     apply_bid_update,
     calc_adjusted_bid,
     check_all_condition_sets,
     check_time_pricing_link as _shared_check_time_pricing_link,
     execute_budget_action as _shared_execute_budget_action,
     execute_pause_archive_action,
+    get_group_execution_cycle,
     get_last_adjustment_time as _shared_get_last_adjustment_time,
     is_execution_cycle_ok as _shared_is_execution_cycle_ok,
     query_target_report,
@@ -305,6 +305,19 @@ def _execute_single_rule(
     if not _check_time_pricing_link(rule, campaign.campaign_id, campaign.profile_id):
         return None, False
 
+    group_id = rule.get("group_id", 0)
+    cycle = get_group_execution_cycle(group_id)
+    last_time = _get_last_adjustment_time(
+        target["target_id"], campaign.campaign_id, campaign.profile_id,
+    )
+    ok, __ = _is_execution_cycle_ok(last_time, cycle)
+    if not ok:
+        logger.info(
+            "[executor_targeting] 规则「%s」(%s) tg=%d 执行周期未到",
+            rule_name, rule_id, target["target_id"],
+        )
+        return None, False
+
     max_days = DEFAULT_CONDITION_DAYS
     for cs in (rule.get("condition_sets") or []):
         days_val = int(cs.get("days", DEFAULT_CONDITION_DAYS) or DEFAULT_CONDITION_DAYS)
@@ -486,28 +499,9 @@ def execute_targeting_rules() -> dict[str, Any]:
         len(targets), ad_group_skip_count,
     )
 
-    # ── 步骤 2：前置周期跳过（逐条查上次竞价时间，仅影响竞价操作）──
-    cycle_skip_count = 0
-    active_targets: list[dict] = []
-    for target in targets:
-        last_time = _get_last_adjustment_time(
-            target["target_id"], target["campaign_id"], target["profile_id"],
-        )
-        ok, __ = _is_execution_cycle_ok(last_time, DEFAULT_CYCLE_DAYS)
-        if not ok:
-            cycle_skip_count += 1
-            continue
-        active_targets.append(target)
-
-    logger.info(
-        "[executor_targeting] 周期跳过 %d 个，进入执行 %d 个",
-        cycle_skip_count, len(active_targets),
-    )
-
-    if not active_targets:
+    if not targets:
         return {
             "扫描定位组数": len(targets),
-            "周期跳过数": cycle_skip_count,
             "有策略匹配数": 0,
             "执行规则数": 0,
             "受影响定位组数": 0,
@@ -516,7 +510,7 @@ def execute_targeting_rules() -> dict[str, Any]:
         }
 
     # ── 步骤 3：批量加载策略记录 + 广告活动 ──
-    unique_pairs = list({(t["campaign_id"], t["profile_id"]) for t in active_targets})
+    unique_pairs = list({(t["campaign_id"], t["profile_id"]) for t in targets})
     strategy_map: dict[tuple[int, int, str], SpAdOptimizationStrategy] = {}
     campaign_map: dict[tuple[int, int], LxSpCampaign] = {}
 
@@ -548,7 +542,7 @@ def execute_targeting_rules() -> dict[str, Any]:
     executed_rule_count = 0
     affected_targets: set[int] = set()
 
-    for target in active_targets:
+    for target in targets:
         campaign = campaign_map.get((target["campaign_id"], target["profile_id"]))
         if campaign is None:
             continue
@@ -594,13 +588,12 @@ def execute_targeting_rules() -> dict[str, Any]:
 
     logger.info(
         "[executor_targeting] 完成: active=%d, executed=%d, affected=%d, errors=%d",
-        len(active_targets), executed_rule_count,
+        len(targets), executed_rule_count,
         len(affected_targets), len(errors),
     )
 
     return {
         "扫描定位组数": len(targets),
-        "周期跳过数": cycle_skip_count,
         "有策略匹配数": len(strategy_map),
         "执行规则数": executed_rule_count,
         "受影响定位组数": len(affected_targets),

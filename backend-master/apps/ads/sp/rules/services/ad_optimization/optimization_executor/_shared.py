@@ -38,6 +38,28 @@ DEFAULT_CONDITION_DAYS = 30
 # 默认执行周期（天）
 DEFAULT_CYCLE_DAYS = 1
 
+
+def get_group_execution_cycle(group_id: int) -> int:
+    """根据规则组 ID 查询执行周期（天），失败返回默认 1。
+
+    Args:
+        group_id: 规则组 ID
+
+    Returns:
+        执行周期天数。
+    """
+    try:
+        from apps.ads.sp.rules.models.lx_ad_rule_group import LxAdRuleGroup
+        cycle = (
+            LxAdRuleGroup.objects
+            .filter(id=group_id)
+            .values_list("execution_cycle", flat=True)
+            .first()
+        )
+        return cycle if cycle else DEFAULT_CYCLE_DAYS
+    except Exception:
+        return DEFAULT_CYCLE_DAYS
+
 # 批量查询分片大小
 BATCH_SIZE = 500
 
@@ -531,7 +553,9 @@ def execute_budget_action(
 
     # 2. 周期检查
     last_time = get_last_budget_adjustment_time(campaign_id, profile_id)
-    cycle_ok, cycle_reason = is_execution_cycle_ok(last_time, DEFAULT_CYCLE_DAYS)
+    group_id = rule.get("group_id", 0)
+    cycle = get_group_execution_cycle(group_id)
+    cycle_ok, cycle_reason = is_execution_cycle_ok(last_time, cycle)
     if not cycle_ok:
         return {"操作": "预算操作", "状态": "跳过", "原因": cycle_reason}
 

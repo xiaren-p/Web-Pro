@@ -40,7 +40,6 @@ from apps.ads.sp.rules.models.sp_bid_adjustment import (
 from apps.ads.sp.rules.services.ad_optimization.optimization_executor._shared import (
     BATCH_SIZE,
     DEFAULT_CONDITION_DAYS,
-    DEFAULT_CYCLE_DAYS,
     apply_bid_update,
     build_metrics_dict,
     calc_adjusted_bid,
@@ -48,6 +47,7 @@ from apps.ads.sp.rules.services.ad_optimization.optimization_executor._shared im
     check_time_pricing_link as _shared_check_time_pricing_link,
     execute_budget_action as _shared_execute_budget_action,
     execute_pause_archive_action,
+    get_group_execution_cycle,
     get_last_adjustment_time as _shared_get_last_adjustment_time,
     is_execution_cycle_ok as _shared_is_execution_cycle_ok,
     resolve_adjustment_status,
@@ -308,6 +308,19 @@ def _execute_single_rule(
     if not _check_time_pricing_link(rule, campaign.campaign_id, campaign.profile_id):
         return None, False
 
+    group_id = rule.get("group_id", 0)
+    cycle = get_group_execution_cycle(group_id)
+    last_time = _get_last_adjustment_time(
+        keyword["keyword_id"], campaign.campaign_id, campaign.profile_id,
+    )
+    ok, __ = _is_execution_cycle_ok(last_time, cycle)
+    if not ok:
+        logger.info(
+            "[executor_keyword] 规则「%s」(%s) kw=%d 执行周期未到",
+            rule_name, rule_id, keyword["keyword_id"],
+        )
+        return None, False
+
     max_days = DEFAULT_CONDITION_DAYS
     for cs in (rule.get("condition_sets") or []):
         days_val = int(cs.get("days", DEFAULT_CONDITION_DAYS) or DEFAULT_CONDITION_DAYS)
@@ -480,33 +493,15 @@ def execute_keyword_rules() -> dict[str, Any]:
         len(keywords), ad_group_skip_count,
     )
 
-    # ── 步骤 2：前置周期跳过（仅针对竞价操作，不影响预算/其他操作）──
-    cycle_skip_count = 0
-    active_keywords: list[dict] = []
-    for kw in keywords:
-        last_time = _get_last_adjustment_time(
-            kw["keyword_id"], kw["campaign_id"], kw["profile_id"],
-        )
-        ok, __ = _is_execution_cycle_ok(last_time, DEFAULT_CYCLE_DAYS)
-        if not ok:
-            cycle_skip_count += 1
-            continue
-        active_keywords.append(kw)
-
-    logger.info(
-        "[executor_keyword] 周期跳过 %d 个，进入执行 %d 个",
-        cycle_skip_count, len(active_keywords),
-    )
-    if not active_keywords:
+    if not keywords:
         return {
             "扫描关键词数": len(keywords),
-            "周期跳过数": cycle_skip_count,
             "有策略匹配数": 0, "执行规则数": 0,
             "受影响关键词数": 0, "结果详情": [], "错误列表": [],
         }
 
     # ── 步骤 3：批量加载策略记录 + 广告活动 ──
-    unique_pairs = list({(k["campaign_id"], k["profile_id"]) for k in active_keywords})
+    unique_pairs = list({(k["campaign_id"], k["profile_id"]) for k in keywords})
     strategy_map: dict[tuple[int, int, str], SpAdOptimizationStrategy] = {}
     campaign_map: dict[tuple[int, int], LxSpCampaign] = {}
 
@@ -535,7 +530,7 @@ def execute_keyword_rules() -> dict[str, Any]:
     executed_rule_count = 0
     affected_keywords: set[int] = set()
 
-    for kw in active_keywords:
+    for kw in keywords:
         campaign = campaign_map.get((kw["campaign_id"], kw["profile_id"]))
         if campaign is None:
             continue
@@ -579,13 +574,12 @@ def execute_keyword_rules() -> dict[str, Any]:
 
     logger.info(
         "[executor_keyword] 完成: active=%d, executed=%d, affected=%d, errors=%d",
-        len(active_keywords), executed_rule_count,
+        len(keywords), executed_rule_count,
         len(affected_keywords), len(errors),
     )
 
     return {
         "扫描关键词数": len(keywords),
-        "周期跳过数": cycle_skip_count,
         "有策略匹配数": len(strategy_map),
         "执行规则数": executed_rule_count,
         "受影响关键词数": len(affected_keywords),

@@ -53,6 +53,7 @@ from apps.ads.sp.rules.services.ad_optimization.optimization_executor._shared im
     check_time_pricing_link as _shared_check_time_pricing_link,
     evaluate_condition_set,
     execute_budget_action as _shared_execute_budget_action,
+    get_group_execution_cycle,
     resolve_adjustment_status,
     resolve_rules,
 )
@@ -505,14 +506,12 @@ def _execute_targeting_bid_item(
     today: date,
 ) -> dict[str, Any]:
     """对单条 targeting_bid_action 执行筛选投放实体 + 条件组 AND + 竞价计算。"""
-    _ = group_id  # TODO: 从 group_id 查 LxAdRuleGroup.execution_cycle
+    execution_cycle_days = get_group_execution_cycle(group_id)
     targeting_type = campaign.targeting_type or "auto"
     target_groups = tba.get("targetingGroups", []) or []
     unlimited = bool(tba.get("unlimitedTargeting", False))
     condition_sets = tba.get("conditionSets", []) or []
     bid_action = tba.get("bidAction") or {}
-
-    # 当前执行周期硬编码为 1 天（后续从 LxAdRuleGroup.execution_cycle 取）
 
     bid_type = bid_action.get("type", "")
     if not bid_type or bid_type == "no_adjust":
@@ -623,11 +622,11 @@ def _execute_targeting_bid_item(
             })
             continue
 
-        # 执行周期检查（当前硬编码 1 天，后续从 LxAdRuleGroup 取）
+        # 执行周期检查
         can_exec, reason = _check_last_adjustment(
             etype, entity_id,
             campaign.campaign_id, campaign.profile_id,
-            execution_cycle_days=1,
+            execution_cycle_days=execution_cycle_days,
         )
         if not can_exec:
             plans.append({
