@@ -905,6 +905,7 @@ export interface AdjustmentHistoryItem {
   rule_name?: string;
   strategy_name?: string;
   group_name?: string;
+  condition_sets?: Record<string, unknown>[];
 }
 
 /** 调整历史响应 */

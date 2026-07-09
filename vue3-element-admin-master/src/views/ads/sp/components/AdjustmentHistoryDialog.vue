@@ -186,6 +186,25 @@ function typeDetail(row: AdjustmentHistoryItem): string {
     lines.push(timeInfo.join("  "));
   }
 
+  // 条件组详情
+  if (row.condition_sets?.length) {
+    const parts: string[] = [];
+    for (const cs of row.condition_sets as any[]) {
+      if (!cs.conditions?.length) continue;
+      const conds = (cs.conditions as any[])
+        .map((c: any) =>
+          c.isRange
+            ? `${c.value} ${c.operator2} ${c.metric} ${c.operator} ${c.value2}`
+            : `${c.metric} ${c.operator} ${c.value}`
+        )
+        .join("、");
+      parts.push(`近${cs.days}天: ${conds}`);
+    }
+    if (parts.length) {
+      lines.push(`详细内容: ${parts.join("；")}`);
+    }
+  }
+
   if (row.msg) {
     lines.push(row.msg);
   }

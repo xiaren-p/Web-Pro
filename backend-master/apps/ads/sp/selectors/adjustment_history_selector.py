@@ -40,6 +40,24 @@ def _build_group_name_map(rule_ids: set[int]) -> dict[int, str]:
     return result
 
 
+def _build_rule_cs_map(rule_ids: set[int]) -> dict[int, list]:
+    """批量查询 rule_id → LxAdRule.condition_sets 映射。
+
+    一次 DB 查询取出对应规则的条件组，避免 N+1 查询。
+
+    Args:
+        rule_ids: 规则 ID 集合
+
+    Returns:
+        {rule_id: condition_sets}
+    """
+    if not rule_ids:
+        return {}
+    return dict(
+        LxAdRule.objects.filter(id__in=list(rule_ids)).values_list("id", "condition_sets")
+    )
+
+
 def _build_rule_name_map(records: list[SpBidAdjustment]) -> dict[int, str]:
     """批量查询 auto_rule_id → LxAdRule.name 映射。
 
@@ -136,6 +154,7 @@ def query_entity_adjustment_history(
     strategy_name_map = _build_strategy_name_map(records)
     rule_ids = {r.auto_rule_id for r in records if r.auto_rule_id}
     group_name_map = _build_group_name_map(rule_ids)
+    rule_cs_map = _build_rule_cs_map(rule_ids)
 
     return [
         {
@@ -152,6 +171,7 @@ def query_entity_adjustment_history(
             "rule_name": rule_name_map.get(r.auto_rule_id or 0, ""),
             "strategy_name": strategy_name_map.get(r.time_pricing_rule_id or 0, ""),
             "group_name": group_name_map.get(r.auto_rule_id or 0, ""),
+            "condition_sets": rule_cs_map.get(r.auto_rule_id or 0, []),
         }
         for r in records
     ]
@@ -183,6 +203,7 @@ def query_campaign_adjustment_history(
     rule_name_map = _build_campaign_rule_name_map(records)
     rule_ids = {r.auto_rule_id for r in records if r.auto_rule_id}
     group_name_map = _build_group_name_map(rule_ids)
+    rule_cs_map = _build_rule_cs_map(rule_ids)
 
     return [
         {
@@ -197,6 +218,7 @@ def query_campaign_adjustment_history(
             "auto_rule_id": r.auto_rule_id,
             "rule_name": rule_name_map.get(r.auto_rule_id or 0, ""),
             "group_name": group_name_map.get(r.auto_rule_id or 0, ""),
+            "condition_sets": rule_cs_map.get(r.auto_rule_id or 0, []),
         }
         for r in records
     ]
