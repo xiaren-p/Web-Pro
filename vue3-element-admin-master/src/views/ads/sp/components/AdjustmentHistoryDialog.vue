@@ -47,7 +47,6 @@
         <template #default="{ row }">
           {{ row.rule_name || row.strategy_name || row.operator || "-" }}
         </template>
-        </template>
       </el-table-column>
       <el-table-column prop="adjustment_status" label="状态" width="70" align="center">
         <template #default="{ row }">
