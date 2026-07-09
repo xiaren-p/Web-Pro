@@ -60,7 +60,7 @@
         </template>
       </el-table-column>
       <el-table-column prop="msg" label="说明" min-width="150" show-overflow-tooltip />
-    </el-table
+    </el-table>
 
     <div class="adj-history-footer">
       <span>共 {{ filteredRecords.length }} 条</span>
