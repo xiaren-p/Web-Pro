@@ -1018,11 +1018,11 @@ onMounted(() => {
 }
 
 .adj-history-icon {
-  cursor: pointer;
-  color: var(--color-info-500);
-  margin-left: 4px;
   display: inline-flex;
   align-items: center;
+  margin-left: 4px;
+  color: var(--color-info-500);
+  cursor: pointer;
 }
 .adj-history-icon:hover {
   color: var(--color-primary-500);

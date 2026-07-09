@@ -950,11 +950,11 @@ onMounted(() => {
 }
 
 .adj-history-icon {
-  cursor: pointer;
-  color: #909399;
-  margin-left: 4px;
   display: inline-flex;
   align-items: center;
+  margin-left: 4px;
+  color: #909399;
+  cursor: pointer;
 }
 .adj-history-icon:hover {
   color: var(--el-color-primary);
