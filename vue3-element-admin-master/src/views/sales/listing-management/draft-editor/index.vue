@@ -24,11 +24,13 @@
         <MoreAttributesSection id="more" />
       </main>
 
-      <!-- 底部操作栏：横跨侧边栏+内容区下方 -->
+      <!-- 底部操作栏：居中显示 -->
       <footer class="draft-editor__footer">
         <el-button size="default" @click="router.back()">取消</el-button>
-        <el-button size="default">保存</el-button>
-        <el-button type="primary" size="default">发布</el-button>
+        <el-button size="default" @click="handleSave">保存</el-button>
+        <el-button type="primary" size="default" :disabled="!canPublish" @click="handlePublish">
+          发布
+        </el-button>
       </footer>
     </div>
   </div>
@@ -38,14 +40,17 @@
 /**
  * 刊登草稿编辑器主页面。
  *
- * 布局：左侧固定侧边栏（返回 + section 导航）+ 右侧内容区（滚动表单）+ 底部操作栏。
+ * 布局：左侧固定侧边栏（返回 + section 导航）+ 右侧内容区（滚动表单）+ 底部操作栏（居中）。
  * 状态管理：通过 provide/inject 将 formData 共享给各 section 子组件。
+ * 语言校验：provide currentSiteCode，子组件实时校验站点语言/中文。
  * Scroll-spy：IntersectionObserver 监听各 section 可见性，高亮侧边栏对应项。
  *
  * 路由：静态路由 /sales/listing-management/draft-editor（hidden: true）
  */
-import { reactive, ref, onMounted, onBeforeUnmount, provide } from "vue";
+import { reactive, ref, computed, onMounted, onBeforeUnmount, provide } from "vue";
 import { useRouter } from "vue-router";
+import { ElMessage } from "element-plus";
+import { extractSiteCode } from "@/utils/lang-check";
 import BasicInfoSection from "./BasicInfoSection.vue";
 import PricingSection from "./PricingSection.vue";
 import ImagesSection from "./ImagesSection.vue";
@@ -65,44 +70,63 @@ const sections = [
   { key: "more", label: "更多属性" },
 ];
 
+/** 创建单语表单字段模板 */
+function createFormFields() {
+  return {
+    shop: "",
+    listingType: "",
+    amazonCategory: "",
+    productType: "",
+    productName: "",
+    productHighlights: "",
+    brandName: "",
+    packageLength: "",
+    packageWidth: "",
+    packageHeight: "",
+    packageDimensionUnit: "Zentimeter",
+    packageWeight: "",
+    packageWeightUnit: "Pfund",
+    salesType: "",
+    deliveryChannel: "",
+    msku: "",
+    externalProductId: "",
+    productCondition: "Neu",
+    price: "",
+    currency: "EUR",
+    promotionPrice: "",
+    promotionStartDate: "",
+    promotionEndDate: "",
+    productDescription: "",
+    bulletPoints: ["", "", "", "", ""],
+    manufacturer: "",
+    operatingSystem: "",
+    listPriceCurrency: "",
+    listPriceWithTax: "",
+    countryOfOrigin: "",
+    batteryRequired: "",
+    hazardousGoods: "",
+  };
+}
+
 /** 草稿表单数据（通过 provide 共享给子组件） */
 const formData = reactive({
-  shop: "",
-  listingType: "",
-  amazonCategory: "",
-  productType: "",
-  productName: "",
-  productHighlights: "",
-  brandName: "",
-  packageLength: "",
-  packageWidth: "",
-  packageHeight: "",
-  packageDimensionUnit: "Zentimeter",
-  packageWeight: "",
-  packageWeightUnit: "Pfund",
-  salesType: "",
-  deliveryChannel: "",
-  msku: "",
-  externalProductId: "",
-  productCondition: "Neu",
-  price: "",
-  currency: "EUR",
-  promotionPrice: "",
-  promotionStartDate: "",
-  promotionEndDate: "",
+  site: createFormFields(),
+  cn: createFormFields(),
   images: [] as File[],
-  productDescription: "",
-  bulletPoints: ["", "", "", "", ""],
-  manufacturer: "",
-  operatingSystem: "",
-  listPriceCurrency: "",
-  listPriceWithTax: "",
-  countryOfOrigin: "",
-  batteryRequired: "",
-  hazardousGoods: "",
 });
 
+/** 当前站点代码（从店铺名称自动推导） */
+const currentSiteCode = computed(() => extractSiteCode(formData.site.shop));
+
+/** 语言校验错误记录（字段路径 → 错误信息） */
+const langErrors = reactive<Record<string, string>>({});
+
+/** 是否可以发布（无语言校验错误） */
+const canPublish = computed(() => Object.values(langErrors).every((msg) => !msg));
+
 provide("draftForm", formData);
+provide("currentSiteCode", currentSiteCode);
+provide("langErrors", langErrors);
 
 /** 当前可见的 section key（scroll-spy 驱动） */
 const activeSection = ref("basic");
@@ -112,6 +136,20 @@ let observer: IntersectionObserver | null = null;
 /** 平滑滚动到指定 section */
 function scrollTo(key: string) {
   document.getElementById(key)?.scrollIntoView({ behavior: "smooth" });
+}
+
+/** 保存草稿（占位） */
+function handleSave() {
+  ElMessage.success("草稿已保存");
+}
+
+/** 发布（占位，校验语言错误后才可点击） */
+function handlePublish() {
+  if (!canPublish.value) {
+    ElMessage.warning("存在语言校验错误，请修正后再发布");
+    return;
+  }
+  ElMessage.success("发布成功");
 }
 
 onMounted(() => {
@@ -201,7 +239,7 @@ onBeforeUnmount(() => observer?.disconnect());
   &__footer {
     display: flex;
     gap: 12px;
-    justify-content: flex-end;
+    justify-content: center;
     padding: 14px 32px;
     background: var(--surface-base);
     border-top: 1px solid var(--border-base);
@@ -246,6 +284,16 @@ onBeforeUnmount(() => observer?.disconnect());
     box-shadow: var(--shadow-xs);
   }
 
+  :deep(.draft-col__header) {
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-secondary);
+    background: var(--surface-subtle);
+    border-radius: var(--radius-sm);
+  }
+
   :deep(.draft-field-row) {
     display: flex;
     gap: 10px;
@@ -274,6 +322,20 @@ onBeforeUnmount(() => observer?.disconnect());
 
   :deep(.draft-field-input--lg) {
     width: 280px;
+  }
+
+  :deep(.lang-error) {
+    .el-input__wrapper,
+    .el-textarea__inner {
+      box-shadow: 0 0 0 1px var(--color-danger-500) inset !important;
+    }
+  }
+
+  :deep(.lang-error-hint) {
+    margin-top: 4px;
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+    color: var(--color-danger-500);
   }
 }
 </style>
