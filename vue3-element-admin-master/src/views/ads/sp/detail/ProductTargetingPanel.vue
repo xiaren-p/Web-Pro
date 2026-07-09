@@ -234,7 +234,7 @@
 
         <el-table-column label="分析" width="64" fixed="right" align="center" :resizable="false">
           <template #default="{ row }">
-            <template v-if="row.targetId && !row._isSummary">
+            <template v-if="row.target_id && !row._isSummary">
               <el-tooltip content="查看历史调整" placement="left">
                 <el-icon class="analysis-icon" :size="16" @click.stop="openHistory(row)">
                   <Clock />
@@ -364,7 +364,7 @@ const adjHistoryDialog = ref<InstanceType<typeof AdjustmentHistoryDialog>>();
 
 function openHistory(row: any): void {
   adjHistoryDialog.value?.open({
-    target_id: row.targetId || row.id,
+    target_id: row.target_id || row.id,
     profile_id: props.profileId,
   });
 }

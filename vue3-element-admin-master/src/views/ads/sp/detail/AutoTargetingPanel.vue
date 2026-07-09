@@ -455,7 +455,7 @@ const adjHistoryDialog = ref<InstanceType<typeof AdjustmentHistoryDialog>>();
 
 function openHistory(row: any): void {
   adjHistoryDialog.value?.open({
-    target_id: row.targetId || row.id,
+    target_id: row.target_id || row.id,
     profile_id: props.profileId || "",
   });
 }
