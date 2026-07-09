@@ -275,9 +275,15 @@
         </el-table-column>
 
         <!-- 固定右：分析 -->
-        <el-table-column label="分析" width="80" fixed="right" align="center" :resizable="false">
+        <el-table-column label="分析" width="64" fixed="right" align="center" :resizable="false">
           <template #default="{ row }">
-            <el-button v-if="row.ad_id" type="primary" link size="small">分析</el-button>
+            <template v-if="row.ad_id && !row._isSummary">
+              <el-tooltip content="查看历史调整" placement="left">
+                <el-icon class="analysis-icon" :size="16" @click.stop="openHistory(row)">
+                  <Clock />
+                </el-icon>
+              </el-tooltip>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -313,6 +319,7 @@
       :columns="activeColumns"
       @save="onColumnConfigSave"
     />
+    <AdjustmentHistoryDialog ref="adjHistoryDialog" />
   </div>
 </template>
 
@@ -326,12 +333,13 @@ import type { AdsResponse } from "@/api/ads";
 
 import { computed, onMounted, ref, watch } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import { CopyDocument, Filter, Operation, VideoPause, CircleClose } from "@element-plus/icons-vue";
+import { CopyDocument, Filter, Operation, VideoPause, CircleClose, Clock } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 
 import { getAds } from "@/api/ads";
 import { DATE_SHORTCUTS } from "@/utils/ads-date-shortcuts";
 import ColumnManager from "@/components/ColumnManager/index.vue";
+import AdjustmentHistoryDialog from "@/views/ads/sp/components/AdjustmentHistoryDialog.vue";
 import { getDefaultDateRange, DATE_RANGE_KEY } from "@/utils/date";
 
 defineOptions({ name: "AdsPanel" });
@@ -350,6 +358,14 @@ const props = defineProps<{
   adGroupId?: string;
   initialDateRange?: string[];
 }>();
+const adjHistoryDialog = ref<InstanceType<typeof AdjustmentHistoryDialog>>();
+
+function openHistory(_row: any): void {
+  adjHistoryDialog.value?.open({
+    campaign_id: props.campaignId || "",
+    profile_id: props.profileId || "",
+  });
+}
 
 /** 列可见性持久化（只存 prop → visible 映射，列定义结构始终以代码为准） */
 const _savedColumns = useLocalStorage<any[]>("ads_panel_columns", []);
@@ -841,5 +857,13 @@ onMounted(() => {
 /* 复制图标 hover 触发（asin-cell 专属，通用规则见 ads-panel.scss） */
 .asin-cell:hover .copy-icon {
   display: inline-flex;
+}
+
+.analysis-icon {
+  cursor: pointer;
+  color: #909399;
+}
+.analysis-icon:hover {
+  color: var(--el-color-primary);
 }
 </style>
