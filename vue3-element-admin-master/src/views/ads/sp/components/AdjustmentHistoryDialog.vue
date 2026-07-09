@@ -87,6 +87,7 @@ import {
 } from "element-plus";
 import { getAdjustmentHistory, type AdjustmentHistoryItem } from "@/api/ads";
 import { formatTimeInZone } from "@/utils/timezones";
+import "element-plus/es/components/radio-button/style/index";
 
 /** 执行类型中文标签映射，与后端 ExecutionTypeChoices 保持一致 */
 const TYPE_LABELS: Record<string, string> = {
