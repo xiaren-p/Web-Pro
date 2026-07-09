@@ -169,6 +169,11 @@
                     </div>
                   </template>
                 </el-tooltip>
+                <el-tooltip content="查看历史调整" placement="top">
+                  <span class="adj-history-icon" @click.stop="openHistory(row)">
+                    <el-icon :size="14"><Clock /></el-icon>
+                  </span>
+                </el-tooltip>
               </div>
             </template>
             <!-- 分时竞价（含星标） -->
@@ -301,6 +306,7 @@
       :currency-icon="currencyIcon"
       @confirm="onBatchBidConfirm"
     />
+    <AdjustmentHistoryDialog ref="adjHistoryDialog" />
   </div>
 </template>
 
@@ -319,10 +325,12 @@ import {
   ArrowDown,
   QuestionFilled,
   CircleClose,
+  Clock,
 } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import BatchBidAdjustDialog from "@/components/BatchBidAdjustDialog/index.vue";
+import AdjustmentHistoryDialog from "@/views/ads/sp/components/AdjustmentHistoryDialog.vue";
 import {
   getProductTargeting,
   batchAdjustProductTargetState,
@@ -359,6 +367,14 @@ const sortParams = ref<Record<string, string>>({});
 
 // ── 批量操作状态 ───────────────────────────────────────
 const batchBidDialogVisible = ref(false);
+const adjHistoryDialog = ref<InstanceType<typeof AdjustmentHistoryDialog>>();
+
+function openHistory(row: any): void {
+  adjHistoryDialog.value?.open({
+    target_id: row.targetId || row.id,
+    profile_id: props.profileId,
+  });
+}
 const batchBidItems = ref<
   Array<{
     id: string | number;
@@ -931,6 +947,17 @@ onMounted(() => {
   font-size: 12px;
   color: var(--color-danger-500);
   cursor: help;
+}
+
+.adj-history-icon {
+  cursor: pointer;
+  color: #909399;
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+}
+.adj-history-icon:hover {
+  color: var(--el-color-primary);
 }
 
 .bid-cell .recent-star {

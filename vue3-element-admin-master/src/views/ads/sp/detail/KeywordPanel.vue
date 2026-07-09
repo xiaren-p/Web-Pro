@@ -202,6 +202,11 @@
                     </div>
                   </template>
                 </el-tooltip>
+                <el-tooltip content="查看历史调整" placement="top">
+                  <span class="adj-history-icon" @click.stop="openHistory(row)">
+                    <el-icon :size="14"><Clock /></el-icon>
+                  </span>
+                </el-tooltip>
               </div>
             </template>
 
@@ -365,6 +370,7 @@
       :currency-icon="currencyIcon"
       @confirm="onBatchBidConfirm"
     />
+    <AdjustmentHistoryDialog ref="adjHistoryDialog" />
   </div>
 </template>
 
@@ -383,12 +389,14 @@ import {
   CircleClose,
   ArrowDown,
   QuestionFilled,
+  Clock,
 } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 import { getKeywords, batchAdjustKeywordState, batchAdjustKeywordBid } from "@/api/ads";
 import { DATE_SHORTCUTS } from "@/utils/ads-date-shortcuts";
 import BatchBidAdjustDialog from "@/components/BatchBidAdjustDialog/index.vue";
+import AdjustmentHistoryDialog from "@/views/ads/sp/components/AdjustmentHistoryDialog.vue";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import { getDefaultDateRange, DATE_RANGE_KEY } from "@/utils/date";
 
@@ -440,6 +448,14 @@ const sortParams = ref<Record<string, string>>({});
 
 // ── 批量操作状态 ───────────────────────────────────────
 const batchBidDialogVisible = ref(false);
+const adjHistoryDialog = ref<InstanceType<typeof AdjustmentHistoryDialog>>();
+
+function openHistory(row: any): void {
+  adjHistoryDialog.value?.open({
+    keyword_id: row.keywordId || row.id,
+    profile_id: props.profileId,
+  });
+}
 const batchBidItems = ref<
   Array<{
     id: string | number;
@@ -991,6 +1007,17 @@ onMounted(fetchData);
   font-size: 12px;
   color: var(--color-danger-500);
   cursor: help;
+}
+
+.adj-history-icon {
+  cursor: pointer;
+  color: #909399;
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+}
+.adj-history-icon:hover {
+  color: var(--el-color-primary);
 }
 
 .bid-cell {

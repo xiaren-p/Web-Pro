@@ -173,6 +173,11 @@
                     </template>
                   </el-input>
                   <span class="recent-star" @click.stop>*</span>
+                  <el-tooltip content="查看历史调整" placement="top">
+                    <span class="adj-history-icon" @click.stop="openHistory(scope.row, 'campaign')">
+                      <el-icon :size="14"><Clock /></el-icon>
+                    </span>
+                  </el-tooltip>
                 </div>
                 <template #content>
                   <div class="latest-adj-content">
@@ -196,6 +201,11 @@
                     <span class="budget-icon">{{ scope.row.currency_icon || "$" }}</span>
                   </template>
                 </el-input>
+                <el-tooltip content="查看历史调整" placement="top">
+                  <span class="adj-history-icon" @click.stop="openHistory(scope.row, 'campaign')">
+                    <el-icon :size="14"><Clock /></el-icon>
+                  </span>
+                </el-tooltip>
               </div>
             </template>
             <template v-else>
@@ -302,13 +312,15 @@
         </div>
       </div>
     </div>
+    <AdjustmentHistoryDialog ref="adjHistoryDialog" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
-import { TrendCharts, List } from "@element-plus/icons-vue";
+import { TrendCharts, List, Clock } from "@element-plus/icons-vue";
 import { ElMessageBox } from "element-plus";
+import AdjustmentHistoryDialog from "@/views/ads/sp/components/AdjustmentHistoryDialog.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -488,6 +500,18 @@ function onPageSizeChange(v: number) {
  */
 function onSelectionChange(rows: any[]): void {
   selectedRows.value = rows.filter((r) => !r._isSummary);
+}
+
+const adjHistoryDialog = ref<InstanceType<typeof AdjustmentHistoryDialog>>();
+
+function openHistory(row: any, type: string): void {
+  const params: Record<string, number | string> = {
+    profile_id: row.profileId || row.profile_id || "",
+  };
+  if (type === "campaign") {
+    params.campaign_id = row.campaignId || row.campaign_id;
+  }
+  adjHistoryDialog.value?.open(params);
 }
 
 /**
@@ -1234,6 +1258,17 @@ function formatValue(val: any): string {
 .budget-cell .recent-star {
   top: -4px;
   right: -8px;
+}
+
+.adj-history-icon {
+  cursor: pointer;
+  color: #909399;
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+}
+.adj-history-icon:hover {
+  color: var(--el-color-primary);
 }
 
 /* tooltip 多行展示 */

@@ -887,3 +887,38 @@ export function getProductTargeting(
     data,
   });
 }
+
+/** 调整历史记录项 */
+export interface AdjustmentHistoryItem {
+  adjustment_time: string;
+  execution_type: string;
+  bid_before?: number;
+  bid_after?: number;
+  budget_before?: number;
+  budget_after?: number;
+  operator: string;
+  msg: string;
+  adjustment_status: string;
+  execution_status: string;
+  auto_rule_id?: number;
+  time_pricing_rule_id?: number;
+}
+
+/** 调整历史响应 */
+export interface AdjustmentHistoryResponse {
+  total: number;
+  records: AdjustmentHistoryItem[];
+}
+
+/**
+ * 查询投放实体或广告活动的调整历史。
+ */
+export function getAdjustmentHistory(
+  params: Record<string, number | string>
+): Promise<AdjustmentHistoryResponse> {
+  return request({
+    url: "/ads/adjustment-history",
+    method: "get",
+    params,
+  });
+}

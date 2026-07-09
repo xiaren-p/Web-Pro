@@ -36,6 +36,7 @@ from apps.ads.sp.views.targeting_view import AutoTargetingViewSet
 from apps.ads.sp.views.negative_targeting_view import AutoNegativeTargetingViewSet
 from apps.ads.sp.views.keyword_view import KeywordViewSet
 from apps.ads.sp.views.negative_keyword_view import NegativeKeywordViewSet
+from apps.ads.sp.views.adjustment_history_view import get_adjustment_history
 from apps.ads.sp.timing.views.time_pricing_strategy_view import TimePricingStrategyViewSet
 from apps.ads.sp.rules.views.rule_strategy_view import RuleStrategyViewSet, RuleStrategyGroupViewSet
 from apps.notice.views.notice_view import NoticeViewSet
@@ -123,6 +124,7 @@ urlpatterns = [
     path('api/v1/ads/keywords/adjust-state', KeywordViewSet.as_view({'post': 'adjust_state'}), name='ads-keywords-adjust-state'),
     path('api/v1/ads/keywords/batch-adjust-state', KeywordViewSet.as_view({'post': 'batch_adjust_state'}), name='ads-keywords-batch-adjust-state'),
     path('api/v1/ads/keywords/batch-adjust-bid', KeywordViewSet.as_view({'post': 'batch_adjust_bid'}), name='ads-keywords-batch-adjust-bid'),
+    path('api/v1/ads/adjustment-history', get_adjustment_history, name='ads-adjustment-history'),
     path('api/v1/ads/negative-keywords', NegativeKeywordViewSet.as_view({'post': 'list_negative_keywords'}), name='ads-negative-keywords-list'),
     path('api/v1/ads/time-pricing-strategy', TimePricingStrategyViewSet.as_view({'get': 'list_or_create', 'post': 'list_or_create'}), name='ads-time-pricing-strategy-list-create'),
     path('api/v1/ads/time-pricing-strategy/shops', TimePricingStrategyViewSet.as_view({'get': 'shops'}), name='ads-time-pricing-strategy-shops'),

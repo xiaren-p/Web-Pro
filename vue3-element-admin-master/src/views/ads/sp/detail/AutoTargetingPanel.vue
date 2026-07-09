@@ -193,6 +193,11 @@
                     </div>
                   </template>
                 </el-tooltip>
+                <el-tooltip content="查看历史调整" placement="top">
+                  <span class="adj-history-icon" @click.stop="openHistory(row)">
+                    <el-icon :size="14"><Clock /></el-icon>
+                  </span>
+                </el-tooltip>
               </div>
             </template>
 
@@ -352,6 +357,7 @@
       :currency-icon="currencyIcon"
       @confirm="onBatchBidConfirm"
     />
+    <AdjustmentHistoryDialog ref="adjHistoryDialog" />
   </div>
 </template>
 
@@ -371,11 +377,13 @@ import {
   VideoPause,
   CircleClose,
   ArrowDown,
+  Clock,
 } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import BatchBidAdjustDialog from "@/components/BatchBidAdjustDialog/index.vue";
+import AdjustmentHistoryDialog from "@/views/ads/sp/components/AdjustmentHistoryDialog.vue";
 import { getAutoTargeting, batchAdjustTargetState, batchAdjustTargetBid } from "@/api/ads";
 import { DATE_SHORTCUTS } from "@/utils/ads-date-shortcuts";
 import { getDefaultDateRange, DATE_RANGE_KEY } from "@/utils/date";
@@ -442,6 +450,16 @@ const selectedRows = ref<any[]>([]);
 
 /** 批量调整竞价对话框显示状态 */
 const batchBidDialogVisible = ref(false);
+
+/** 调整历史对话框 */
+const adjHistoryDialog = ref<InstanceType<typeof AdjustmentHistoryDialog>>();
+
+function openHistory(row: any): void {
+  adjHistoryDialog.value?.open({
+    target_id: row.targetId || row.id,
+    profile_id: props.profileId || "",
+  });
+}
 
 /** 批量调整竞价项列表 */
 const batchBidItems = ref<
@@ -997,6 +1015,17 @@ onMounted(() => {
   font-size: 12px;
   color: var(--color-danger-500);
   cursor: help;
+}
+
+.adj-history-icon {
+  cursor: pointer;
+  color: var(--color-info-500);
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+}
+.adj-history-icon:hover {
+  color: var(--color-primary-500);
 }
 
 .bid-cell .recent-star {
