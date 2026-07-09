@@ -63,7 +63,7 @@ from apps.ads.sp.timing.services.time_pricing_shared import (
     get_utc_now,
     get_rules_for_segments,
 )
-from apps.common.utils.timezone_utils import get_fixed_utc_offset
+from apps.common.utils.timezone_utils import get_current_utc_offset
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ def _in_time_range(hit: AdTimePricingHit, strategy: LxTimePricingStrategy) -> bo
         True 表示当前在某个时段内
     """
     now_utc = get_utc_now()
-    site_offset = get_fixed_utc_offset(hit.timezone)
+    site_offset = get_current_utc_offset(hit.timezone)
 
     time_settings = strategy.time_settings or {}
     segments = (time_settings.get("segments", []) if isinstance(time_settings, dict) else [])

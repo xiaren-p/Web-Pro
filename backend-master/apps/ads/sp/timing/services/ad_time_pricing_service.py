@@ -9,6 +9,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from django.db import connections
 from django.db.models import Q
@@ -26,7 +27,7 @@ from apps.ads.sp.timing.services.time_pricing_shared import (
     filter_segments_for_today,
     get_utc_now,
 )
-from apps.common.utils.timezone_utils import country_to_timezone, get_fixed_utc_offset
+from apps.common.utils.timezone_utils import country_to_timezone, get_current_utc_offset
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +63,9 @@ def _calc_strategy_times(
     if (eh, em) < (sh, sm_val):
         time_end_naive += timedelta(days=1)
 
-    offset_hours = get_fixed_utc_offset(tz_name)
+    offset_hours = get_current_utc_offset(tz_name)
     site_tz = dt_timezone(timedelta(hours=offset_hours))
-    cn_tz = dt_timezone(timedelta(hours=8))
+    cn_tz = ZoneInfo("Asia/Shanghai")
 
     time_start = time_start_naive.replace(tzinfo=site_tz)
     time_end = time_end_naive.replace(tzinfo=site_tz)
@@ -374,7 +375,7 @@ def _is_in_any_segment_now(hit: AdTimePricingHit, strategies: list[LxTimePricing
         return False
 
     now_utc = get_utc_now()
-    site_offset = get_fixed_utc_offset(hit.timezone)
+    site_offset = get_current_utc_offset(hit.timezone)
 
     time_settings = strategy.time_settings or {}
     segments = (time_settings.get("segments", []) if isinstance(time_settings, dict) else [])

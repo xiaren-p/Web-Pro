@@ -72,6 +72,7 @@
 import { ref, computed } from "vue";
 import { ElDialog, ElTable, ElTableColumn, ElTag, ElRadioGroup, ElRadioButton, ElTooltip } from "element-plus";
 import { getAdjustmentHistory, type AdjustmentHistoryItem } from "@/api/ads";
+import { formatTimeInZone } from "@/utils/timezones";
 
 const TYPE_LABELS: Record<string, string> = {
   BID_ADJUSTMENT: "自动规则",
@@ -102,6 +103,7 @@ const TYPE_TAGS: Record<string, string> = {
 const visible = ref(false);
 const title = ref("");
 const filterType = ref("");
+const storeTimezone = ref("");
 const allRecords = ref<AdjustmentHistoryItem[]>([]);
 const loading = ref(false);
 
@@ -137,16 +139,7 @@ function typeDetail(row: AdjustmentHistoryItem): string {
 }
 
 function formatTime(time: string): string {
-  if (!time) return "-";
-  const d = new Date(time);
-  return d.toLocaleString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  return formatTimeInZone(time, storeTimezone.value || undefined);
 }
 
 function handleFilter(): void {
@@ -157,10 +150,12 @@ async function open(params: Record<string, number | string>): Promise<void> {
   visible.value = true;
   title.value = "调整历史";
   filterType.value = "";
+  storeTimezone.value = "";
   loading.value = true;
   try {
     const res = await getAdjustmentHistory(params);
     allRecords.value = res.records || [];
+    storeTimezone.value = (res as any).timezone || "";
   } finally {
     loading.value = false;
   }

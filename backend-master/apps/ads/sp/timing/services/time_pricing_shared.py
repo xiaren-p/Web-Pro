@@ -7,12 +7,13 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone as dt_timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 # UTC 标准时区（项目统一基准）
 UTC_TZ = dt_timezone.utc
 
 # 北京时间固定偏移（兼容旧接口，新代码请用 get_utc_now）
-CN_TZ = dt_timezone(timedelta(hours=8))
+CN_TZ = ZoneInfo("Asia/Shanghai")
 CN_OFFSET_HOURS = 8
 
 # 分时策略触发分布式锁 Key（Redis）；视图层入队前获取，入队后释放

@@ -3,6 +3,8 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from apps.ads.models.lx_ads_profile import LxAdsProfile
+from apps.common.utils.timezone_utils import country_to_timezone
 from apps.system.auth import BearerTokenAuthentication
 from apps.system.permissions.api_access import IsApiAccessible
 from apps.ads.sp.selectors.adjustment_history_selector import (
@@ -53,4 +55,15 @@ def get_adjustment_history(request: Request) -> Response:
     else:
         return drf_error("keyword_id / target_id / campaign_id 三选一必填", code="B0001")
 
-    return drf_ok({"total": len(records), "records": records})
+    # 查询站点时区
+    tz_name = ""
+    country_name = ""
+    prof = LxAdsProfile.objects.filter(profile_id=int(profile_id)).values("country_code").first()
+    if prof and prof["country_code"]:
+        tz_name = country_to_timezone(prof["country_code"])
+
+    return drf_ok({
+        "total": len(records),
+        "records": records,
+        "timezone": tz_name,
+    })

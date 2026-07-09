@@ -908,6 +908,7 @@ export interface AdjustmentHistoryItem {
 export interface AdjustmentHistoryResponse {
   total: number;
   records: AdjustmentHistoryItem[];
+  timezone: string;
 }
 
 /**

@@ -61,6 +61,9 @@ _TIMEZONE_UTC_OFFSET: dict[str, int] = {
 def get_fixed_utc_offset(tz_name: str) -> int:
     """获取站点时区的固定 UTC 偏移（小时），不分冬夏令时。
 
+    已弃用：请使用 get_current_utc_offset 替代。
+    保留作为 fallback 供 get_current_utc_offset 异常时回退。
+
     Args:
         tz_name: 时区名，如 "Europe/London"
 
@@ -68,6 +71,27 @@ def get_fixed_utc_offset(tz_name: str) -> int:
         UTC 偏移小时数，未知时区返回 0
     """
     return _TIMEZONE_UTC_OFFSET.get(tz_name, 0)
+
+
+def get_current_utc_offset(tz_name: str) -> int:
+    """获取站点时区当前的 UTC 偏移（小时），尊重夏令时。
+
+    优先通过 zoneinfo.ZoneInfo 动态计算当前实际偏移，
+    失败时回退到 _TIMEZONE_UTC_OFFSET 硬编码值。
+
+    Args:
+        tz_name: 时区名，如 "Europe/London"
+
+    Returns:
+        当前 UTC 偏移小时数，失败返回 0
+    """
+    if not tz_name:
+        return 0
+    try:
+        now = datetime.now(ZoneInfo(tz_name))
+        return int(now.utcoffset().total_seconds() / 3600)
+    except (ZoneInfoNotFoundError, KeyError, Exception):
+        return _TIMEZONE_UTC_OFFSET.get(tz_name, 0)
 
 
 def country_to_timezone(country_code: str) -> str:
