@@ -143,6 +143,7 @@ def build_item_map(
 
     将 campaign_keys 按 batch_size 分批构建 Q 对象查询，
     避免单个 OR 超长 SQL，同时只返回命中的行。
+    投放项 bid 为空时自动从广告组 default_bid 继承。
 
     Args:
         campaign_keys: 需要查询的 (campaign_id, profile_id) 集合
@@ -152,9 +153,11 @@ def build_item_map(
         {(cid, pid): [{"item_type", "item_id", "ad_group_id", "bid"}]}
     """
     from django.db.models import Q
+    from apps.ads.sp.models.lx_sp_ad_group import LxSpAdGroup
 
     item_map: dict[tuple[int, int], list[dict[str, Any]]] = {}
     keys_list = list(campaign_keys)
+    ag_ids_to_inherit: set[int] = set()
 
     for offset in range(0, len(keys_list), batch_size):
         chunk = keys_list[offset:offset + batch_size]
@@ -162,23 +165,51 @@ def build_item_map(
         for cid, pid in chunk:
             q |= Q(campaign_id=cid, profile_id=pid)
 
-        for t in LxSpTarget.objects.filter(q, bid__isnull=False, state="enabled").iterator():
+        for t in LxSpTarget.objects.filter(q, state="enabled").iterator():
             key = (t.campaign_id, t.profile_id)
             item_map.setdefault(key, []).append({
                 "item_type": "target",
                 "item_id": t.target_id,
                 "ad_group_id": t.ad_group_id,
-                "bid": float(t.bid),
+                "bid": float(t.bid) if t.bid is not None else None,
             })
+            if t.bid is None:
+                ag_ids_to_inherit.add(t.ad_group_id)
 
-        for k in LxSpKeyword.objects.filter(q, bid__isnull=False, state="enabled").iterator():
+        for k in LxSpKeyword.objects.filter(q, state="enabled").iterator():
             key = (k.campaign_id, k.profile_id)
             item_map.setdefault(key, []).append({
                 "item_type": "keyword",
                 "item_id": k.keyword_id,
                 "ad_group_id": k.ad_group_id,
-                "bid": float(k.bid),
+                "bid": float(k.bid) if k.bid is not None else None,
             })
+            if k.bid is None:
+                ag_ids_to_inherit.add(k.ad_group_id)
+
+    # 竞价继承：bid 为空时从广告组 default_bid 获取
+    ag_bid_map: dict[int, float] = {}
+    if ag_ids_to_inherit:
+        for ag in LxSpAdGroup.objects.filter(
+            ad_group_id__in=list(ag_ids_to_inherit),
+            state="enabled",
+            default_bid__isnull=False,
+        ).only("ad_group_id", "default_bid"):
+            ag_bid_map[ag.ad_group_id] = float(ag.default_bid)
+
+    for key in list(item_map.keys()):
+        inherited: list[dict[str, Any]] = []
+        for item in item_map[key]:
+            bid = item["bid"]
+            if bid is None:
+                bid = ag_bid_map.get(item["ad_group_id"])
+                if bid is None:
+                    continue
+            inherited.append({**item, "bid": bid})
+        if inherited:
+            item_map[key] = inherited
+        else:
+            del item_map[key]
 
     return item_map
 
