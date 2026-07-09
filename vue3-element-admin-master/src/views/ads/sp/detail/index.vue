@@ -83,12 +83,6 @@
         </template>
         <template v-else>
           <div class="targeting-tabs-wrapper">
-            <div class="targeting-subtabs">
-              <el-radio-group v-model="targetingMode" size="small">
-                <el-radio-button value="keyword">关键词投放</el-radio-button>
-                <el-radio-button value="product">商品投放</el-radio-button>
-              </el-radio-group>
-            </div>
             <KeywordPanel
               v-if="targetingMode === 'keyword'"
               ref="keywordRef"
@@ -97,15 +91,17 @@
               :initial-date-range="inheritedDateRange"
               @keyword-bid="onKeywordBid"
               @keyword-state="onKeywordState"
+              @switch-mode="targetingMode = 'product'"
             />
             <ProductTargetingPanel
-              v-else
+              v-if="targetingMode === 'product'"
               ref="productTargetingRef"
               :campaign-id="campaignId"
               :profile-id="profileId"
               :initial-date-range="inheritedDateRange"
               @target-bid="onProductTargetBid"
               @target-state="onProductTargetState"
+              @switch-mode="targetingMode = 'keyword'"
             />
           </div>
         </template>
