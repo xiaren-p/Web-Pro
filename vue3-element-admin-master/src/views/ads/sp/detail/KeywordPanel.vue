@@ -407,8 +407,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "update-bid", payload: { row: any; bid: number }): void;
-  (e: "update-state", payload: { row: any; state: "enabled" | "paused" }): void;
+  (e: "keyword-bid", payload: { row: any; bid: number }): void;
+  (e: "keyword-state", payload: { row: any; state: "enabled" | "paused" }): void;
   (e: "switch-mode"): void;
 }>();
 
@@ -822,7 +822,7 @@ function confirmBid(row: any): void {
     type: "warning",
   })
     .then(() => {
-      emit("update-bid", { row, bid: val });
+      emit("keyword-bid", { row, bid: val });
     })
     .catch(() => {
       row._bidInput = row.bid ?? 0;
@@ -839,7 +839,7 @@ function resetBid(row: any): void {
 // ── 状态可编辑（emit 到父组件，不调 API）──────────────────────────────────
 function onSwitchChange(row: any, val: string | number | boolean): void {
   const s = String(val) as "enabled" | "paused";
-  emit("update-state", { row, state: s });
+  emit("keyword-state", { row, state: s });
 }
 
 /**

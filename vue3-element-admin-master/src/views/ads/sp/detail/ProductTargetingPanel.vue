@@ -347,8 +347,8 @@ const props = defineProps<{
   initialDateRange?: string[];
 }>();
 const emit = defineEmits<{
-  (e: "update-bid", payload: { row: any; bid: number }): void;
-  (e: "update-state", payload: { row: any; state: "enabled" | "paused" }): void;
+  (e: "target-bid", payload: { row: any; bid: number }): void;
+  (e: "target-state", payload: { row: any; state: "enabled" | "paused" }): void;
   (e: "switch-mode"): void;
 }>();
 
@@ -726,7 +726,7 @@ function confirmBid(row: any): void {
     type: "warning",
   })
     .then(() => {
-      emit("update-bid", { row, bid: val });
+      emit("target-bid", { row, bid: val });
     })
     .catch(() => {
       row._bidInput = row.bid ?? 0;
@@ -742,7 +742,7 @@ function resetBid(row: any): void {
 
 function onSwitchChange(row: any, val: string | number | boolean): void {
   const s = String(val) as "enabled" | "paused";
-  emit("update-state", { row, state: s });
+  emit("target-state", { row, state: s });
 }
 
 /**
