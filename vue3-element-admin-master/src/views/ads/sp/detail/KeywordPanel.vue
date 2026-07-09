@@ -449,12 +449,20 @@ const sortParams = ref<Record<string, string>>({});
 
 // ── 批量操作状态 ───────────────────────────────────────
 const batchBidDialogVisible = ref(false);
+
+/** 调整历史弹窗 */
 const adjHistoryDialog = ref<InstanceType<typeof AdjustmentHistoryDialog>>();
 
-function openHistory(row: any): void {
+/**
+ * 打开关键词的调整历史弹窗。
+ * 传递 keyword_id + profile_id，查询竞价/分时/暂停记录。
+ *
+ * @param row - 表格行数据
+ */
+function openHistory(row: Record<string, unknown>): void {
   adjHistoryDialog.value?.open({
-    keyword_id: row.keyword_id || row.id,
-    profile_id: props.profileId,
+    keyword_id: (row.keyword_id as string) || (row.id as string) || "",
+    profile_id: props.profileId || "",
   });
 }
 const batchBidItems = ref<
@@ -1005,7 +1013,7 @@ onMounted(fetchData);
   display: inline-flex;
   align-items: center;
   margin-left: 4px;
-  color: #909399;
+  color: var(--text-secondary, #909399);
   cursor: pointer;
 }
 .adj-history-icon:hover {
@@ -1013,7 +1021,7 @@ onMounted(fetchData);
 }
 
 .analysis-icon {
-  color: #909399;
+  color: var(--text-secondary, #909399);
   cursor: pointer;
 }
 .analysis-icon:hover {

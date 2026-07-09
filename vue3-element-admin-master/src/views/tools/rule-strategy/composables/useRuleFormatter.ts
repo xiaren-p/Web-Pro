@@ -1,4 +1,10 @@
-import { ACTION_LABEL, NO_VALUE_ACTIONS, type AdRule } from "../types";
+import {
+  ACTION_LABEL,
+  NO_VALUE_ACTIONS,
+  type AdRule,
+  type ConditionWithRange,
+  type RuleAction,
+} from "../types";
 
 const METRIC_LABEL: Record<string, string> = {
   cost: "花费",
@@ -29,7 +35,7 @@ const OP_LABEL: Record<string, string> = {
   "!=": "≠",
 };
 
-function formatSingleCondition(c: Record<string, any>): string {
+function formatSingleCondition(c: ConditionWithRange): string {
   const m = METRIC_LABEL[c.metric] || c.metric || "?";
   if (c.isRange && c.operator2) {
     const o2 = OP_LABEL[c.operator2] || c.operator2;
@@ -39,7 +45,7 @@ function formatSingleCondition(c: Record<string, any>): string {
   return `${m} ${OP_LABEL[c.operator] || c.operator} ${c.value}`;
 }
 
-function formatBidAction(ba: Record<string, any>, prefix: string = ""): string {
+function formatBidAction(ba: RuleAction, prefix: string = ""): string {
   if (!ba?.type || ba.type === "no_adjust") return "";
   const label = ACTION_LABEL[ba.type] || ba.type;
   if (NO_VALUE_ACTIONS.has(ba.type)) return prefix ? `${prefix}: ${label}` : label;

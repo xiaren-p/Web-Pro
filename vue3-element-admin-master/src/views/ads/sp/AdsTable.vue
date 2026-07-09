@@ -489,12 +489,19 @@ function onSelectionChange(rows: any[]): void {
   selectedRows.value = rows.filter((r) => !r._isSummary);
 }
 
+/** 调整历史弹窗 */
 const adjHistoryDialog = ref<InstanceType<typeof AdjustmentHistoryDialog>>();
 
-function openHistory(row: any): void {
+/**
+ * 打开广告活动维度的调整历史弹窗。
+ * 传递 campaign_id + profile_id，查询预算变更/暂停/启用记录。
+ *
+ * @param row - 表格行数据
+ */
+function openHistory(row: Record<string, unknown>): void {
   adjHistoryDialog.value?.open({
-    campaign_id: row.campaign_id || "",
-    profile_id: row.profile_id || "",
+    campaign_id: (row.campaign_id as string) || "",
+    profile_id: (row.profile_id as string) || "",
   });
 }
 
@@ -1329,7 +1336,7 @@ function formatValue(val: any): string {
 
 .analysis-icon {
   cursor: pointer;
-  color: #909399;
+  color: var(--text-secondary, #909399);
 }
 .analysis-icon:hover {
   color: var(--el-color-primary);

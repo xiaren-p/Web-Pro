@@ -189,7 +189,7 @@
           <template #default="{ row }">
             <template v-if="row.ad_group_id && !row._isSummary">
               <el-tooltip content="查看历史调整" placement="left">
-                <el-icon class="analysis-icon" :size="16" @click.stop="openHistory(row)">
+                <el-icon class="analysis-icon" :size="16" @click.stop="openHistory()">
                   <Clock />
                 </el-icon>
               </el-tooltip>
@@ -236,7 +236,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useLocalStorage } from "@vueuse/core";
-import { CopyDocument, Filter, Operation, VideoPause, CircleClose, Clock } from "@element-plus/icons-vue";
+import {
+  CopyDocument,
+  Filter,
+  Operation,
+  VideoPause,
+  CircleClose,
+  Clock,
+} from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import ColumnManager from "@/components/ColumnManager/index.vue";
 import AdjustmentHistoryDialog from "@/views/ads/sp/components/AdjustmentHistoryDialog.vue";
@@ -259,9 +266,14 @@ const props = defineProps<{
   profileId?: string;
   initialDateRange?: string[];
 }>();
+/** 调整历史弹窗 */
 const adjHistoryDialog = ref<InstanceType<typeof AdjustmentHistoryDialog>>();
 
-function openHistory(_row: any): void {
+/**
+ * 打开广告活动维度的调整历史弹窗。
+ * 传递 campaign_id + profile_id（来自 props），查询预算变更/暂停/启用记录。
+ */
+function openHistory(): void {
   adjHistoryDialog.value?.open({
     campaign_id: props.campaignId || "",
     profile_id: props.profileId || "",
@@ -687,7 +699,7 @@ onMounted(() => {
 
 .analysis-icon {
   cursor: pointer;
-  color: #909399;
+  color: var(--text-secondary, #909399);
 }
 .analysis-icon:hover {
   color: var(--el-color-primary);

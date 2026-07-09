@@ -450,12 +450,18 @@ const selectedRows = ref<any[]>([]);
 /** 批量调整竞价对话框显示状态 */
 const batchBidDialogVisible = ref(false);
 
-/** 调整历史对话框 */
+/** 调整历史弹窗 */
 const adjHistoryDialog = ref<InstanceType<typeof AdjustmentHistoryDialog>>();
 
-function openHistory(row: any): void {
+/**
+ * 打开自动定位组的调整历史弹窗。
+ * 传递 target_id + profile_id，查询竞价/分时/暂停记录。
+ *
+ * @param row - 表格行数据
+ */
+function openHistory(row: Record<string, unknown>): void {
   adjHistoryDialog.value?.open({
-    target_id: row.target_id || row.id,
+    target_id: (row.target_id as string) || (row.id as string) || "",
     profile_id: props.profileId || "",
   });
 }
@@ -1028,7 +1034,7 @@ onMounted(() => {
 }
 
 .analysis-icon {
-  color: #909399;
+  color: var(--text-secondary, #909399);
   cursor: pointer;
 }
 .analysis-icon:hover {
