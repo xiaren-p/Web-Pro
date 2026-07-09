@@ -726,19 +726,7 @@ function resetBid(row: any): void {
 
 function onSwitchChange(row: any, val: string | number | boolean): void {
   const s = String(val) as "enabled" | "paused";
-  const oldVal = s === "enabled" ? "paused" : "enabled";
-  const label = s === "enabled" ? "启用" : "暂停";
-  ElMessageBox.confirm(`确认将商品投放状态修改为「${label}」？`, "确认修改状态", {
-    confirmButtonText: "确认",
-    cancelButtonText: "取消",
-    type: "warning",
-  })
-    .then(() => {
-      emit("update-state", { row, state: s });
-    })
-    .catch(() => {
-      row.state = oldVal;
-    });
+  emit("update-state", { row, state: s });
 }
 
 /**
@@ -753,19 +741,6 @@ async function batchSetState(state: "enabled" | "paused"): Promise<void> {
   }
 
   const label = state === "enabled" ? "启用" : "暂停";
-  try {
-    await ElMessageBox.confirm(
-      `确认将选中的 ${selectedRows.value.length} 条商品投放状态修改为「${label}」？`,
-      "确认批量修改状态",
-      {
-        confirmButtonText: "确认",
-        cancelButtonText: "取消",
-        type: "warning",
-      }
-    );
-  } catch {
-    return;
-  }
 
   const ids = selectedRows.value.map((row) => row.target_id).filter(Boolean);
   if (ids.length === 0) {

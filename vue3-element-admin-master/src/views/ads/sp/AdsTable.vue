@@ -557,19 +557,6 @@ function resetBudget(row: any): void {
  * @returns {Promise<void>}
  */
 async function onStateChange(row: any, val: string | number | boolean): Promise<void> {
-  const oldVal = val === "enabled" ? "paused" : "enabled";
-  const targetLabel = val === "enabled" ? "启用" : "暂停";
-  try {
-    await ElMessageBox.confirm(`确认将广告活动状态修改为「${targetLabel}」？`, "确认修改状态", {
-      confirmButtonText: "确认",
-      cancelButtonText: "取消",
-      type: "warning",
-    });
-  } catch {
-    // 用户取消：还原 switch
-    row.state = oldVal;
-    return;
-  }
   emit("update-state", { row, state: val });
 }
 
