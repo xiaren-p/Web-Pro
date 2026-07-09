@@ -1028,8 +1028,8 @@ onMounted(() => {
 }
 
 .analysis-icon {
-  cursor: pointer;
   color: #909399;
+  cursor: pointer;
 }
 .analysis-icon:hover {
   color: var(--color-primary-500);

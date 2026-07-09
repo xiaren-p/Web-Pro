@@ -711,15 +711,6 @@ function formatState(val: string): string {
 }
 
 /**
- * 打开分析抽屉，展示选中行的详情与指标。
- *
- * @param {any} row - 点击的行数据
- */
-function openDrawer(row: any): void {
-  activeRow.value = row;
-  drawerVisible.value = true;
-}
-
 /**
  * 表格勾选变化回调。
  *
@@ -1022,8 +1013,8 @@ onMounted(fetchData);
 }
 
 .analysis-icon {
-  cursor: pointer;
   color: #909399;
+  cursor: pointer;
 }
 .analysis-icon:hover {
   color: var(--el-color-primary);

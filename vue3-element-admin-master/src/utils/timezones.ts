@@ -25,7 +25,7 @@ export const COUNTRY_TIMEZONE: Record<string, string> = {
   AU: "Australia/Sydney",
   SG: "Asia/Singapore",
   CN: "Asia/Shanghai",
-}
+};
 
 /**
  * IANA 时区 → UTC 偏移（冬季基准），前端展示 fallback。
@@ -53,25 +53,29 @@ export const TIMEZONE_UTC_OFFSET: Record<string, number> = {
   "Australia/Sydney": 10,
   "Asia/Singapore": 8,
   "Asia/Shanghai": 8,
-}
+};
 
 /**
  * 将 UTC ISO 字符串按指定 IANA 时区格式化为本地时间。
  * 时区名无效时回退为浏览器本地时间。
  */
 export function formatTimeInZone(utcIso: string, timezone?: string): string {
-  if (!utcIso) return "-"
-  const d = new Date(utcIso)
+  if (!utcIso) return "-";
+  const d = new Date(utcIso);
   const opts: Intl.DateTimeFormatOptions = {
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-  }
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  };
   if (timezone) {
     try {
-      return d.toLocaleString("zh-CN", { ...opts, timeZone: timezone })
+      return d.toLocaleString("zh-CN", { ...opts, timeZone: timezone });
     } catch {
       // fallback：无效时区 → 浏览器本地时间
     }
   }
-  return d.toLocaleString("zh-CN", opts)
+  return d.toLocaleString("zh-CN", opts);
 }

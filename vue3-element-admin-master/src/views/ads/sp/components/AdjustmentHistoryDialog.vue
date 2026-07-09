@@ -1,5 +1,5 @@
 <template>
-  <el-dialog
+  <ElDialog
     v-model="visible"
     :title="title"
     width="900px"
@@ -7,65 +7,65 @@
     class="adj-history-dialog"
   >
     <div class="adj-history-filters">
-      <el-radio-group v-model="filterType" size="small" @change="handleFilter">
-        <el-radio-button value="">全部</el-radio-button>
-        <el-radio-button value="BID_ADJUSTMENT">自动规则</el-radio-button>
-        <el-radio-button value="MANUAL_ADJUSTMENT">手动修改</el-radio-button>
-        <el-radio-button value="TIME_PRICING_START">分时开始</el-radio-button>
-        <el-radio-button value="TIME_PRICING_CALLBACK">分时回调</el-radio-button>
-        <el-radio-button value="BID_PAUSE,BID_ENABLE">暂停/启用</el-radio-button>
-        <el-radio-button value="budget">预算调整</el-radio-button>
-      </el-radio-group>
+      <ElRadioGroup v-model="filterType" size="small" @change="handleFilter">
+        <ElRadioButton value="">全部</ElRadioButton>
+        <ElRadioButton value="BID_ADJUSTMENT">自动规则</ElRadioButton>
+        <ElRadioButton value="MANUAL_ADJUSTMENT">手动修改</ElRadioButton>
+        <ElRadioButton value="TIME_PRICING_START">分时开始</ElRadioButton>
+        <ElRadioButton value="TIME_PRICING_CALLBACK">分时回调</ElRadioButton>
+        <ElRadioButton value="BID_PAUSE,BID_ENABLE">暂停/启用</ElRadioButton>
+        <ElRadioButton value="budget">预算调整</ElRadioButton>
+      </ElRadioGroup>
     </div>
 
-    <el-table :data="filteredRecords" size="small" max-height="420" stripe>
-      <el-table-column prop="adjustment_time" label="时间" min-width="155">
+    <ElTable :data="filteredRecords" size="small" max-height="420" stripe>
+      <ElTableColumn prop="adjustment_time" label="时间" min-width="155">
         <template #default="{ row }">
           {{ formatTime(row.adjustment_time) }}
         </template>
-      </el-table-column>
-      <el-table-column prop="execution_type" label="类型" width="100">
+      </ElTableColumn>
+      <ElTableColumn prop="execution_type" label="类型" width="100">
         <template #default="{ row }">
-          <el-tooltip :content="typeDetail(row)" placement="top" :show-after="300">
-            <el-tag :type="typeTag(row.execution_type)" size="small" effect="plain">
+          <ElTooltip :content="typeDetail(row)" placement="top" :show-after="300">
+            <ElTag :type="typeTag(row.execution_type)" size="small" effect="plain">
               {{ typeLabel(row.execution_type) }}
-            </el-tag>
-          </el-tooltip>
+            </ElTag>
+          </ElTooltip>
         </template>
-      </el-table-column>
-      <el-table-column prop="before" label="调整前" width="80" align="right">
+      </ElTableColumn>
+      <ElTableColumn prop="before" label="调整前" width="80" align="right">
         <template #default="{ row }">
           {{ row.bid_before ?? row.budget_before ?? "-" }}
         </template>
-      </el-table-column>
-      <el-table-column prop="after" label="调整后" width="80" align="right">
+      </ElTableColumn>
+      <ElTableColumn prop="after" label="调整后" width="80" align="right">
         <template #default="{ row }">
           {{ row.bid_after ?? row.budget_after ?? "-" }}
         </template>
-      </el-table-column>
-      <el-table-column label="操作人/规则" width="140" show-overflow-tooltip>
+      </ElTableColumn>
+      <ElTableColumn label="操作人/规则" width="140" show-overflow-tooltip>
         <template #default="{ row }">
           {{ row.rule_name || row.strategy_name || row.operator || "-" }}
         </template>
-      </el-table-column>
-      <el-table-column prop="adjustment_status" label="状态" width="70" align="center">
+      </ElTableColumn>
+      <ElTableColumn prop="adjustment_status" label="状态" width="70" align="center">
         <template #default="{ row }">
-          <el-tag
+          <ElTag
             :type="row.adjustment_status === 'SUCCESS' ? 'success' : 'warning'"
             size="small"
             effect="dark"
           >
             {{ row.adjustment_status === "SUCCESS" ? "已执行" : "待执行" }}
-          </el-tag>
+          </ElTag>
         </template>
-      </el-table-column>
-      <el-table-column prop="msg" label="说明" min-width="150" show-overflow-tooltip />
-    </el-table>
+      </ElTableColumn>
+      <ElTableColumn prop="msg" label="说明" min-width="150" show-overflow-tooltip />
+    </ElTable>
 
     <div class="adj-history-footer">
       <span>共 {{ filteredRecords.length }} 条</span>
     </div>
-  </el-dialog>
+  </ElDialog>
 </template>
 
 <script setup lang="ts">
@@ -75,7 +75,15 @@
  *  通过 ref.open(params) 调用，params 需包含 entity_id + profile_id。
  */
 import { ref, computed } from "vue";
-import { ElDialog, ElTable, ElTableColumn, ElTag, ElRadioGroup, ElRadioButton, ElTooltip } from "element-plus";
+import {
+  ElDialog,
+  ElTable,
+  ElTableColumn,
+  ElTag,
+  ElRadioGroup,
+  ElRadioButton,
+  ElTooltip,
+} from "element-plus";
 import { getAdjustmentHistory, type AdjustmentHistoryItem } from "@/api/ads";
 import { formatTimeInZone } from "@/utils/timezones";
 
@@ -137,7 +145,7 @@ function typeLabel(type: string): string {
 
 /** 执行类型 → Element Plus Tag 颜色（大小写不敏感） */
 function typeTag(type: string): "success" | "warning" | "info" | "danger" {
-  return (TYPE_TAGS[type] || TYPE_TAGS[type.toUpperCase()]) as any || "info";
+  return ((TYPE_TAGS[type] || TYPE_TAGS[type.toUpperCase()]) as any) || "info";
 }
 
 /**
@@ -147,27 +155,27 @@ function typeTag(type: string): "success" | "warning" | "info" | "danger" {
  * 手动修改：显示操作人 + 竞价变化 + msg
  */
 function typeDetail(row: AdjustmentHistoryItem): string {
-  const parts: string[] = []
+  const parts: string[] = [];
 
   if (row.rule_name) {
-    parts.push(`「${row.rule_name}」规则修改`)
+    parts.push(`「${row.rule_name}」规则修改`);
   } else if (row.strategy_name) {
-    parts.push(`分时策略「${row.strategy_name}」`)
+    parts.push(`分时策略「${row.strategy_name}」`);
   } else if (row.operator) {
-    parts.push(`由 ${row.operator} 完成`)
+    parts.push(`由 ${row.operator} 完成`);
   }
 
   if (row.bid_before !== undefined && row.bid_before !== null) {
-    parts.push(`竞价 ${row.bid_before} → ${row.bid_after}`)
+    parts.push(`竞价 ${row.bid_before} → ${row.bid_after}`);
   } else if (row.budget_before !== undefined && row.budget_before !== null) {
-    parts.push(`预算 ${row.budget_before} → ${row.budget_after}`)
+    parts.push(`预算 ${row.budget_before} → ${row.budget_after}`);
   }
 
   if (row.msg) {
-    parts.push(row.msg)
+    parts.push(row.msg);
   }
 
-  return parts.join(" | ") || typeLabel(row.execution_type)
+  return parts.join(" | ") || typeLabel(row.execution_type);
 }
 
 /**
@@ -204,7 +212,8 @@ async function open(params: Record<string, number | string>): Promise<void> {
   }
 }
 
-defineExpose({ open });</script>
+defineExpose({ open });
+</script>
 
 <style scoped>
 .adj-history-dialog :deep(.el-dialog__body) {
@@ -215,8 +224,8 @@ defineExpose({ open });</script>
 }
 .adj-history-footer {
   margin-top: 8px;
-  text-align: right;
   font-size: 12px;
   color: var(--text-secondary, #909399);
+  text-align: right;
 }
 </style>
