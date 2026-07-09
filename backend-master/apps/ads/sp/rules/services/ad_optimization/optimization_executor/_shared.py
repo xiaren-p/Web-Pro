@@ -36,7 +36,7 @@ MIN_BID_FLOOR = 0.02
 DEFAULT_CONDITION_DAYS = 30
 
 # 默认执行周期（天）
-DEFAULT_CYCLE_DAYS = 1
+DEFAULT_CYCLE_DAYS = 14
 
 
 def get_group_execution_cycle(group_id: int) -> int:

@@ -19,9 +19,9 @@ class LxAdRuleGroup(models.Model):
     )
 
     execution_cycle = models.IntegerField(
-        default=1,
+        default=14,
         verbose_name="执行周期（天）",
-        help_text="每 N 天执行一次，默认 1 表示每天执行",
+        help_text="每 N 天执行一次，默认 14 天",
     )
 
     rule_order = models.JSONField(
