@@ -216,9 +216,9 @@ def _apply_results(
         if result.get("code") == "SUCCESS":
             record.execution_status = ExecutionStatusChoices.SUCCESS
             if is_pause:
-                record.msg = "竞价暂停成功"
+                record.msg = "实体暂停成功"
             elif is_enable:
-                record.msg = "竞价启用成功"
+                record.msg = "实体启用成功"
             else:
                 before = round(float(record.bid_before or 0), 4)
                 after = round(float(record.bid_after or 0), 4)
@@ -227,9 +227,9 @@ def _apply_results(
             record.execution_status = ExecutionStatusChoices.FAILED
             error_desc = result.get("description", "unknown")
             if is_pause:
-                record.msg = f"竞价暂停失败，error: {error_desc}"
+                record.msg = f"实体暂停失败，error: {error_desc}"
             elif is_enable:
-                record.msg = f"竞价启用失败，error: {error_desc}"
+                record.msg = f"实体启用失败，error: {error_desc}"
             else:
                 record.msg = f"竞价调整失败，error: {error_desc}"
 

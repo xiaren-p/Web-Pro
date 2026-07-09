@@ -167,9 +167,9 @@ def build_bid_lines(
             logger.warning("[build_bid_lines] 规则条件解析失败", exc_info=True)
 
     if etype == BidExecType.BID_PAUSE:
-        lines.append("执行操作: 竞价暂停")
+        lines.append("执行操作: 投放暂停")
     elif etype == BidExecType.BID_ENABLE:
-        lines.append("执行操作: 竞价启用")
+        lines.append("执行操作: 投放启用")
     elif etype in (BidExecType.BID_ADJUSTMENT, BidExecType.MANUAL_ADJUSTMENT):
         before = float(rec.bid_before) if rec.bid_before is not None else 0
         after = float(rec.bid_after) if rec.bid_after is not None else 0

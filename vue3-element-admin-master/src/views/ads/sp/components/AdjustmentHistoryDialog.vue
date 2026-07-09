@@ -2,7 +2,7 @@
   <ElDialog
     v-model="visible"
     :title="title"
-    width="900px"
+    width="920px"
     destroy-on-close
     class="adj-history-dialog"
   >
@@ -53,7 +53,7 @@
           {{ row.rule_name || row.strategy_name || row.operator || "-" }}
         </template>
       </ElTableColumn>
-      <ElTableColumn prop="adjustment_status" label="状态" width="70" align="center">
+      <ElTableColumn prop="adjustment_status" label="状态" width="80" align="center">
         <template #default="{ row }">
           <ElTag
             :type="row.adjustment_status === 'SUCCESS' ? 'success' : 'warning'"
