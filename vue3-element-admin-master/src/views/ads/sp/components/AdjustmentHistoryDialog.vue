@@ -243,25 +243,25 @@ defineExpose({ open });
 }
 .adj-history-footer {
   margin-top: 8px;
-  text-align: right;
   font-size: 12px;
   color: var(--text-secondary, #909399);
+  text-align: right;
 }
 </style>
 
 <style>
 .adj-detail-tooltip {
   max-width: 420px;
-  white-space: pre-line;
   font-size: 12px;
   line-height: 1.6;
+  white-space: pre-line;
 }
 
 .adj-history-dialog .el-table th.el-table__cell {
   height: 36px;
   padding: 4px 0;
-  line-height: 28px;
   font-size: 12px;
+  line-height: 28px;
 }
 .adj-history-dialog .el-table td.el-table__cell {
   padding: 6px 0;
