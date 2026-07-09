@@ -5,6 +5,7 @@
     width="920px"
     destroy-on-close
     class="adj-history-dialog"
+    @opened="onDialogOpened"
   >
     <div class="adj-history-filters">
       <ElRadioGroup v-model="filterType" size="small">
@@ -82,7 +83,7 @@
  * 支持按类型筛选（自动规则/手动修改/分时开始/分时回调/暂停启用/预算调整）。
  * 通过 ref.open(params) 调用，params 需包含 entity_id + profile_id。
  */
-import { ref, computed } from "vue";
+import { ref, computed, nextTick } from "vue";
 import {
   ElDialog,
   ElTable,
@@ -133,8 +134,6 @@ const filterType = ref("");
 const storeTimezone = ref("");
 /** 全量调整记录 */
 const allRecords = ref<AdjustmentHistoryItem[]>([]);
-/** 加载状态 */
-const loading = ref(false);
 
 /**
  * 根据当前 filterType 筛选记录。
@@ -159,9 +158,9 @@ function typeTag(type: string): "success" | "warning" | "info" | "danger" {
 /**
  * 悬停时显示的完整调整详情，与竞价 * 星标格式一致。
  *
- * 自动规则：规则组「新广告 8-30（一）」—「AUTO 广告活动 规则一」规则
- *           时间  竞价 0.14 → 0.12
- *           竞价调整成功 0.14 → 0.12
+ * 自动规则：规则组「超 90 天自动广告」—「自动广告特殊规则一」规则
+ *           时间  竞价 0.12 → 0.14
+ *           竞价调整成功 0.12 → 0.14
  * 分时调价：分时策略「通用竞价分时」
  * 手动修改：由 陈慧瑩 完成
  */
@@ -208,6 +207,21 @@ function formatTime(time: string): string {
 }
 
 /**
+ * 弹窗打开完成回调：强制 filterType 刷新一次，
+ * 解决页面刷新后 el-radio-button 未正确渲染的时序问题。
+ */
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+function onDialogOpened(): void {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => {
+    filterType.value = "";
+    nextTick(() => {
+      filterType.value = "";
+    });
+  }, 50);
+}
+
+/**
  * 打开弹窗并加载调整历史数据。
  * 由父组件通过 defineExpose 的 ref 调用。
  *
@@ -218,13 +232,12 @@ async function open(params: Record<string, number | string>): Promise<void> {
   title.value = "调整历史";
   filterType.value = "";
   storeTimezone.value = "";
-  loading.value = true;
   try {
     const res = await getAdjustmentHistory(params);
     allRecords.value = res.records || [];
     storeTimezone.value = (res as any).timezone || "";
   } finally {
-    loading.value = false;
+    // loading handled by parent if needed
   }
 }
 
@@ -257,13 +270,18 @@ defineExpose({ open });
   white-space: pre-line;
 }
 
-.adj-history-dialog .el-table th.el-table__cell {
-  height: 36px;
-  padding: 4px 0;
+/* 覆盖各父组件泄漏到弹窗的 el-table 表头样式 */
+.adj-history-dialog .el-table__header-wrapper th.el-table__cell {
+  height: 32px !important;
+  padding: 2px 0 !important;
   font-size: 12px;
   line-height: 28px;
+  background: var(--el-table-header-bg-color, #f5f7fa);
 }
 .adj-history-dialog .el-table td.el-table__cell {
   padding: 6px 0;
+}
+.adj-history-dialog .el-table .cell {
+  padding: 0 8px;
 }
 </style>
