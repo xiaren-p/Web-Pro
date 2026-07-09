@@ -98,9 +98,7 @@
  * 所属板块：tools / 广告规则策略。
  */
 import type { AdRule } from "@/views/tools/rule-strategy/types";
-import {
-  COMPARISON_LABEL,
-} from "@/views/tools/rule-strategy/types";
+import { COMPARISON_LABEL } from "@/views/tools/rule-strategy/types";
 import { useRuleFormatter } from "@/views/tools/rule-strategy/composables/useRuleFormatter";
 
 import { ref, computed } from "vue";

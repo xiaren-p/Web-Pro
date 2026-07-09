@@ -253,10 +253,7 @@
  * SP 广告规则草稿箱面板：左侧规则类目 + 右侧规则表格展示
  */
 import type { AdRule, RuleFormData } from "./types";
-import {
-  COMPARISON_LABEL,
-  COMPARISON_TARGET_OPTIONS,
-} from "./types";
+import { COMPARISON_LABEL, COMPARISON_TARGET_OPTIONS } from "./types";
 import { useRuleFormatter } from "./composables/useRuleFormatter";
 
 import { ref, computed } from "vue";

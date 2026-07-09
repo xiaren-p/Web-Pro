@@ -178,13 +178,13 @@ onBeforeUnmount(() => observer?.disconnect());
 
   /* ── 侧边栏 ── */
   &__sidebar {
+    flex-shrink: 0;
     width: 220px;
     padding: 0;
     overflow-y: auto;
     background: var(--surface-base);
     border-right: 1px solid var(--border-base);
     box-shadow: 2px 0 8px rgb(15 23 42 / 4%);
-    flex-shrink: 0;
   }
 
   &__nav-back {
@@ -238,13 +238,13 @@ onBeforeUnmount(() => observer?.disconnect());
 
   &__footer {
     display: flex;
+    flex-shrink: 0;
     gap: 12px;
     justify-content: center;
     padding: 14px 32px;
     background: var(--surface-base);
     border-top: 1px solid var(--border-base);
     box-shadow: 0 -2px 8px rgb(15 23 42 / 4%);
-    flex-shrink: 0;
   }
 
   /* ── 子 section 共享样式（穿透到子组件） ── */
