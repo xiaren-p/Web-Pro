@@ -1,5 +1,5 @@
 <template>
-  <ElDialog
+  <el-dialog
     v-model="visible"
     :title="title"
     width="900px"
@@ -7,65 +7,66 @@
     class="adj-history-dialog"
   >
     <div class="adj-history-filters">
-      <ElRadioGroup v-model="filterType" size="small" @change="handleFilter">
-        <ElRadioButton value="">全部</ElRadioButton>
-        <ElRadioButton value="BID_ADJUSTMENT">自动规则</ElRadioButton>
-        <ElRadioButton value="MANUAL_ADJUSTMENT">手动修改</ElRadioButton>
-        <ElRadioButton value="TIME_PRICING_START">分时开始</ElRadioButton>
-        <ElRadioButton value="TIME_PRICING_CALLBACK">分时回调</ElRadioButton>
-        <ElRadioButton value="BID_PAUSE,BID_ENABLE">暂停/启用</ElRadioButton>
-        <ElRadioButton value="budget">预算调整</ElRadioButton>
-      </ElRadioGroup>
+      <el-radio-group v-model="filterType" size="small" @change="handleFilter">
+        <el-radio-button value="">全部</el-radio-button>
+        <el-radio-button value="BID_ADJUSTMENT">自动规则</el-radio-button>
+        <el-radio-button value="MANUAL_ADJUSTMENT">手动修改</el-radio-button>
+        <el-radio-button value="TIME_PRICING_START">分时开始</el-radio-button>
+        <el-radio-button value="TIME_PRICING_CALLBACK">分时回调</el-radio-button>
+        <el-radio-button value="BID_PAUSE,BID_ENABLE">暂停/启用</el-radio-button>
+        <el-radio-button value="budget">预算调整</el-radio-button>
+      </el-radio-group>
     </div>
 
-    <ElTable :data="filteredRecords" size="small" max-height="420" stripe>
-      <ElTableColumn prop="adjustment_time" label="时间" min-width="155">
+    <el-table :data="filteredRecords" size="small" max-height="420" stripe>
+      <el-table-column prop="adjustment_time" label="时间" min-width="155">
         <template #default="{ row }">
           {{ formatTime(row.adjustment_time) }}
         </template>
-      </ElTableColumn>
-      <ElTableColumn prop="execution_type" label="类型" width="100">
+      </el-table-column>
+      <el-table-column prop="execution_type" label="类型" width="100">
         <template #default="{ row }">
-          <ElTooltip :content="typeDetail(row)" placement="top" :show-after="300">
-            <ElTag :type="typeTag(row.execution_type)" size="small" effect="plain">
+          <el-tooltip :content="typeDetail(row)" placement="top" :show-after="300">
+            <el-tag :type="typeTag(row.execution_type)" size="small" effect="plain">
               {{ typeLabel(row.execution_type) }}
-            </ElTag>
-          </ElTooltip>
+            </el-tag>
+          </el-tooltip>
         </template>
-      </ElTableColumn>
-      <ElTableColumn prop="before" label="调整前" width="80" align="right">
+      </el-table-column>
+      <el-table-column prop="before" label="调整前" width="80" align="right">
         <template #default="{ row }">
           {{ row.bid_before ?? row.budget_before ?? "-" }}
         </template>
-      </ElTableColumn>
-      <ElTableColumn prop="after" label="调整后" width="80" align="right">
+      </el-table-column>
+      <el-table-column prop="after" label="调整后" width="80" align="right">
         <template #default="{ row }">
           {{ row.bid_after ?? row.budget_after ?? "-" }}
         </template>
-      </ElTableColumn>
-      <ElTableColumn prop="operator" label="操作人" width="80">
+      </el-table-column>
+      <el-table-column label="操作人/规则" width="140" show-overflow-tooltip>
         <template #default="{ row }">
-          {{ row.operator || "-" }}
+          {{ row.rule_name || row.strategy_name || row.operator || "-" }}
         </template>
-      </ElTableColumn>
-      <ElTableColumn prop="adjustment_status" label="状态" width="70" align="center">
+        </template>
+      </el-table-column>
+      <el-table-column prop="adjustment_status" label="状态" width="70" align="center">
         <template #default="{ row }">
-          <ElTag
+          <el-tag
             :type="row.adjustment_status === 'SUCCESS' ? 'success' : 'warning'"
             size="small"
             effect="dark"
           >
             {{ row.adjustment_status === "SUCCESS" ? "已执行" : "待执行" }}
-          </ElTag>
+          </el-tag>
         </template>
-      </ElTableColumn>
-      <ElTableColumn prop="msg" label="说明" min-width="150" show-overflow-tooltip />
-    </ElTable>
+      </el-table-column>
+      <el-table-column prop="msg" label="说明" min-width="150" show-overflow-tooltip />
+    </el-table
 
     <div class="adj-history-footer">
       <span>共 {{ filteredRecords.length }} 条</span>
     </div>
-  </ElDialog>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -204,8 +205,7 @@ async function open(params: Record<string, number | string>): Promise<void> {
   }
 }
 
-defineExpose({ open });
-</script>
+defineExpose({ open });</script>
 
 <style scoped>
 .adj-history-dialog :deep(.el-dialog__body) {
