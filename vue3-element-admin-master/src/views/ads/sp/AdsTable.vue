@@ -227,18 +227,15 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="分析" width="80" fixed="right" align="center" :resizable="false">
+        <el-table-column label="分析" width="64" fixed="right" align="center" :resizable="false">
           <template #default="{ row }">
-            <el-button
-              v-if="!row._isSummary"
-              type="primary"
-              link
-              size="small"
-              class="analyze-btn"
-              @click="$emit('view-row', row)"
-            >
-              分析
-            </el-button>
+            <template v-if="!row._isSummary">
+              <el-tooltip content="查看历史调整" placement="left">
+                <el-icon class="analysis-icon" :size="16" @click.stop="openHistory(row)">
+                  <Clock />
+                </el-icon>
+              </el-tooltip>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -302,13 +299,15 @@
         </div>
       </div>
     </div>
+    <AdjustmentHistoryDialog ref="adjHistoryDialog" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
-import { TrendCharts, List } from "@element-plus/icons-vue";
+import { TrendCharts, List, Clock } from "@element-plus/icons-vue";
 import { ElMessageBox } from "element-plus";
+import AdjustmentHistoryDialog from "@/views/ads/sp/components/AdjustmentHistoryDialog.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -488,6 +487,15 @@ function onPageSizeChange(v: number) {
  */
 function onSelectionChange(rows: any[]): void {
   selectedRows.value = rows.filter((r) => !r._isSummary);
+}
+
+const adjHistoryDialog = ref<InstanceType<typeof AdjustmentHistoryDialog>>();
+
+function openHistory(row: any): void {
+  adjHistoryDialog.value?.open({
+    campaign_id: row.campaign_id || "",
+    profile_id: row.profile_id || "",
+  });
 }
 
 /**
@@ -1317,5 +1325,13 @@ function formatValue(val: any): string {
 /* 排序图标缩小 */
 :deep(.caret-wrapper) {
   transform: scale(0.7);
+}
+
+.analysis-icon {
+  cursor: pointer;
+  color: #909399;
+}
+.analysis-icon:hover {
+  color: var(--el-color-primary);
 }
 </style>
