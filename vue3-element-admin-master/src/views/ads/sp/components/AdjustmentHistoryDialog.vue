@@ -24,11 +24,13 @@
           {{ formatTime(row.adjustment_time) }}
         </template>
       </ElTableColumn>
-      <ElTableColumn prop="execution_type" label="类型" width="90">
+      <ElTableColumn prop="execution_type" label="类型" width="100">
         <template #default="{ row }">
-          <ElTag :type="typeTag(row.execution_type)" size="small" effect="plain">
-            {{ typeLabel(row.execution_type) }}
-          </ElTag>
+          <ElTooltip :content="typeDetail(row)" placement="top" :show-after="300">
+            <ElTag :type="typeTag(row.execution_type)" size="small" effect="plain">
+              {{ typeLabel(row.execution_type) }}
+            </ElTag>
+          </ElTooltip>
         </template>
       </ElTableColumn>
       <ElTableColumn prop="before" label="调整前" width="80" align="right">
@@ -68,7 +70,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { ElDialog, ElTable, ElTableColumn, ElTag, ElRadioGroup, ElRadioButton } from "element-plus";
+import { ElDialog, ElTable, ElTableColumn, ElTag, ElRadioGroup, ElRadioButton, ElTooltip } from "element-plus";
 import { getAdjustmentHistory, type AdjustmentHistoryItem } from "@/api/ads";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -91,6 +93,10 @@ const TYPE_TAGS: Record<string, string> = {
   TIME_PRICING_CALLBACK: "info",
   BID_PAUSE: "danger",
   BID_ENABLE: "success",
+  RULE_BUDGET_ADJUSTMENT: "",
+  MANUAL_BUDGET_ADJUSTMENT: "success",
+  CAMPAIGN_PAUSE: "danger",
+  CAMPAIGN_ENABLE: "success",
 };
 
 const visible = ref(false);
@@ -111,6 +117,23 @@ function typeLabel(type: string): string {
 
 function typeTag(type: string): "success" | "warning" | "info" | "danger" {
   return (TYPE_TAGS[type] as any) || "info";
+}
+
+function typeDetail(row: AdjustmentHistoryItem): string {
+  const parts: string[] = [];
+  if (row.auto_rule_id) {
+    parts.push(`规则 ID: ${row.auto_rule_id}`);
+  }
+  if (row.time_pricing_rule_id) {
+    parts.push(`分时策略 ID: ${row.time_pricing_rule_id}`);
+  }
+  if (parts.length === 0 && row.operator) {
+    parts.push(`操作人: ${row.operator}`);
+  }
+  if (row.msg) {
+    parts.push(row.msg);
+  }
+  return parts.join(" | ") || typeLabel(row.execution_type);
 }
 
 function formatTime(time: string): string {
