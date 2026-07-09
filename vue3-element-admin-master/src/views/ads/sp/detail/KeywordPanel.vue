@@ -202,11 +202,6 @@
                     </div>
                   </template>
                 </el-tooltip>
-                <el-tooltip content="查看历史调整" placement="top">
-                  <span class="adj-history-icon" @click.stop="openHistory(row)">
-                    <el-icon :size="14"><Clock /></el-icon>
-                  </span>
-                </el-tooltip>
               </div>
             </template>
 
@@ -245,7 +240,13 @@
         <!-- 固定右：分析 -->
         <el-table-column label="分析" width="64" fixed="right" align="center" :resizable="false">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="openDrawer(row)">分析</el-button>
+            <template v-if="row.keywordId && !row._isSummary">
+              <el-tooltip content="查看历史调整" placement="left">
+                <el-icon class="analysis-icon" :size="16" @click.stop="openHistory(row)">
+                  <Clock />
+                </el-icon>
+              </el-tooltip>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -1017,6 +1018,14 @@ onMounted(fetchData);
   cursor: pointer;
 }
 .adj-history-icon:hover {
+  color: var(--el-color-primary);
+}
+
+.analysis-icon {
+  cursor: pointer;
+  color: #909399;
+}
+.analysis-icon:hover {
   color: var(--el-color-primary);
 }
 

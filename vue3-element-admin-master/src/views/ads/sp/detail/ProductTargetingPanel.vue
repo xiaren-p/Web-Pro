@@ -169,11 +169,6 @@
                     </div>
                   </template>
                 </el-tooltip>
-                <el-tooltip content="查看历史调整" placement="top">
-                  <span class="adj-history-icon" @click.stop="openHistory(row)">
-                    <el-icon :size="14"><Clock /></el-icon>
-                  </span>
-                </el-tooltip>
               </div>
             </template>
             <!-- 分时竞价（含星标） -->
@@ -237,17 +232,15 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="分析" width="80" fixed="right" align="center" :resizable="false">
+        <el-table-column label="分析" width="64" fixed="right" align="center" :resizable="false">
           <template #default="{ row }">
-            <el-button
-              v-if="row.target_id && !row._isSummary"
-              type="primary"
-              link
-              size="small"
-              class="analyze-btn"
-            >
-              分析
-            </el-button>
+            <template v-if="row.targetId && !row._isSummary">
+              <el-tooltip content="查看历史调整" placement="left">
+                <el-icon class="analysis-icon" :size="16" @click.stop="openHistory(row)">
+                  <Clock />
+                </el-icon>
+              </el-tooltip>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -957,6 +950,14 @@ onMounted(() => {
   cursor: pointer;
 }
 .adj-history-icon:hover {
+  color: var(--el-color-primary);
+}
+
+.analysis-icon {
+  cursor: pointer;
+  color: #909399;
+}
+.analysis-icon:hover {
   color: var(--el-color-primary);
 }
 
