@@ -186,10 +186,13 @@
  */
 import type { AdRule, AdRuleGroup } from "@/views/tools/rule-strategy/types";
 import { COMPARISON_LABEL } from "@/views/tools/rule-strategy/types";
+import { useRuleFormatter } from "@/views/tools/rule-strategy/composables/useRuleFormatter";
 
 import { ref, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus, Edit, Delete, FolderAdd, Search, InfoFilled } from "@element-plus/icons-vue";
+
+const { getRuleSummary } = useRuleFormatter();
 
 defineOptions({ name: "AutoRuleDrawer" });
 
@@ -233,15 +236,6 @@ function getRuleStatusType(status: string): "success" | "info" {
 
 function getRuleStatusText(status: string): string {
   return status === "active" ? "启用" : "暂停";
-}
-
-function getRuleSummary(rule: AdRule): string {
-  return rule.conditionSets
-    .map(
-      (cs) =>
-        `≤${cs.days}d, ${cs.conditions.map((c) => `${c.metric}${c.operator}${c.value}`).join(",")}`
-    )
-    .join(" | ");
 }
 
 function open(): void {

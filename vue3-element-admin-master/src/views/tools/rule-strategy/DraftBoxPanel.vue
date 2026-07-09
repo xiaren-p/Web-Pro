@@ -256,9 +256,8 @@ import type { AdRule, RuleFormData } from "./types";
 import {
   COMPARISON_LABEL,
   COMPARISON_TARGET_OPTIONS,
-  ACTION_LABEL,
-  NO_VALUE_ACTIONS,
 } from "./types";
+import { useRuleFormatter } from "./composables/useRuleFormatter";
 
 import { ref, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -276,6 +275,8 @@ import {
 
 import RuleFormDialog from "./RuleFormDialog.vue";
 import { createRule, updateRule, deleteRule } from "@/api/ads/rule-strategy";
+
+const { getRuleSummary, formatActions } = useRuleFormatter();
 
 defineOptions({ name: "DraftBoxPanel" });
 
@@ -347,40 +348,6 @@ function formatCategories(rule: AdRule): string {
   const cats = rule.categories || [];
   if (cats.length === 0) return "-";
   return cats.join("、");
-}
-
-function formatActions(rule: AdRule): string {
-  const parts: string[] = [];
-  const ba = rule.bidAction;
-  if (ba?.type) {
-    const label = ACTION_LABEL[ba.type] || ba.type;
-    if (NO_VALUE_ACTIONS.has(ba.type)) {
-      parts.push(label);
-    } else {
-      const suffix = ba.type.includes("decrease") ? "↓" : "↑";
-      const val = ba.type.includes("percent") ? `${ba.value}%` : `€${ba.value}`;
-      parts.push(`${label} ${val} ${suffix}`);
-    }
-  }
-  const bg = rule.budgetAction;
-  if (bg?.type && bg.type !== "no_adjust") {
-    const label = ACTION_LABEL[bg.type] || bg.type;
-    const suffix = bg.type.includes("increase") ? "↑" : "↓";
-    parts.push(`${label} €${bg.value}/天 ${suffix}`);
-  }
-  if (rule.negativeAction) parts.push(ACTION_LABEL[rule.negativeAction] || rule.negativeAction);
-  if (rule.addKeywordAction)
-    parts.push(ACTION_LABEL[rule.addKeywordAction] || rule.addKeywordAction);
-  return parts.length > 0 ? parts.join(" · ") : "-";
-}
-
-function getRuleSummary(rule: AdRule): string {
-  return rule.conditionSets
-    .map(
-      (cs) =>
-        `≤${cs.days}天, ${cs.conditions.map((c) => `${c.metric}${c.operator}${c.value}`).join(" / ")}`
-    )
-    .join(" | ");
 }
 
 function formatDate(dateString: string): string {

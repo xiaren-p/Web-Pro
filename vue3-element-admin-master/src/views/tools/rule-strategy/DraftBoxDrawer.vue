@@ -100,15 +100,16 @@
 import type { AdRule } from "@/views/tools/rule-strategy/types";
 import {
   COMPARISON_LABEL,
-  ACTION_LABEL,
-  NO_VALUE_ACTIONS,
 } from "@/views/tools/rule-strategy/types";
+import { useRuleFormatter } from "@/views/tools/rule-strategy/composables/useRuleFormatter";
 
 import { ref, computed } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus, Edit, Delete, Search } from "@element-plus/icons-vue";
 
 import RuleFormDialog from "@/views/tools/rule-strategy/RuleFormDialog.vue";
+
+const { getRuleSummary, formatActions } = useRuleFormatter();
 
 defineOptions({ name: "DraftBoxDrawer" });
 
@@ -136,43 +137,6 @@ function formatShops(rule: AdRule): string {
   if (!rule.shops || rule.shops.length === 0) return "-";
   if (rule.shops.length === 1) return String(rule.shops[0]);
   return `${rule.shops.length} 个店铺`;
-}
-
-function formatActions(rule: AdRule): string {
-  const parts: string[] = [];
-  // 竞价操作
-  const ba = rule.bidAction;
-  if (ba?.type) {
-    const label = ACTION_LABEL[ba.type] || ba.type;
-    if (NO_VALUE_ACTIONS.has(ba.type)) {
-      parts.push(label);
-    } else {
-      const suffix = ba.type.includes("decrease") ? "↓" : "↑";
-      const val = ba.type.includes("percent") ? `${ba.value}%` : `€${ba.value}`;
-      parts.push(`${label} ${val} ${suffix}`);
-    }
-  }
-  // 预算操作
-  const bg = rule.budgetAction;
-  if (bg?.type && bg.type !== "no_adjust") {
-    const label = ACTION_LABEL[bg.type] || bg.type;
-    const suffix = bg.type.includes("increase") ? "↑" : "↓";
-    parts.push(`${label} €${bg.value}/天 ${suffix}`);
-  }
-  // 搜索词操作
-  if (rule.negativeAction) parts.push(ACTION_LABEL[rule.negativeAction] || rule.negativeAction);
-  if (rule.addKeywordAction)
-    parts.push(ACTION_LABEL[rule.addKeywordAction] || rule.addKeywordAction);
-  return parts.length > 0 ? parts.join(" · ") : "-";
-}
-
-function getRuleSummary(rule: AdRule): string {
-  return rule.conditionSets
-    .map(
-      (cs) =>
-        `≤${cs.days}天, ${cs.conditions.map((c) => `${c.metric}${c.operator}${c.value}`).join(" / ")}`
-    )
-    .join("\n");
 }
 
 function open(): void {

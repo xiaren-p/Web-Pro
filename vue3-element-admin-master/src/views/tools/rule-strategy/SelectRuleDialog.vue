@@ -128,10 +128,13 @@
  */
 import type { AdRule, AdRuleGroup } from "./types";
 import { COMPARISON_LABEL } from "./types";
+import { useRuleFormatter } from "./composables/useRuleFormatter";
 
 import { ref, computed } from "vue";
 import { Search, Document, Delete } from "@element-plus/icons-vue";
 import type { ElTable } from "element-plus";
+
+const { getRuleSummary } = useRuleFormatter();
 
 defineOptions({ name: "SelectRuleDialog" });
 
@@ -190,15 +193,6 @@ function formatShops(rule: AdRule): string {
   if (!rule.shops || rule.shops.length === 0) return "-";
   if (rule.shops.length === 1) return String(rule.shops[0]);
   return `${rule.shops.length} 个店铺`;
-}
-
-function getRuleSummary(rule: AdRule): string {
-  return rule.conditionSets
-    .map(
-      (cs) =>
-        `≤${cs.days}天, ${cs.conditions.map((c) => `${c.metric}${c.operator}${c.value}`).join(" / ")}`
-    )
-    .join(" | ");
 }
 
 function handleConfirm(): void {

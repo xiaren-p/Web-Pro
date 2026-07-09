@@ -291,6 +291,7 @@
  */
 import type { AdRule, AdRuleGroup } from "./types";
 import { COMPARISON_LABEL } from "./types";
+import { useRuleFormatter } from "./composables/useRuleFormatter";
 
 import { ref, computed, watch, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -319,6 +320,8 @@ import {
 
 import SelectRuleDialog from "./SelectRuleDialog.vue";
 import RuleFormDialog from "./RuleFormDialog.vue";
+
+const { getRuleSummary } = useRuleFormatter();
 
 defineOptions({ name: "AutoRulePanel" });
 
@@ -478,15 +481,6 @@ async function handleDragEnd(evt: Sortable.SortableEvent): Promise<void> {
   } finally {
     loading.value = false;
   }
-}
-
-function getRuleSummary(rule: AdRule): string {
-  return rule.conditionSets
-    .map(
-      (cs) =>
-        `≤${cs.days}天, ${cs.conditions.map((c) => `${c.metric}${c.operator}${c.value}`).join(" / ")}`
-    )
-    .join(" | ");
 }
 
 function formatShops(rule: AdRule): string {
