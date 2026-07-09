@@ -18,54 +18,56 @@
       </ElRadioGroup>
     </div>
 
-    <ElTable :data="filteredRecords" size="small" max-height="420" stripe>
-      <ElTableColumn prop="adjustment_time" label="时间" min-width="155">
-        <template #default="{ row }">
-          {{ formatTime(row.adjustment_time) }}
-        </template>
-      </ElTableColumn>
-      <ElTableColumn prop="execution_type" label="类型" width="100">
-        <template #default="{ row }">
-          <ElTooltip
-            :content="typeDetail(row)"
-            placement="top"
-            :show-after="300"
-            popper-class="adj-detail-tooltip"
-          >
-            <ElTag :type="typeTag(row.execution_type)" size="small" effect="plain">
-              {{ typeLabel(row.execution_type) }}
-            </ElTag>
-          </ElTooltip>
-        </template>
-      </ElTableColumn>
-      <ElTableColumn prop="before" label="调整前" width="80" align="right">
-        <template #default="{ row }">
-          {{ row.bid_before ?? row.budget_before ?? "-" }}
-        </template>
-      </ElTableColumn>
-      <ElTableColumn prop="after" label="调整后" width="80" align="right">
-        <template #default="{ row }">
-          {{ row.bid_after ?? row.budget_after ?? "-" }}
-        </template>
-      </ElTableColumn>
-      <ElTableColumn label="操作人/规则" width="140" show-overflow-tooltip>
-        <template #default="{ row }">
-          {{ row.rule_name || row.strategy_name || row.operator || "-" }}
-        </template>
-      </ElTableColumn>
-      <ElTableColumn prop="adjustment_status" label="状态" width="80" align="center">
-        <template #default="{ row }">
-          <ElTag
-            :type="row.adjustment_status === 'SUCCESS' ? 'success' : 'warning'"
-            size="small"
-            effect="dark"
-          >
-            {{ row.adjustment_status === "SUCCESS" ? "已执行" : "待执行" }}
-          </ElTag>
-        </template>
-      </ElTableColumn>
-      <ElTableColumn prop="msg" label="说明" min-width="150" show-overflow-tooltip />
-    </ElTable>
+    <div class="adj-history-table">
+      <el-table :data="filteredRecords" size="small" max-height="420" stripe empty-text="暂无数据">
+        <el-table-column prop="adjustment_time" label="时间" min-width="155">
+          <template #default="{ row }">
+            {{ formatTime(row.adjustment_time) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="execution_type" label="类型" width="100">
+          <template #default="{ row }">
+            <el-tooltip
+              :content="typeDetail(row)"
+              placement="top"
+              :show-after="300"
+              popper-class="adj-detail-tooltip"
+            >
+              <el-tag :type="typeTag(row.execution_type)" size="small" effect="plain">
+                {{ typeLabel(row.execution_type) }}
+              </el-tag>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column prop="before" label="调整前" width="80" align="right">
+          <template #default="{ row }">
+            {{ row.bid_before ?? row.budget_before ?? "-" }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="after" label="调整后" width="80" align="right">
+          <template #default="{ row }">
+            {{ row.bid_after ?? row.budget_after ?? "-" }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作人/规则" width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.rule_name || row.strategy_name || row.operator || "-" }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="adjustment_status" label="状态" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag
+              :type="row.adjustment_status === 'SUCCESS' ? 'success' : 'warning'"
+              size="small"
+              effect="dark"
+            >
+              {{ row.adjustment_status === "SUCCESS" ? "已执行" : "待执行" }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="msg" label="说明" min-width="150" show-overflow-tooltip />
+      </el-table>
+    </div>
 
     <div class="adj-history-footer">
       <span>共 {{ filteredRecords.length }} 条</span>
@@ -235,6 +237,9 @@ defineExpose({ open });
 }
 .adj-history-filters {
   margin-bottom: var(--spacing-2, 10px);
+}
+.adj-history-table {
+  min-height: 360px;
 }
 .adj-history-footer {
   margin-top: 8px;
