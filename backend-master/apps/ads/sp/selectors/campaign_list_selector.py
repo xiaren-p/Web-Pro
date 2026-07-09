@@ -890,7 +890,12 @@ def _summarize_conditions(condition_sets: Any) -> str:
             m = c.get("metric") or c.get("field") or "?"
             o = c.get("operator", ">")
             v = c.get("value", "?")
-            cond_parts.append(f"{m}{o}{v}")
+            if c.get("isRange"):
+                o2 = c.get("operator2", "<")
+                v2 = c.get("value2", "?")
+                cond_parts.append(f"{v}{o2}{m}{o}{v2}")
+            else:
+                cond_parts.append(f"{m}{o}{v}")
         if cond_parts:
             parts.append(f"近{days}天: {', '.join(cond_parts)}")
     return "；".join(parts) if parts else "无"

@@ -156,7 +156,8 @@ def build_bid_lines(
                         if bool(c.get("isRange", False)):
                             o2 = str(c.get("operator2", "<"))
                             v2 = c.get("value2", "")
-                            seg += f" 且 {op_label.get(o2, o2)} {v2}"
+                            o2sym = op_label.get(o2, o2)
+                            seg = f"{v} {o2sym} {nm} {osym} {v2}"
                         cond_strs.append(seg)
                     if cond_strs:
                         group_parts.append(f"近{days}天: {', '.join(cond_strs)}")

@@ -251,13 +251,18 @@ def evaluate_condition_set(
         if actual is None:
             actual = 0.0
 
-        if not evaluate_single_condition(actual, operator, value):
-            return False
-
         if bool(cond.get("isRange", False)):
             operator2 = str(cond.get("operator2", "<"))
             value2 = float(cond.get("value2", 0) or 0)
-            if not evaluate_single_condition(actual, operator2, value2):
+            # 左半边：UI 显示为 value operator2 metric → 翻转 operator2 得到 metric flip_op value
+            left_op = {"<": ">", ">": "<", "<=": ">=", ">=": "<="}.get(operator2, operator2)
+            if not evaluate_single_condition(actual, left_op, value):
+                return False
+            # 右半边：UI 显示为 metric operator value2 → 直接评估
+            if not evaluate_single_condition(actual, operator, value2):
+                return False
+        else:
+            if not evaluate_single_condition(actual, operator, value):
                 return False
 
     return True
