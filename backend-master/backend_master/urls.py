@@ -40,6 +40,9 @@ urlpatterns = [
     # 销售域 — Listing / 标签 / 图片上传
     path("api/v1/", include("apps.sales.urls")),
 
+    # 刊登域 — 商品刊登管理
+    path("api/v1/sales/", include("apps.sales.publication.urls")),
+
     # 领星基础数据域 — 店铺下拉
 
     path("api/v1/", include("apps.lingxing_basic.urls")),
