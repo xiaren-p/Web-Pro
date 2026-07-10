@@ -4,7 +4,9 @@
 """
 from django.urls import path
 
-from apps.ads.views.shop_profile_view import ShopProfileViewSet
+from apps.ads.views.profile_options_view import ProfileOptionsViewSet
+from apps.ads.views.sku_options_view import SkuOptionsViewSet
+from apps.ads.views.enum_labels_view import EnumLabelsViewSet
 from apps.ads.views.ad_portfolio_view import AdPortfolioViewSet
 from apps.ads.sp.views.campaign_view import AdCampaignViewSet
 from apps.ads.sp.views.group_view import AdGroupViewSet
@@ -27,9 +29,9 @@ urlpatterns = [
     path("ads/campaigns/batch-adjust-budget", AdCampaignViewSet.as_view({"post": "batch_adjust_budget"}), name="ads-campaigns-batch-adjust-budget"),
 
     # ── 选项 ──
-    path("ads/options", ShopProfileViewSet.as_view({"post": "options"}), name="ads-options"),
-    path("ads/sku-options", ShopProfileViewSet.as_view({"post": "sku_options"}), name="ads-sku-options"),
-    path("ads/enum-labels", ShopProfileViewSet.as_view({"post": "enum_labels"}), name="ads-enum-labels"),
+    path("ads/options", ProfileOptionsViewSet.as_view({"post": "options"}), name="ads-options"),
+    path("ads/sku-options", SkuOptionsViewSet.as_view({"post": "sku_options"}), name="ads-sku-options"),
+    path("ads/enum-labels", EnumLabelsViewSet.as_view({"post": "enum_labels"}), name="ads-enum-labels"),
     path("ads/portfolios/options", AdPortfolioViewSet.as_view({"post": "options"}), name="ads-portfolios-options"),
 
     # ── 广告组 / 广告 ──
