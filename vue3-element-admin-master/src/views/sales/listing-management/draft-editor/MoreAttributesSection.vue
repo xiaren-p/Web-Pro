@@ -4,72 +4,49 @@
       <span class="draft-section__bar" />
       更多属性
     </div>
+
+    <!-- 工具栏：仅必填 + 搜索 -->
+    <div class="more-attrs__toolbar">
+      <el-checkbox v-model="onlyShowRequired">仅查看必填字段</el-checkbox>
+      <el-input
+        v-model="searchText"
+        placeholder="搜索字段名称"
+        clearable
+        size="small"
+        class="more-attrs__search"
+        :prefix-icon="SearchIcon"
+      />
+      <span v-if="otherFields.length" class="more-attrs__count">
+        共 {{ otherFields.length }} 个字段
+      </span>
+    </div>
+
     <el-row :gutter="24">
       <!-- 左栏：站点内容 -->
       <el-col :span="12">
         <div class="draft-col__header">站点内容</div>
-        <div class="draft-section__body">
-          <el-button type="primary" size="small" style="margin-bottom: 16px">
-            应用刊登模板
-          </el-button>
-          <p class="search-hint">搜索字段请在此处操作，不要用 Ctrl+F（可能会找不到）</p>
-          <el-form label-position="left" label-width="200px" size="default">
-            <el-form-item label="制造商" required>
-              <el-input
-                v-model="f.site.manufacturer"
-                maxlength="100"
-                show-word-limit
-                placeholder="示例：Nike, Procter & Gamble"
-                :class="{ 'lang-error': errors['site.manufacturer'] }"
-                @input="onValidateSite('manufacturer', '制造商')"
+        <div v-loading="loading" class="draft-section__body">
+          <el-empty
+            v-if="!filteredFields.length && !loading"
+            description="暂无更多属性字段"
+            :image-size="60"
+          />
+          <el-form v-else label-position="left" label-width="200px" size="default">
+            <el-form-item
+              v-for="field in filteredFields"
+              :key="field.attrName"
+              :label="field.label[1]"
+              :required="field.required"
+            >
+              <DynamicField
+                :model-value="dynamicFormData.site[field.attrName]"
+                :field-config="field"
+                @update:model-value="
+                  (val: string) => onSiteInput(field.attrName, field.label[1], val)
+                "
               />
-              <div v-if="errors['site.manufacturer']" class="lang-error-hint">
-                {{ errors["site.manufacturer"] }}
-              </div>
-            </el-form-item>
-            <el-form-item label="操作系统" required>
-              <el-input
-                v-model="f.site.operatingSystem"
-                placeholder="示例：Linux, Mac OS X v10.4 Tiger"
-                :class="{ 'lang-error': errors['site.operatingSystem'] }"
-                @input="onValidateSite('operatingSystem', '操作系统')"
-              />
-              <div v-if="errors['site.operatingSystem']" class="lang-error-hint">
-                {{ errors["site.operatingSystem"] }}
-              </div>
-            </el-form-item>
-            <el-form-item label="价目表货币" required>
-              <el-input v-model="f.site.listPriceCurrency" placeholder="示例：EUR" />
-            </el-form-item>
-            <el-form-item label="含税价目表" required>
-              <el-input v-model="f.site.listPriceWithTax" placeholder="示例：69" />
-            </el-form-item>
-            <el-form-item label="原产国" required>
-              <el-input
-                v-model="f.site.countryOfOrigin"
-                placeholder="示例：Großbritannien, Spanien"
-                :class="{ 'lang-error': errors['site.countryOfOrigin'] }"
-                @input="onValidateSite('countryOfOrigin', '原产国')"
-              />
-              <div v-if="errors['site.countryOfOrigin']" class="lang-error-hint">
-                {{ errors["site.countryOfOrigin"] }}
-              </div>
-            </el-form-item>
-            <el-form-item label="需要电池吗？" required>
-              <el-select v-model="f.site.batteryRequired" class="draft-field-input--sm">
-                <el-option label="是" value="yes" />
-                <el-option label="否" value="no" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="危险商品规管" required>
-              <el-input
-                v-model="f.site.hazardousGoods"
-                placeholder="示例：GHS, Lagerung, Transport"
-                :class="{ 'lang-error': errors['site.hazardousGoods'] }"
-                @input="onValidateSite('hazardousGoods', '危险商品规管')"
-              />
-              <div v-if="errors['site.hazardousGoods']" class="lang-error-hint">
-                {{ errors["site.hazardousGoods"] }}
+              <div v-if="errors[`site.${field.attrName}`]" class="lang-error-hint">
+                {{ errors[`site.${field.attrName}`] }}
               </div>
             </el-form-item>
           </el-form>
@@ -79,68 +56,28 @@
       <!-- 右栏：中文内容 -->
       <el-col :span="12">
         <div class="draft-col__header">中文内容</div>
-        <div class="draft-section__body">
-          <el-button type="primary" size="small" style="margin-bottom: 16px">
-            应用刊登模板
-          </el-button>
-          <p class="search-hint">搜索字段请在此处操作，不要用 Ctrl+F（可能会找不到）</p>
-          <el-form label-position="left" label-width="200px" size="default">
-            <el-form-item label="制造商" required>
-              <el-input
-                v-model="f.cn.manufacturer"
-                maxlength="100"
-                show-word-limit
-                placeholder="示例：耐克、宝洁"
-                :class="{ 'lang-error': errors['cn.manufacturer'] }"
-                @input="onValidateCn('manufacturer', '制造商')"
+        <div v-loading="loading" class="draft-section__body">
+          <el-empty
+            v-if="!filteredFields.length && !loading"
+            description="暂无更多属性字段"
+            :image-size="60"
+          />
+          <el-form v-else label-position="left" label-width="200px" size="default">
+            <el-form-item
+              v-for="field in filteredFields"
+              :key="field.attrName"
+              :label="field.label[0]"
+              :required="field.required"
+            >
+              <DynamicField
+                :model-value="dynamicFormData.cn[field.attrName]"
+                :field-config="field"
+                @update:model-value="
+                  (val: string) => onCnInput(field.attrName, field.label[0], val)
+                "
               />
-              <div v-if="errors['cn.manufacturer']" class="lang-error-hint">
-                {{ errors["cn.manufacturer"] }}
-              </div>
-            </el-form-item>
-            <el-form-item label="操作系统" required>
-              <el-input
-                v-model="f.cn.operatingSystem"
-                placeholder="示例：Linux、Mac OS X v10.4 Tiger"
-                :class="{ 'lang-error': errors['cn.operatingSystem'] }"
-                @input="onValidateCn('operatingSystem', '操作系统')"
-              />
-              <div v-if="errors['cn.operatingSystem']" class="lang-error-hint">
-                {{ errors["cn.operatingSystem"] }}
-              </div>
-            </el-form-item>
-            <el-form-item label="价目表货币" required>
-              <el-input v-model="f.cn.listPriceCurrency" placeholder="示例：EUR" />
-            </el-form-item>
-            <el-form-item label="含税价目表" required>
-              <el-input v-model="f.cn.listPriceWithTax" placeholder="示例：69" />
-            </el-form-item>
-            <el-form-item label="原产国" required>
-              <el-input
-                v-model="f.cn.countryOfOrigin"
-                placeholder="示例：英国、西班牙"
-                :class="{ 'lang-error': errors['cn.countryOfOrigin'] }"
-                @input="onValidateCn('countryOfOrigin', '原产国')"
-              />
-              <div v-if="errors['cn.countryOfOrigin']" class="lang-error-hint">
-                {{ errors["cn.countryOfOrigin"] }}
-              </div>
-            </el-form-item>
-            <el-form-item label="需要电池吗？" required>
-              <el-select v-model="f.cn.batteryRequired" class="draft-field-input--sm">
-                <el-option label="是" value="yes" />
-                <el-option label="否" value="no" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="危险商品规管" required>
-              <el-input
-                v-model="f.cn.hazardousGoods"
-                placeholder="示例：GHS、存储、运输"
-                :class="{ 'lang-error': errors['cn.hazardousGoods'] }"
-                @input="onValidateCn('hazardousGoods', '危险商品规管')"
-              />
-              <div v-if="errors['cn.hazardousGoods']" class="lang-error-hint">
-                {{ errors["cn.hazardousGoods"] }}
+              <div v-if="errors[`cn.${field.attrName}`]" class="lang-error-hint">
+                {{ errors[`cn.${field.attrName}`] }}
               </div>
             </el-form-item>
           </el-form>
@@ -152,15 +89,22 @@
 
 <script setup lang="ts">
 /**
- * 更多属性 section：双栏布局（站点内容 / 中文内容）。
- * 制造商、操作系统、价目表、原产国、电池需求、危险品规管。
- * 实时校验语言：站点列校验站点语言，中文列校验中文。
+ * 更多属性 section：基于 Amazon JSON Schema 动态渲染。
  *
- * 通过 inject 获取父组件 provide 的 formData / currentSiteCode / langErrors。
+ * 数据流：
+ * 1. 从 draftForm inject 获取 marketplaceId 和 productType
+ * 2. useProductTypeSchema 监听两者，自动拉取 Schema 并解析
+ * 3. otherFields（未归入 basic/quote/image/desc 的字段）动态渲染
+ * 4. 工具栏：仅必填过滤 + 字段名搜索
+ * 5. 双栏布局：左栏站点语言值，右栏中文值
+ * 6. 文本字段实时校验语言（站点列校验站点语言，中文列校验中文）
  */
-import { inject } from "vue";
+import { ref, computed, inject } from "vue";
 import type { ComputedRef } from "vue";
+import { Search as SearchIcon } from "@element-plus/icons-vue";
+import { useProductTypeSchema, flattenFieldLabels } from "@/composables/useProductTypeSchema";
 import { validateSiteLang, validateChinese } from "@/utils/lang-check";
+import DynamicField from "./components/DynamicField.vue";
 
 defineOptions({ name: "MoreAttributesSection" });
 
@@ -168,25 +112,68 @@ const f = inject<any>("draftForm");
 const siteCode = inject<ComputedRef<string>>("currentSiteCode")!;
 const errors = inject<Record<string, string>>("langErrors")!;
 
-/** 校验站点语言字段 */
-function onValidateSite(field: string, label: string) {
-  const key = `site.${field}`;
-  const result = validateSiteLang(f.site[field], siteCode.value, label);
-  errors[key] = result.message;
+/** 从表单数据获取 marketplaceId 和 productType，驱动 Schema 拉取。 */
+const { loading, otherFields, dynamicFormData } = useProductTypeSchema(
+  () => f?.site?.marketplaceId ?? "",
+  () => f?.site?.productType ?? ""
+);
+
+/** 搜索关键词。 */
+const searchText = ref("");
+
+/** 仅查看必填字段。 */
+const onlyShowRequired = ref(false);
+
+/** 过滤后的字段列表（搜索 + 仅必填）。 */
+const filteredFields = computed(() => {
+  let result = otherFields.value;
+
+  if (searchText.value.trim()) {
+    const search = searchText.value.trim().toUpperCase();
+    result = result.filter((field) =>
+      flattenFieldLabels(field).some((label) => label.includes(search))
+    );
+  }
+
+  if (onlyShowRequired.value) {
+    result = result.filter((field) => field.required);
+  }
+
+  return result;
+});
+
+/** 站点列输入处理 + 语言校验。 */
+function onSiteInput(attrName: string, label: string, val: string) {
+  dynamicFormData.site[attrName] = val;
+  const result = validateSiteLang(val, siteCode.value, label);
+  errors[`site.${attrName}`] = result.message;
 }
 
-/** 校验中文字段 */
-function onValidateCn(field: string, label: string) {
-  const key = `cn.${field}`;
-  const result = validateChinese(f.cn[field], label);
-  errors[key] = result.message;
+/** 中文列输入处理 + 语言校验。 */
+function onCnInput(attrName: string, label: string, val: string) {
+  dynamicFormData.cn[attrName] = val;
+  const result = validateChinese(val, label);
+  errors[`cn.${attrName}`] = result.message;
 }
 </script>
 
 <style scoped lang="scss">
-.search-hint {
-  margin-bottom: 16px;
-  font-size: var(--font-size-xs);
-  color: var(--text-tertiary);
+.more-attrs {
+  &__toolbar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 0 0 16px;
+  }
+
+  &__search {
+    width: 240px;
+  }
+
+  &__count {
+    font-size: var(--font-size-xs);
+    color: var(--text-tertiary);
+    white-space: nowrap;
+  }
 }
 </style>

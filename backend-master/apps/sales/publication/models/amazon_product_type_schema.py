@@ -1,16 +1,16 @@
-"""Amazon 商品类型 JSON Schema 模型（lx_amazon_product_type）。
+"""Amazon 商品类型 JSON Schema 模型（amazon_product_type_schema）。
 
-存储从领星接口同步的 Amazon productType 对应的 JSON Schema 定义，
+存储 Amazon productType 对应的 JSON Schema 定义，
 包含站点语言版本及中文版本。
 """
 from django.db import models
 
 
-class AmazonProductTypeSchemaSchema(models.Model):
+class AmazonProductTypeSchema(models.Model):
     """Amazon 商品类型 JSON Schema。
 
-    对应领星接口返回的 data.productType 节点，product_type_unique_id 为主键。
-    每条记录描述一个 productType 的 JSON Schema 结构定义。
+    product_type_unique_id 为主键，每条记录描述一个 productType 的
+    JSON Schema 结构定义（含站点语言 + 中文双语版本）。
     """
 
     product_type_unique_id = models.CharField(
@@ -53,8 +53,8 @@ class AmazonProductTypeSchemaSchema(models.Model):
     )
 
     class Meta:
-        managed = False
-        db_table = "lx_amazon_product_type"
+        managed = True
+        db_table = "amazon_product_type_schema"
         verbose_name = "Amazon 商品类型 JSON Schema"
         verbose_name_plural = "Amazon 商品类型 JSON Schema"
         ordering = ["product_type_unique_id"]

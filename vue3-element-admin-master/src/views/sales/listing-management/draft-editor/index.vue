@@ -74,6 +74,7 @@ const sections = [
 function createFormFields() {
   return {
     shop: "",
+    marketplaceId: "",
     listingType: "",
     amazonCategory: "",
     productType: "",
