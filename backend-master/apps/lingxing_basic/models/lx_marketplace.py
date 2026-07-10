@@ -1,4 +1,4 @@
-"""亚马逊市场列表（lx_marketplace，managed=False）。"""
+"""亚马逊市场列表（lx_marketplace）。"""
 from django.db import models
 
 
@@ -36,7 +36,7 @@ class LxMarketplace(models.Model):
     )
 
     class Meta:
-        managed = False
+        managed = True
         db_table = "lx_marketplace"
         verbose_name = "亚马逊市场列表"
         verbose_name_plural = "亚马逊市场列表"
