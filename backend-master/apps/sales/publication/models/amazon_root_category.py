@@ -55,17 +55,25 @@ class AmazonRootCategory(models.Model):
         default=list,
         help_text="如 ['ADVERTISEMENT_COLLECTIBLES']",
     )
-    browse_node_attributes = models.JSONField(
+    browse_node_attributes = models.TextField(
         verbose_name="类目节点属性",
-        default=dict,
+        blank=True,
+        default="",
+        help_text="JSON 编码的字符串，如 {\"recommended_browse_nodes\":\"9579602031\"}",
     )
-    category_path_id = models.JSONField(
+    category_path_id = models.CharField(
+        max_length=500,
         verbose_name="类目路径ID",
-        default=dict,
+        blank=True,
+        default="",
+        help_text="逗号分隔的路径ID，如 9579557031,9579562031,9579602031",
     )
-    category_path_name = models.JSONField(
+    category_path_name = models.CharField(
+        max_length=500,
         verbose_name="类目路径名称",
-        default=dict,
+        blank=True,
+        default="",
+        help_text="如 Apps & Spiele > Dienstprogramme > Audioaufnahmen",
     )
     created_at = models.DateTimeField(
         auto_now_add=True,

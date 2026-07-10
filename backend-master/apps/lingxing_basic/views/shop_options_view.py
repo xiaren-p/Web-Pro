@@ -25,9 +25,11 @@ class ShopOptionsViewSet(viewsets.ViewSet):
         for s in qs:
             out.append({
                 "sid": s.sid,
+                "mid": s.mid,
                 "name": s.name or str(s.sid),
                 "country": s.country or "",
                 "region": s.region or "",
-                "account_name": s.account_name or "",
+                "accountName": s.account_name or "",
+                "marketplaceId": s.marketplace_id or "",
             })
         return drf_ok(out)

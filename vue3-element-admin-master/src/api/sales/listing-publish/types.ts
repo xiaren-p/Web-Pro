@@ -55,3 +55,37 @@ export interface ProductTypeSchemaQuery {
   marketplaceId: string;
   productTypeOrigin: string;
 }
+
+// ── Amazon 分类 ──────────────────────────────────────────────────────────────
+
+/** Amazon 分类节点（对应 AmazonRootCategorySerializer 输出）。 */
+export interface AmazonCategoryVO {
+  categoryUniqueId: string;
+  categoryName: string;
+  categoryId: number;
+  marketplaceId: string;
+  parentId: number;
+  isRoot: number;
+  hasChildren: number;
+  childCategories: string[];
+  productTypeOrigin: string[];
+  browseNodeAttributes: string;
+  categoryPathId: string;
+  categoryPathName: string;
+}
+
+/** 分类搜索类型。 */
+export type CategorySearchType = "category_name" | "product_type_origin" | "category_id";
+
+// ── 店铺 ──────────────────────────────────────────────────────────────────────
+
+/** 店铺下拉选项（对应 ShopOptionsViewSet 输出）。 */
+export interface ShopOptionVO {
+  sid: number;
+  mid: number | null;
+  name: string;
+  country: string;
+  region: string;
+  accountName: string;
+  marketplaceId: string;
+}

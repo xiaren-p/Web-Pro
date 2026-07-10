@@ -1,5 +1,15 @@
 from apps.sales.publication.selectors.product_type_schema_selector import (
     get_product_type_schema,
 )
+from apps.sales.publication.selectors.amazon_root_category_selector import (
+    get_root_categories,
+    get_category_children,
+    search_categories,
+)
 
-__all__ = ["get_product_type_schema"]
+__all__ = [
+    "get_product_type_schema",
+    "get_root_categories",
+    "get_category_children",
+    "search_categories",
+]
