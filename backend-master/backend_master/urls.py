@@ -23,7 +23,7 @@ from apps.system.views.menu_view import MenuViewSet
 from apps.system.views.position_view import PositionViewSet
 from apps.system.views.codegen_view import CodegenViewSet
 from apps.system.views.work_report_view import WorkReportViewSet
-from apps.sales.views.shop_view import ShopOptionsViewSet
+from apps.lingxing_basic.views.shop_view import ShopOptionsViewSet
 from apps.sales.listing.views.listing_view import SalesProductListingViewSet
 from apps.sales.listing.views.listing_tag_view import ListingTagViewSet
 from apps.sales.listing.views.image_view import ImageUploadViewSet

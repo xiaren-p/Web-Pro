@@ -13,8 +13,8 @@ from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.sales.listing.models.lx_order_profit import LxOrderProfit
 from apps.sales.listing.models.lx_listing_meta import LxListingMeta
-from apps.sales.models.lx_shops import LxShops
-from apps.sales.models.lx_exchange_rate import LxExchangeRate
+from apps.lingxing_basic.models.lx_shops import LxShops
+from apps.lingxing_basic.models.lx_exchange_rate import LxExchangeRate
 
 
 def get_listing_page_data(params: dict) -> dict:

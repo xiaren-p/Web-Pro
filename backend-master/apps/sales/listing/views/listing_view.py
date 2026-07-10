@@ -16,8 +16,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
-from apps.sales.models.lx_shops import LxShops
-from apps.sales.models.lx_exchange_rate import LxExchangeRate
+from apps.lingxing_basic.models.lx_shops import LxShops
+from apps.lingxing_basic.models.lx_exchange_rate import LxExchangeRate
 from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_meta import LxListingMeta
 from apps.sales.listing.models.lx_listing_tag import LxListingTag

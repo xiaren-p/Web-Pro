@@ -5,16 +5,11 @@
 
 from django.urls import path
 
-from apps.sales.views.shop_view import ShopOptionsViewSet
 from apps.sales.listing.views.listing_view import SalesProductListingViewSet
 from apps.sales.listing.views.listing_tag_view import ListingTagViewSet
 from apps.sales.listing.views.image_view import ImageUploadViewSet
 
 urlpatterns = [
-    # 店铺下拉
-    path("shops/options", ShopOptionsViewSet.as_view({"get": "shops"}), name="shops-options"),
-    path("shops/owners", ShopOptionsViewSet.as_view({"get": "owners"}), name="shops-owners"),
-
     # Listing
     path("sales/product/listing", SalesProductListingViewSet.as_view({"get": "page"}), name="sales-listing-page"),
     path("sales/product/listing/labels/upsert", SalesProductListingViewSet.as_view({"post": "upsert_labels"}), name="sales-listing-upsert-labels"),

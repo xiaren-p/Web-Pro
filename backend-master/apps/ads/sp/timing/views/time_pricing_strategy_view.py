@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from apps.ads.models.lx_ads_profile import LxAdsProfile
 from apps.ads.sp.timing.models.lx_time_pricing_strategy import LxTimePricingStrategy
-from apps.sales.models.lx_user import LxUser
+from apps.lingxing_basic.models.lx_user import LxUser
 from apps.sales.listing.models.lx_listing_meta import LxListingMeta
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.ads.sp.timing.serializers.ads_time_pricing_strategy_serializer import LxTimePricingStrategySerializer

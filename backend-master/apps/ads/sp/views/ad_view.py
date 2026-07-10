@@ -29,8 +29,8 @@ LxSpAd,
     LxSpAdGroup,
     LxSpCampaign,
 )
-from apps.sales.models.lx_exchange_rate import LxExchangeRate
-from apps.sales.models.lx_shops import LxShops
+from apps.lingxing_basic.models.lx_exchange_rate import LxExchangeRate
+from apps.lingxing_basic.models.lx_shops import LxShops
 from apps.sales.listing.models.lx_listing_data import LxListingData
 from apps.sales.listing.models.lx_listing_tag import LxListingTag
 from apps.ads.sp.services.ads_metrics_service import (

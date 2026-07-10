@@ -10,8 +10,8 @@ from django.core.cache import cache as _cache
 from apps.ads.models.lx_ads_profile import LxAdsProfile
 from apps.ads.sp.models.lx_sp_ad import LxSpAd
 from apps.sales.listing.models.lx_listing_data import LxListingData
-from apps.sales.models.lx_shops import LxShops
-from apps.sales.models.lx_exchange_rate import LxExchangeRate
+from apps.lingxing_basic.models.lx_shops import LxShops
+from apps.lingxing_basic.models.lx_exchange_rate import LxExchangeRate
 from apps.ads.views._helpers import parse_exchange_rate
 
 _REF_TTL = 600

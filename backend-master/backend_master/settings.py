@@ -240,6 +240,7 @@ INSTALLED_APPS = [
     'apps.ads',            # 广告管理域
     'apps.system',         # 系统管理域
     'apps.product',      # 领星数据域
+    'apps.lingxing_basic', # 领星基础数据域
 ]
 
 MIDDLEWARE = [

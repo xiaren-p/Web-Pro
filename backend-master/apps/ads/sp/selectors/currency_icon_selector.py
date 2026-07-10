@@ -6,7 +6,7 @@
 import logging
 
 from apps.ads.models.lx_ads_profile import LxAdsProfile
-from apps.sales.models.lx_exchange_rate import LxExchangeRate
+from apps.lingxing_basic.models.lx_exchange_rate import LxExchangeRate
 
 logger = logging.getLogger(__name__)
 
