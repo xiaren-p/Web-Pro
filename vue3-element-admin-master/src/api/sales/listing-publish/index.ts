@@ -1,7 +1,7 @@
 /**
- * 刊登管理 - API 模块（商品类型 Schema + Amazon 分类 + 店铺）。
+ * 刊登管理 - API 模块（商品类型 Schema + Amazon 分类 + 店铺 + 市场 + 模板 CRUD）。
  *
- * 后端路由前缀：GET /api/v1/sales/...
+ * 后端路由前缀：/api/v1/sales/publication/...
  */
 import request from "@/utils/request";
 import type {
@@ -10,6 +10,11 @@ import type {
   AmazonCategoryVO,
   CategorySearchType,
   ShopOptionVO,
+  MarketplaceVO,
+  PublishTemplateDetailVO,
+  PublishTemplateForm,
+  PublishTemplatePageQuery,
+  PublishTemplatePageResult,
 } from "./types";
 
 export type {
@@ -19,6 +24,12 @@ export type {
   AmazonCategoryVO,
   CategorySearchType,
   ShopOptionVO,
+  MarketplaceVO,
+  PublishTemplateListVO,
+  PublishTemplateDetailVO,
+  PublishTemplateForm,
+  PublishTemplatePageQuery,
+  PublishTemplatePageResult,
 } from "./types";
 
 export const ListingPublishAPI = {
@@ -32,7 +43,7 @@ export const ListingPublishAPI = {
    */
   getProductTypeSchema(params: ProductTypeSchemaQuery) {
     return request<ProductTypeSchemaVO, any>({
-      url: "/sales/product-type-schema",
+      url: "/sales/publication/product-type-schema",
       method: "get",
       params,
     });
@@ -48,7 +59,7 @@ export const ListingPublishAPI = {
    */
   getRootCategories(marketplaceId: string) {
     return request<AmazonCategoryVO[], any>({
-      url: "/sales/root-categories",
+      url: "/sales/publication/root-categories",
       method: "get",
       params: { marketplaceId },
     });
@@ -63,7 +74,7 @@ export const ListingPublishAPI = {
    */
   getCategoryChildren(marketplaceId: string, categoryUniqueId: string) {
     return request<AmazonCategoryVO[], any>({
-      url: "/sales/category-children",
+      url: "/sales/publication/category-children",
       method: "get",
       params: { marketplaceId, categoryUniqueId },
     });
@@ -79,7 +90,7 @@ export const ListingPublishAPI = {
    */
   searchCategories(marketplaceId: string, searchType: CategorySearchType, keyword: string) {
     return request<AmazonCategoryVO[], any>({
-      url: "/sales/category-search",
+      url: "/sales/publication/category-search",
       method: "get",
       params: { marketplaceId, searchType, keyword },
     });
@@ -96,6 +107,91 @@ export const ListingPublishAPI = {
     return request<ShopOptionVO[], any>({
       url: "/shops/options",
       method: "get",
+    });
+  },
+
+  // ── Amazon 市场列表 ──
+
+  /**
+   * 获取全部 Amazon 市场列表（从 LxMarketplace）。
+   *
+   * @returns 市场数组，每项含 marketplaceId / country / code / region。
+   */
+  getMarketplaces() {
+    return request<MarketplaceVO[], any>({
+      url: "/sales/publication/marketplaces",
+      method: "get",
+    });
+  },
+
+  // ── 刊登模板 CRUD ──
+
+  /**
+   * 分页查询模板列表（不含 data_json）。
+   *
+   * @param params - 分页查询参数（pageNum / pageSize / keyword）。
+   * @returns 分页结果，含 total 和 list。
+   */
+  getTemplatePage(params: PublishTemplatePageQuery) {
+    return request<PublishTemplatePageResult, any>({
+      url: "/sales/publication/templates/page",
+      method: "get",
+      params,
+    });
+  },
+
+  /**
+   * 获取模板详情（含 dataJson），用于编辑表单回填。
+   *
+   * @param id - 模板主键 ID。
+   * @returns 模板详情，含 dataJson 字段。
+   */
+  getTemplateForm(id: string) {
+    return request<PublishTemplateDetailVO, any>({
+      url: `/sales/publication/templates/${id}/form`,
+      method: "get",
+    });
+  },
+
+  /**
+   * 新增模板。
+   *
+   * @param data - 模板表单数据（amazonData 映射到 data_json）。
+   * @returns 创建后的模板详情。
+   */
+  createTemplate(data: PublishTemplateForm) {
+    return request<PublishTemplateDetailVO, any>({
+      url: "/sales/publication/templates",
+      method: "post",
+      data,
+    });
+  },
+
+  /**
+   * 编辑模板。
+   *
+   * @param id - 模板主键 ID。
+   * @param data - 模板表单数据。
+   * @returns 更新后的模板详情。
+   */
+  updateTemplate(id: string, data: PublishTemplateForm) {
+    return request<PublishTemplateDetailVO, any>({
+      url: `/sales/publication/templates/${id}`,
+      method: "put",
+      data,
+    });
+  },
+
+  /**
+   * 软删除模板。
+   *
+   * @param id - 模板主键 ID。
+   * @returns 删除结果。
+   */
+  deleteTemplate(id: string) {
+    return request<{ deletedCount: number }, any>({
+      url: `/sales/publication/templates/${id}`,
+      method: "delete",
     });
   },
 };

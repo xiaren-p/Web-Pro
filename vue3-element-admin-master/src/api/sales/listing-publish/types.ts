@@ -89,3 +89,60 @@ export interface ShopOptionVO {
   accountName: string;
   marketplaceId: string;
 }
+
+// ── Amazon 市场列表 ──────────────────────────────────────────────────────────
+
+/** 市场下拉选项（对应 MarketplaceViewSet 输出）。 */
+export interface MarketplaceVO {
+  marketplaceId: string;
+  country: string;
+  code: string;
+  region: string;
+  awsRegion: string;
+}
+
+// ── 刊登模板 ──────────────────────────────────────────────────────────────────
+
+/** 模板列表行（不含 data_json）。 */
+export interface PublishTemplateListVO {
+  id: number;
+  templateName: string;
+  marketplaceId: string;
+  productType: string;
+  productTypeUniqueId: string;
+  countryCode: string;
+  createUserName: string;
+  updateUserName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 模板详情（含 dataJson）。 */
+export interface PublishTemplateDetailVO extends PublishTemplateListVO {
+  /** 动态 Amazon 属性数据。 */
+  dataJson: Record<string, unknown>;
+}
+
+/** 模板写入表单（新增/编辑）。 */
+export interface PublishTemplateForm {
+  templateName: string;
+  marketplaceId: string;
+  productType: string;
+  productTypeUniqueId: string;
+  countryCode: string;
+  /** 动态 Amazon 属性数据，后端映射到 data_json。 */
+  amazonData: Record<string, unknown>;
+}
+
+/** 模板分页查询参数。 */
+export interface PublishTemplatePageQuery {
+  pageNum?: number;
+  pageSize?: number;
+  keyword?: string;
+}
+
+/** 模板分页响应。 */
+export interface PublishTemplatePageResult {
+  total: number;
+  list: PublishTemplateListVO[];
+}

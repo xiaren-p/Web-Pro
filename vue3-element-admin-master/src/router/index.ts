@@ -94,6 +94,12 @@ export const constantRoutes: RouteRecordRaw[] = [
         component: () => import("@/views/sales/listing-management/draft-editor/index.vue"),
         meta: { title: "添加草稿", hidden: true, keepAlive: false },
       },
+      {
+        path: "/sales/listing-management/template-editor",
+        name: "TemplateEditor",
+        component: () => import("@/views/sales/listing-management/template-editor/index.vue"),
+        meta: { title: "模板编辑", hidden: true, keepAlive: false },
+      },
     ],
   },
 ];
