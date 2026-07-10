@@ -162,16 +162,16 @@ httpRequest.interceptors.response.use(responseFulfilled, responseRejected);
 /**
  * 外部应用调用专用请求实例，baseURL 自动适配环境：
  *   - 生产环境（VITE_APP_API_ORIGIN 非空）：`https://api.hanlis.cn/api/v1`
- *     → 绝对 URL，Axios 完全忽略 VITE_APP_BASE_API 的 /api/v1，不再拼错。
- *   - 开发环境（VITE_APP_API_ORIGIN 为空）：`/dev-api/api/v1`
- *     → Vite 代理匹配 /dev-api/api/v1/* 并剥去 /dev-api，转发到 Django localhost:8000。
+ *     → 绝对 URL，Axios 完全忽略 VITE_APP_BASE_API，不再拼错。
+ *   - 开发环境（VITE_APP_API_ORIGIN 为空）：复用 VITE_APP_BASE_API
+ *     → 与默认 request 实例一致。
  *
  * 使用方式：`import { requestV2 } from "@/utils/request"`
  * 路径只需写端点相对路径（如 `/ads/queue/`），无需拼接域名或版本前缀。
  */
 const _v2BaseURL = import.meta.env.VITE_APP_API_ORIGIN
   ? `${import.meta.env.VITE_APP_API_ORIGIN}/api/v1`
-  : `${import.meta.env.VITE_APP_BASE_API}/api/v1`;
+  : import.meta.env.VITE_APP_BASE_API;
 
 const httpRequestV2 = axios.create({
   baseURL: _v2BaseURL,
