@@ -282,9 +282,9 @@ defineExpose({ open });
   padding: 0 8px;
 }
 .adj-history-dialog .el-table__empty-block {
-  min-height: 320px;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 320px;
 }
 </style>
