@@ -119,6 +119,10 @@
  * 3. 浏览 - 树形导航，点击有子分类的节点展开，叶子节点可选择
  *
  * 选中后 emit("select", categoryData) 并写入 localStorage 常用记录。
+ *
+ * 性能优化：
+ * - rootCache / childrenCache 模块级 Map，会话内不重复请求
+ * - watch(marketplaceId) 仅在弹窗打开时触发请求
  */
 import { ref, watch } from "vue";
 import { ArrowRight } from "@element-plus/icons-vue";
@@ -139,6 +143,10 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const activeTab = ref<"common" | "search" | "browse">("browse");
+
+// ── 分类缓存（模块级，弹窗关闭不销毁）──
+const rootCache = new Map<string, AmazonCategoryVO[]>();
+const childrenCache = new Map<string, AmazonCategoryVO[]>();
 
 // ── 常用 ──
 const STORAGE_KEY = "draftCategoryHistory";
@@ -189,9 +197,19 @@ const breadcrumb = ref<AmazonCategoryVO[]>([]);
 
 async function loadRoot() {
   if (!props.marketplaceId) return;
+
+  /** 命中缓存则直接使用，不发请求。 */
+  const cached = rootCache.get(props.marketplaceId);
+  if (cached) {
+    currentList.value = cached;
+    breadcrumb.value = [];
+    return;
+  }
+
   treeLoading.value = true;
   try {
     currentList.value = await ListingPublishAPI.getRootCategories(props.marketplaceId);
+    rootCache.set(props.marketplaceId, currentList.value);
     breadcrumb.value = [];
   } catch {
     currentList.value = [];
@@ -202,6 +220,16 @@ async function loadRoot() {
 
 async function expandNode(node: AmazonCategoryVO) {
   if (node.hasChildren !== 1) return;
+
+  /** 命中缓存则直接使用，不发请求。 */
+  const cacheKey = `${props.marketplaceId}_${node.categoryUniqueId}`;
+  const cached = childrenCache.get(cacheKey);
+  if (cached) {
+    breadcrumb.value.push(node);
+    currentList.value = cached;
+    return;
+  }
+
   treeLoading.value = true;
   try {
     const children = await ListingPublishAPI.getCategoryChildren(
@@ -210,6 +238,7 @@ async function expandNode(node: AmazonCategoryVO) {
     );
     breadcrumb.value.push(node);
     currentList.value = children;
+    childrenCache.set(cacheKey, children);
   } catch {
     currentList.value = [];
   } finally {
@@ -234,7 +263,10 @@ function selectCategory(category: AmazonCategoryVO) {
   emit("update:visible", false);
 }
 
-// ── 弹窗打开时初始化 ──
+/**
+ * 弹窗打开时初始化：加载常用列表 + 根分类。
+ * 仅在弹窗打开时触发，避免 marketplaceId 变更时在后台发起无效请求。
+ */
 watch(
   () => props.visible,
   (val) => {

@@ -85,11 +85,17 @@ class AmazonRootCategory(models.Model):
     )
 
     class Meta:
-        managed = False
+        managed = True
         db_table = "lx_amazon_root_category"
         verbose_name = "Amazon 根分类"
         verbose_name_plural = "Amazon 根分类"
         ordering = ["category_unique_id"]
+        indexes = [
+            models.Index(fields=["marketplace_id", "is_root"], name="idx_arc_mp_root"),
+            models.Index(fields=["marketplace_id", "parent_id"], name="idx_arc_mp_parent"),
+            models.Index(fields=["marketplace_id", "category_unique_id"], name="idx_arc_mp_unique"),
+            models.Index(fields=["marketplace_id", "category_name"], name="idx_arc_mp_name"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["category_unique_id", "marketplace_id"],
