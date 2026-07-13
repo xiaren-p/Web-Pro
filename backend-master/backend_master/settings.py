@@ -141,6 +141,8 @@ CELERY_TASK_ROUTES = {
     'apps.system.tasks.maintenance_tasks.cleanup_orphan_uploads':      {'queue': 'celery'},
     # 广告活动参考数据缓存刷新（定时预热，280s 一轮，保证页面缓存永不过期）
     'apps.ads.sp.tasks.listing_cache_refresh_task.refresh_listing_caches': {'queue': 'celery'},
+    # SP 广告上传队列失败记录每日自动重试
+    'apps.ads.sp.tasks.retry_ad_queue_task.retry_failed_ad_queue_task': {'queue': 'celery'},
     # ── parallel_queue（concurrency=4）：可并行的批量任务 ────────────────────
     'apps.ai.tasks.chat_task.run_ai_chat_task':                            {'queue': 'parallel_queue'},
     'apps.ads.sp.rules.tasks.bid_adjustment_task.run_bid_adjustment_task':                   {'queue': 'parallel_queue'},
@@ -205,6 +207,11 @@ CELERY_BEAT_SCHEDULE = {
     'listing-cache-refresh': {
         'task': 'apps.ads.sp.tasks.listing_cache_refresh_task.refresh_listing_caches',
         'schedule': 280.0,
+    },
+    # SP 广告上传队列失败记录每日自动重试：每天 18:00 (Asia/Shanghai)
+    'retry-failed-ad-queue': {
+        'task': 'apps.ads.sp.tasks.retry_ad_queue_task.retry_failed_ad_queue_task',
+        'schedule': crontab(hour=18, minute=0),
     },
 }
 
