@@ -26,8 +26,8 @@ class ProductTypeSchemaSerializer(serializers.Serializer):
     displayName = serializers.CharField(source="display_name", read_only=True)
     requiredFields = serializers.SerializerMethodField()
     defaultFields = serializers.SerializerMethodField()
-    fields = serializers.SerializerMethodField()
-    fieldsZh = serializers.SerializerMethodField()
+    fields = serializers.SerializerMethodField(method_name="get_schema_fields")
+    fieldsZh = serializers.SerializerMethodField(method_name="get_schema_fields_zh")
 
     def _safe_parse(self, raw: str) -> dict:
         """安全解析 JSON 文本，失败时返回空 dict。"""
@@ -54,12 +54,12 @@ class ProductTypeSchemaSerializer(serializers.Serializer):
                 defaults[key] = val["default"]
         return defaults
 
-    def get_fields(self, obj: AmazonProductTypeSchema) -> dict:
+    def get_schema_fields(self, obj: AmazonProductTypeSchema) -> dict:
         """提取站点语言版本的字段定义（properties.properties）。"""
         props = self._safe_parse(obj.properties)
         return props.get("properties", {})
 
-    def get_fieldsZh(self, obj: AmazonProductTypeSchema) -> dict:
+    def get_schema_fields_zh(self, obj: AmazonProductTypeSchema) -> dict:
         """提取中文版本的字段定义（properties_zh.properties）。"""
         props = self._safe_parse(obj.properties_zh)
         return props.get("properties", {})
