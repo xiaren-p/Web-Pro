@@ -55,7 +55,7 @@ _SHOP_RE = re.compile(r"^[a-zA-Z0-9]+$")
 _AD_NAME_RE = re.compile(
     r"^[a-zA-Z0-9+]+(?:-[a-zA-Z0-9+]+)*(?:\s+[a-zA-Z0-9+]+(?:-[a-zA-Z0-9+]+)*)*$"
 )
-_SKU_RE = re.compile(r"^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$")
+_SKU_RE = re.compile(r"^[a-zA-Z0-9*]+(?:-[a-zA-Z0-9*]+)*$")
 
 
 # ── 内部解析辅助函数 ────────────────────────────────────────────────────────────
@@ -287,7 +287,7 @@ def _get_group_error(shop: str, ad_name: str, group: pd.DataFrame) -> str | None
         if pd.notna(row[_COL_SKU]):
             sku = str(row[_COL_SKU])
             if not _SKU_RE.match(sku):
-                return f"{_COL_SKU}='{sku}' 格式不合规（仅允许字母/数字/横杠）"
+                return f"{_COL_SKU}='{sku}' 格式不合规（仅允许字母/数字/横杠/星号）"
 
     return None
 
