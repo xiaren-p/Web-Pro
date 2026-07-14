@@ -25,7 +25,7 @@ import type { SchemaFieldDef, ProductTypeSchemaVO } from "@/api/sales/listing-pu
 
 /** 解析后的表单字段配置。 */
 export interface ParsedFieldConfig {
-  /** 字段名（如 item_name、style）。 */
+  /** 字段名（如 item_name、style）。子字段用复合键如 item_thickness_decimal_value。 */
   attrName: string;
   /** 标签 [中文, 站点语言]。 */
   label: [string, string];
@@ -55,8 +55,10 @@ export interface ParsedFieldConfig {
   placeholder?: string;
   /** select 是否允许自定义输入。 */
   allowCreate?: boolean;
-  /** 如果是组字段，子字段列表。 */
+  /** 如果是组字段，子字段列表（解析后会被展平到 result 中）。 */
   subFields?: ParsedFieldConfig[];
+  /** 如果是从组字段展平出的子字段，父字段的 attrName。 */
+  parentAttrName?: string;
 }
 
 // ── 字段分类硬编码清单（仿领星 fieldClassification）────────────────────────────
@@ -246,18 +248,16 @@ function parseField(
   const zhDesc = zhDef?.description ?? "";
   const siteDesc = siteDef.description ?? "";
 
-  // 对象组字段：递归解析子字段
+  // 对象组字段：递归解析子字段（父标题不加星号）
   if (isGroupField(siteDef)) {
     const subFields = parseSubFields(siteDef, zhDef);
     if (subFields.length === 0) return null;
-    // 组的必填状态：任一子字段必填
-    const groupRequired = subFields.some((f) => f.required);
     return {
       attrName,
       label: [zhTitle, siteTitle],
       description: [zhDesc, siteDesc],
       fieldType: "group",
-      required: groupRequired,
+      required: false,
       subFields,
     };
   }
@@ -364,7 +364,23 @@ function parseAllFields(schema: ProductTypeSchemaVO): ParsedFieldConfig[] {
     if (parsed) result.push(parsed);
   }
 
-  return result;
+  /** 展平：把组字段的子字段拆为独立条目，移除父组条目。 */
+  const flattened: ParsedFieldConfig[] = [];
+  for (const field of result) {
+    if (field.fieldType === "group" && field.subFields?.length) {
+      for (const sf of field.subFields) {
+        flattened.push({
+          ...sf,
+          attrName: `${field.attrName}_${sf.attrName}`,
+          parentAttrName: field.attrName,
+        });
+      }
+    } else {
+      flattened.push(field);
+    }
+  }
+
+  return flattened;
 }
 
 /**
@@ -409,13 +425,7 @@ export function flattenFieldLabels(field: ParsedFieldConfig): string[] {
   const result: string[] = [field.attrName.toUpperCase()];
   if (field.label[0]) result.push(field.label[0].toUpperCase());
   if (field.label[1]) result.push(field.label[1].toUpperCase());
-  if (field.subFields) {
-    for (const sf of field.subFields) {
-      result.push(sf.attrName.toUpperCase());
-      if (sf.label[0]) result.push(sf.label[0].toUpperCase());
-      if (sf.label[1]) result.push(sf.label[1].toUpperCase());
-    }
-  }
+  if (field.parentAttrName) result.push(field.parentAttrName.toUpperCase());
   return result;
 }
 
