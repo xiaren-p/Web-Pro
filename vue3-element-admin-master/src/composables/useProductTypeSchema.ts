@@ -105,7 +105,6 @@ const SYSTEM_FIELD_NAMES = new Set(["marketplace_id", "language_tag"]);
 
 /** 需过滤掉的字段（领星 filterValueFields + otherSpecialField）。 */
 const FILTER_VALUE_FIELDS = new Set([
-  "skip_offer",
   "main_offer_image_locator",
   "other_offer_image_locator_1",
   "other_offer_image_locator_2",
@@ -114,8 +113,6 @@ const FILTER_VALUE_FIELDS = new Set([
   "other_offer_image_locator_5",
   "parentage_level",
   "child_parent_sku_relationship",
-  "merchant_suggested_asin",
-  "supplier_declared_has_product_identifier_exemption",
   "swatch_product_image_locator",
 ]);
 
@@ -262,8 +259,10 @@ function parseField(
   // 映射类型
   const { fieldType, options, allowCreate } = mapFieldType(valueDef);
 
-  // 判断必填
-  const required = requiredFields.has(attrName);
+  // 判断必填：根级 required 数组 OR 子字段 items.required 含非系统字段
+  const hasItemsRequired =
+    siteDef.items?.required?.some((r: string) => !SYSTEM_FIELD_NAMES.has(r)) ?? false;
+  const required = requiredFields.has(attrName) || hasItemsRequired;
 
   // placeholder
   const placeholder = siteDef.examples?.[0] ?? valueDef.examples?.[0] ?? "";
