@@ -25,7 +25,7 @@ import type { SchemaFieldDef, ProductTypeSchemaVO } from "@/api/sales/listing-pu
 
 /** 解析后的表单字段配置。 */
 export interface ParsedFieldConfig {
-  /** 字段名（如 item_name、style）。子字段用复合键如 item_thickness_decimal_value。 */
+  /** 字段名（如 item_name、style）。 */
   attrName: string;
   /** 标签 [中文, 站点语言]。 */
   label: [string, string];
@@ -55,10 +55,8 @@ export interface ParsedFieldConfig {
   placeholder?: string;
   /** select 是否允许自定义输入。 */
   allowCreate?: boolean;
-  /** 如果是组字段，子字段列表（解析后会被展平到 result 中）。 */
+  /** 如果是组字段，子字段列表。 */
   subFields?: ParsedFieldConfig[];
-  /** 如果是从组字段展平出的子字段，父字段的 attrName。 */
-  parentAttrName?: string;
 }
 
 // ── 字段分类硬编码清单（仿领星 fieldClassification）────────────────────────────
@@ -364,23 +362,7 @@ function parseAllFields(schema: ProductTypeSchemaVO): ParsedFieldConfig[] {
     if (parsed) result.push(parsed);
   }
 
-  /** 展平：把组字段的子字段拆为独立条目，移除父组条目。 */
-  const flattened: ParsedFieldConfig[] = [];
-  for (const field of result) {
-    if (field.fieldType === "group" && field.subFields?.length) {
-      for (const sf of field.subFields) {
-        flattened.push({
-          ...sf,
-          attrName: `${field.attrName}_${sf.attrName}`,
-          parentAttrName: field.attrName,
-        });
-      }
-    } else {
-      flattened.push(field);
-    }
-  }
-
-  return flattened;
+  return result;
 }
 
 /**
@@ -399,15 +381,13 @@ export function classifyFields(allFields: ParsedFieldConfig[]) {
   const otherFields: ParsedFieldConfig[] = [];
 
   for (const field of allFields) {
-    /** 子字段用父字段名做分类（如 item_package_dimensions_length 归入 BASIC）。 */
-    const classifyName = field.parentAttrName || field.attrName;
-    if (BASIC_FIELD_NAMES.has(classifyName)) {
+    if (BASIC_FIELD_NAMES.has(field.attrName)) {
       basicFields.push(field);
-    } else if (QUOTE_FIELD_NAMES.has(classifyName)) {
+    } else if (QUOTE_FIELD_NAMES.has(field.attrName)) {
       quoteFields.push(field);
-    } else if (IMAGE_FIELD_NAMES.has(classifyName)) {
+    } else if (IMAGE_FIELD_NAMES.has(field.attrName)) {
       imageFields.push(field);
-    } else if (DESC_FIELD_NAMES.has(classifyName)) {
+    } else if (DESC_FIELD_NAMES.has(field.attrName)) {
       descFields.push(field);
     } else {
       otherFields.push(field);
@@ -427,7 +407,13 @@ export function flattenFieldLabels(field: ParsedFieldConfig): string[] {
   const result: string[] = [field.attrName.toUpperCase()];
   if (field.label[0]) result.push(field.label[0].toUpperCase());
   if (field.label[1]) result.push(field.label[1].toUpperCase());
-  if (field.parentAttrName) result.push(field.parentAttrName.toUpperCase());
+  if (field.subFields) {
+    for (const sf of field.subFields) {
+      result.push(sf.attrName.toUpperCase());
+      if (sf.label[0]) result.push(sf.label[0].toUpperCase());
+      if (sf.label[1]) result.push(sf.label[1].toUpperCase());
+    }
+  }
   return result;
 }
 

@@ -1,8 +1,91 @@
 <template>
   <div class="dynamic-field">
+    <!-- group：子字段组 -->
+    <div v-if="fieldConfig.fieldType === 'group'" class="dynamic-field__group">
+      <div v-for="sf in fieldConfig.subFields" :key="sf.attrName" class="dynamic-field__group-item">
+        <label class="dynamic-field__group-label">
+          <span v-if="sf.required" class="dynamic-field__group-star">*</span>
+          {{ sf.label[1] || sf.label[0] }}
+        </label>
+        <!-- string -->
+        <el-input
+          v-if="sf.fieldType === 'string'"
+          :model-value="groupValues[sf.attrName] || ''"
+          :maxlength="sf.maxLength || undefined"
+          :minlength="sf.minLength || undefined"
+          :show-word-limit="!!sf.maxLength"
+          :placeholder="sf.placeholder || ''"
+          clearable
+          size="small"
+          @update:model-value="
+            (v: string | number | boolean | undefined) => onGroupInput(sf.attrName, v)
+          "
+        />
+        <!-- select -->
+        <el-select
+          v-else-if="sf.fieldType === 'select'"
+          :model-value="groupValues[sf.attrName] || ''"
+          :placeholder="sf.placeholder || ''"
+          :allow-create="sf.allowCreate"
+          filterable
+          clearable
+          size="small"
+          default-first-option
+          @update:model-value="
+            (v: string | number | boolean | undefined) => onGroupInput(sf.attrName, v)
+          "
+        >
+          <el-option
+            v-for="opt in sf.options"
+            :key="opt.value"
+            :label="opt.name"
+            :value="opt.value"
+          />
+        </el-select>
+        <!-- number / integer -->
+        <el-input
+          v-else-if="sf.fieldType === 'number' || sf.fieldType === 'integer'"
+          :model-value="groupValues[sf.attrName] || ''"
+          :placeholder="sf.placeholder || ''"
+          clearable
+          size="small"
+          @update:model-value="
+            (v: string | number | boolean | undefined) =>
+              onGroupNumberInput(sf.attrName, v, sf.fieldType === 'integer')
+          "
+        />
+        <!-- date -->
+        <el-date-picker
+          v-else-if="sf.fieldType === 'date'"
+          :model-value="groupValues[sf.attrName] || ''"
+          type="date"
+          value-format="YYYY-MM-DD"
+          placeholder="请选择日期"
+          clearable
+          size="small"
+          @update:model-value="
+            (v: string | number | boolean | undefined) => onGroupInput(sf.attrName, v)
+          "
+        />
+        <!-- radio -->
+        <el-radio-group
+          v-else-if="sf.fieldType === 'radio'"
+          :model-value="groupValues[sf.attrName] || ''"
+          size="small"
+          @update:model-value="
+            (v: string | number | boolean | undefined) => onGroupInput(sf.attrName, v)
+          "
+        >
+          <el-radio v-for="opt in sf.options" :key="opt.value" :value="opt.value">
+            {{ opt.name }}
+          </el-radio>
+        </el-radio-group>
+      </div>
+    </div>
+
     <!-- string：文本输入 -->
     <el-input
-      v-if="fieldConfig.fieldType === 'string'"
+      v-else-if="fieldConfig.fieldType === 'string'"
       :model-value="modelValue"
       :maxlength="fieldConfig.maxLength || undefined"
       :minlength="fieldConfig.minLength || undefined"
@@ -76,10 +159,9 @@
  *
  * 根据 ParsedFieldConfig.fieldType 渲染对应的 Element Plus 控件：
  * string -> el-input、select -> el-select、number/integer -> el-input（数字过滤）、
- * date -> el-date-picker、radio -> el-radio-group。
- * 组字段已在 parseAllFields 中展平为独立条目，无需 group 分支。
+ * date -> el-date-picker、radio -> el-radio-group、group -> 子字段组。
  */
-import { computed } from "vue";
+import { computed, reactive } from "vue";
 import type { ParsedFieldConfig } from "@/composables/useProductTypeSchema";
 
 interface Props {
@@ -108,6 +190,9 @@ const suffixText = computed(() => {
   return "";
 });
 
+/** 组字段各子字段的值。 */
+const groupValues = reactive<Record<string, string>>({});
+
 /** 文本/选择/日期/单选的统一输入处理。 */
 function onInput(val: string | number | boolean | undefined) {
   emit("update:modelValue", val != null ? String(val) : "");
@@ -124,6 +209,26 @@ function onNumberInput(val: string | number | boolean | undefined) {
   const cleaned = isInteger ? raw.replace(/[^\d-]/g, "") : raw.replace(/[^\d.-]/g, "");
   emit("update:modelValue", cleaned);
 }
+
+/** 组字段子字段输入处理。 */
+function onGroupInput(attrName: string, val: string | number | boolean | undefined) {
+  groupValues[attrName] = val != null ? String(val) : "";
+}
+
+/** 组字段子字段数字输入处理。 */
+function onGroupNumberInput(
+  attrName: string,
+  val: string | number | boolean | undefined,
+  isInt: boolean
+) {
+  if (val == null || val === "") {
+    groupValues[attrName] = "";
+    return;
+  }
+  const raw = String(val);
+  const cleaned = isInt ? raw.replace(/[^\d-]/g, "") : raw.replace(/[^\d.-]/g, "");
+  groupValues[attrName] = cleaned;
+}
 </script>
 
 <style scoped lang="scss">
@@ -136,6 +241,34 @@ function onNumberInput(val: string | number | boolean | undefined) {
   &__suffix {
     font-size: var(--font-size-xs);
     color: var(--text-tertiary);
+  }
+
+  &__group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__group-item {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  &__group-label {
+    flex-shrink: 0;
+    width: 120px;
+    font-size: 12px;
+    line-height: 30px;
+    text-align: right;
+    color: #33363c;
+    white-space: nowrap;
+  }
+
+  &__group-star {
+    color: #f5222d;
+    font-size: 10px;
+    margin-right: 2px;
   }
 }
 </style>

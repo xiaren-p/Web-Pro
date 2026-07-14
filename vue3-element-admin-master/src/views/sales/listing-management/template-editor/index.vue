@@ -232,7 +232,7 @@ watch(otherFields, (fields) => {
   }
 });
 
-/** 过滤后的字段列表（搜索 + 仅必填）。 */
+/** 过滤后的字段列表（搜索 + 仅必填）。组字段有必填子字段时视为必填。 */
 const filteredFields = computed<ParsedFieldConfig[]>(() => {
   let result = otherFields.value;
 
@@ -244,13 +244,17 @@ const filteredFields = computed<ParsedFieldConfig[]>(() => {
   }
 
   if (onlyShowRequired.value) {
-    result = result.filter((field) => field.required);
+    result = result.filter((field) => {
+      if (field.required) return true;
+      if (field.subFields?.some((sf) => sf.required)) return true;
+      return false;
+    });
   }
 
   return result;
 });
 
-/** 字段名 → 分组 key 映射（从 propertyGroups 构建）。子字段通过 parentAttrName 查找。 */
+/** 字段名 → 分组 key 映射（从 propertyGroups 构建）。 */
 const fieldGroupMap = computed(() => {
   const map: Record<string, string> = {};
   for (const [groupKey, group] of Object.entries(propertyGroups.value)) {
@@ -261,18 +265,14 @@ const fieldGroupMap = computed(() => {
   return map;
 });
 
-/** 按分组排列的字段列表。子字段通过 parentAttrName 查找父字段的分组。 */
+/** 按分组排列的字段列表。 */
 const groupedFields = computed(() => {
   const groups: { key: string; title: string; fields: ParsedFieldConfig[] }[] = [];
   const seen = new Set<string>();
   const groupOrder: string[] = [];
 
   for (const field of filteredFields.value) {
-    const gk =
-      fieldGroupMap.value[field.attrName] ??
-      (field.parentAttrName ? fieldGroupMap.value[field.parentAttrName] : undefined) ??
-      "product_details";
-
+    const gk = fieldGroupMap.value[field.attrName] || "product_details";
     if (!seen.has(gk)) {
       seen.add(gk);
       groupOrder.push(gk);
