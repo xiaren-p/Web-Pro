@@ -17,11 +17,15 @@
       <el-empty v-if="!commonList.length" description="暂无常用分类" :image-size="60" />
       <div v-else class="category-dialog__list">
         <div v-for="item in commonList" :key="item.categoryUniqueId" class="category-dialog__item">
-          <span class="category-dialog__item-name">{{ item.categoryName }}</span>
+          <span class="category-dialog__item-name">
+            {{ item.categoryPathName || item.categoryName }}
+          </span>
           <span class="category-dialog__item-type">
             {{ item.productTypeOrigin?.join(", ") || "-" }}
           </span>
-          <el-button type="primary" size="small" @click="selectCategory(item)">选择</el-button>
+          <el-button v-if="isLeaf(item)" type="primary" size="small" @click="selectCategory(item)">
+            选择
+          </el-button>
         </div>
       </div>
     </div>
@@ -57,11 +61,15 @@
           :key="item.categoryUniqueId"
           class="category-dialog__item"
         >
-          <span class="category-dialog__item-name">{{ item.categoryName }}</span>
+          <span class="category-dialog__item-name">
+            {{ item.categoryPathName || item.categoryName }}
+          </span>
           <span class="category-dialog__item-type">
             {{ item.productTypeOrigin?.join(", ") || "-" }}
           </span>
-          <el-button type="primary" size="small" @click="selectCategory(item)">选择</el-button>
+          <el-button v-if="isLeaf(item)" type="primary" size="small" @click="selectCategory(item)">
+            选择
+          </el-button>
         </div>
       </div>
     </div>
@@ -97,7 +105,7 @@
               <ArrowRight />
             </el-icon>
           </span>
-          <template v-if="item.hasChildren !== 1">
+          <template v-if="isLeaf(item)">
             <span class="category-dialog__item-type">
               {{ item.productTypeOrigin?.join(", ") || "-" }}
             </span>
@@ -148,7 +156,10 @@ const activeTab = ref<"common" | "search" | "browse">("browse");
 const rootCache = new Map<string, AmazonCategoryVO[]>();
 const childrenCache = new Map<string, AmazonCategoryVO[]>();
 
-// ── 常用 ──
+/** 判断分类是否为叶子节点（不可再展开）。仿领星 selectItem 逻辑。 */
+function isLeaf(item: AmazonCategoryVO): boolean {
+  return item.hasChildren === 0 && item.childCategories.length === 0;
+}
 const STORAGE_KEY = "draftCategoryHistory";
 const commonList = ref<AmazonCategoryVO[]>([]);
 

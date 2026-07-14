@@ -122,18 +122,31 @@ const FILTER_VALUE_FIELDS = new Set([
 // ── 核心解析逻辑 ──────────────────────────────────────────────────────────────
 
 /**
- * 从 array 类型字段定义中提取 value 子字段定义。
+ * 从 array 类型字段定义中递归提取 value 子字段定义。
  *
  * Amazon Schema 中大部分字段结构为：
  * { type: "array", items: { type: "object", properties: { value: {...}, marketplace_id: {...} } } }
- * 此函数提取 items.properties.value 作为实际字段定义。
+ * 此函数优先提取 items.properties.value。
+ *
+ * 部分嵌套字段没有 value 键（如 outer -> material），
+ * 此时取第一个非系统子字段并递归提取，直到遇到非数组类型或找到 value。
  *
  * @param fieldDef - 原始字段定义。
- * @returns value 子字段定义，不存在时返回原 fieldDef。
+ * @returns 最终可映射的叶子字段定义。
  */
 function extractValueFieldDef(fieldDef: SchemaFieldDef): SchemaFieldDef {
-  if (fieldDef.type === "array" && fieldDef.items?.properties?.value) {
-    return fieldDef.items.properties.value;
+  if (fieldDef.type !== "array" || !fieldDef.items?.properties) {
+    return fieldDef;
+  }
+  const subProps = fieldDef.items.properties;
+  if (subProps.value) {
+    return subProps.value;
+  }
+  // 无 value 键时取第一个非系统子字段，递归提取（如 outer -> material -> value）
+  for (const key of Object.keys(subProps)) {
+    if (!SYSTEM_FIELD_NAMES.has(key)) {
+      return extractValueFieldDef(subProps[key]);
+    }
   }
   return fieldDef;
 }

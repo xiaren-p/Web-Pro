@@ -103,9 +103,17 @@
               <el-form-item
                 v-for="field in filteredFields"
                 :key="field.attrName"
-                :label="field.label[1] || field.label[0]"
                 :required="field.required"
               >
+                <template #label>
+                  <div class="template-editor__label">
+                    <p class="template-editor__label-zh">
+                      <span v-if="field.required" class="template-editor__label-star">*</span>
+                      {{ field.label[0] }}
+                    </p>
+                    <p class="template-editor__label-en">{{ field.label[1] }}</p>
+                  </div>
+                </template>
                 <DynamicField
                   :model-value="templateFormData[field.attrName]"
                   :field-config="field"
@@ -508,6 +516,28 @@ onMounted(async () => {
     font-size: var(--font-size-xs);
     color: var(--text-tertiary);
     white-space: nowrap;
+  }
+
+  &__label {
+    line-height: 1.5;
+
+    &-zh {
+      margin: 0;
+      font-size: 12px;
+      color: #33363c;
+    }
+
+    &-en {
+      margin: 0;
+      font-size: 12px;
+      color: #888c94;
+    }
+
+    &-star {
+      color: #f5222d;
+      font-size: 10px;
+      margin-right: 4px;
+    }
   }
 
   &__footer {
