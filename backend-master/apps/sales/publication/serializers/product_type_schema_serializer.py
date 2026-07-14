@@ -36,6 +36,8 @@ _FIELD_GROUP_RULES: dict[str, list[str]] = {
         "item_package_dimensions",
         "item_package_weight",
         "epr_product_packaging",
+        "master_pack_layers_per_pallet_quantity",
+        "master_packs_per_layer_quantity",
     ],
     "offer": [
         "skip_offer",
@@ -105,7 +107,9 @@ _FIELD_GROUP_RULES: dict[str, list[str]] = {
         "supplier_declared_dg_hz_regulation_chemicals",
         "supplier_declared_dg_hz_regulation_ghs",
         "is_discontinued_by_manufacturer",
-        "gpsr_safety_attestation",
+        "ghs",
+        "ghs_chemical_h_code",
+        "supplier_declared_dg_hz_regulation",
     ],
     "product_identity": [
         "item_name",
@@ -116,6 +120,7 @@ _FIELD_GROUP_RULES: dict[str, list[str]] = {
         "merchant_suggested_asin",
         "recommended_browse_nodes",
         "model_number",
+        "model_name",
         "manufacturer",
         "catalog_number",
         "item_type_keyword",
@@ -165,7 +170,6 @@ _FIELD_GROUP_RULES: dict[str, list[str]] = {
         "collar_style",
         "outer",
         "water_resistance_level",
-        "batteries_included",
         "sport_type",
         "team_name",
         "league_name",
@@ -173,6 +177,19 @@ _FIELD_GROUP_RULES: dict[str, list[str]] = {
         "compatible_devices",
         "included_components",
         "warranty_description",
+        "backing",
+        "grip",
+        "grit",
+        "item_thickness",
+        "item_length_width",
+        "hardness",
+        "number_of_packs",
+        "set_name",
+        "collection_item",
+        "unit_count",
+        "item_diameter",
+        "package_contains_sku",
+        "package_level",
     ],
 }
 
@@ -248,8 +265,30 @@ class ProductTypeSchemaSerializer(serializers.Serializer):
             return {}
 
     def get_requiredFields(self, obj: AmazonProductTypeSchema) -> list:
-        """从 properties 根级提取必填字段名列表。"""
-        return self._parsed_props.get("required", [])
+        """从 properties 根级 + allOf 块中提取全部必填字段名列表。
+
+        大部分必填字段在根级 ``required`` 数组中，但 Amazon Schema 的
+        ``allOf`` 块里还有额外的条件必填字段（如 ABRASIVE_SHEETS 的
+        model_name、manufacturer、part_number 等）。
+        """
+        result: list[str] = list(self._parsed_props.get("required", []))
+
+        # 递归扫描 allOf 块中所有 required 数组
+        def _scan_all_of(blocks: list) -> None:
+            if not isinstance(blocks, list):
+                return
+            for block in blocks:
+                if not isinstance(block, dict):
+                    continue
+                if "required" in block and isinstance(block["required"], list):
+                    result.extend(block["required"])
+                if "then" in block and isinstance(block["then"], dict):
+                    _scan_all_of([block["then"]])
+                if "else" in block and isinstance(block["else"], dict):
+                    _scan_all_of([block["else"]])
+
+        _scan_all_of(self._parsed_props.get("allOf", []))
+        return list(dict.fromkeys(result))  # 去重保序
 
     def get_defaultFields(self, obj: AmazonProductTypeSchema) -> dict:
         """从 $defs 提取 marketplace_id / language_tag 默认值。"""

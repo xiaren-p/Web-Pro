@@ -281,7 +281,7 @@ function parseField(
     description: [zhDesc, siteDesc],
     fieldType,
     required,
-    maxLength: valueDef.maxLength === 0 ? undefined : valueDef.maxLength,
+    maxLength: valueDef.maxLength || valueDef.maxUtf8ByteLength || undefined,
     minLength: valueDef.minLength || undefined,
     minimum: valueDef.minimum,
     maximum: valueDef.maximum,

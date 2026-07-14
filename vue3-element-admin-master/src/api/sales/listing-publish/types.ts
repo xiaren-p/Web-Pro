@@ -20,6 +20,7 @@ export interface SchemaFieldDef {
   enumNames?: string[];
   maxLength?: number;
   minLength?: number;
+  maxUtf8ByteLength?: number;
   minimum?: number;
   maximum?: number;
   multipleOf?: number;
