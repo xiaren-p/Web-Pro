@@ -58,6 +58,9 @@ class AmazonProductTypeSchema(models.Model):
         verbose_name = "Amazon 商品类型 JSON Schema"
         verbose_name_plural = "Amazon 商品类型 JSON Schema"
         ordering = ["product_type_unique_id"]
+        indexes = [
+            models.Index(fields=["marketplace_id", "product_type_origin"], name="idx_apts_mp_pt"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.display_name} ({self.product_type_unique_id})"

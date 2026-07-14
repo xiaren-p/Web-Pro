@@ -18,6 +18,9 @@ class ProductTypeSchemaSerializer(serializers.Serializer):
 
     将 model 中的 properties / properties_zh（JSON 文本）解析后拆分为
     fields / fieldsZh / requiredFields / defaultFields，前端可直接消费。
+
+    性能优化：to_representation 中预解析 properties 和 properties_zh
+    各一次，避免 4 个 get_* 方法各自重复解析大 JSON。
     """
 
     productTypeUniqueId = serializers.CharField(source="product_type_unique_id", read_only=True)
@@ -29,7 +32,14 @@ class ProductTypeSchemaSerializer(serializers.Serializer):
     fields = serializers.SerializerMethodField(method_name="get_schema_fields")
     fieldsZh = serializers.SerializerMethodField(method_name="get_schema_fields_zh")
 
-    def _safe_parse(self, raw: str) -> dict:
+    def to_representation(self, instance: AmazonProductTypeSchema) -> dict:
+        """序列化入口：预解析 JSON，缓存到实例私有属性上。"""
+        self._parsed_props = self._safe_parse(instance.properties)
+        self._parsed_props_zh = self._safe_parse(instance.properties_zh)
+        return super().to_representation(instance)
+
+    @staticmethod
+    def _safe_parse(raw: str) -> dict:
         """安全解析 JSON 文本，失败时返回空 dict。"""
         if not raw:
             return {}
@@ -41,13 +51,11 @@ class ProductTypeSchemaSerializer(serializers.Serializer):
 
     def get_requiredFields(self, obj: AmazonProductTypeSchema) -> list:
         """从 properties 根级提取必填字段名列表。"""
-        props = self._safe_parse(obj.properties)
-        return props.get("required", [])
+        return self._parsed_props.get("required", [])
 
     def get_defaultFields(self, obj: AmazonProductTypeSchema) -> dict:
         """从 $defs 提取 marketplace_id / language_tag 默认值。"""
-        props = self._safe_parse(obj.properties)
-        defs = props.get("$defs", {})
+        defs = self._parsed_props.get("$defs", {})
         defaults: dict[str, str] = {}
         for key, val in defs.items():
             if isinstance(val, dict) and "default" in val:
@@ -56,10 +64,8 @@ class ProductTypeSchemaSerializer(serializers.Serializer):
 
     def get_schema_fields(self, obj: AmazonProductTypeSchema) -> dict:
         """提取站点语言版本的字段定义（properties.properties）。"""
-        props = self._safe_parse(obj.properties)
-        return props.get("properties", {})
+        return self._parsed_props.get("properties", {})
 
     def get_schema_fields_zh(self, obj: AmazonProductTypeSchema) -> dict:
         """提取中文版本的字段定义（properties_zh.properties）。"""
-        props = self._safe_parse(obj.properties_zh)
-        return props.get("properties", {})
+        return self._parsed_props_zh.get("properties", {})
