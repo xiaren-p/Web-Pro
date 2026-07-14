@@ -19,66 +19,58 @@
       <main ref="contentRef" class="template-editor__content">
         <!-- 基本信息 -->
         <section id="basic" class="template-editor__section">
-          <div class="template-editor__section-header">
-            <span class="template-editor__section-bar" />
-            基本信息
-          </div>
-          <div class="template-editor__section-body">
-            <el-form
-              ref="formRef"
-              label-position="left"
-              label-width="200px"
-              size="default"
-              :model="form"
-            >
-              <el-form-item label="模板名称" required>
-                <el-input
-                  v-model="form.templateName"
-                  maxlength="50"
-                  show-word-limit
-                  clearable
-                  placeholder="请输入模板名称"
-                  class="template-editor__input"
+          <div class="template-editor__section-header">基本信息</div>
+          <el-form
+            ref="formRef"
+            label-position="left"
+            label-width="300px"
+            size="default"
+            :model="form"
+          >
+            <el-form-item label="模板名称" required>
+              <el-input
+                v-model="form.templateName"
+                maxlength="50"
+                show-word-limit
+                clearable
+                placeholder="请输入模板名称"
+                class="template-editor__input"
+              />
+            </el-form-item>
+            <el-form-item label="国家/市场" required>
+              <el-select
+                v-model="form.marketplaceId"
+                filterable
+                placeholder="请选择市场"
+                class="template-editor__input"
+                @change="onMarketplaceChange"
+              >
+                <el-option
+                  v-for="m in marketplaceList"
+                  :key="m.marketplaceId"
+                  :label="`${m.country} (${m.code})`"
+                  :value="m.marketplaceId"
                 />
-              </el-form-item>
-              <el-form-item label="国家/市场" required>
-                <el-select
-                  v-model="form.marketplaceId"
-                  filterable
-                  placeholder="请选择市场"
-                  class="template-editor__input"
-                  @change="onMarketplaceChange"
-                >
-                  <el-option
-                    v-for="m in marketplaceList"
-                    :key="m.marketplaceId"
-                    :label="`${m.country} (${m.code})`"
-                    :value="m.marketplaceId"
-                  />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="商品类型" required>
-                <span v-if="form.productType" class="template-editor__product-type">
-                  {{ form.productType }}
-                </span>
-                <el-button
-                  size="small"
-                  :disabled="!form.marketplaceId"
-                  @click="showCategoryDialog = true"
-                >
-                  {{ form.productType ? "更改商品类型" : "选择商品类型" }}
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </div>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="商品类型" required>
+              <span v-if="form.productType" class="template-editor__product-type">
+                {{ form.productType }}
+              </span>
+              <el-button
+                size="small"
+                :disabled="!form.marketplaceId"
+                @click="showCategoryDialog = true"
+              >
+                {{ form.productType ? "更改商品类型" : "选择商品类型" }}
+              </el-button>
+            </el-form-item>
+          </el-form>
         </section>
 
         <!-- 更多属性 -->
         <section id="more" class="template-editor__section">
-          <div class="template-editor__section-header">
-            <span class="template-editor__section-bar" />
-            更多属性
-          </div>
+          <div class="template-editor__section-header">更多属性</div>
 
           <!-- 工具栏 -->
           <div v-if="otherFields.length" class="template-editor__toolbar">
@@ -93,46 +85,42 @@
             <span class="template-editor__count">共 {{ otherFields.length }} 个字段</span>
           </div>
 
-          <div class="template-editor__section-body">
-            <el-empty
-              v-if="!filteredFields.length && !loading"
-              description="请先选择商品类型"
-              :image-size="60"
-            />
-            <template v-else>
-              <div
-                v-for="group in groupedFields"
-                :key="group.key"
-                class="template-editor__field-group"
-              >
-                <div class="template-editor__field-group-title">{{ group.title }}</div>
-                <div class="template-editor__section-body template-editor__section-body--flush">
-                  <el-form label-position="left" label-width="200px" size="default">
-                    <el-form-item
-                      v-for="field in group.fields"
-                      :key="field.attrName"
-                      :required="field.required"
-                    >
-                      <template #label>
-                        <div class="template-editor__label">
-                          <p class="template-editor__label-zh">
-                            <span v-if="field.required" class="template-editor__label-star">*</span>
-                            {{ field.label[0] }}
-                          </p>
-                          <p class="template-editor__label-en">{{ field.label[1] }}</p>
-                        </div>
-                      </template>
-                      <DynamicField
-                        :model-value="templateFormData[field.attrName]"
-                        :field-config="field"
-                        @update:model-value="(val: string) => onFieldInput(field.attrName, val)"
-                      />
-                    </el-form-item>
-                  </el-form>
-                </div>
-              </div>
-            </template>
-          </div>
+          <el-empty
+            v-if="!filteredFields.length && !loading"
+            description="请先选择商品类型"
+            :image-size="60"
+          />
+          <template v-else>
+            <div
+              v-for="group in groupedFields"
+              :key="group.key"
+              class="template-editor__field-group"
+            >
+              <div class="template-editor__field-group-title">{{ group.title }}</div>
+              <el-form label-position="left" label-width="300px" size="default">
+                <el-form-item
+                  v-for="field in group.fields"
+                  :key="field.attrName"
+                  :required="field.required"
+                >
+                  <template #label>
+                    <div class="template-editor__label">
+                      <p class="template-editor__label-zh">
+                        <span v-if="field.required" class="template-editor__label-star">*</span>
+                        {{ field.label[0] }}
+                      </p>
+                      <p class="template-editor__label-en">{{ field.label[1] }}</p>
+                    </div>
+                  </template>
+                  <DynamicField
+                    :model-value="templateFormData[field.attrName]"
+                    :field-config="field"
+                    @update:model-value="(val: string) => onFieldInput(field.attrName, val)"
+                  />
+                </el-form-item>
+              </el-form>
+            </div>
+          </template>
         </section>
       </main>
 
@@ -227,7 +215,7 @@ const onlyShowRequired = ref(false);
  * 监听 form.marketplaceId + form.productType，两者有值时自动拉取。
  * 模板编辑器使用单栏（不需要 site/cn 双栏），因此用自己的 formData。
  */
-const { otherFields, propertyGroups } = useProductTypeSchema(
+const { otherFields, propertyGroups, propertyGroupsZh } = useProductTypeSchema(
   () => form.marketplaceId,
   () => form.productType
 );
@@ -286,7 +274,7 @@ const groupedFields = computed(() => {
       groupOrder.push(gk);
       groups.push({
         key: gk,
-        title: propertyGroups.value[gk]?.title || gk,
+        title: propertyGroupsZh.value[gk]?.title || propertyGroups.value[gk]?.title || gk,
         fields: [],
       });
     }
@@ -446,22 +434,22 @@ onMounted(async () => {
   height: 100%;
   background: var(--app-bg);
 
+  /* ── 侧边栏（160px，居中菜单）── */
   &__sidebar {
     flex-shrink: 0;
-    width: 220px;
+    width: 160px;
     overflow-y: auto;
-    background: var(--surface-base);
-    border-right: 1px solid var(--border-base);
-    box-shadow: 2px 0 8px rgb(15 23 42 / 4%);
+    background: #fff;
+    padding: 12px 0;
   }
 
   &__nav-back {
-    padding: 18px 24px;
+    display: block;
+    padding: 10px 0;
     font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
     color: var(--text-tertiary);
+    text-align: center;
     cursor: pointer;
-    border-bottom: 1px solid var(--border-subtle);
     transition: color var(--transition-ui);
 
     &:hover {
@@ -470,78 +458,83 @@ onMounted(async () => {
   }
 
   &__nav-item {
-    padding: 14px 24px;
-    font-size: var(--font-size-base);
-    color: var(--text-secondary);
+    display: block;
+    padding: 10px 0;
+    text-align: center;
     cursor: pointer;
-    border-left: 3px solid transparent;
     transition: all var(--transition-ui);
 
     &:hover {
-      color: var(--text-primary);
-      background: var(--surface-subtle);
+      color: var(--color-primary-600);
     }
 
     &.is-active {
-      font-weight: var(--font-weight-semibold);
-      color: var(--color-primary-600);
-      background: var(--color-primary-50);
-      border-left-color: var(--color-primary-600);
+      background-color: #e5effe;
+      color: #005bf5;
     }
   }
 
+  /* ── 右侧区域 ── */
   &__right {
     display: flex;
     flex: 1;
     flex-direction: column;
     min-height: 0;
+    width: calc(100% - 180px);
   }
 
   &__content {
     flex: 1;
-    padding: 28px 32px;
+    padding: 12px 12px 0;
     overflow-y: auto;
+    scroll-behavior: smooth;
+    height: calc(100% - 72px);
   }
 
+  /* ── section 卡片（白底、4px 圆角、无边框）── */
   &__section {
-    margin-bottom: 24px;
+    padding: 20px;
+    margin-bottom: 10px;
+    background-color: #fff;
+    border-radius: 4px;
   }
 
   &__section-header {
+    position: relative;
     display: flex;
-    gap: 10px;
     align-items: center;
-    padding-bottom: 14px;
+    height: 22px;
+    padding-left: 10px;
     margin-bottom: 20px;
-    font-size: var(--font-size-xl);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-    border-bottom: 2px solid var(--border-subtle);
-  }
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 22px;
+    color: #0b1019;
 
-  &__section-bar {
-    display: inline-block;
-    width: 4px;
-    height: 20px;
-    background: var(--color-primary-600);
-    border-radius: 2px;
-  }
-
-  &__section-body {
-    padding: 24px;
-    background: var(--surface-base);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-xs);
-
-    &--flush {
-      margin-bottom: 0;
-      border-top: 0;
-      border-radius: 0 0 var(--radius-xl) var(--radius-xl);
-      box-shadow: none;
+    /* 蓝色左边条 */
+    &::before {
+      content: "";
+      position: absolute;
+      top: 4px;
+      left: 0;
+      width: 2px;
+      height: 14px;
+      background: #005bf5;
     }
   }
 
+  &__section-bar {
+    display: none; /* 由 ::before 替代 */
+  }
+
+  &__section-body {
+    &--flush {
+      margin-bottom: 0;
+      border-top: 0;
+    }
+  }
+
+  /* ── 字段分组标题 ── */
   &__field-group {
     margin-bottom: 16px;
 
@@ -551,16 +544,29 @@ onMounted(async () => {
   }
 
   &__field-group-title {
-    padding: 10px 24px;
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-    background: var(--surface-subtle);
-    border: 1px solid var(--border-subtle);
-    border-bottom: 0;
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 22px;
+    padding-left: 10px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 22px;
+    color: #0b1019;
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 4px;
+      left: 0;
+      width: 2px;
+      height: 14px;
+      background: #005bf5;
+    }
   }
 
+  /* ── 输入框 ── */
   &__input {
     width: 320px;
   }
@@ -571,6 +577,7 @@ onMounted(async () => {
     color: var(--text-primary);
   }
 
+  /* ── 工具栏 ── */
   &__toolbar {
     display: flex;
     gap: 12px;
@@ -588,6 +595,7 @@ onMounted(async () => {
     white-space: nowrap;
   }
 
+  /* ── 双语标签 ── */
   &__label {
     line-height: 1.5;
 
@@ -610,15 +618,24 @@ onMounted(async () => {
     }
   }
 
+  /* ── 底部操作栏（固定）── */
   &__footer {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 9;
     display: flex;
-    flex-shrink: 0;
-    gap: 12px;
+    gap: 20px;
+    align-items: center;
     justify-content: center;
-    padding: 14px 32px;
-    background: var(--surface-base);
-    border-top: 1px solid var(--border-base);
-    box-shadow: 0 -2px 8px rgb(15 23 42 / 4%);
+    padding: 20px 0;
+    background: #fff;
+    box-shadow: 0 4px 8px rgb(0 0 0 / 8%);
+
+    :deep(.el-button) {
+      min-width: 96px;
+    }
   }
 }
 </style>
