@@ -399,13 +399,15 @@ export function classifyFields(allFields: ParsedFieldConfig[]) {
   const otherFields: ParsedFieldConfig[] = [];
 
   for (const field of allFields) {
-    if (BASIC_FIELD_NAMES.has(field.attrName)) {
+    /** 子字段用父字段名做分类（如 item_package_dimensions_length 归入 BASIC）。 */
+    const classifyName = field.parentAttrName || field.attrName;
+    if (BASIC_FIELD_NAMES.has(classifyName)) {
       basicFields.push(field);
-    } else if (QUOTE_FIELD_NAMES.has(field.attrName)) {
+    } else if (QUOTE_FIELD_NAMES.has(classifyName)) {
       quoteFields.push(field);
-    } else if (IMAGE_FIELD_NAMES.has(field.attrName)) {
+    } else if (IMAGE_FIELD_NAMES.has(classifyName)) {
       imageFields.push(field);
-    } else if (DESC_FIELD_NAMES.has(field.attrName)) {
+    } else if (DESC_FIELD_NAMES.has(classifyName)) {
       descFields.push(field);
     } else {
       otherFields.push(field);
