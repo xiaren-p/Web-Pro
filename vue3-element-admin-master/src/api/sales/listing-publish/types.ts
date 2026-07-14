@@ -48,6 +48,16 @@ export interface ProductTypeSchemaVO {
   fields: Record<string, SchemaFieldDef>;
   /** 中文版本的字段定义。 */
   fieldsZh: Record<string, SchemaFieldDef>;
+  /** 站点语言版本的属性分组。 */
+  propertyGroups: Record<string, PropertyGroup>;
+  /** 中文版本的属性分组。 */
+  propertyGroupsZh: Record<string, PropertyGroup>;
+}
+
+/** 属性分组（来自 propertyGroups / propertyGroupsZh）。 */
+export interface PropertyGroup {
+  title: string;
+  propertyNames: string[];
 }
 
 /** getProductType 接口查询参数。 */

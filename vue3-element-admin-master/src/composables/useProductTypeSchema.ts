@@ -16,7 +16,7 @@
  * - integer            -> integer
  * - boolean            -> radio
  */
-import { ref, reactive, watch, toValue } from "vue";
+import { ref, reactive, watch, toValue, computed } from "vue";
 import type { Ref, MaybeRefOrGetter } from "vue";
 import { ListingPublishAPI } from "@/api/sales/listing-publish";
 import type { SchemaFieldDef, ProductTypeSchemaVO } from "@/api/sales/listing-publish/types";
@@ -518,5 +518,7 @@ export function useProductTypeSchema(
     defaultFields,
     schemaData,
     fetchSchema,
+    propertyGroups: computed(() => schemaData.value?.propertyGroups ?? {}),
+    propertyGroupsZh: computed(() => schemaData.value?.propertyGroupsZh ?? {}),
   };
 }
