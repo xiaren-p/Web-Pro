@@ -32,7 +32,7 @@ export interface ParsedFieldConfig {
   /** 描述 [中文, 站点语言]。 */
   description: [string, string];
   /** 表单控件类型。 */
-  fieldType: "string" | "select" | "number" | "integer" | "date" | "radio";
+  fieldType: "string" | "select" | "number" | "integer" | "date" | "radio" | "group";
   /** 是否必填。 */
   required: boolean;
   /** 最大长度。 */
@@ -55,11 +55,13 @@ export interface ParsedFieldConfig {
   placeholder?: string;
   /** select 是否允许自定义输入。 */
   allowCreate?: boolean;
+  /** 如果是组字段，子字段列表。 */
+  subFields?: ParsedFieldConfig[];
 }
 
 // ── 字段分类硬编码清单（仿领星 fieldClassification）────────────────────────────
 
-/** 基本信息字段。 */
+/** 基本信息字段（对齐领星 basicFields）。 */
 const BASIC_FIELD_NAMES = new Set([
   "item_name",
   "generic_keyword",
@@ -70,10 +72,9 @@ const BASIC_FIELD_NAMES = new Set([
   "merchant_shipping_group",
   "recommended_browse_nodes",
   "item_type_keyword",
-  "title_differentiation",
 ]);
 
-/** 报价字段。 */
+/** 报价/变体字段（对齐领星 skuVariationFields）。 */
 const QUOTE_FIELD_NAMES = new Set([
   "variation_theme",
   "externally_assigned_product_identifier",
@@ -81,7 +82,6 @@ const QUOTE_FIELD_NAMES = new Set([
   "condition_note",
   "purchasable_offer",
   "supplier_declared_has_product_identifier_exemption",
-  "merchant_suggested_asin",
 ]);
 
 /** 图片字段。 */
@@ -227,7 +227,7 @@ function mapFieldType(
  * @param attrName - 字段名。
  * @param siteDef - 站点语言字段定义。
  * @param zhDef - 中文字段定义。
- * @param requiredFields - 必填字段名集合。
+ * @param requiredFields - 根级必填字段名集合。
  * @returns 解析后的字段配置，若字段应跳过则返回 null。
  */
 function parseField(
@@ -236,33 +236,41 @@ function parseField(
   zhDef: SchemaFieldDef | undefined,
   requiredFields: Set<string>
 ): ParsedFieldConfig | null {
-  // 过滤系统字段和需排除字段
   if (SYSTEM_FIELD_NAMES.has(attrName) || FILTER_VALUE_FIELDS.has(attrName)) {
     return null;
   }
 
-  // 对象组字段暂不支持，跳过
+  // 提取标签和描述（组字段和普通字段共用）
+  const zhTitle = zhDef?.title ?? attrName;
+  const siteTitle = siteDef.title ?? attrName;
+  const zhDesc = zhDef?.description ?? "";
+  const siteDesc = siteDef.description ?? "";
+
+  // 对象组字段：递归解析子字段
   if (isGroupField(siteDef)) {
-    return null;
+    const subFields = parseSubFields(siteDef, zhDef);
+    if (subFields.length === 0) return null;
+    // 组的必填状态：任一子字段必填
+    const groupRequired = subFields.some((f) => f.required);
+    return {
+      attrName,
+      label: [zhTitle, siteTitle],
+      description: [zhDesc, siteDesc],
+      fieldType: "group",
+      required: groupRequired,
+      subFields,
+    };
   }
 
   // hidden 字段跳过
   const valueDef = extractValueFieldDef(siteDef);
   if (valueDef.hidden === true) return null;
 
-  // 提取标签和描述
-  const zhTitle = zhDef?.title ?? attrName;
-  const siteTitle = siteDef.title ?? attrName;
-  const zhDesc = zhDef?.description ?? "";
-  const siteDesc = siteDef.description ?? "";
-
   // 映射类型
   const { fieldType, options, allowCreate } = mapFieldType(valueDef);
 
-  // 判断必填：根级 required 数组 OR 子字段 items.required 含非系统字段
-  const hasItemsRequired =
-    siteDef.items?.required?.some((r: string) => !SYSTEM_FIELD_NAMES.has(r)) ?? false;
-  const required = requiredFields.has(attrName) || hasItemsRequired;
+  // 判断必填：只看根级 required 数组
+  const required = requiredFields.has(attrName);
 
   // placeholder
   const placeholder = siteDef.examples?.[0] ?? valueDef.examples?.[0] ?? "";
@@ -284,6 +292,59 @@ function parseField(
     placeholder,
     allowCreate,
   };
+}
+
+/**
+ * 解析对象组字段的子字段列表。
+ *
+ * 对于 items.properties 含多个非系统子字段的字段（如 item_dimensions），
+ * 遍历每个子字段递归提取 value 定义，构建 ParsedFieldConfig 数组。
+ *
+ * @param siteDef - 站点语言组字段定义。
+ * @param zhDef - 中文组字段定义。
+ * @returns 子字段配置数组。
+ */
+function parseSubFields(
+  siteDef: SchemaFieldDef,
+  zhDef: SchemaFieldDef | undefined
+): ParsedFieldConfig[] {
+  if (!siteDef.items?.properties) return [];
+  const result: ParsedFieldConfig[] = [];
+  const zhSubProps = zhDef?.items?.properties ?? {};
+
+  for (const [subKey, subDef] of Object.entries(siteDef.items.properties)) {
+    if (SYSTEM_FIELD_NAMES.has(subKey)) continue;
+
+    const valueDef = extractValueFieldDef(subDef);
+    if (valueDef.hidden === true) continue;
+
+    const { fieldType, options, allowCreate } = mapFieldType(valueDef);
+    const zhSubDef = zhSubProps[subKey] as SchemaFieldDef | undefined;
+    const subZhTitle = zhSubDef?.title ?? subKey;
+    const subSiteTitle = subDef.title ?? subKey;
+
+    // 子字段必填：items.required 包含该子字段名
+    const subRequired = siteDef.items?.required?.includes(subKey) ?? false;
+
+    const placeholder = subDef.examples?.[0] ?? valueDef.examples?.[0] ?? "";
+
+    result.push({
+      attrName: subKey,
+      label: [subZhTitle, subSiteTitle],
+      description: ["", ""],
+      fieldType,
+      required: subRequired,
+      maxLength: valueDef.maxLength === 0 ? undefined : valueDef.maxLength,
+      minLength: valueDef.minLength || undefined,
+      minimum: valueDef.minimum,
+      maximum: valueDef.maximum,
+      multipleOf: valueDef.multipleOf,
+      options,
+      placeholder,
+      allowCreate,
+    });
+  }
+  return result;
 }
 
 /**
@@ -348,6 +409,13 @@ export function flattenFieldLabels(field: ParsedFieldConfig): string[] {
   const result: string[] = [field.attrName.toUpperCase()];
   if (field.label[0]) result.push(field.label[0].toUpperCase());
   if (field.label[1]) result.push(field.label[1].toUpperCase());
+  if (field.subFields) {
+    for (const sf of field.subFields) {
+      result.push(sf.attrName.toUpperCase());
+      if (sf.label[0]) result.push(sf.label[0].toUpperCase());
+      if (sf.label[1]) result.push(sf.label[1].toUpperCase());
+    }
+  }
   return result;
 }
 
