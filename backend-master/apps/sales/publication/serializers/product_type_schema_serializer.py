@@ -225,6 +225,20 @@ def _build_property_groups(schema_properties: dict, lang: str) -> dict:
     return groups
 
 
+# variation_theme 枚举分量后缀（如 STYLE_NAME → style）
+_VT_SUFFIXES = ["_name", "_type", "_quantity", "_count"]
+
+
+def _theme_part_to_field(part: str) -> str | None:
+    """将 variation_theme 枚举分量转为 schema 字段名。"""
+    word = part.strip().lower()
+    for suffix in _VT_SUFFIXES:
+        if word.endswith(suffix):
+            word = word[:-len(suffix)]
+            break
+    return word or None
+
+
 class ProductTypeSchemaSerializer(serializers.Serializer):
     """商品类型 Schema 读取序列化器。
 
@@ -265,15 +279,17 @@ class ProductTypeSchemaSerializer(serializers.Serializer):
             return {}
 
     def get_requiredFields(self, obj: AmazonProductTypeSchema) -> list:
-        """从 properties 根级 + allOf 块中提取全部必填字段名列表。
+        """提取全部必填字段名列表。
 
-        大部分必填字段在根级 ``required`` 数组中，但 Amazon Schema 的
-        ``allOf`` 块里还有额外的条件必填字段（如 ABRASIVE_SHEETS 的
-        model_name、manufacturer、part_number 等）。
+        来源：
+        1. 根级 required 数组（始终 6 个）
+        2. allOf 块中的 required（DB 有则取）
+        3. variation_theme 枚举值反推字段引用
         """
-        result: list[str] = list(self._parsed_props.get("required", []))
+        props = self._parsed_props
+        result: list[str] = list(props.get("required", []))
 
-        # 递归扫描 allOf 块中所有 required 数组
+        # 扫描 allOf 块
         def _scan_all_of(blocks: list) -> None:
             if not isinstance(blocks, list):
                 return
@@ -287,7 +303,25 @@ class ProductTypeSchemaSerializer(serializers.Serializer):
                 if "else" in block and isinstance(block["else"], dict):
                     _scan_all_of([block["else"]])
 
-        _scan_all_of(self._parsed_props.get("allOf", []))
+        _scan_all_of(props.get("allOf", []))
+
+        # variation_theme 推导
+        field_defs = props.get("properties", {})
+        vt = field_defs.get("variation_theme", {})
+        vt_names = (
+            vt.get("items", {})
+            .get("properties", {})
+            .get("name", {})
+            .get("enum", [])
+        )
+        for name in vt_names:
+            if not isinstance(name, str):
+                continue
+            for part in name.split("/"):
+                key = _theme_part_to_field(part.strip())
+                if key and key in field_defs:
+                    result.append(key)
+
         return list(dict.fromkeys(result))  # 去重保序
 
     def get_defaultFields(self, obj: AmazonProductTypeSchema) -> dict:
