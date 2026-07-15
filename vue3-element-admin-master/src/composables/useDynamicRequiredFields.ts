@@ -317,6 +317,20 @@ export function getDynamicRequiredFields(schema: Record<string, unknown>, data: 
  * // rules.item_name.requiredFlag === true  （根级 required 命中）
  * ```
  */
+/**
+ * 获取组字段的子字段名列表。
+ *
+ * @description 检查 schema field 是否有 items.properties → 取非系统子键。
+ * 与 useProductTypeSchema 的 isGroupField 逻辑一致。
+ */
+const SYSTEM_NAMES = new Set(["marketplace_id", "language_tag"]);
+function getGroupChildren(fieldDef: Record<string, unknown>): string[] {
+  const items = fieldDef.items as Record<string, unknown> | undefined;
+  const subProps = items?.properties as Record<string, unknown> | undefined;
+  if (!subProps) return [];
+  return Object.keys(subProps).filter((k) => !SYSTEM_NAMES.has(k));
+}
+
 export function buildRequiredFieldRuleObj(
   schemaData: Record<string, unknown>,
   formData: Record<string, unknown>
@@ -331,16 +345,36 @@ export function buildRequiredFieldRuleObj(
     required: schemaData.requiredFields ?? [],
   };
 
-  // 一次 getDynamicRequiredFields → 捕获根级 required + 条件必填
+  // 预计算组字段映射（父 → 子字段名列表）
+  const childrenMap: Record<string, string[]> = {};
+  for (const attrName of Object.keys(fields)) {
+    const children = getGroupChildren(fields[attrName] as Record<string, unknown>);
+    if (children.length > 1 || (children.length === 1 && children[0] !== "value")) {
+      childrenMap[attrName] = children;
+    }
+  }
+
+  // 一次 getDynamicRequiredFields → 捕获根级 required + 条件必填 + 子级必填
   const allRequired = getDynamicRequiredFields(fullSchema, formData);
 
   for (const attrName of Object.keys(fields)) {
-    const isRequired = allRequired.includes(attrName);
-    result[attrName] = {
-      required: isRequired ? [attrName] : [],
-      forbidden: [],
-      requiredFlag: isRequired,
-    };
+    const children = childrenMap[attrName];
+    if (children) {
+      // 组字段：收集子字段的必填命中
+      const childRequired = allRequired.filter((r) => children.includes(r));
+      result[attrName] = {
+        required: childRequired,
+        forbidden: [],
+        requiredFlag: childRequired.length > 0,
+      };
+    } else {
+      const isRequired = allRequired.includes(attrName);
+      result[attrName] = {
+        required: isRequired ? [attrName] : [],
+        forbidden: [],
+        requiredFlag: isRequired,
+      };
+    }
   }
 
   return result;

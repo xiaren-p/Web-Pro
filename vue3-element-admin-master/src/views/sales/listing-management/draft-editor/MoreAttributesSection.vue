@@ -246,11 +246,19 @@ const groupedFields = computed(() => {
   }
 
   // 分配字段到组
+  // 匹配规则：① attrName 直接命中 group.propertyNames
+  //          ② 组字段的任一子字段名命中 group.propertyNames（适配领星扁平分组）
   const ungrouped: import("./composables/useFieldClassification").ClassifiedField[] = [];
   for (const cf of filteredClassified.value) {
     let assigned = false;
     for (const [id, g] of Object.entries(pg)) {
-      if (g.propertyNames.includes(cf.attrName)) {
+      const matched =
+        g.propertyNames.includes(cf.attrName) ||
+        (dynamicDescInfo.value[cf.attrName]?.fields &&
+          Object.keys(dynamicDescInfo.value[cf.attrName].fields!).some((childKey) =>
+            g.propertyNames.includes(childKey)
+          ));
+      if (matched) {
         const entry = groupsMap.get(id);
         if (entry) entry.fields.push(cf);
         assigned = true;

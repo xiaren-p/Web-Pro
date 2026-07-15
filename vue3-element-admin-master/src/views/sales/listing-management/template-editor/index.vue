@@ -304,7 +304,13 @@ const groupedFields = computed(() => {
   for (const cf of filteredClassified.value) {
     let assigned = false;
     for (const [id, g] of Object.entries(pg)) {
-      if (g.propertyNames.includes(cf.attrName)) {
+      const matched =
+        g.propertyNames.includes(cf.attrName) ||
+        (dynamicDescInfo.value[cf.attrName]?.fields &&
+          Object.keys(dynamicDescInfo.value[cf.attrName].fields!).some((childKey) =>
+            g.propertyNames.includes(childKey)
+          ));
+      if (matched) {
         const entry = groupsMap.get(id);
         if (entry) entry.fields.push(cf);
         assigned = true;
