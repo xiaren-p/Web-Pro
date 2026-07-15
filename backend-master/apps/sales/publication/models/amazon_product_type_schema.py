@@ -43,6 +43,16 @@ class AmazonProductTypeSchema(models.Model):
         blank=True,
         default="",
     )
+    property_groups = models.TextField(
+        verbose_name="属性分组（站点语言版本）",
+        blank=True,
+        default="",
+    )
+    property_groups_zh = models.TextField(
+        verbose_name="属性分组（中文版本）",
+        blank=True,
+        default="",
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="创建时间",
