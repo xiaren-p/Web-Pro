@@ -91,35 +91,28 @@
             :image-size="60"
           />
           <template v-else>
-            <div
-              v-for="group in groupedFields"
-              :key="group.key"
-              class="template-editor__field-group"
-            >
-              <div class="template-editor__field-group-title">{{ group.title }}</div>
-              <el-form label-position="left" label-width="300px" size="default">
-                <el-form-item
-                  v-for="field in group.fields"
-                  :key="field.attrName"
-                  :required="field.required"
-                >
-                  <template #label>
-                    <div class="template-editor__label">
-                      <p class="template-editor__label-zh">
-                        <span v-if="field.required" class="template-editor__label-star">*</span>
-                        {{ field.label[0] }}
-                      </p>
-                      <p class="template-editor__label-en">{{ field.label[1] }}</p>
-                    </div>
-                  </template>
-                  <DynamicField
-                    :model-value="templateFormData[field.attrName]"
-                    :field-config="field"
-                    @update:model-value="(val: string) => onFieldInput(field.attrName, val)"
-                  />
-                </el-form-item>
-              </el-form>
-            </div>
+            <el-form label-position="left" label-width="300px" size="default">
+              <el-form-item
+                v-for="field in filteredFields"
+                :key="field.attrName"
+                :required="field.required"
+              >
+                <template #label>
+                  <div class="template-editor__label">
+                    <p class="template-editor__label-zh">
+                      <span v-if="field.required" class="template-editor__label-star">*</span>
+                      {{ field.label[0] }}
+                    </p>
+                    <p class="template-editor__label-en">{{ field.label[1] }}</p>
+                  </div>
+                </template>
+                <DynamicField
+                  :model-value="templateFormData[field.attrName]"
+                  :field-config="field"
+                  @update:model-value="(val: string) => onFieldInput(field.attrName, val)"
+                />
+              </el-form-item>
+            </el-form>
           </template>
         </section>
       </main>
@@ -215,7 +208,7 @@ const onlyShowRequired = ref(false);
  * 监听 form.marketplaceId + form.productType，两者有值时自动拉取。
  * 模板编辑器使用单栏（不需要 site/cn 双栏），因此用自己的 formData。
  */
-const { otherFields, propertyGroups, propertyGroupsZh } = useProductTypeSchema(
+const { otherFields } = useProductTypeSchema(
   () => form.marketplaceId,
   () => form.productType
 );
@@ -252,39 +245,6 @@ const filteredFields = computed<ParsedFieldConfig[]>(() => {
   }
 
   return result;
-});
-
-/** 字段名 → 分组 key 映射（从 propertyGroups 构建）。 */
-const fieldGroupMap = computed(() => {
-  const map: Record<string, string> = {};
-  for (const [groupKey, group] of Object.entries(propertyGroups.value)) {
-    for (const fieldName of group.propertyNames) {
-      map[fieldName] = groupKey;
-    }
-  }
-  return map;
-});
-
-/** 按分组排列的字段列表。 */
-const groupedFields = computed(() => {
-  const groups: { key: string; title: string; fields: ParsedFieldConfig[] }[] = [];
-  const seen = new Set<string>();
-  const groupOrder: string[] = [];
-
-  for (const field of filteredFields.value) {
-    const gk = fieldGroupMap.value[field.attrName] || "product_details";
-    if (!seen.has(gk)) {
-      seen.add(gk);
-      groupOrder.push(gk);
-      groups.push({
-        key: gk,
-        title: propertyGroupsZh.value[gk]?.title || propertyGroups.value[gk]?.title || gk,
-        fields: [],
-      });
-    }
-    groups[groupOrder.indexOf(gk)].fields.push(field);
-  }
-  return groups;
 });
 
 /**
@@ -535,38 +495,6 @@ onMounted(async () => {
     &--flush {
       margin-bottom: 0;
       border-top: 0;
-    }
-  }
-
-  /* ── 字段分组标题 ── */
-  &__field-group {
-    margin-bottom: 16px;
-
-    &:last-child {
-      margin-bottom: 0;
-    }
-  }
-
-  &__field-group-title {
-    position: relative;
-    display: flex;
-    align-items: center;
-    height: 22px;
-    padding-left: 10px;
-    margin-bottom: 16px;
-    font-size: 13px;
-    font-weight: 700;
-    line-height: 22px;
-    color: #0b1019;
-
-    &::before {
-      content: "";
-      position: absolute;
-      top: 4px;
-      left: 0;
-      width: 2px;
-      height: 14px;
-      background: #005bf5;
     }
   }
 

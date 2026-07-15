@@ -573,6 +573,7 @@ export function useAdCampaignList() {
     filters,
     (v) => {
       writeCache(STORAGE_KEYS.filters, { ...v });
+      writeCache("ADS_SP_DATE_RANGE", v.range);
     },
     { deep: true }
   );

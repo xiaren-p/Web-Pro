@@ -265,30 +265,8 @@ class ProductTypeSchemaSerializer(serializers.Serializer):
             return {}
 
     def get_requiredFields(self, obj: AmazonProductTypeSchema) -> list:
-        """提取全部必填字段名列表。
-
-        来源：
-        1. 根级 required 数组
-        2. allOf 块中的 required（DB 有则取，无则空）
-        """
-        props = self._parsed_props
-        result: list[str] = list(props.get("required", []))
-
-        def _scan_all_of(blocks: list) -> None:
-            if not isinstance(blocks, list):
-                return
-            for block in blocks:
-                if not isinstance(block, dict):
-                    continue
-                if "required" in block and isinstance(block["required"], list):
-                    result.extend(block["required"])
-                if "then" in block and isinstance(block["then"], dict):
-                    _scan_all_of([block["then"]])
-                if "else" in block and isinstance(block["else"], dict):
-                    _scan_all_of([block["else"]])
-
-        _scan_all_of(props.get("allOf", []))
-        return list(dict.fromkeys(result))
+        """从 properties 根级提取必填字段名列表。"""
+        return list(self._parsed_props.get("required", []))
 
     def get_defaultFields(self, obj: AmazonProductTypeSchema) -> dict:
         """从 $defs 提取 marketplace_id / language_tag 默认值。"""
