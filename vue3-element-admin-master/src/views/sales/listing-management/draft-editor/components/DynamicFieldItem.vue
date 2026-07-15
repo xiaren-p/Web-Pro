@@ -50,7 +50,7 @@ el-select、number/integer → el-input（数字过滤）、 * date → el-date-
   </el-input>
   <el-date-picker
     v-else-if="fieldConfig.type === 'date'"
-    :model-value="modelValue as string | number | undefined"
+    :model-value="dateModelValue"
     type="date"
     value-format="YYYY-MM-DD"
     placeholder="请选择日期"
@@ -88,6 +88,12 @@ const props = withDefaults(defineProps<Props>(), { disabled: false });
 const emit = defineEmits<{
   "update:modelValue": [value: string | number | boolean | undefined];
 }>();
+
+const dateModelValue = computed(() => {
+  if (typeof props.modelValue === "string" || typeof props.modelValue === "number")
+    return props.modelValue;
+  return undefined;
+});
 
 const suffixText = computed(() => {
   const { minimum, maximum } = props.fieldConfig;

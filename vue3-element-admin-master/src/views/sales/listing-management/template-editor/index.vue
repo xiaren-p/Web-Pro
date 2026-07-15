@@ -103,35 +103,43 @@ value: "商品名", marketplace_id: "ATVPDKIKX0DER" } * ] * * 组字段： * tem
             description="请先选择商品类型"
             :image-size="60"
           />
-          <el-form v-else label-position="left" label-width="300px" size="default">
-            <el-form-item
-              v-for="cf in filteredClassified"
-              :key="cf.attrName"
-              :required="cf.requiredFields.length > 0"
-            >
-              <template #label>
-                <div class="template-editor__label">
-                  <p class="template-editor__label-zh">
-                    <span v-if="cf.requiredFields.length > 0" class="template-editor__label-star">
-                      *
-                    </span>
-                    {{ dynamicDescInfo[cf.attrName]?.label[0] ?? cf.attrName }}
-                  </p>
-                  <p class="template-editor__label-en">
-                    {{ dynamicDescInfo[cf.attrName]?.label[1] ?? cf.attrName }}
-                  </p>
-                </div>
-              </template>
-              <DynamicField
-                :field-config="dynamicDescInfo[cf.attrName]"
-                :category="cf.category"
-                :model-value="(templateFormData[cf.attrName] as unknown[]) ?? []"
-                :required-fields="cf.requiredFields"
-                :marketplace-id="form.marketplaceId"
-                @update:model-value="(val: unknown[]) => onFieldInput(cf.attrName, val)"
-              />
-            </el-form-item>
-          </el-form>
+          <template v-else>
+            <div v-for="group in groupedFields" :key="group.title" class="template-editor__group">
+              <div class="template-editor__group-title">{{ group.title }}</div>
+              <el-form label-position="left" label-width="300px" size="default">
+                <el-form-item
+                  v-for="cf in group.fields"
+                  :key="cf.attrName"
+                  :required="cf.requiredFields.length > 0"
+                >
+                  <template #label>
+                    <div class="template-editor__label">
+                      <p class="template-editor__label-zh">
+                        <span
+                          v-if="cf.requiredFields.length > 0"
+                          class="template-editor__label-star"
+                        >
+                          *
+                        </span>
+                        {{ dynamicDescInfo[cf.attrName]?.label[0] ?? cf.attrName }}
+                      </p>
+                      <p class="template-editor__label-en">
+                        {{ dynamicDescInfo[cf.attrName]?.label[1] ?? cf.attrName }}
+                      </p>
+                    </div>
+                  </template>
+                  <DynamicField
+                    :field-config="dynamicDescInfo[cf.attrName]"
+                    :category="cf.category"
+                    :model-value="(templateFormData[cf.attrName] as unknown[]) ?? []"
+                    :required-fields="cf.requiredFields"
+                    :marketplace-id="form.marketplaceId"
+                    @update:model-value="(val: unknown[]) => onFieldInput(cf.attrName, val)"
+                  />
+                </el-form-item>
+              </el-form>
+            </div>
+          </template>
         </section>
       </main>
 
@@ -163,6 +171,7 @@ import type {
 } from "@/api/sales/listing-publish";
 import { useProductTypeSchema, flattenFieldLabels } from "@/composables/useProductTypeSchema";
 import { useFieldClassification } from "@/views/sales/listing-management/draft-editor/composables/useFieldClassification";
+import { buildRequiredFieldRuleObj } from "@/composables/useDynamicRequiredFields";
 import CategorySelectDialog from "../draft-editor/components/CategorySelectDialog.vue";
 import DynamicField from "../draft-editor/components/DynamicField.vue";
 
@@ -201,6 +210,8 @@ const {
   loading: schemaLoading,
   otherFields,
   dynamicDescInfo,
+  schemaData,
+  propertyGroupsZh,
 } = useProductTypeSchema(
   () => form.marketplaceId,
   () => form.productType
@@ -224,13 +235,25 @@ watch(otherFields, (fields) => {
 });
 
 /**
+ * 必填规则映射（根级 required + 条件必填）。
+ */
+const requiredFieldRuleMap = computed(() => {
+  if (!schemaData.value || !Object.keys(templateFormData).length) return undefined;
+  return buildRequiredFieldRuleObj(
+    schemaData.value,
+    templateFormData as unknown as Record<string, unknown>
+  );
+});
+
+/**
  * 分类后的字段列表。
  *
  * @description 根据 templateFormData 的当前值对字段分类。
  */
 const classifiedFields = useFieldClassification(
   computed(() => templateFormData as Record<string, unknown[]>),
-  computed(() => dynamicDescInfo.value)
+  computed(() => dynamicDescInfo.value),
+  computed(() => requiredFieldRuleMap.value)
 );
 
 /**
@@ -253,6 +276,52 @@ const filteredClassified = computed(() => {
   }
 
   return result;
+});
+
+/**
+ * 按 propertyGroups 分组后的字段列表。
+ */
+const groupedFields = computed(() => {
+  const groups: {
+    title: string;
+    fields: import("@/views/sales/listing-management/draft-editor/composables/useFieldClassification").ClassifiedField[];
+  }[] = [];
+  const pg = propertyGroupsZh.value ?? {};
+
+  const groupsMap = new Map<
+    string,
+    {
+      title: string;
+      fields: import("@/views/sales/listing-management/draft-editor/composables/useFieldClassification").ClassifiedField[];
+    }
+  >();
+  for (const [id, g] of Object.entries(pg)) {
+    groupsMap.set(id, { title: g.title, fields: [] });
+  }
+
+  const ungrouped: import("@/views/sales/listing-management/draft-editor/composables/useFieldClassification").ClassifiedField[] =
+    [];
+  for (const cf of filteredClassified.value) {
+    let assigned = false;
+    for (const [id, g] of Object.entries(pg)) {
+      if (g.propertyNames.includes(cf.attrName)) {
+        const entry = groupsMap.get(id);
+        if (entry) entry.fields.push(cf);
+        assigned = true;
+        break;
+      }
+    }
+    if (!assigned) ungrouped.push(cf);
+  }
+
+  for (const [id] of Object.entries(pg)) {
+    const entry = groupsMap.get(id);
+    if (entry && entry.fields.length) groups.push(entry);
+  }
+
+  if (ungrouped.length) groups.push({ title: "其他", fields: ungrouped });
+
+  return groups;
 });
 
 /**
@@ -539,6 +608,20 @@ onMounted(async () => {
       font-size: 10px;
       color: #f5222d;
     }
+  }
+
+  &__group {
+    margin-bottom: 20px;
+  }
+
+  &__group-title {
+    padding: 6px 12px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0b1019;
+    background: #f5f7fa;
+    border-radius: 2px;
   }
 
   /* ── 底部操作栏 ── */

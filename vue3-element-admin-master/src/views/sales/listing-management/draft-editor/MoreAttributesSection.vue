@@ -49,48 +49,50 @@ Schema 解析 * @see useFieldClassification - 字段分类 * @see DynamicField -
             description="暂无更多属性字段"
             :image-size="60"
           />
-          <el-form v-else label-position="left" label-width="200px" size="default">
-            <el-form-item
-              v-for="cf in filteredClassified"
-              :key="cf.attrName"
-              :required="cf.requiredFields.length > 0"
-            >
-              <template #label>
-                <div class="more-attrs__label">
-                  <p class="more-attrs__label-zh">
-                    <span v-if="cf.requiredFields.length > 0" class="more-attrs__label-star">
-                      *
-                    </span>
-                    {{ dynamicDescInfo[cf.attrName]?.label[1] ?? cf.attrName }}
-                  </p>
-                  <p class="more-attrs__label-en">
-                    {{ dynamicDescInfo[cf.attrName]?.label[0] ?? cf.attrName }}
-                  </p>
-                </div>
-              </template>
-
-              <!-- 使用 DynamicField 路由组件 -->
-              <DynamicField
-                :field-config="dynamicDescInfo[cf.attrName]"
-                :category="cf.category"
-                :model-value="(dynamicFormData.site[cf.attrName] as unknown[]) ?? []"
-                :required-fields="cf.requiredFields"
-                :marketplace-id="siteCode"
-                @update:model-value="
-                  (val: unknown[]) =>
-                    onSiteInput(
-                      cf.attrName,
-                      dynamicDescInfo[cf.attrName]?.label[1] ?? cf.attrName,
-                      val
-                    )
-                "
-              />
-
-              <div v-if="errors[`site.${cf.attrName}`]" class="lang-error-hint">
-                {{ errors[`site.${cf.attrName}`] }}
-              </div>
-            </el-form-item>
-          </el-form>
+          <template v-else>
+            <div v-for="group in groupedFields" :key="group.title" class="more-attrs__group">
+              <div class="more-attrs__group-title">{{ group.title }}</div>
+              <el-form label-position="left" label-width="200px" size="default">
+                <el-form-item
+                  v-for="cf in group.fields"
+                  :key="cf.attrName"
+                  :required="cf.requiredFields.length > 0"
+                >
+                  <template #label>
+                    <div class="more-attrs__label">
+                      <p class="more-attrs__label-zh">
+                        <span v-if="cf.requiredFields.length > 0" class="more-attrs__label-star">
+                          *
+                        </span>
+                        {{ dynamicDescInfo[cf.attrName]?.label[1] ?? cf.attrName }}
+                      </p>
+                      <p class="more-attrs__label-en">
+                        {{ dynamicDescInfo[cf.attrName]?.label[0] ?? cf.attrName }}
+                      </p>
+                    </div>
+                  </template>
+                  <DynamicField
+                    :field-config="dynamicDescInfo[cf.attrName]"
+                    :category="cf.category"
+                    :model-value="(dynamicFormData.site[cf.attrName] as unknown[]) ?? []"
+                    :required-fields="cf.requiredFields"
+                    :marketplace-id="siteCode"
+                    @update:model-value="
+                      (val: unknown[]) =>
+                        onSiteInput(
+                          cf.attrName,
+                          dynamicDescInfo[cf.attrName]?.label[1] ?? cf.attrName,
+                          val
+                        )
+                    "
+                  />
+                  <div v-if="errors[`site.${cf.attrName}`]" class="lang-error-hint">
+                    {{ errors[`site.${cf.attrName}`] }}
+                  </div>
+                </el-form-item>
+              </el-form>
+            </div>
+          </template>
         </div>
       </el-col>
 
@@ -103,47 +105,50 @@ Schema 解析 * @see useFieldClassification - 字段分类 * @see DynamicField -
             description="暂无更多属性字段"
             :image-size="60"
           />
-          <el-form v-else label-position="left" label-width="200px" size="default">
-            <el-form-item
-              v-for="cf in filteredClassified"
-              :key="cf.attrName"
-              :required="cf.requiredFields.length > 0"
-            >
-              <template #label>
-                <div class="more-attrs__label">
-                  <p class="more-attrs__label-zh">
-                    <span v-if="cf.requiredFields.length > 0" class="more-attrs__label-star">
-                      *
-                    </span>
-                    {{ dynamicDescInfo[cf.attrName]?.label[0] ?? cf.attrName }}
-                  </p>
-                  <p class="more-attrs__label-en">
-                    {{ dynamicDescInfo[cf.attrName]?.label[1] ?? cf.attrName }}
-                  </p>
-                </div>
-              </template>
-
-              <DynamicField
-                :field-config="dynamicDescInfo[cf.attrName]"
-                :category="cf.category"
-                :model-value="(dynamicFormData.cn[cf.attrName] as unknown[]) ?? []"
-                :required-fields="cf.requiredFields"
-                :marketplace-id="siteCode"
-                @update:model-value="
-                  (val: unknown[]) =>
-                    onCnInput(
-                      cf.attrName,
-                      dynamicDescInfo[cf.attrName]?.label[0] ?? cf.attrName,
-                      val
-                    )
-                "
-              />
-
-              <div v-if="errors[`cn.${cf.attrName}`]" class="lang-error-hint">
-                {{ errors[`cn.${cf.attrName}`] }}
-              </div>
-            </el-form-item>
-          </el-form>
+          <template v-else>
+            <div v-for="group in groupedFields" :key="group.title" class="more-attrs__group">
+              <div class="more-attrs__group-title">{{ group.title }}</div>
+              <el-form label-position="left" label-width="200px" size="default">
+                <el-form-item
+                  v-for="cf in group.fields"
+                  :key="cf.attrName"
+                  :required="cf.requiredFields.length > 0"
+                >
+                  <template #label>
+                    <div class="more-attrs__label">
+                      <p class="more-attrs__label-zh">
+                        <span v-if="cf.requiredFields.length > 0" class="more-attrs__label-star">
+                          *
+                        </span>
+                        {{ dynamicDescInfo[cf.attrName]?.label[0] ?? cf.attrName }}
+                      </p>
+                      <p class="more-attrs__label-en">
+                        {{ dynamicDescInfo[cf.attrName]?.label[1] ?? cf.attrName }}
+                      </p>
+                    </div>
+                  </template>
+                  <DynamicField
+                    :field-config="dynamicDescInfo[cf.attrName]"
+                    :category="cf.category"
+                    :model-value="(dynamicFormData.cn[cf.attrName] as unknown[]) ?? []"
+                    :required-fields="cf.requiredFields"
+                    :marketplace-id="siteCode"
+                    @update:model-value="
+                      (val: unknown[]) =>
+                        onCnInput(
+                          cf.attrName,
+                          dynamicDescInfo[cf.attrName]?.label[0] ?? cf.attrName,
+                          val
+                        )
+                    "
+                  />
+                  <div v-if="errors[`cn.${cf.attrName}`]" class="lang-error-hint">
+                    {{ errors[`cn.${cf.attrName}`] }}
+                  </div>
+                </el-form-item>
+              </el-form>
+            </div>
+          </template>
         </div>
       </el-col>
     </el-row>
@@ -155,6 +160,7 @@ import { ref, computed, inject } from "vue";
 import { Search as SearchIcon } from "@element-plus/icons-vue";
 import { useProductTypeSchema, flattenFieldLabels } from "@/composables/useProductTypeSchema";
 import { useFieldClassification } from "./composables/useFieldClassification";
+import { buildRequiredFieldRuleObj } from "@/composables/useDynamicRequiredFields";
 import { validateSiteLang, validateChinese } from "@/utils/lang-check";
 import DynamicField from "./components/DynamicField.vue";
 
@@ -165,14 +171,26 @@ const siteCode = inject<import("vue").ComputedRef<string>>("currentSiteCode")!;
 const errors = inject<Record<string, string>>("langErrors")!;
 
 // ── Schema 解析 ──
-const { loading, dynamicFormData, dynamicDescInfo } = useProductTypeSchema(
-  () => f?.site?.marketplaceId ?? "",
-  () => f?.site?.productType ?? ""
-);
+const { loading, dynamicFormData, dynamicDescInfo, schemaData, propertyGroupsZh } =
+  useProductTypeSchema(
+    () => f?.site?.marketplaceId ?? "",
+    () => f?.site?.productType ?? ""
+  );
 
 // ── 搜索与过滤 ──
 const searchText = ref("");
 const onlyShowRequired = ref(false);
+
+/**
+ * 必填规则映射（根级 required + 条件必填）。
+ */
+const requiredFieldRuleMap = computed(() => {
+  if (!schemaData.value || !Object.keys(dynamicFormData.site).length) return undefined;
+  return buildRequiredFieldRuleObj(
+    schemaData.value,
+    dynamicFormData.site as unknown as Record<string, unknown>
+  );
+});
 
 /**
  * 分类后的字段列表。
@@ -182,7 +200,8 @@ const onlyShowRequired = ref(false);
  */
 const classifiedFields = useFieldClassification(
   computed(() => dynamicFormData.site as unknown as Record<string, unknown[]>),
-  computed(() => dynamicDescInfo.value)
+  computed(() => dynamicDescInfo.value),
+  computed(() => requiredFieldRuleMap.value)
 );
 
 /**
@@ -205,6 +224,51 @@ const filteredClassified = computed(() => {
   }
 
   return result;
+});
+
+/**
+ * 按 propertyGroups 分组后的字段列表。
+ *
+ * @description 匹配领星分组渲染：每组带标题头，字段按 propertyNames 归属。
+ * 未匹配任何分组的字段归于"其他"。
+ */
+const groupedFields = computed(() => {
+  const groups: {
+    title: string;
+    fields: import("./composables/useFieldClassification").ClassifiedField[];
+  }[] = [];
+  const pg = propertyGroupsZh.value ?? {};
+
+  // 初始化组
+  const groupsMap = new Map<string, typeof groups extends (infer U)[] ? U : never>();
+  for (const [id, g] of Object.entries(pg)) {
+    groupsMap.set(id, { title: g.title, fields: [] });
+  }
+
+  // 分配字段到组
+  const ungrouped: import("./composables/useFieldClassification").ClassifiedField[] = [];
+  for (const cf of filteredClassified.value) {
+    let assigned = false;
+    for (const [id, g] of Object.entries(pg)) {
+      if (g.propertyNames.includes(cf.attrName)) {
+        const entry = groupsMap.get(id);
+        if (entry) entry.fields.push(cf);
+        assigned = true;
+        break;
+      }
+    }
+    if (!assigned) ungrouped.push(cf);
+  }
+
+  // 输出非空组
+  for (const [id] of Object.entries(pg)) {
+    const entry = groupsMap.get(id);
+    if (entry && entry.fields.length) groups.push(entry);
+  }
+
+  if (ungrouped.length) groups.push({ title: "其他", fields: ungrouped });
+
+  return groups;
 });
 
 // ── 输入处理 ──
@@ -277,6 +341,20 @@ function onCnInput(attrName: string, label: string, val: unknown[]) {
       font-size: 10px;
       color: #f5222d;
     }
+  }
+
+  &__group {
+    margin-bottom: 20px;
+  }
+
+  &__group-title {
+    padding: 6px 12px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0b1019;
+    background: #f5f7fa;
+    border-radius: 2px;
   }
 }
 </style>

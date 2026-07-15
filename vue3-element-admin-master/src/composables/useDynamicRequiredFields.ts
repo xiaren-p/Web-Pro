@@ -296,20 +296,16 @@ export function getDynamicRequiredFields(schema: Record<string, unknown>, data: 
 /**
  * 构建 requiredFieldRuleObj。
  *
- * @description 遍历完整 JSON Schema 的每个顶级属性（properties），
- * 对每个属性调用 getDynamicRequiredFields，汇总为领星兼容的
- * requiredFieldRuleObj 格式。
+ * @description 重建完整 Schema（含 properties + required），
+ * 一次 getDynamicRequiredFields 计算所有根级必填，按 attrName 归类。
  *
- * 领星对应：DraftOtherDetail 的 requiredFieldRuleObj prop，
- * 在 processDynamicDescInfoList 中判断每个字段的必填/禁用。
+ * 匹配领星 DraftOtherDetail.requiredFieldRuleObj 逻辑。
  *
- * @param fullSchema - 完整商品类型 JSON Schema
- *   - 必须含有 properties 顶级字段
- *   - 每个 property 可以是 array/object/string/number 等
+ * @param schemaData - 后端 API 返回的 ProductTypeSchemaVO
+ *   - 必须含有 fields（= properties）和 requiredFields（= required）
  *
  * @param formData - 当前表单值
- *   - key=attrName, value=对应的表单数据
- *   - 值与 schema properties 层级对应
+ *   - key=attrName, value=对应的表单数据（嵌套数组格式）
  *
  * @returns 字段级别的必填规则映射（RequiredFieldRuleMap）
  *   - key=attrName
@@ -317,38 +313,33 @@ export function getDynamicRequiredFields(schema: Record<string, unknown>, data: 
  *
  * @example
  * ```typescript
- * const fullSchema = {
- *   type: "object",
- *   properties: {
- *     item_name: { type: "array", items: { ... } },
- *     batteries_included: { type: "array", items: { ... } },
- *     battery_weight: { type: "array", items: { ... } },
- *   },
- *   required: ["item_name"],
- *   allOf: [{ if: { ... }, then: { required: ["battery_weight"] } }],
- * };
- *
- * const rules = buildRequiredFieldRuleObj(fullSchema, formData);
- * // rules.battery_weight.requiredFlag === true  （当条件满足时）
+ * const rules = buildRequiredFieldRuleObj(schemaData.value, formData);
+ * // rules.item_name.requiredFlag === true  （根级 required 命中）
  * ```
  */
 export function buildRequiredFieldRuleObj(
-  fullSchema: Record<string, unknown>,
+  schemaData: Record<string, unknown>,
   formData: Record<string, unknown>
 ): RequiredFieldRuleMap {
   const result: RequiredFieldRuleMap = {};
+  const fields = (schemaData.fields ?? {}) as Record<string, unknown>;
 
-  const properties = (fullSchema.properties ?? {}) as Record<string, unknown>;
-  for (const [attrName, propSchema] of Object.entries(properties)) {
-    if (typeof propSchema !== "object" || propSchema === null) continue;
-    const required = getDynamicRequiredFields(
-      propSchema as Record<string, unknown>,
-      formData[attrName]
-    );
+  // 重建完整 Schema（匹配领星 raw schema 的 { type, properties, required } 结构）
+  const fullSchema: Record<string, unknown> = {
+    type: "object",
+    properties: fields,
+    required: schemaData.requiredFields ?? [],
+  };
+
+  // 一次 getDynamicRequiredFields → 捕获根级 required + 条件必填
+  const allRequired = getDynamicRequiredFields(fullSchema, formData);
+
+  for (const attrName of Object.keys(fields)) {
+    const isRequired = allRequired.includes(attrName);
     result[attrName] = {
-      required,
+      required: isRequired ? [attrName] : [],
       forbidden: [],
-      requiredFlag: required.length > 0,
+      requiredFlag: isRequired,
     };
   }
 
