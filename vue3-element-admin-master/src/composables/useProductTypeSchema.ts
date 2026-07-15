@@ -59,16 +59,6 @@ export interface ParsedFieldConfig {
   subFields?: ParsedFieldConfig[];
 }
 
-/** 分组后的字段段（用于"更多属性"按组渲染）。 */
-export interface GroupedFieldSection {
-  /** 分组标识（如 product_details、offer）。 */
-  groupKey: string;
-  /** 分组标题（优先中文）。 */
-  title: string;
-  /** 该分组下的字段列表。 */
-  fields: ParsedFieldConfig[];
-}
-
 // ── 字段分类硬编码清单（仿领星 fieldClassification）────────────────────────────
 
 /** 基本信息字段（对齐领星 basicFields）。 */
@@ -280,8 +270,9 @@ function parseField(
   // 判断必填：只看根级 required 数组
   const required = requiredFields.has(attrName);
 
-  // placeholder
-  const placeholder = siteDef.examples?.[0] ?? valueDef.examples?.[0] ?? "";
+  // placeholder（对齐领星："示例：xxx"）
+  const example = siteDef.examples?.[0] ?? valueDef.examples?.[0] ?? "";
+  const placeholder = example ? `示例：${example}` : "";
 
   return {
     attrName,
@@ -334,7 +325,8 @@ function parseSubFields(
     // 子字段必填：items.required 包含该子字段名
     const subRequired = siteDef.items?.required?.includes(subKey) ?? false;
 
-    const placeholder = subDef.examples?.[0] ?? valueDef.examples?.[0] ?? "";
+    const subExample = subDef.examples?.[0] ?? valueDef.examples?.[0] ?? "";
+    const placeholder = subExample ? `示例：${subExample}` : "";
 
     result.push({
       attrName: subKey,
@@ -427,58 +419,6 @@ export function flattenFieldLabels(field: ParsedFieldConfig): string[] {
   return result;
 }
 
-/**
- * 按 propertyGroupsZh / propertyGroups 将 otherFields 分组。
- *
- * 仿领星"更多属性"渲染逻辑：遍历 API 返回的 propertyGroups（保持顺序），
- * 将 otherFields 中属于该组 propertyNames 的字段归入对应分组。
- * 未匹配任何分组的字段归入兜底"其他"组。
- *
- * @param otherFields - 已分类为"更多属性"的字段列表。
- * @param propertyGroups - 站点语言属性分组。
- * @param propertyGroupsZh - 中文属性分组（优先取 title）。
- * @returns 分组后的字段段数组（跳过空组）。
- */
-export function groupFieldsByPropertyGroups(
-  otherFields: ParsedFieldConfig[],
-  propertyGroups: Record<string, { title: string; propertyNames: string[] }>,
-  propertyGroupsZh: Record<string, { title: string; propertyNames: string[] }>
-): GroupedFieldSection[] {
-  if (!Object.keys(propertyGroupsZh).length && !Object.keys(propertyGroups).length) {
-    return [{ groupKey: "", title: "", fields: otherFields }];
-  }
-
-  const fieldMap = new Map(otherFields.map((f) => [f.attrName, f]));
-  const usedNames = new Set<string>();
-  const sections: GroupedFieldSection[] = [];
-
-  const groupEntries = Object.entries(
-    Object.keys(propertyGroupsZh).length ? propertyGroupsZh : propertyGroups
-  );
-
-  for (const [groupKey, group] of groupEntries) {
-    const enGroup = propertyGroups[groupKey];
-    const fields: ParsedFieldConfig[] = [];
-    for (const name of group.propertyNames) {
-      const field = fieldMap.get(name);
-      if (field) {
-        fields.push(field);
-        usedNames.add(name);
-      }
-    }
-    if (fields.length) {
-      sections.push({ groupKey, title: group.title || enGroup?.title || groupKey, fields });
-    }
-  }
-
-  const leftovers = otherFields.filter((f) => !usedNames.has(f.attrName));
-  if (leftovers.length) {
-    sections.push({ groupKey: "__other__", title: "", fields: leftovers });
-  }
-
-  return sections;
-}
-
 // ── Composable ───────────────────────────────────────────────────────────────
 
 /**
@@ -500,15 +440,6 @@ export function useProductTypeSchema(
   const allFields = ref<ParsedFieldConfig[]>([]) as Ref<ParsedFieldConfig[]>;
   const otherFields = ref<ParsedFieldConfig[]>([]) as Ref<ParsedFieldConfig[]>;
   const schemaData = ref<ProductTypeSchemaVO | null>(null);
-
-  /** propertyGroups / propertyGroupsZh computed（供 groupedOtherFields 使用）。 */
-  const propertyGroups = computed(() => schemaData.value?.propertyGroups ?? {});
-  const propertyGroupsZh = computed(() => schemaData.value?.propertyGroupsZh ?? {});
-
-  /** otherFields 按 propertyGroups 分组后的结果。 */
-  const groupedOtherFields = computed(() =>
-    groupFieldsByPropertyGroups(otherFields.value, propertyGroups.value, propertyGroupsZh.value)
-  );
 
   /** 动态表单数据（site / cn 双栏，每栏 key=attrName, value=字符串）。 */
   const dynamicFormData = reactive<{
@@ -583,12 +514,11 @@ export function useProductTypeSchema(
     error,
     allFields,
     otherFields,
-    groupedOtherFields,
     dynamicFormData,
     defaultFields,
     schemaData,
     fetchSchema,
-    propertyGroups,
-    propertyGroupsZh,
+    propertyGroups: computed(() => schemaData.value?.propertyGroups ?? {}),
+    propertyGroupsZh: computed(() => schemaData.value?.propertyGroupsZh ?? {}),
   };
 }

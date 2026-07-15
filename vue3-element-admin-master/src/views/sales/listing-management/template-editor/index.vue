@@ -86,43 +86,32 @@
           </div>
 
           <el-empty
-            v-if="!filteredGroupedFields.length && !loading"
+            v-if="!filteredFields.length && !loading"
             description="请先选择商品类型"
             :image-size="60"
           />
-          <template v-else>
-            <div
-              v-for="group in filteredGroupedFields"
-              :key="group.groupKey || '__other__'"
-              class="template-editor__field-group"
+          <el-form v-else label-position="left" label-width="300px" size="default">
+            <el-form-item
+              v-for="field in filteredFields"
+              :key="field.attrName"
+              :required="field.required"
             >
-              <div v-if="group.title" class="template-editor__field-group-title">
-                {{ group.title }}
-              </div>
-              <el-form label-position="left" label-width="300px" size="default">
-                <el-form-item
-                  v-for="field in group.fields"
-                  :key="field.attrName"
-                  :required="field.required"
-                >
-                  <template #label>
-                    <div class="template-editor__label">
-                      <p class="template-editor__label-zh">
-                        <span v-if="field.required" class="template-editor__label-star">*</span>
-                        {{ field.label[0] }}
-                      </p>
-                      <p class="template-editor__label-en">{{ field.label[1] }}</p>
-                    </div>
-                  </template>
-                  <DynamicField
-                    :model-value="templateFormData[field.attrName]"
-                    :field-config="field"
-                    @update:model-value="(val: string) => onFieldInput(field.attrName, val)"
-                  />
-                </el-form-item>
-              </el-form>
-            </div>
-          </template>
+              <template #label>
+                <div class="template-editor__label">
+                  <p class="template-editor__label-zh">
+                    <span v-if="field.required" class="template-editor__label-star">*</span>
+                    {{ field.label[0] }}
+                  </p>
+                  <p class="template-editor__label-en">{{ field.label[1] }}</p>
+                </div>
+              </template>
+              <DynamicField
+                :model-value="templateFormData[field.attrName]"
+                :field-config="field"
+                @update:model-value="(val: string) => onFieldInput(field.attrName, val)"
+              />
+            </el-form-item>
+          </el-form>
         </section>
       </main>
 
@@ -167,7 +156,7 @@ import type {
   PublishTemplateForm,
 } from "@/api/sales/listing-publish";
 import { useProductTypeSchema, flattenFieldLabels } from "@/composables/useProductTypeSchema";
-import type { GroupedFieldSection } from "@/composables/useProductTypeSchema";
+import type { ParsedFieldConfig } from "@/composables/useProductTypeSchema";
 import CategorySelectDialog from "../draft-editor/components/CategorySelectDialog.vue";
 import DynamicField from "../draft-editor/components/DynamicField.vue";
 
@@ -217,7 +206,7 @@ const onlyShowRequired = ref(false);
  * 监听 form.marketplaceId + form.productType，两者有值时自动拉取。
  * 模板编辑器使用单栏（不需要 site/cn 双栏），因此用自己的 formData。
  */
-const { otherFields, groupedOtherFields } = useProductTypeSchema(
+const { otherFields } = useProductTypeSchema(
   () => form.marketplaceId,
   () => form.productType
 );
@@ -234,34 +223,26 @@ watch(otherFields, (fields) => {
   }
 });
 
-/** 过滤后的分组字段列表（搜索 + 仅必填）。组字段有必填子字段时视为必填。 */
-const filteredGroupedFields = computed<GroupedFieldSection[]>(() => {
-  let groups = groupedOtherFields.value;
+/** 过滤后的字段列表（搜索 + 仅必填）。组字段有必填子字段时视为必填。 */
+const filteredFields = computed<ParsedFieldConfig[]>(() => {
+  let result = otherFields.value;
 
   if (searchText.value.trim()) {
     const search = searchText.value.trim().toUpperCase();
-    groups = groups
-      .map((g) => ({
-        ...g,
-        fields: g.fields.filter((field) =>
-          flattenFieldLabels(field).some((label) => label.includes(search))
-        ),
-      }))
-      .filter((g) => g.fields.length);
+    result = result.filter((field) =>
+      flattenFieldLabels(field).some((label) => label.includes(search))
+    );
   }
 
   if (onlyShowRequired.value) {
-    groups = groups
-      .map((g) => ({
-        ...g,
-        fields: g.fields.filter(
-          (field) => field.required || field.subFields?.some((sf) => sf.required)
-        ),
-      }))
-      .filter((g) => g.fields.length);
+    result = result.filter((field) => {
+      if (field.required) return true;
+      if (field.subFields?.some((sf) => sf.required)) return true;
+      return false;
+    });
   }
 
-  return groups;
+  return result;
 });
 
 /**
@@ -512,38 +493,6 @@ onMounted(async () => {
     &--flush {
       margin-bottom: 0;
       border-top: 0;
-    }
-  }
-
-  /* ── 字段分组标题 ── */
-  &__field-group {
-    margin-bottom: 16px;
-
-    &:last-child {
-      margin-bottom: 0;
-    }
-  }
-
-  &__field-group-title {
-    position: relative;
-    display: flex;
-    align-items: center;
-    height: 22px;
-    padding-left: 10px;
-    margin-bottom: 16px;
-    font-size: 13px;
-    font-weight: 700;
-    line-height: 22px;
-    color: #0b1019;
-
-    &::before {
-      content: "";
-      position: absolute;
-      top: 4px;
-      left: 0;
-      width: 2px;
-      height: 14px;
-      background: #005bf5;
     }
   }
 

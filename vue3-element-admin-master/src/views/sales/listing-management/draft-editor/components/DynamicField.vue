@@ -1,85 +1,100 @@
 <template>
   <div class="dynamic-field">
-    <!-- group：子字段组 -->
+    <!-- group：子字段组（对齐领星 DynamicFormGroup） -->
     <div v-if="fieldConfig.fieldType === 'group'" class="dynamic-field__group">
-      <div v-for="sf in fieldConfig.subFields" :key="sf.attrName" class="dynamic-field__group-item">
-        <label class="dynamic-field__group-label">
-          <span v-if="sf.required" class="dynamic-field__group-star">*</span>
-          {{ sf.label[1] || sf.label[0] }}
-        </label>
-        <!-- string -->
-        <el-input
-          v-if="sf.fieldType === 'string'"
-          :model-value="groupValues[sf.attrName] || ''"
-          :maxlength="sf.maxLength || undefined"
-          :minlength="sf.minLength || undefined"
-          :show-word-limit="!!sf.maxLength"
-          :placeholder="sf.placeholder || ''"
-          clearable
-          size="small"
-          @update:model-value="
-            (v: string | number | boolean | undefined) => onGroupInput(sf.attrName, v)
-          "
-        />
-        <!-- select -->
-        <el-select
-          v-else-if="sf.fieldType === 'select'"
-          :model-value="groupValues[sf.attrName] || ''"
-          :placeholder="sf.placeholder || ''"
-          :allow-create="sf.allowCreate"
-          filterable
-          clearable
-          size="small"
-          default-first-option
-          @update:model-value="
-            (v: string | number | boolean | undefined) => onGroupInput(sf.attrName, v)
-          "
-        >
-          <el-option
-            v-for="opt in sf.options"
-            :key="opt.value"
-            :label="opt.name"
-            :value="opt.value"
-          />
-        </el-select>
-        <!-- number / integer -->
-        <el-input
-          v-else-if="sf.fieldType === 'number' || sf.fieldType === 'integer'"
-          :model-value="groupValues[sf.attrName] || ''"
-          :placeholder="sf.placeholder || ''"
-          clearable
-          size="small"
-          @update:model-value="
-            (v: string | number | boolean | undefined) =>
-              onGroupNumberInput(sf.attrName, v, sf.fieldType === 'integer')
-          "
-        />
-        <!-- date -->
-        <el-date-picker
-          v-else-if="sf.fieldType === 'date'"
-          :model-value="groupValues[sf.attrName] || ''"
-          type="date"
-          value-format="YYYY-MM-DD"
-          placeholder="请选择日期"
-          clearable
-          size="small"
-          @update:model-value="
-            (v: string | number | boolean | undefined) => onGroupInput(sf.attrName, v)
-          "
-        />
-        <!-- radio -->
-        <el-radio-group
-          v-else-if="sf.fieldType === 'radio'"
-          :model-value="groupValues[sf.attrName] || ''"
-          size="small"
-          @update:model-value="
-            (v: string | number | boolean | undefined) => onGroupInput(sf.attrName, v)
-          "
-        >
-          <el-radio v-for="opt in sf.options" :key="opt.value" :value="opt.value">
-            {{ opt.name }}
-          </el-radio>
-        </el-radio-group>
+      <!-- 组标题：中文 + 英文 -->
+      <div class="dynamic-field__group-title-wrap">
+        <span class="dynamic-field__group-title-zh">{{ fieldConfig.label[0] }}</span>
+        <span class="dynamic-field__group-title-en">{{ fieldConfig.label[1] }}</span>
+      </div>
+      <!-- 子字段列表（垂直堆叠，每个子字段双语标签 + 输入框） -->
+      <div class="dynamic-field__group-body">
+        <div v-for="sf in fieldConfig.subFields" :key="sf.attrName" class="dynamic-field__sub-item">
+          <div class="dynamic-field__sub-label">
+            <p class="dynamic-field__sub-label-zh">
+              <span v-if="sf.required" class="dynamic-field__sub-star">*</span>
+              {{ sf.label[0] }}
+            </p>
+            <p class="dynamic-field__sub-label-en">{{ sf.label[1] }}</p>
+          </div>
+          <div class="dynamic-field__sub-control">
+            <!-- string -->
+            <el-input
+              v-if="sf.fieldType === 'string'"
+              :model-value="groupValues[sf.attrName] || ''"
+              :maxlength="sf.maxLength || undefined"
+              :minlength="sf.minLength || undefined"
+              :show-word-limit="!!sf.maxLength"
+              :placeholder="sf.placeholder || ''"
+              clearable
+              size="small"
+              @update:model-value="
+                (v: string | number | boolean | undefined) => onGroupInput(sf.attrName, v)
+              "
+            />
+            <!-- select -->
+            <el-select
+              v-else-if="sf.fieldType === 'select'"
+              :model-value="groupValues[sf.attrName] || ''"
+              :placeholder="sf.placeholder || ''"
+              :allow-create="sf.allowCreate"
+              filterable
+              clearable
+              size="small"
+              default-first-option
+              class="dynamic-field__select"
+              @update:model-value="
+                (v: string | number | boolean | undefined) => onGroupInput(sf.attrName, v)
+              "
+            >
+              <el-option
+                v-for="opt in sf.options"
+                :key="opt.value"
+                :label="opt.name"
+                :value="opt.value"
+              />
+            </el-select>
+            <!-- number / integer -->
+            <el-input
+              v-else-if="sf.fieldType === 'number' || sf.fieldType === 'integer'"
+              :model-value="groupValues[sf.attrName] || ''"
+              :placeholder="sf.placeholder || ''"
+              clearable
+              size="small"
+              @update:model-value="
+                (v: string | number | boolean | undefined) =>
+                  onGroupNumberInput(sf.attrName, v, sf.fieldType === 'integer')
+              "
+            />
+            <!-- date -->
+            <el-date-picker
+              v-else-if="sf.fieldType === 'date'"
+              :model-value="groupValues[sf.attrName] || ''"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="请选择日期"
+              clearable
+              size="small"
+              class="dynamic-field__date"
+              @update:model-value="
+                (v: string | number | boolean | undefined) => onGroupInput(sf.attrName, v)
+              "
+            />
+            <!-- radio -->
+            <el-radio-group
+              v-else-if="sf.fieldType === 'radio'"
+              :model-value="groupValues[sf.attrName] || ''"
+              size="small"
+              @update:model-value="
+                (v: string | number | boolean | undefined) => onGroupInput(sf.attrName, v)
+              "
+            >
+              <el-radio v-for="opt in sf.options" :key="opt.value" :value="opt.value">
+                {{ opt.name }}
+              </el-radio>
+            </el-radio-group>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -160,6 +175,11 @@
  * 根据 ParsedFieldConfig.fieldType 渲染对应的 Element Plus 控件：
  * string -> el-input、select -> el-select、number/integer -> el-input（数字过滤）、
  * date -> el-date-picker、radio -> el-radio-group、group -> 子字段组。
+ *
+ * group 类型对齐领星 DynamicFormGroup：
+ * - 组标题：中文加粗 14px + 英文加粗 #999
+ * - 子字段垂直堆叠，每个子字段双语标签（中文带* + 英文）+ 输入框
+ * - 组容器背景 #fafbfc，padding 20px
  */
 import { computed, reactive } from "vue";
 import type { ParsedFieldConfig } from "@/composables/useProductTypeSchema";
@@ -243,32 +263,81 @@ function onGroupNumberInput(
     color: var(--text-tertiary);
   }
 
+  /* ── 组字段（对齐领星 DynamicFormGroup）── */
   &__group {
+    background: rgb(250 251 252);
+    padding: 20px 20px 1px;
+    margin-bottom: 20px;
+  }
+
+  &__group-title-wrap {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  &__group-title-zh {
+    color: #000;
+    font-weight: 700;
+    font-size: 14px;
+    margin-right: 10px;
+  }
+
+  &__group-title-en {
+    font-weight: 700;
+    color: #999;
+  }
+
+  &__group-body {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
+    padding-bottom: 19px;
   }
 
-  &__group-item {
+  /* ── 子字段行 ── */
+  &__sub-item {
     display: flex;
     gap: 12px;
-    align-items: center;
+    align-items: flex-start;
   }
 
-  &__group-label {
+  &__sub-label {
     flex-shrink: 0;
-    width: 120px;
-    font-size: 12px;
-    line-height: 30px;
+    width: 160px;
+    padding-top: 5px;
     text-align: right;
-    color: #33363c;
-    white-space: nowrap;
   }
 
-  &__group-star {
+  &__sub-label-zh {
+    margin: 0;
+    font-size: 12px;
+    line-height: 16px;
+    color: #33363c;
+  }
+
+  &__sub-label-en {
+    margin: 0;
+    font-size: 12px;
+    line-height: 16px;
+    color: #888c94;
+  }
+
+  &__sub-star {
     color: #f5222d;
     font-size: 10px;
-    margin-right: 2px;
+    margin-right: 4px;
+  }
+
+  &__sub-control {
+    flex: 1;
+    min-width: 0;
+
+    .el-input,
+    .el-select,
+    .el-date-editor {
+      width: 100%;
+    }
   }
 }
 </style>
