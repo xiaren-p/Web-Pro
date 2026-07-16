@@ -759,7 +759,7 @@ class AutoTargetingViewSet(viewsets.ViewSet):
         is_tp = is_time_pricing_active(cid_int, pid_int)
         operator = get_operator_name(request)
 
-        item_ids = [int(it["id"]) for it in all_items if it.get("id")]
+        item_ids = [int(it["id"]) for it in items if it.get("id")]
         existing_map: dict[int, LxSpTarget] = {}
         for t in LxSpTarget.objects.filter(
             target_id__in=item_ids, profile_id=pid_int,
