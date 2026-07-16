@@ -619,7 +619,6 @@ function parseField(
 
   // 第 3 步：提取 value 子字段定义（叶子字段）
   const valueSiteDef = extractValueFieldDef(siteDef);
-  if (valueSiteDef.hidden === true) return null;
 
   // 对齐领星 DynamicFormItem：叶子字段 label/description 取自 items.properties.value
   // 例：merchant_suggested_asin 外层 title=错误自动生成，valueDef.title=正确中文
@@ -669,7 +668,7 @@ function parseField(
  *
  * 对于组字段的每个子字段（items.properties 的 entry）：
  * 1. 过滤系统字段（marketplace_id, language_tag）
- * 2. 提取 value 子定义，跳过 hidden 字段
+ * 2. 提取 value 子定义
  * 3. 映射控件类型
  * 4. 提取双语标签
  * 5. 判断 items.required 包含性
@@ -718,7 +717,6 @@ function parseSubFields(
 
     // 提取 value 定义
     const valueDef = extractValueFieldDef(subDef);
-    if (valueDef.hidden === true) continue;
 
     // 映射控件类型
     const { type, options, allowCreate } = mapFieldType(valueDef);
