@@ -280,6 +280,8 @@ const BASIC_FIELD_NAMES = new Set([
  * 这些字段在报价/变体区域中渲染。
  */
 const QUOTE_FIELD_NAMES = new Set([
+  "item_sku",
+  "parent_sku",
   "variation_theme",
   "externally_assigned_product_identifier",
   "condition_type",
@@ -594,55 +596,59 @@ function parseField(
   // 第 1 步：过滤不需要渲染的字段
   if (SYSTEM_FIELD_NAMES.has(attrName) || FILTER_VALUE_FIELDS.has(attrName)) return null;
 
-  // 第 2 步：提取标题和描述
-  // 领星逻辑：zhTitle = zhDef.title || attrName, siteTitle = siteDef.title || attrName
-  const zhTitle = zhDef?.title ?? attrName;
-  const siteTitle = siteDef.title ?? attrName;
-  const zhDesc = zhDef?.description ?? "";
-  const siteDesc = siteDef.description ?? "";
-
-  // 第 3 步：组字段处理
+  // 第 2 步：组字段处理（外层 title/description）
   if (isGroupField(siteDef)) {
+    const zhTitle = zhDef?.title ?? attrName;
+    const siteTitle = siteDef.title ?? attrName;
+    const zhDesc = zhDef?.description ?? "";
+    const siteDesc = siteDef.description ?? "";
     const fields = parseSubFields(siteDef, zhDef);
-    // 没有子字段 → 跳过
     if (!fields || Object.keys(fields).length === 0) return null;
     return {
       attrName,
       label: [zhTitle, siteTitle],
       description: [zhDesc, siteDesc],
-      type: "string", // 组字段的 type 无实际意义，占位
-      required: false, // 组字段本身不标记必填
+      type: "string",
+      required: false,
       fields,
       itemsRequired: siteDef.items?.required,
     };
   }
 
-  // 第 4 步：提取 value 子字段定义
-  const valueDef = extractValueFieldDef(siteDef);
-  if (valueDef.hidden === true) return null;
+  // 第 3 步：提取 value 子字段定义（叶子字段）
+  const valueSiteDef = extractValueFieldDef(siteDef);
+  if (valueSiteDef.hidden === true) return null;
 
-  // 第 5 步：映射控件类型
-  const { type, options, allowCreate } = mapFieldType(valueDef);
+  // 对齐领星 DynamicFormItem：叶子字段 label/description 取自 items.properties.value
+  // 例：merchant_suggested_asin 外层 title=错误自动生成，valueDef.title=正确中文
+  const valueZhDef = zhDef ? extractValueFieldDef(zhDef) : undefined;
+  const zhTitle = valueZhDef?.title || zhDef?.title || attrName;
+  const siteTitle = valueSiteDef?.title || siteDef.title || attrName;
+  const zhDesc = valueZhDef?.description || zhDef?.description || "";
+  const siteDesc = valueSiteDef?.description || siteDef.description || "";
 
-  // 第 6 步：判断必填（根级 required）
+  // 第 4 步：映射控件类型
+  const { type, options, allowCreate } = mapFieldType(valueSiteDef);
+
+  // 第 5 步：判断必填（根级 required）
   const required = requiredFields.has(attrName);
 
-  // 第 7 步：提取 placeholder
-  const example = siteDef.examples?.[0] ?? valueDef.examples?.[0] ?? "";
+  // 第 6 步：提取 placeholder
+  const example = siteDef.examples?.[0] ?? valueSiteDef.examples?.[0] ?? "";
   const placeholder = example ? `示例：${example}` : "";
 
-  // 第 8 步：返回完整配置
+  // 第 7 步：返回完整配置
   return {
     attrName,
     label: [zhTitle, siteTitle],
     description: [zhDesc, siteDesc],
     type,
     required,
-    maxLength: valueDef.maxLength || valueDef.maxUtf8ByteLength || undefined,
-    minLength: valueDef.minLength || undefined,
-    minimum: valueDef.minimum,
-    maximum: valueDef.maximum,
-    multipleOf: valueDef.multipleOf,
+    maxLength: valueSiteDef.maxLength || valueSiteDef.maxUtf8ByteLength || undefined,
+    minLength: valueSiteDef.minLength || undefined,
+    minimum: valueSiteDef.minimum,
+    maximum: valueSiteDef.maximum,
+    multipleOf: valueSiteDef.multipleOf,
     options,
     maxUniqueItems: siteDef.maxItems,
     minUniqueItems: siteDef.minItems,

@@ -377,5 +377,8 @@ export function buildRequiredFieldRuleObj(
     }
   }
 
+  // 对齐领星 updateRequiredField：merchant_suggested_asin 始终不标记为必填
+  delete result.merchant_suggested_asin;
+
   return result;
 }
