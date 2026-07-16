@@ -611,6 +611,8 @@ function parseField(
       type: "string",
       required: false,
       fields,
+      maxUniqueItems: siteDef.maxItems,
+      minUniqueItems: siteDef.minItems,
       itemsRequired: siteDef.items?.required,
     };
   }
