@@ -1078,6 +1078,34 @@ export function useProductTypeSchema(
         dynamicFormData.site[field.attrName] = JSON.parse(JSON.stringify(defaultValue));
         dynamicFormData.cn[field.attrName] = JSON.parse(JSON.stringify(defaultValue));
       }
+
+      // ── 展平 otherFields（对齐领星扁平模型）──
+      // 领星：组字段（如 item_dimensions）不进入 formData，
+      //       子字段（如 item_length）提升为独立根级字段。
+      //       视觉分组完全由 propertyGroups 控制。
+      const flatOther: ParsedFieldConfig[] = [];
+      for (const field of classified.otherFields) {
+        if (field.fields) {
+          for (const [childKey, childConfig] of Object.entries(field.fields)) {
+            flatOther.push(childConfig);
+            if (!dynamicDescInfo.value[childKey]) {
+              dynamicDescInfo.value[childKey] = childConfig;
+            }
+            const flatInit = data.defaultFields.marketplace_id
+              ? [{ value: "", marketplace_id: data.defaultFields.marketplace_id }]
+              : [{ value: "" }];
+            if (!dynamicFormData.site[childKey]) {
+              dynamicFormData.site[childKey] = JSON.parse(JSON.stringify(flatInit));
+            }
+            if (!dynamicFormData.cn[childKey]) {
+              dynamicFormData.cn[childKey] = JSON.parse(JSON.stringify(flatInit));
+            }
+          }
+        } else {
+          flatOther.push(field);
+        }
+      }
+      otherFields.value = flatOther as ParsedFieldConfig[];
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : "Schema 加载失败";
       otherFields.value = [];
