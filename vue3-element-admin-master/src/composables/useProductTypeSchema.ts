@@ -46,7 +46,7 @@
  * // dynamicFormData.site[field.attrName] = [{ value: "", marketplace_id: "ATVPDKIKX0DER" }]
  * ```
  */
-import { ref, reactive, watch, toValue, computed } from "vue";
+import { ref, reactive, watch, toValue } from "vue";
 import type { Ref, MaybeRefOrGetter } from "vue";
 import { ListingPublishAPI } from "@/api/sales/listing-publish";
 import type { SchemaFieldDef, ProductTypeSchemaVO } from "@/api/sales/listing-publish/types";
@@ -833,6 +833,42 @@ export function classifyFields(allFields: ParsedFieldConfig[]) {
 }
 
 /**
+ * 创建字段的初始嵌套表单值。
+ *
+ * @description 对齐领星 recursiveProcessDynamicForm 的初始化逻辑，
+ * 但子字段值使用 { value, marketplace_id } 包装（匹配 DynamicField* 子组件的读取方式）。
+ *
+ * - 叶子字段（无 fields）：`[{ value: "", marketplace_id: "xxx" }]`
+ * - 组字段（有 fields）：`[{ subKey1: { value: "", marketplace_id: "xxx" }, ..., marketplace_id: "xxx" }]`
+ *
+ * @param field - 解析后的字段配置
+ * @param marketplaceId - 市场 ID
+ * @returns 嵌套数组格式的初始值
+ */
+export function createFieldDefaultValue(
+  field: ParsedFieldConfig,
+  marketplaceId: string
+): unknown[] {
+  if (!field.fields) {
+    // 叶子字段
+    return [{ value: "", marketplace_id: marketplaceId }];
+  }
+  // 组字段：每个子字段初始化为 { value: "", marketplace_id }
+  const item: Record<string, unknown> = { marketplace_id: marketplaceId };
+  for (const [subKey, subConfig] of Object.entries(field.fields)) {
+    if (SYSTEM_FIELD_NAMES.has(subKey)) {
+      item[subKey] = marketplaceId;
+    } else if (subConfig.fields) {
+      // 嵌套更深层的组字段（罕见），递归处理
+      item[subKey] = (createFieldDefaultValue(subConfig, marketplaceId) as unknown[])[0];
+    } else {
+      item[subKey] = { value: "", marketplace_id: marketplaceId };
+    }
+  }
+  return [item];
+}
+
+/**
  * 提取字段的搜索关键词。
  *
  * @description 用于搜索框过滤，返回字段名 + 双语标签 + 子字段关键词的大写数组。
@@ -991,14 +1027,6 @@ export function useProductTypeSchema(
   const otherFields = ref<ParsedFieldConfig[]>([]) as Ref<ParsedFieldConfig[]>;
 
   /**
-   * 全量展平后的字段配置。
-   *
-   * @description 所有字段的扁平化版本：组字段的子字段提升为根级，父字段丢弃。
-   * 用于模板编辑器等需要全量动态字段的场景。
-   */
-  const flatAllFields = ref<ParsedFieldConfig[]>([]) as Ref<ParsedFieldConfig[]>;
-
-  /**
    * 后端返回的原始 Schema 数据。
    *
    * @description 保留完整数据，供其他 composable 使用
@@ -1062,67 +1090,33 @@ export function useProductTypeSchema(
       schemaData.value = data;
       defaultFields.value = data.defaultFields;
 
-      // 解析
+      // 解析（嵌套结构，不展平）
       const parsed = parseAllFields(data);
       allFields.value = parsed;
 
-      // 分类（用于"更多属性"归属判断）
+      // 分类（对齐领星 fieldClassification）
       const classified = classifyFields(parsed);
+      otherFields.value = classified.otherFields;
 
-      // 构建 dynamicDescInfo（全量字段，含嵌套父字段）
+      // 构建 dynamicDescInfo 映射
       const descInfo: Record<string, ParsedFieldConfig> = {};
       for (const field of parsed) descInfo[field.attrName] = field;
       dynamicDescInfo.value = descInfo;
 
-      // 默认值模板
-      const baseDefault = data.defaultFields.marketplace_id
-        ? { value: "", marketplace_id: data.defaultFields.marketplace_id }
-        : { value: "" };
-
-      // 预计算 otherField 归属（O(1) 查找）
-      const otherFieldNames = new Set(classified.otherFields.map((f) => f.attrName));
-
-      // ── 展平 ALL fields（对齐领星扁平模型）──
-      // 组字段（如 item_dimensions）→ 子字段提升根级，父字段丢弃
-      // 叶子字段 → 直接保留
-      const flatAll: ParsedFieldConfig[] = [];
-      const flatOther: ParsedFieldConfig[] = [];
-      const siteData: Record<string, any[]> = {};
-      const cnData: Record<string, any[]> = {};
-
-      for (const field of parsed) {
-        if (field.fields) {
-          // 组字段：子字段提升，父字段不加入
-          for (const [childKey, childConfig] of Object.entries(field.fields)) {
-            flatAll.push(childConfig);
-            if (!descInfo[childKey]) descInfo[childKey] = childConfig;
-            siteData[childKey] = [JSON.parse(JSON.stringify(baseDefault))];
-            cnData[childKey] = [JSON.parse(JSON.stringify(baseDefault))];
-            if (otherFieldNames.has(field.attrName)) {
-              flatOther.push(childConfig);
-            }
-          }
-        } else {
-          // 叶子字段：直接保留
-          flatAll.push(field);
-          siteData[field.attrName] = [JSON.parse(JSON.stringify(baseDefault))];
-          cnData[field.attrName] = [JSON.parse(JSON.stringify(baseDefault))];
-          if (otherFieldNames.has(field.attrName)) {
-            flatOther.push(field);
-          }
-        }
+      // 初始化表单数据（嵌套数组格式，对齐领星 recursiveProcessDynamicForm）
+      const marketplaceId = data.defaultFields.marketplace_id ?? "";
+      const siteData: Record<string, unknown[]> = {};
+      const cnData: Record<string, unknown[]> = {};
+      for (const field of classified.otherFields) {
+        const initVal = createFieldDefaultValue(field, marketplaceId);
+        siteData[field.attrName] = JSON.parse(JSON.stringify(initVal));
+        cnData[field.attrName] = JSON.parse(JSON.stringify(initVal));
       }
-
-      // 更新响应式数据
-      dynamicDescInfo.value = descInfo;
       dynamicFormData.site = siteData;
       dynamicFormData.cn = cnData;
-      otherFields.value = flatOther as ParsedFieldConfig[];
-      flatAllFields.value = flatAll as ParsedFieldConfig[];
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : "Schema 加载失败";
       otherFields.value = [];
-      flatAllFields.value = [];
     } finally {
       loading.value = false;
     }
@@ -1135,7 +1129,6 @@ export function useProductTypeSchema(
       if (mpId && ptOrigin) fetchSchema(mpId, ptOrigin);
       else {
         otherFields.value = [];
-        flatAllFields.value = [];
         dynamicFormData.site = {} as Record<string, any[]>;
         dynamicFormData.cn = {} as Record<string, any[]>;
       }
@@ -1148,13 +1141,10 @@ export function useProductTypeSchema(
     error,
     allFields,
     otherFields,
-    flatAllFields,
     dynamicFormData,
     dynamicDescInfo,
     defaultFields,
     schemaData,
     fetchSchema,
-    propertyGroups: computed(() => schemaData.value?.propertyGroups ?? {}),
-    propertyGroupsZh: computed(() => schemaData.value?.propertyGroupsZh ?? {}),
   };
 }
