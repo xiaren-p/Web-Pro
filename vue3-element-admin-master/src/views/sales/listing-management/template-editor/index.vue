@@ -208,7 +208,7 @@ const onlyShowRequired = ref(false);
 
 const {
   loading: schemaLoading,
-  otherFields,
+  flatAllFields,
   dynamicDescInfo,
   schemaData,
   propertyGroupsZh,
@@ -223,10 +223,10 @@ const templateFormData = reactive<Record<string, any[]>>({});
 /**
  * 初始化模板表单数据。
  *
- * @description 当 otherFields 变化时，为新字段初始化默认值。
+ * @description 当 flatAllFields 变化时，为新字段初始化默认值。
  * 默认值格式：`[{ value: "", marketplace_id: form.marketplaceId }]`
  */
-watch(otherFields, (fields) => {
+watch(flatAllFields, (fields) => {
   for (const field of fields) {
     if (!(field.attrName in templateFormData)) {
       templateFormData[field.attrName] = [{ value: "", marketplace_id: form.marketplaceId }];
@@ -385,7 +385,7 @@ async function loadTemplateDetail() {
     // 等 Schema 拉取完成后回填动态字段
     if (detail.dataJson) {
       watch(
-        otherFields,
+        flatAllFields,
         (fields) => {
           if (fields.length) {
             for (const field of fields) {
@@ -427,10 +427,8 @@ async function handleSave() {
   try {
     /** 收集动态字段值（直接使用嵌套数组格式）。 */
     const amazonData: Record<string, unknown> = {};
-    for (const field of otherFields.value) {
-      if (templateFormData[field.attrName]) {
-        amazonData[field.attrName] = templateFormData[field.attrName];
-      }
+    for (const [key, val] of Object.entries(templateFormData)) {
+      if (val) amazonData[key] = val;
     }
 
     const payload: PublishTemplateForm = {

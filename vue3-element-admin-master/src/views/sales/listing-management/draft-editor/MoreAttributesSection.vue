@@ -171,7 +171,7 @@ const siteCode = inject<import("vue").ComputedRef<string>>("currentSiteCode")!;
 const errors = inject<Record<string, string>>("langErrors")!;
 
 // ── Schema 解析 ──
-const { loading, dynamicFormData, dynamicDescInfo, schemaData, propertyGroupsZh } =
+const { loading, otherFields, dynamicFormData, dynamicDescInfo, schemaData, propertyGroupsZh } =
   useProductTypeSchema(
     () => f?.site?.marketplaceId ?? "",
     () => f?.site?.productType ?? ""
@@ -205,10 +205,18 @@ const classifiedFields = useFieldClassification(
 );
 
 /**
- * 过滤后的分类字段列表（搜索 + 仅必填）。
+ * "更多属性"归属字段名集合。
+ *
+ * @description 来自 otherFields（展平后）的 attrName 集合，
+ * 用于过滤 classifiedFields（全量字段）中真正属于"更多属性"的字段。
+ */
+const otherFieldSet = computed(() => new Set(otherFields.value.map((f) => f.attrName)));
+
+/**
+ * 过滤后的分类字段列表（归属 + 搜索 + 仅必填）。
  */
 const filteredClassified = computed(() => {
-  let result = classifiedFields.value;
+  let result = classifiedFields.value.filter((cf) => otherFieldSet.value.has(cf.attrName));
 
   if (searchText.value.trim()) {
     const search = searchText.value.trim().toUpperCase();

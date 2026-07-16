@@ -991,6 +991,14 @@ export function useProductTypeSchema(
   const otherFields = ref<ParsedFieldConfig[]>([]) as Ref<ParsedFieldConfig[]>;
 
   /**
+   * 全量展平后的字段配置。
+   *
+   * @description 所有字段的扁平化版本：组字段的子字段提升为根级，父字段丢弃。
+   * 用于模板编辑器等需要全量动态字段的场景。
+   */
+  const flatAllFields = ref<ParsedFieldConfig[]>([]) as Ref<ParsedFieldConfig[]>;
+
+  /**
    * 后端返回的原始 Schema 数据。
    *
    * @description 保留完整数据，供其他 composable 使用
@@ -1058,57 +1066,63 @@ export function useProductTypeSchema(
       const parsed = parseAllFields(data);
       allFields.value = parsed;
 
-      // 分类
+      // 分类（用于"更多属性"归属判断）
       const classified = classifyFields(parsed);
-      otherFields.value = classified.otherFields;
 
-      // 构建字段映射
+      // 构建 dynamicDescInfo（全量字段，含嵌套父字段）
       const descInfo: Record<string, ParsedFieldConfig> = {};
       for (const field of parsed) descInfo[field.attrName] = field;
       dynamicDescInfo.value = descInfo;
 
-      // 初始化表单数据
-      dynamicFormData.site = {} as Record<string, any[]>;
-      dynamicFormData.cn = {} as Record<string, any[]>;
-      for (const field of classified.otherFields) {
-        const defaultValue = data.defaultFields.marketplace_id
-          ? [{ value: "", marketplace_id: data.defaultFields.marketplace_id }]
-          : [{ value: "" }];
-        // 深拷贝，避免引用共享
-        dynamicFormData.site[field.attrName] = JSON.parse(JSON.stringify(defaultValue));
-        dynamicFormData.cn[field.attrName] = JSON.parse(JSON.stringify(defaultValue));
-      }
+      // 默认值模板
+      const baseDefault = data.defaultFields.marketplace_id
+        ? { value: "", marketplace_id: data.defaultFields.marketplace_id }
+        : { value: "" };
 
-      // ── 展平 otherFields（对齐领星扁平模型）──
-      // 领星：组字段（如 item_dimensions）不进入 formData，
-      //       子字段（如 item_length）提升为独立根级字段。
-      //       视觉分组完全由 propertyGroups 控制。
+      // 预计算 otherField 归属（O(1) 查找）
+      const otherFieldNames = new Set(classified.otherFields.map((f) => f.attrName));
+
+      // ── 展平 ALL fields（对齐领星扁平模型）──
+      // 组字段（如 item_dimensions）→ 子字段提升根级，父字段丢弃
+      // 叶子字段 → 直接保留
+      const flatAll: ParsedFieldConfig[] = [];
       const flatOther: ParsedFieldConfig[] = [];
-      for (const field of classified.otherFields) {
+      const siteData: Record<string, any[]> = {};
+      const cnData: Record<string, any[]> = {};
+
+      for (const field of parsed) {
         if (field.fields) {
+          // 组字段：子字段提升，父字段不加入
           for (const [childKey, childConfig] of Object.entries(field.fields)) {
-            flatOther.push(childConfig);
-            if (!dynamicDescInfo.value[childKey]) {
-              dynamicDescInfo.value[childKey] = childConfig;
-            }
-            const flatInit = data.defaultFields.marketplace_id
-              ? [{ value: "", marketplace_id: data.defaultFields.marketplace_id }]
-              : [{ value: "" }];
-            if (!dynamicFormData.site[childKey]) {
-              dynamicFormData.site[childKey] = JSON.parse(JSON.stringify(flatInit));
-            }
-            if (!dynamicFormData.cn[childKey]) {
-              dynamicFormData.cn[childKey] = JSON.parse(JSON.stringify(flatInit));
+            flatAll.push(childConfig);
+            if (!descInfo[childKey]) descInfo[childKey] = childConfig;
+            siteData[childKey] = [JSON.parse(JSON.stringify(baseDefault))];
+            cnData[childKey] = [JSON.parse(JSON.stringify(baseDefault))];
+            if (otherFieldNames.has(field.attrName)) {
+              flatOther.push(childConfig);
             }
           }
         } else {
-          flatOther.push(field);
+          // 叶子字段：直接保留
+          flatAll.push(field);
+          siteData[field.attrName] = [JSON.parse(JSON.stringify(baseDefault))];
+          cnData[field.attrName] = [JSON.parse(JSON.stringify(baseDefault))];
+          if (otherFieldNames.has(field.attrName)) {
+            flatOther.push(field);
+          }
         }
       }
+
+      // 更新响应式数据
+      dynamicDescInfo.value = descInfo;
+      dynamicFormData.site = siteData;
+      dynamicFormData.cn = cnData;
       otherFields.value = flatOther as ParsedFieldConfig[];
+      flatAllFields.value = flatAll as ParsedFieldConfig[];
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : "Schema 加载失败";
       otherFields.value = [];
+      flatAllFields.value = [];
     } finally {
       loading.value = false;
     }
@@ -1121,6 +1135,7 @@ export function useProductTypeSchema(
       if (mpId && ptOrigin) fetchSchema(mpId, ptOrigin);
       else {
         otherFields.value = [];
+        flatAllFields.value = [];
         dynamicFormData.site = {} as Record<string, any[]>;
         dynamicFormData.cn = {} as Record<string, any[]>;
       }
@@ -1133,6 +1148,7 @@ export function useProductTypeSchema(
     error,
     allFields,
     otherFields,
+    flatAllFields,
     dynamicFormData,
     dynamicDescInfo,
     defaultFields,
